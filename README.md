@@ -9,11 +9,17 @@ I will document and build on this tools set with examples.  I am only working wi
 
 **Some links**
 
-https://community.esri.com/blogs/dan_patterson/2019/03/17/geometry-in-numpy-1
-https://community.esri.com/blogs/dan_patterson/2019/04/10/geometry-arcpy-and-numpy-2
-https://community.esri.com/blogs/dan_patterson/2019/04/10/geometry-deconstructing-poly-features-3
-https://community.esri.com/blogs/dan_patterson/2019/04/17/geometry-reconstructing-poly-features-4
-https://community.esri.com/blogs/dan_patterson/2019/04/17/geometry-attributes-actually-the-other-bits-5
-https://community.esri.com/blogs/dan_patterson/2019/05/09/geometry-dont-believe-what-you-see-6
-https://community.esri.com/blogs/dan_patterson/2019/05/13/geometry-forms-of-the-same-feature-7
+[Geometry in NumPy](https://community.esri.com/blogs/dan_patterson/2019/03/17/geometry-in-numpy-1)
+
+[Geometry, Arcpy and NumPy](https://community.esri.com/blogs/dan_patterson/2019/04/10/geometry-arcpy-and-numpy-2)
+
+[Deconstructing poly* features](https://community.esri.com/blogs/dan_patterson/2019/04/10/geometry-deconstructing-poly-features-3)
+
+[Reconstructing poly* features](https://community.esri.com/blogs/dan_patterson/2019/04/17/geometry-reconstructing-poly-features-4)
+
+[Attributes.. the other bits](https://community.esri.com/blogs/dan_patterson/2019/04/17/geometry-attributes-actually-the-other-bits-5)
+
+[Don't believ what you see](https://community.esri.com/blogs/dan_patterson/2019/05/09/geometry-dont-believe-what-you-see-6)
+
+[Geometry: forms of the same feature](https://community.esri.com/blogs/dan_patterson/2019/05/13/geometry-forms-of-the-same-feature-7)
 
