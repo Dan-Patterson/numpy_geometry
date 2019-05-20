@@ -19,17 +19,23 @@ I will document and build on this tools set with examples.  I am only working wi
 
 [Attributes.. the other bits](https://community.esri.com/blogs/dan_patterson/2019/04/17/geometry-attributes-actually-the-other-bits-5)
 
-[Don't believ what you see](https://community.esri.com/blogs/dan_patterson/2019/05/09/geometry-dont-believe-what-you-see-6)
+[Don't believe what you see](https://community.esri.com/blogs/dan_patterson/2019/05/09/geometry-dont-believe-what-you-see-6)
 
 [Geometry: forms of the same feature](https://community.esri.com/blogs/dan_patterson/2019/05/13/geometry-forms-of-the-same-feature-7)
 
-Consider the following multipart shapes.  The first shape has is second part slightly offset and it also contains a hole.  The second shape is a flip/mirror/translate of its first part.
+
 
 <a href="url"><img src="https://github.com/Dan-Patterson/npGeo/blob/master/Shape2.png" align="right" height="229" width="400" ></a>
+
+Consider the following multipart shapes.  The first shape has is second part slightly offset and it also contains a hole.  The second shape is a flip/mirror/translate of its first part.
 
 The centroids of each part are shown on the image.  These locations have been confirmed using arcpy and npGeo methods.
 
 The point coordinates with (300,000 m, 5,000,000 m, MTM 9) subtracted from their values.  So the data are in a projected coordinate system and all further measures will be in planar/metric units.
+
+
+
+
 
 ```
 pnt shape  part  X       Y     
