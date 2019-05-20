@@ -31,6 +31,7 @@ The centroids of each part are shown on the image.  These locations have been co
 
 The point coordinates with (300,000 m, 5,000,000 m, MTM 9) subtracted from their values.  So the data are in a projected coordinate system and all further measures will be in planar/metric units.
 
+```
 pnt shape  part  X       Y     
 --------------------------------
  000     0         10.00   20.00
@@ -72,17 +73,18 @@ pnt shape  part  X       Y
  036     1         15.00   22.00
  037     1         15.00   24.00
  038     1         25.00   24.00
- 
+``` 
  
  This shape (s2) is simply represented by the last 2 columns, the first 2 columns are solely for printing purposes.
  The sequence of points is identified by their Id and From and To points (IFT)
- 
+
+```
 s2.IFT 
 array([[ 0,  0, 11],    1st shape, 1st part, points 0 to but not including 11
        [ 0, 11, 21],    1st shape, 2nd part
        [ 1, 21, 30],    2nd shape, 1st part
        [ 1, 30, 39]])   2nd shape, 2nd part
-       
+```       
 The methods and functions that will be shown use this information in their processing.  In this fashion, it is possible to try and optimize the derivation of properties and application of functions by using the whole point sequence of their subgroupings.
 
 
