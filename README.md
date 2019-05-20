@@ -24,6 +24,7 @@ I will document and build on this tools set with examples.  I am only working wi
 [Geometry: forms of the same feature](https://community.esri.com/blogs/dan_patterson/2019/05/13/geometry-forms-of-the-same-feature-7)
 
 
+# Multipart shapes
 
 <a href="url"><img src="https://github.com/Dan-Patterson/npGeo/blob/master/Shape2.png" align="right" height="229" width="400" ></a>
 
@@ -56,8 +57,8 @@ pnt shape  part  X       Y
  013     0          4.00   14.00
  014     0          4.00   18.00
  015     0          8.00   18.00
- 016     0   x       nan     nan  ---- the null point, separating the inner and outer rings of the 2nd part of the first shape
- 017     0          6.00   17.00
+ 016     0   x       nan     nan  ---- the null point, separating the inner and outer rings of the 2nd part
+ 017     0          6.00   17.00        of the first shape
  018     0          5.00   15.00
  019     0          7.00   15.00
  020     0  ___     6.00   17.00
