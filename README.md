@@ -24,5 +24,6 @@ I will document and build on this tools set with examples.  I am only working wi
 [Geometry: forms of the same feature](https://community.esri.com/blogs/dan_patterson/2019/05/13/geometry-forms-of-the-same-feature-7)
 
 Consider the following shapes
-<a href="url"><img src="https://github.com/Dan-Patterson/npGeo/blob/master/Shape2.png" align="left" height="400" width="300" ></a>
+<a href="url"><img src="https://github.com/Dan-Patterson/npGeo/blob/master/Shape2.png" align="left" height="229" width="400" ></a>
+
 
