@@ -23,3 +23,6 @@ I will document and build on this tools set with examples.  I am only working wi
 
 [Geometry: forms of the same feature](https://community.esri.com/blogs/dan_patterson/2019/05/13/geometry-forms-of-the-same-feature-7)
 
+Consider the following shapes
+Shape2.png
+
