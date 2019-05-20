@@ -23,7 +23,67 @@ I will document and build on this tools set with examples.  I am only working wi
 
 [Geometry: forms of the same feature](https://community.esri.com/blogs/dan_patterson/2019/05/13/geometry-forms-of-the-same-feature-7)
 
-Consider the following shapes
-<a href="url"><img src="https://github.com/Dan-Patterson/npGeo/blob/master/Shape2.png" align="left" height="229" width="400" ></a>
+Consider the following multipart shapes.  The first shape has is second part slightly offset and it also contains a hole.  The second shape is a flip/mirror/translate of its first part.
+
+<a href="url"><img src="https://github.com/Dan-Patterson/npGeo/blob/master/Shape2.png" align="right" height="229" width="400" ></a>
+
+The centroids of each part are shown on the image.  These locations have been confirmed using arcpy and npGeo methods.
+
+The point coordinates with (300,000 m, 5,000,000 m, MTM 9) subtracted from their values.  So the data are in a projected coordinate system and all further measures will be in planar/metric units.
+
+pnt shape  part  X       Y     
+--------------------------------
+ 000     0         10.00   20.00
+ 001     0         10.00   10.00
+ 002     0          0.00   10.00
+ 003     0          0.00   20.00
+ 004     0         10.00   20.00
+ 005     0   x       nan     nan  ---- the null point separating the inner and outer rings of the first shape
+ 006     0          3.00   19.00
+ 007     0          3.00   13.00
+ 008     0          9.00   13.00
+ 009     0          9.00   19.00
+ 010     0          3.00   19.00
+ 011     0   o      8.00   18.00  ---- Start of the 2nd part of the first shape
+ 012     0          8.00   14.00
+ 013     0          4.00   14.00
+ 014     0          4.00   18.00
+ 015     0          8.00   18.00
+ 016     0   x       nan     nan  ---- the null point, separating the inner and outer rings of the 2nd part of the first shape
+ 017     0          6.00   17.00
+ 018     0          5.00   15.00
+ 019     0          7.00   15.00
+ 020     0  ___     6.00   17.00
+ 021     1   o     12.00   18.00  ---- the 2nd shape begins, its first part
+ 022     1         12.00   12.00
+ 023     1         20.00   12.00
+ 024     1         20.00   10.00
+ 025     1         10.00   10.00
+ 026     1         10.00   20.00
+ 027     1         20.00   20.00
+ 028     1         20.00   18.00
+ 029     1         12.00   18.00
+ 030     1   o     25.00   24.00  ---- the 2nd part of the 2nd shape
+ 031     1         25.00   14.00
+ 032     1         15.00   14.00
+ 033     1         15.00   16.00
+ 034     1         23.00   16.00
+ 035     1         23.00   22.00
+ 036     1         15.00   22.00
+ 037     1         15.00   24.00
+ 038     1         25.00   24.00
+ 
+ 
+ This shape (s2) is simply represented by the last 2 columns, the first 2 columns are solely for printing purposes.
+ The sequence of points is identified by their Id and From and To points (IFT)
+ 
+s2.IFT 
+array([[ 0,  0, 11],    1st shape, 1st part, points 0 to but not including 11
+       [ 0, 11, 21],    1st shape, 2nd part
+       [ 1, 21, 30],    2nd shape, 1st part
+       [ 1, 30, 39]])   2nd shape, 2nd part
+       
+The methods and functions that will be shown use this information in their processing.  In this fashion, it is possible to try and optimize the derivation of properties and application of functions by using the whole point sequence of their subgroupings.
+
 
 
