@@ -94,8 +94,9 @@ array([[ 0,  0, 11],    1st shape, 1st part, points 0 to but not including 11
 ```       
 The methods and functions that will be shown use this information in their processing.  In this fashion, it is possible to try and optimize the derivation of properties and application of functions by using the whole point sequence of their subgroupings.
 
-
+----
 **Options to obtaining ndarray values**
+
 
 (1)  FeatureClassToNumPyArray
 
@@ -117,6 +118,7 @@ array([(300010., 5000020.), (300010., 5000010.), (300000., 5000010.), (300000., 
        (300023., 5000016.), (300023., 5000022.), (300015., 5000022.), (300015., 5000024.),
        (300025., 5000024.)], dtype=[('SHAPE@X', '<f8'), ('SHAPE@Y', '<f8')])
 ```
+
 
 (2)  SearchCursors and the ``__geo_interface__`` method
 
@@ -156,15 +158,15 @@ a1  # ---- as a list of values ----
     (300020.0, 5000020.0),
     (300020.0, 5000018.0),
     (300012.0, 5000018.0)]]],
- [[[(300025.0042000003, 5000024.0),
-    (300024.9957999997, 5000014.0),
-    (300014.9957999997, 5000014.0),
-    (300014.9974999996, 5000016.0),
-    (300022.9974999996, 5000016.0),
-    (300023.0025000004, 5000022.0),
-    (300015.0025000004, 5000022.0),
-    (300015.0042000003, 5000024.0),
-    (300025.0042000003, 5000024.0)]]]]
+ [[[(300025.0, 5000024.0),
+    (300025.0, 5000014.0),
+    (300015.0, 5000014.0),
+    (300015.0, 5000016.0),
+    (300023.0, 5000016.0),
+    (300023.0, 5000022.0),
+    (300015.0, 5000022.0),
+    (300015.0, 5000024.0),
+    (300025.0, 5000024.0)]]]]
 
 np.asarray(a1)  # ---- as an object array containing lists of coordinates
 array([[list([[(300010.0, 5000020.0), (300010.0, 5000010.0), (300000.0, 5000010.0), (300000.0, 5000020.0),
