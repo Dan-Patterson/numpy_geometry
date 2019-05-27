@@ -98,10 +98,10 @@ This will obviously not be possible in all situations, but every bit helps.
 
 
 ----
-**Options to obtaining ndarray values**
+**ndarray values from esri geometry**
 
 
-(1)  FeatureClassToNumPyArray
+**(1)  FeatureClassToNumPyArray**
 
 The standby, great for singlepart simple shapes.  You have to read the X, and Y coordinates separately or as a ``SHAPE@XY`` since reading the ``SHAPE@`` to retrieve the object directly is not permitted.
 
@@ -123,7 +123,7 @@ array([(300010., 5000020.), (300010., 5000010.), (300000., 5000010.), (300000., 
 ```
 
 
-(2)  SearchCursors and the ``__geo_interface__`` method
+**(2)  SearchCursors and the ``__geo_interface__`` method**
 
 Works, and useful if you intend to work with the arcgis module.  There are variants on this as well depending on whether you want arrays or arrays or just an array of objects.
 
@@ -188,3 +188,32 @@ array([[list([[(300010.0, 5000020.0), (300010.0, 5000010.0), (300000.0, 5000010.
       dtype=object)
 ```
 
+**(3) Searchcursors and _as_narray**
+
+A related ditty, however, you have to specify the fields directly and you essentially get the equivalent of FeatureClassToNumPyArray.
+
+```
+cur = arcpy.da.SearchCursor(in_fc2, ['OID@', 'SHAPE@X', 'SHAPE@Y'], spatial_reference=SR, explode_to_points=True)
+
+cur._as_narray()  # ---- The worker
+ 
+array([(1, 300010., 5000020.), (1, 300010., 5000010.), (1, 300000., 5000010.), (1, 300000., 5000020.),
+       (1, 300010., 5000020.), (1, 300003., 5000019.), (1, 300003., 5000013.), (1, 300009., 5000013.),
+       (1, 300009., 5000019.), (1, 300003., 5000019.), (1, 300008., 5000018.), (1, 300008., 5000014.),
+       (1, 300004., 5000014.), (1, 300004., 5000018.), (1, 300008., 5000018.), (1, 300006., 5000017.),
+       (1, 300005., 5000015.), (1, 300007., 5000015.), (1, 300006., 5000017.), (2, 300012., 5000018.),
+       (2, 300012., 5000012.), (2, 300020., 5000012.), (2, 300020., 5000010.), (2, 300010., 5000010.),
+       (2, 300010., 5000020.), (2, 300020., 5000020.), (2, 300020., 5000018.), (2, 300012., 5000018.),
+       (2, 300025., 5000024.), (2, 300025., 5000014.), (2, 300015., 5000014.), (2, 300015., 5000016.),
+       (2, 300023., 5000016.), (2, 300023., 5000022.), (2, 300015., 5000022.), (2, 300015., 5000024.),
+       (2, 300025., 5000024.)], dtype=[('OID@', '<i4'), ('SHAPE@X', '<f8'), ('SHAPE@Y', '<f8')])
+
+# related
+
+cur._dtype   # ==> dtype([('OID@', '<i4'), ('SHAPE@X', '<f8'), ('SHAPE@Y', '<f8')])
+
+cur.fields   # ==> ('OID@', 'SHAPE@X', 'SHAPE@Y')
+
+```
+
+The parts and the geometry are not identified within the sequences.  Constructing points from the above is no big deal, but polylines and polygons would fail miserably.
