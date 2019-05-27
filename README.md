@@ -26,7 +26,7 @@ I will document and build on thes tools set with examples.  I am only working wi
 
 # Multipart shapes
 
-<a href="url"><img src="https://github.com/Dan-Patterson/npGeo/blob/master/Shape2.png" align="right" height="229" width="400" ></a>
+<a href="url"><img src="https://github.com/Dan-Patterson/npGeo/blob/master/Shape2.png" align="right" height="300" width="auto" ></a>
 
 Consider the following multipart shapes.  The first shape has is second part slightly offset and it also contains a hole.  The second shape is a flip/mirror/translate of its first part.
 
@@ -98,7 +98,7 @@ This will obviously not be possible in all situations, but every bit helps.
 
 
 ----
-**ndarray values from esri geometry**
+# ndarray values from esri geometry
 
 
 **(1)  FeatureClassToNumPyArray**
@@ -216,4 +216,9 @@ cur.fields   # ==> ('OID@', 'SHAPE@X', 'SHAPE@Y')
 
 ```
 
+
+<a href="url"><img src="https://github.com/Dan-Patterson/npGeo/blob/master/bad_shape.png" align="right" height="300" width="auto" ></a>
+
 The parts and the geometry are not identified within the sequences.  Constructing points from the above is no big deal, but polylines and polygons would fail miserably.
+
+
