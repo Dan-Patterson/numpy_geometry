@@ -3,9 +3,9 @@ A numpy geometry class and functions that work with arcpy and ESRI featureclasse
 
 This is a work in progress, so bear with me.  The intent of the Geo class is to treat the geometry of featureclasses as one entity.  Most approaches I have see so far tend to construct the geometric representations of geometries using some variant of arcpy cursors.
 
-When trying to work with numpy and the geometries, this creates problems since geometry is rarely nice uniform same shapes.  Object arrays containing the coordinates are the norm.  What I set out to do was create a uniform 2D array of coordinates with np.nan values separating the parts of a particular shape and a companion array which denote the feature ID and the from-to point pairs.  This is similar to the FeatureClassToNumPy array approach, but that particular function and its inverse are only useful for simple singlepart geometries.
+When trying to work with numpy and the geometries, this creates problems since geometry is rarely simple shapes.  Object arrays containing the coordinates are the norm.  What I set out to do was create a uniform 2D array of coordinates with np.nan values separating the parts of a particular shape and a companion array which denotes the feature ID and the from-to point pairs.  This is similar to the FeatureClassToNumPy array approach, but that particular function and its inverse, are only useful for simple singlepart geometries.
 
-I will document and build on this tools set with examples.  I am only working with featureclasses stored in file geodatabase featureclasses.
+I will document and build on thes tools set with examples.  I am only working with featureclasses stored in a file geodatabase.
 
 **Some links**
 
@@ -41,7 +41,7 @@ The point coordinates with (300,000 m, 5,000,000 m, MTM 9) subtracted from their
 ```
 pnt shape  part  X       Y     
 --------------------------------
- 000     0         10.00   20.00
+ 000     0         10.00   20.00 
  001     0         10.00   10.00
  002     0          0.00   10.00
  003     0          0.00   20.00
@@ -87,12 +87,15 @@ pnt shape  part  X       Y
 
 ```
 s2.IFT 
-array([[ 0,  0, 11],    1st shape, 1st part, points 0 to but not including 11
+array([[ 0,  0, 11],    1st shape, 1st part, points 0 to 11 (but not including 11, following array slicing format)
        [ 0, 11, 21],    1st shape, 2nd part
        [ 1, 21, 30],    2nd shape, 1st part
        [ 1, 30, 39]])   2nd shape, 2nd part
 ```       
 The methods and functions that will be shown use this information in their processing.  In this fashion, it is possible to try and optimize the derivation of properties and application of functions by using the whole point sequence of their subgroupings.
+
+This will obviously not be possible in all situations, but every bit helps.
+
 
 ----
 **Options to obtaining ndarray values**
@@ -169,6 +172,7 @@ a1  # ---- as a list of values ----
     (300025.0, 5000024.0)]]]]
 
 np.asarray(a1)  # ---- as an object array containing lists of coordinates
+
 array([[list([[(300010.0, 5000020.0), (300010.0, 5000010.0), (300000.0, 5000010.0), (300000.0, 5000020.0),
                (300010.0, 5000020.0)], [(300003.0, 5000019.0), (300003.0, 5000013.0), (300009.0, 5000013.0),
                (300009.0, 5000019.0), (300003.0, 5000019.0)]])],
