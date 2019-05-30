@@ -46,12 +46,16 @@ array(                  array([[[12., 18.], array([[14., 20.],
 Both the array of arrays and the geo array are saved in the Scripts folder.
 To load the Geo array, save the files to disk.  You can save and load arrays using the follow syntax.  This was used to create the files saved here.
 ```
+# ---- For single arrays
 np.save("c:/path_to_file/three_arrays.npy", z, allow_pickle=True, fix_imports=False)   # ---- save to disk
 
-arr = np.load(c:/path_to_file/three_arrays.npy", allow_pickle=True, fix_imports=False) # ---- the above arrays
+arr = np.load(c:/path_to_file/three_arrays.npy", allow_pickle=True, fix_imports=False) # ---- load above arrays
+
+# ---- For multiple arrays
+np.savez("c:/temp/geo_array.npz", s2=s2, IFT=s2.IFT)  # ---- save arrays, s2 and s2.IFT with names (s2, IFT)
 
 npzfiles = np.load("c:/temp/geo_array.npz")  # ---- the Geo array and the array of I(ds)F(rom)T(o) values
 npzfiles.files                               # ---- will show ==> ['s2', 'IFT']
-s2 = npzfiles['s2']
+s2 = npzfiles['s2']                          # ---- slice the arrays by name from the npz file to get each array
 IFT = npzfiles['IFT']
 ```
