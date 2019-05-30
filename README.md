@@ -87,8 +87,8 @@ pnt shape  part  X       Y
 
 ```
 s2.IFT 
-array([[ 0,  0, 11],    1st shape, 1st part, points 0 to 11 (but not including 11, following array slicing format)
-       [ 0, 11, 21],    1st shape, 2nd part
+array([[ 0,  0, 11],    1st shape, 1st part, points 0 to 11 (but not including 11,
+       [ 0, 11, 21],    1st shape, 2nd part                  following array slicing format)
        [ 1, 21, 30],    2nd shape, 1st part
        [ 1, 30, 39]])   2nd shape, 2nd part
 ```       
@@ -101,7 +101,7 @@ This will obviously not be possible in all situations, but every bit helps.
 # ndarray values from esri geometry
 
 
-**(1) The arcpy geometry
+**(1) The arcpy geometry**
 
 This is what the geometry looks like for the first shape (multipart with holes).
 
@@ -246,6 +246,8 @@ cur.fields   # ==> ('OID@', 'SHAPE@X', 'SHAPE@Y')
 
 <a href="url"><img src="https://github.com/Dan-Patterson/npGeo/blob/master/bad_shape.png" align="right" height="300" width="auto" ></a>
 
-The parts and the geometry are not identified within the sequences.  Constructing points from the above is no big deal, but polylines and polygons would fail miserably.
+The parts and the geometry are not identified within the sequences.  Constructing points from the above is no big deal, but polylines and polygons would fail miserably... as shown in this example.
+
+The need to identify parts and holes in polygons prompted this study to see whether arcpy geometries could be represented in a different manner in numpy array format.  Currently, there are operations that cannot be done simply on arcpy geometries that are so simple in numpy.  Want to shift some polygons a couple of meters?  Just shuffle through a search cursor disassemble the point to an arcpy.Array, cycle through each point (checking for None), then doing the math on each point.  Finally, just reassemble the points array and reconstitute the polygon.  In numpy, if the whole dataset can be represented as an Nx2 array... you just add/subtract from the whole array.  Other functions, like convex hulls will require you to operate on 'chunks' of the array, rather than on the whole dataset at once.  At least nothing needs to be devolved to its smallest part first.  More on this in subsequent sections.
 
 
