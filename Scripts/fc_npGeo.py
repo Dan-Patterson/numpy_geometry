@@ -8,7 +8,7 @@ Script :   fc_npGeo.py
 
 Author :   Dan_Patterson@carleton.ca
 
-Modified : 2019-05-25
+Modified : 2019-05-29
 
 Purpose :  Tools for working with poly features as an array class
 
@@ -552,7 +552,7 @@ def _demo_(in_fc, kind, info=None):
 #    m = np.nanmin(tmp, axis=0)
     m = [300000., 5000000.]
     a = tmp  - m
-    g = Geo(a, IFT, kind, info, False)
+    g = Geo(a, IFT, kind, info)
     frmt = """
     Type :  {}
     ids-from-to:
@@ -569,18 +569,18 @@ def _demo_(in_fc, kind, info=None):
 if __name__ == "__main__":
     """optional location for parameters"""
 
-#    # All polygon shapes
-#    in_fc0 = r"C:/Arc_projects/CoordGeom/CoordGeom.gdb/Polygons"
-#    SR, sh0, IFT0, s0 = _demo_(in_fc0, 2, 's0', False)
-#    # Single multipart polygon shape
-#    in_fc1 = r"C:/Arc_projects/CoordGeom/CoordGeom.gdb/Shape1"
-#    SR1, sh1, IFT1, s1 = _demo_(in_fc1, 2, False, False)  # multipart
-#    # Above plus one shape to the right
-#    in_fc2 = r"C:/Arc_projects/CoordGeom/CoordGeom.gdb/Shape2"
-#    SR, sh2, IFT2, s2 = _demo_(in_fc2, 2, 's2', False)
-#    # Ontario large file
-#    #in_fc3 = r"C:\Arc_projects\Canada\Canada.gdb\Ontario_LCConic"
-#    #SR3, sh3, IFT3, s3 = _demo_(in_fc3, 2, 's3', False)
-#    #
-#    # ---- Get the shapes that you want by changing s0
-#    #shps = [s0.get(i) for i in range(5)]
+    # All polygon shapes
+    in_fc0 = r"C:/Arc_projects/CoordGeom/CoordGeom.gdb/Polygons"
+    SR, sh0, IFT0, s0 = _demo_(in_fc0, 2, 's0')
+    # Single multipart polygon shape
+    in_fc1 = r"C:/Arc_projects/CoordGeom/CoordGeom.gdb/Shape1"
+    SR1, sh1, IFT1, s1 = _demo_(in_fc1, 2, False)  # multipart
+    # Above plus one shape to the right
+    in_fc2 = r"C:/Arc_projects/CoordGeom/CoordGeom.gdb/Shape2"
+    SR, sh2, IFT2, s2 = _demo_(in_fc2, 2, 's2')
+    # Ontario large file
+    #in_fc3 = r"C:\Arc_projects\Canada\Canada.gdb\Ontario_LCConic"
+    #SR3, sh3, IFT3, s3 = _demo_(in_fc3, 2, 's3', False)
+    #
+    # ---- Get the shapes that you want by changing s0
+    #shps = [s0.get(i) for i in range(5)]
