@@ -101,7 +101,34 @@ This will obviously not be possible in all situations, but every bit helps.
 # ndarray values from esri geometry
 
 
-**(1)  FeatureClassToNumPyArray**
+**(1) The arcpy geometry
+
+This is what the geometry looks like for the first shape (multipart with holes).
+
+```
+p0
+<Polygon object at 0x2a193f76128[0x2a18ea2d8a0]>
+
+p0[:2]  # ---- two parts, so slice
+[<Array [<Point (300010.0, 5000020.0, #, #)>, <Point (300010.0, 5000010.0, #, #)>, <Point (300000.0, 5000010.0, #, #)>,
+         <Point (300000.0, 5000020.0, #, #)>, <Point (300010.0, 5000020.0, #, #)>,
+         None,
+         <Point (300003.0, 5000019.0, #, #)>, <Point (300003.0, 5000013.0, #, #)>, <Point (300009.0, 5000013.0, #, #)>,
+         <Point (300009.0, 5000019.0, #, #)>, <Point (300003.0, 5000019.0, #, #)>]>,
+ <Array [<Point (300008.0, 5000018.0, #, #)>, <Point (300008.0, 5000014.0, #, #)>, <Point (300004.0, 5000014.0, #, #)>,
+         <Point (300004.0, 5000018.0, #, #)>, <Point (300008.0, 5000018.0, #, #)>,
+         None,
+         <Point (300006.0, 5000017.0, #, #)>, <Point (300005.0, 5000015.0, #, #)>, <Point (300007.0, 5000015.0, #, #)>,
+         <Point (300006.0, 5000017.0, #, #)>]>]
+```
+The polygon consists of two parts, represented as the arcpy.Array.  This in turn consists of sequences of arcpy.Point values with outer rings ordered clockwise and inner rings/holes, order counter-clockwise.  Inner and outer rings are separated by None, rather than a null point since a null point, unfortunately, has X and Y values of 0.
+```
+(arcpy.Point()
+<Point (0.0, 0.0, #, #)>
+```
+
+
+**(2)  FeatureClassToNumPyArray**
 
 The standby, great for singlepart simple shapes.  You have to read the X, and Y coordinates separately or as a ``SHAPE@XY`` since reading the ``SHAPE@`` to retrieve the object directly is not permitted.
 
@@ -123,7 +150,7 @@ array([(300010., 5000020.), (300010., 5000010.), (300000., 5000010.), (300000., 
 ```
 
 
-**(2)  SearchCursors and the ``__geo_interface__`` method**
+**(3)  SearchCursors and the ``__geo_interface__`` method**
 
 Works, and useful if you intend to work with the arcgis module.  There are variants on this as well depending on whether you want arrays or arrays or just an array of objects.
 
@@ -188,7 +215,7 @@ array([[list([[(300010.0, 5000020.0), (300010.0, 5000010.0), (300000.0, 5000010.
       dtype=object)
 ```
 
-**(3) Searchcursors and _as_narray**
+**(4) Searchcursors and _as_narray**
 
 A related ditty, however, you have to specify the fields directly and you essentially get the equivalent of FeatureClassToNumPyArray.
 
