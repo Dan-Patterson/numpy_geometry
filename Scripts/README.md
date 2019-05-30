@@ -18,7 +18,7 @@ This is where the Geo class is housed along with methods an properties applicabl
 Geo arrays can be constructed from other ndarrays using **arrays_Geo**.  Three sample arrays are shown below.  They have been arranged in column format to save space.  
 
 ```
-array(                 array([[[12., 18.], array([[14., 20.],
+array(                  array([[[12., 18.], array([[14., 20.],
     [array([[10., 20.],         [12., 12.],        [10., 20.],
             [10., 10.],         [20., 12.],        [15., 28.],
             [ 0., 10.],         [20., 10.],        [14., 20.]])
