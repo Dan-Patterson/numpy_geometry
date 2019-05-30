@@ -1,4 +1,4 @@
-c:/path_to_file/****Scripts****
+****Scripts****
 
 **fc_npGeo.py**
 
