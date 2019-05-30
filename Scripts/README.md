@@ -50,8 +50,8 @@ np.save("c:/path_to_file/three_arrays.npy", z, allow_pickle=True, fix_imports=Fa
 
 arr = np.load(c:/path_to_file/three_arrays.npy", allow_pickle=True, fix_imports=False) # ---- the above arrays
 
-npzfiles = np.load("c:/temp/geo_array.npz")          # ---- the Geo array and the array of I(ds)F(rom)T(o) values
-npzfiles.files   # ---- will show ==> ['s2', 'IFT']
+npzfiles = np.load("c:/temp/geo_array.npz")  # ---- the Geo array and the array of I(ds)F(rom)T(o) values
+npzfiles.files                               # ---- will show ==> ['s2', 'IFT']
 s2 = npzfiles['s2']
 IFT = npzfiles['IFT']
 ```
