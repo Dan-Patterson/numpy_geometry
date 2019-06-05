@@ -9,7 +9,7 @@ Numpy is part of the distribution for ArcGIS Pro, so no other dependencies need 
 If you wish to clone their distribution or modify the existing one, some guidance is provided here.
 
 [Clone... ArcGIS Pro ... for non administrators](https://community.esri.com/blogs/dan_patterson/2018/12/28/clone)
-<a href="url"><img src="https://github.com/Dan-Patterson/npGeo/blob/master/Scripts/clone2.png" align="center" height="300" width="auto" ></a>
+<a href="url"><img src="https://github.com/Dan-Patterson/npGeo/blob/master/Scripts/clones2.png" align="center" height="300" width="auto" ></a>
 
 
 **npGeo.py**
