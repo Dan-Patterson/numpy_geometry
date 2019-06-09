@@ -4,40 +4,21 @@
 fc_npGeo
 ========
 
-Script :   fc_npGeo.py
+Script : 
+    fc_npGeo.py
 
-Author :   Dan_Patterson@carleton.ca
+Author : 
+    Dan_Patterson@carleton.ca
 
 Modified : 2019-05-29
+    Creation date during 2019 as part of ``arraytools``.
 
-Purpose :  Tools for working with poly features as an array class
+Purpose : Tools for working with poly features as an array class
+    Requires npGeo to implement the array geometry class.
 
-Notes
------
-
-**Class instantiation**
-
-Quote from Subclassing ndarrays::
-
-    As you can see, the object can be initialized in the __new__ method or the
-    __init__ method, or both, and in fact ndarray does not have an __init__
-    method, because all the initialization is done in the __new__ method.
-
-
-**General notes**
-
-The Geo class returns a 2D array of points which may consist of single or
-multipart shapes with or without inner rings (holes).
-
-The methods defined  in the Geo class allow one to operate on the parts of the
-shapes separately or in combination.  Since the coordinate data are represented
-as an Nx2 array, it is sometimes easier to perform calculations on the dataset
-all at once using numpy ``nan`` functions.  For example, to determine the
-minimum for the whole dataset:
-
->>> np.nanmin(Geo, axis=0)
-
-All null points (nan, nan) are omitted from the calculations.
+See Also : npGeo
+    A fuller description of the class, its methods and properties is given
+    there.  This script focuses on getting arcpy geometry into numpy arrays.
 
 References
 ----------
@@ -74,7 +55,6 @@ include:
 `Polygon to Line
 <https://pro.arcgis.com/en/pro-app/tool-reference/data-management/polygon
 -to-line.htm>`_.
-
 
 """
 # pylint: disable=C0103  # invalid-name

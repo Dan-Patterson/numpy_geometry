@@ -1,19 +1,47 @@
 # -*- coding: utf-8 -*-
 """
+=====
 npGeo
 =====
 
-Script :   npGeo.py
+Script : npGeo.py
+    A geometry class and methods based on numpy.
 
-Author :   Dan_Patterson@carleton.ca
+Author :
+    Dan_Patterson@carleton.ca
 
-Modified : 2019-05-29
+Modified : 2019-06-06
+    Initial creation period 2019-05
 
-Purpose :  a numpy geometry class
+Purpose : geometry tools
+    A numpy geometry class, its properties and methods.
 
 Notes
 -----
-See fc_npGeo.py for further documentation.
+**Class instantiation**
+
+Quote from Subclassing ndarrays::
+
+    As you can see, the object can be initialized in the __new__ method or the
+    __init__ method, or both, and in fact ndarray does not have an __init__
+    method, because all the initialization is done in the __new__ method.
+
+
+**General notes**
+
+The Geo class returns a 2D array of points which may consist of single or
+multipart shapes with or without inner rings (holes).
+
+The methods defined  in the Geo class allow one to operate on the parts of the
+shapes separately or in combination.  Since the coordinate data are represented
+as an Nx2 array, it is sometimes easier to perform calculations on the dataset
+all at once using numpy ``nan`` functions.  For example, to determine the
+minimum for the whole dataset:
+
+>>> np.nanmin(Geo, axis=0)
+
+All null points (nan, nan) are omitted from the calculations.
+
 
 **Working with np.ndarray and geo class**
 
@@ -58,6 +86,16 @@ References
 ----------
 `Subclassing ndarrays
 <https://docs.scipy.org/doc/numpy/user/basics.subclassing.html>`_.
+
+**Sample file**
+
+Saved in the arraytools folder and on GitHub::
+
+    fname = 'C:/Git_Dan/arraytools/Data/geo_array.npz'
+    npzfiles = np.load(fname")  # ---- the Geo, I(ds)F(rom)T(o) arrays
+    npzfiles.files              # ---- will show ==> ['s2', 'IFT']
+    s2 = npzfiles['s2']         # ---- slice by name from the npz file to get
+    IFT = npzfiles['IFT']       #      each array
 """
 # pylint: disable=R0904  # pylint issue
 # pylint: disable=C0103  # invalid-name
@@ -65,6 +103,7 @@ References
 # pylint: disable=R0914  # Too many local variables
 # pylint: disable=R1710  # inconsistent-return-statements
 # pylint: disable=W0105  # string statement has no effect
+# pylint: disable=W0201  # attribute defined outside __init__... none in numpy
 # pylint: disable=W0621  # redefining name
 
 import sys
@@ -85,27 +124,29 @@ INTS = np.typecodes['AllInteger']
 NUMS = FLOATS + INTS
 TwoPI = np.pi*2.
 
-__all__ = ['FLOATS',  'INTS', 'NUMS', 'TwoPI',  # constants
+__all__ = ['FLOATS', 'INTS', 'NUMS', 'TwoPI',  # constants
            'Geo', 'arrays_Geo', 'Geo_array',    # class and from, to methods
            '_angles_', '_ch_',                  # helpers
            '_o_ring_', '_pnts_on_line_',
            '_poly_segments_', '_updateGeo',
            'prn_geo', 'prn_tbl',                # printing
            '_simplify_lines_',
-           '_nan_split_',  'assemble',]    # unfinished
+           '_nan_split_']    # unfinished
 # ===========================================================================
 # ---- Construct the Geo array from a list of ndarrays or an ndarray and
 #       deconstruct, thevGeo array back to its origins
-# 
-def arrays_Geo(in_arrays):
+#
+def arrays_Geo(in_arrays, Kind=2, Info=None):
     """Produce a Geo class object from a list/tuple of arrays.
 
     Parameters
     ----------
     in_arrays : list
-        in_arrays can be created by adding existing 2D arrays to the list or
-        produced from the conversion of poly features to arrays using
+        ``in_arrays`` can be created by adding existing 2D arrays to the list
+         or produced from the conversion of poly features to arrays using
         ``poly2arrays``.
+    Kind : integer
+        Points (0), polylines (1) or polygons (2)
 
     Returns
     -------
@@ -120,12 +161,10 @@ def arrays_Geo(in_arrays):
     """
     id_too = []
     a_2d = []
-    if in_arrays.__class__ in (np.ndarray):
-        in_arrays = [in_arrays]
     for i, p in enumerate(in_arrays):
         if p.ndim == 2:
             id_too.append([i, len(p)])
-            a_2d.extend(p)
+            a_2d.append(p)
         elif p.ndim == 3:
             id_too.extend([[i, len(k)] for k in p])
             a_2d.append([j for i in p for j in i])
@@ -134,9 +173,46 @@ def arrays_Geo(in_arrays):
     I = id_too[:, 0]
     too = np.cumsum(id_too[:, 1])
     frum = np.concatenate(([0], too))
-#    FT = np.array(list(zip(frum, too)))
     IFT = np.array(list(zip(I, frum, too)))
-    return a_2d, IFT
+    new_geo = Geo(a_2d, IFT, Kind, Info)
+    return new_geo
+
+# ==== update Geo array, or create one from a list of arrays ================
+#
+def _updateGeo(a_2d, K=None, id_too=None, Info=None):
+    """Create a new Geo from a list of arrays.
+
+    Parameters
+    ----------
+    a_2d : list/tuple/array
+        Some form of nested 2D array-like structure that can be stacked
+    K : integer
+        Points (0), polylines (1) or polygons (2)
+    id_too : array-like
+        If None, then the structure will be created.
+    Info : text (optional)
+        Provide any information that will help in identifying the array.
+    Returns
+    -------
+    A new Geo array is returned given the inputs.
+    """
+    if K not in (0, 1, 2):
+        print("Output type not specified")
+        return None
+    if id_too is None:
+        id_too = [(i, len(a)) for i, a in enumerate(a_2d)]
+#        id_too = []
+#        for i, a in enumerate(a_2d):
+#            id_too.append((i, len(a)))
+    a_2d = np.vstack(a_2d)
+    id_too = np.array(id_too)
+    I = id_too[:, 0]
+    too = np.cumsum(id_too[:, 1])
+    frum = np.concatenate(([0], too))
+    IFT = np.array(list(zip(I, frum, too)))
+    new_geo = Geo(a_2d, IFT, K, Info)
+    return new_geo
+
 
 def Geo_array(in_geo):
     """Reconstruct the input arrays from the Geo array"""
@@ -187,8 +263,8 @@ class Geo(np.ndarray):
     # ----
     def __new__(cls, arr=None, IFT=None, Kind=2, Info=""):
         """
-        Create Geo based on numpy ndarray.  The class focus is on geometry
-        properties and methods.
+        Create a Geo array based on numpy ndarray.  The class focus is on
+         geometry properties and methods.
 
         Requires
         --------
@@ -237,15 +313,19 @@ class Geo(np.ndarray):
         (words from documentation) OR another instance of our own array.
         You can use the following with a dictionary instead of None:
 
-        >>> self.info = getattr(obj,'info',{}) 
+        >>> self.info = getattr(obj,'info',{})
         """
         if src_arr is None:
             return
+        self.IFT = getattr(src_arr, 'IFT', None)
         self.IDs = getattr(src_arr, 'IDs', None)
         self.FT = getattr(src_arr, 'FT', None)
-        self.IFT = getattr(src_arr, 'IFT', None)
         self.K = getattr(src_arr, 'K', None)
         self.Info = getattr(src_arr, 'Info', None)
+        self.N = getattr(src_arr, 'N', None)
+        self.X = getattr(src_arr, 'X', None)
+        self.Y = getattr(src_arr, 'Y', None)
+        self.XY = getattr(src_arr, 'XY', None)
 
     def __array_wrap__(self, out_arr, context=None):
         """Wrap it up"""
@@ -280,7 +360,7 @@ class Geo(np.ndarray):
 
     @property
     def pnts(self):
-        """Point count for shapes."""
+        """Point count for shapes excluding null points."""
         return np.array([(i, len(p[~np.isnan(p[:, 0])]))
                          for i, p in enumerate(self.shapes)])
 
@@ -301,7 +381,10 @@ class Geo(np.ndarray):
         formally: return np.asarray([(self[f:t]) for f, t in self.FT]) but with
         additions to add the FT and IFT properties
         """
-        return np.asarray(np.split(self.base, self.IFT[:, 2]))[:-1]
+        xy = self.base
+        if xy is None:
+            xy = self.XY.view(np.ndarray)
+        return np.asarray(np.split(xy, self.IFT[:, 2]))[:-1]
 
     @property
     def bits(self):
@@ -320,40 +403,9 @@ class Geo(np.ndarray):
                 out.append(ply)
         return np.asarray(out)
     #
-    # ---- methods -----------------------------------------------------------
+    # ---- areas, centrality, lengths/perimeter for polylines/polygons
     #
-    def get(self, ID):
-        """Get the shape associated with the feature ID, g.I"""
-        parts_ = self.FT[self.IDs == ID]
-        out = np.asarray([np.asarray(self.XY[p[0]:p[1]]) for p in parts_])
-        return out.squeeze()
-
-    def pull(self, ID_list):
-        """Pull multiple shapes"""
-        if isinstance(ID_list, (list, tuple, np.ndarray)):
-            parts_ = np.vstack([self.FT[self.IDs == i] for i in ID_list])
-            out = np.asarray([np.asarray(self.XY[p[0]:p[1]]) for p in parts_])
-            return out
-        print("An array/tuple/list of IDs are required, see ``get``")
-        return None
-
-    def pnt_info(self, by_part=True, with_null=False):
-        """Point count by feature, by part, include null/nan points"""
-        chunks = self.split(by_part)
-        if with_null:
-            return self.FT[:, 1] - self.FT[:, 0]
-        return np.array([len(i[~np.isnan(i[:, 0])]) for i in chunks])
-
-    def split(self, by_part=False):
-        """Split points by shape or by parts for each shape.
-        Use self.parts or self.shapes directly"""
-        if by_part:
-            return self.parts
-        return self.shapes
-    #
-    # ---- Methods to determine areas, centroids, extents, etc. rather than
-    #      have them as properties, plus other methods using/changing geometry
-    #
+    @property
     def areas(self):
         """Area for the sub arrays using _e_area for the calculations"""
         def _e_area(a):
@@ -372,27 +424,15 @@ class Geo(np.ndarray):
         totals = np.bincount(self.IDs, weights=subs)  # weight by IDs' area
         return totals
 
-    def is_convex(self, by_part=True):
-        """Return True for convex, False for concave.  Holes are excluded,
-        multipart shapes are included by setting by_part=True
+    @property
+    def centers(self):
+        """Return the center of an array. Duplicates are removed and rings and
+        multiparts are used in the coordinate average.
         """
-        def _x_(a):
-            """cross product"""
-            dx, dy = a[0] - a[-1]
-            if np.allclose(dx, dy):    # closed loop
-                a = a[:-1]
-            ba = a - np.roll(a, 1, 0)  # vector 1
-            bc = a - np.roll(a, -1, 0) # vector 2
-            return np.cross(ba, bc)
-        # ----
-        chunks = self.split(by_part)
-        check = []
-        for p in chunks:
-            p = _o_ring_(p)       # ---- run ``_o_ring_
-            check.append(_x_(p))  # cross-product
-        check = np.array([np.all(np.sign(i) >= 0) for i in check])
-        return check
+        out = [np.nanmean(np.unique(c, axis=0), axis=0) for c in self.shapes]
+        return np.asarray(out)
 
+    @property
     def centroids(self):
         """Centroid of the polygons.
         """
@@ -436,6 +476,86 @@ class Geo(np.ndarray):
         ys = weighted(centr[:, 1], self.IDs, areas)
         return np.array(list(zip(xs, ys)))
 
+    @property
+    def lengths(self):
+        """Poly lengths/perimeter"""
+        def _cal(a):
+            """Perform the calculation, mini-e_leng"""
+            diff = a[:-1] - a[1:]
+            return np.nansum(np.sqrt(np.einsum('ij,ij->i', diff, diff)))
+        # ----
+        if self.K not in (1, 2):
+            print("polyline/polygon representation is required")
+            return None
+        lengs = [_cal(i) for i in self.parts]
+        totals = np.bincount(self.IDs, weights=lengs)
+        return np.asarray(totals)
+    #
+    # ---- methods -----------------------------------------------------------
+    # ---- extents
+    def AOI_extent(self):
+        """Determine the full extent of the dataset.
+        This is the A(rea) O(f) I(nterest)
+        """
+        return np.concatenate((np.nanmin(self.XY, axis=0),
+                               np.nanmax(self.XY, axis=0)))
+
+    def AOI_rectangle(self):
+        """The Area of Interest polygon as derived from the AOI_extent"""
+        bounds = self.AOI_extent()
+        L, B, R, T = bounds
+        return np.array([[L, B], [L, T], [R, T], [R, B], [L, B]])
+
+    def extents(self, by_part=False):
+        """Extents are returned as L(eft), B(ottom), R(ight), T(op)
+        """
+        def _extent_(i):
+            """Extent of a sub-array in an object array"""
+            return np.concatenate((np.nanmin(i, axis=0), np.nanmax(i, axis=0)))
+        # ----
+        if self.N == 1:
+            by_part = True
+        p_ext = [_extent_(i) for i in self.split(by_part)]
+        return np.asarray(p_ext)
+
+    def extent_rectangles(self):
+        """Return extent polygons for all shapes.  Points are ordered clockwise
+         from the bottom left, with the first and last points the same.
+         Requires an Advanced license in Pro
+
+        See Also
+        --------
+        AOI_extent and AOI_poly
+         """
+        ext_polys = []
+        for ext in self.extents():
+            L, B, R, T = ext
+            poly = np.array([[L, B], [L, T], [R, T], [R, B], [L, B]])
+            ext_polys.append(poly)
+        return np.asarray(ext_polys)
+
+    # ---- slicing, sampling equivalents
+    def get(self, ID, asGeo=True):
+        """Return the shape associated with the feature ID as an Geo array or
+        an ndarray.
+
+        Parameters
+        ----------
+        ID : integer
+            A single integer value.
+        asGeo : Boolean
+            True, returns an updated Geo array.  False returns an ndarray or
+            object array.
+        """
+        if not isinstance(ID, (int)):
+            print("An integer ID is required, see ``pull`` for multiple values.")
+            return None
+        if asGeo:
+            f_t = self.IFT[self.IDs == ID]
+            s_e = f_t.ravel()
+            return Geo(self[s_e[1]: s_e[-1]], IFT=f_t, Kind=self.K)
+        return self.shapes[ID]
+
     def outer_rings(self, asGeo=False):
         """Collect the outer ring of a polygon shape.  Returns a list of
         ndarrays or optionally a new Geo array.
@@ -457,8 +577,82 @@ class Geo(np.ndarray):
             return _updateGeo(a_2d, K, id_too, info)  # ---- update Geo
         return a_2d
 
-    # ---- Angles and its helpers, _o_ring_, _angle_, isconvex
+    def pull(self, ID_list, asGeo=True):
+        """Pull multiple shapes, in the order provided.  The original IDs are
+        kept but the point sequence is altered to reflect the new order
+
+        Parameters
+        ----------
+        ID_list : array-like
+            A list, tuple or ndarray of ID values identifying which features
+            to pull from the input.
+        asGeo : Boolean
+            True, returns an updated Geo array.  False returns an ndarray or
+            object array.
+        """
+        if not isinstance(ID_list, (list, tuple, np.ndarray)):
+            print("An array/tuple/list of IDs are required, see ``get``")
+            return None
+        parts_ = np.vstack([self.IFT[self.IDs == i] for i in ID_list])
+        vals = [np.asarray(self.XY[p[1]:p[2]]) for p in parts_]
+        if not asGeo:
+            return np.asarray(vals)
+        I = parts_[:, 0]
+        too = np.cumsum([len(i) for i in vals])
+        frum = np.concatenate(([0], too))
+        IFT = np.array(list(zip(I, frum, too)))
+        vals = np.vstack(vals)
+        return Geo(vals, IFT, self.K)
+
+    def split(self, by_part=False):
+        """Split points by shape or by parts for each shape.
+        Use self.parts or self.shapes directly"""
+        if by_part:
+            return self.parts
+        return self.shapes
+
+    def point_info(self, by_part=True, with_null=False):
+        """Point count by feature or parts of feature.
+
+        Parameters
+        ----------
+        by part: boolean
+            True for each feature part or False for the whole feature.
+        with_null : boolean
+            True, to include nan/null points.
+        """
+        chunks = self.split(by_part)
+        if with_null:
+            return self.FT[:, 1] - self.FT[:, 0]
+        return np.array([len(i[~np.isnan(i[:, 0])]) for i in chunks])
     #
+    # ---- Methods to determine angles, convexity and other properties that
+    #      enable you use methods by part or by whole
+    #
+    def is_convex(self, by_part=True):
+        """Return True for convex, False for concave.  Holes are excluded,
+        multipart shapes are included by setting by_part=True
+        """
+        def _x_(a):
+            """cross product"""
+            dx, dy = a[0] - a[-1]
+            if np.allclose(dx, dy):    # closed loop
+                a = a[:-1]
+            ba = a - np.roll(a, 1, 0)  # vector 1
+            bc = a - np.roll(a, -1, 0) # vector 2
+            return np.cross(ba, bc)
+        # ----
+        if self.K != 2:
+            print("Polygons are required")
+            return None
+        chunks = self.split(by_part)
+        check = []
+        for p in chunks:
+            p = _o_ring_(p)       # ---- run ``_o_ring_
+            check.append(_x_(p))  # cross-product
+        check = np.array([np.all(np.sign(i) >= 0) for i in check])
+        return check
+
     def angles(self, inside=True, in_deg=True):
         """Sequential 3 point angles from a poly* shape.  The outer ring for
         each part is used.  see ``_angles_`` and ``_o_ring_``.
@@ -468,31 +662,6 @@ class Geo(np.ndarray):
         for p in self.parts:  # -- run _angle_ and _o_ring_ on the chunks
             angles.append(_angles_(p, inside, in_deg))
         return angles
-
-    # ---- centrality
-    #
-    def centers(self):
-        """Return the center of an array. Duplicates are removed and rings and
-        multiparts are used in the coordinate average.
-        """
-        out = [np.nanmean(np.unique(c, axis=0), axis=0) for c in self.shapes]
-        return np.asarray(out)
-
-    # ---- lengths/perimeter for polylines/polygons
-    #
-    def lengths(self):
-        """Poly lengths/perimeter"""
-        def _cal(a):
-            """Perform the calculation, mini-e_leng"""
-            diff = a[:-1] - a[1:]
-            return np.nansum(np.sqrt(np.einsum('ij,ij->i', diff, diff)))
-        # ----
-        if self.K not in (1, 2):
-            print("polyline/polygon representation is required")
-            return None
-        lengs = [_cal(i) for i in self.parts]
-        totals = np.bincount(self.IDs, weights=lengs)
-        return np.asarray(totals)
     #
     # ---- maxs, mins, means, pnts for all features
     #
@@ -551,21 +720,9 @@ class Geo(np.ndarray):
         return out
     #
     # ---- changes to geometry, derived from geometry
-    #  convex_hulls, extent polygons, minimum area bounding rectangle
+    #  convex_hulls, minimum area bounding rectangle
+    #  **see also** extent properties above
     #
-    def AOI_extent(self):
-        """Determine the full extent of the dataset. 
-        This is the A(rea) O(f) I(nterest)
-        """
-        return np.concatenate((np.nanmin(self.XY, axis=0),
-                               np.nanmax(self.XY, axis=0)))
-
-    def AOI_rectangle(self):
-        """The Area of Interest polygon as derived from the AOI_extent"""
-        bounds = self.AOI_extent()
-        L, B, R, T = bounds
-        return np.array([[L, B], [L, T], [R, T], [R, B], [L, B]])
-
     def convex_hulls(self, by_part=False):
         """Convex hull for shapes.
 
@@ -582,34 +739,6 @@ class Geo(np.ndarray):
             h = _ch_(s)
             ch_out.append(h)
         return ch_out
-        
-    def extents(self, by_part=False):
-        """Extents are returned as L(eft), B(ottom), R(ight), T(op)
-        """
-        def _extent_(i):
-            """Extent of a sub-array in an object array"""
-            return np.concatenate((np.nanmin(i, axis=0), np.nanmax(i, axis=0)))
-        # ----
-        if self.N == 1:
-            by_part = True
-        p_ext = [_extent_(i) for i in self.split(by_part)]
-        return np.asarray(p_ext)
-
-    def extent_rectangles(self):
-        """Return extent polygons for all shapes.  Points are ordered clockwise
-         from the bottom left, with the first and last points the same.
-         Requires an Advanced license in Pro
-
-        See Also
-        --------
-        AOI_extent and AOI_poly
-         """
-        ext_polys = []
-        for ext in self.extents():
-            L, B, R, T = ext
-            poly = np.array([[L, B], [L, T], [R, T], [R, B], [L, B]])
-            ext_polys.append(poly)
-        return np.asarray(ext_polys)
 
     def min_area_rect(self):
         """Determines the minimum area rectangle for a shape represented
@@ -644,15 +773,16 @@ class Geo(np.ndarray):
                     vals = [min_area, Xmin, Ymin, Xmax, Ymax]
             rects.append(vals)
         return rects
-
-    #-------------------------------------------------------------
+    #
+    #---- conversions --------------------------------------------------------
+    #
     def fill_holes(self):
         """Fill holes in polygon shapes.  Returns a Geo class"""
         a_2d = []
         id_too = []
         K = self.K
         if K < 2:
-            print("polygon geometry required")
+            print("Polygon geometry required.")
             return None
         for i, p in enumerate(self.parts):
             nan_check = np.isnan(p[:, 0]) # check the Xs for nan
@@ -662,11 +792,11 @@ class Geo(np.ndarray):
             a_2d.append(np.array(p))
             id_too.append([i, len(p)])
         info = "{} fill_holes".format(self.Info)
-        new_geo = _updateGeo(a_2d,  K, id_too, info)  # run update
+        new_geo = _updateGeo(a_2d, K, id_too, info)  # run update
         return new_geo
 
     def holes_to_shape(self):
-        """Return holes in polygon shapes.  Returns a Geo class.ZZZ"""
+        """Return holes in polygon shapes.  Returns a Geo class or None"""
         a_2d = []
         id_too = []
         K = self.K
@@ -681,20 +811,68 @@ class Geo(np.ndarray):
                 p_new = p_new[1:][::-1]
                 a_2d.append(np.array(p_new))
                 id_too.append([i, len(p_new)])
-        if len(a_2d) == 0:
+        if not a_2d:  # ---- if empty
             return None
-        info = "{}holes2shape".format(self.Info)
-        new_geo = _updateGeo(a_2d, K, id_too, Info=info)    # run update
+        new_geo = _updateGeo(a_2d, K, id_too)    # run update
         return new_geo
 
+    def multipart_to_singlepart(self, info=""):
+        """Convert multipart shapes to singleparts and return a new Geo array.
+        """
+        ift = self.IFT
+        data = np.vstack(self.parts)
+        ift[:, 0] = np.arange(len(self.parts))
+        new_geo = Geo(data, IFT=ift, Kind=self.K, Info=info)
+        return new_geo
+
+    def od_pairs(self):
+        """Construct origin-destination pairs for traversing around the
+        perimeter of polygons or along polylines or between sequences
+        of points.
+
+        Returns
+        -------
+        A 2D ndarray is returned of origin-distination pairs.
+        """
+        od = []
+        for p in self.bits:
+            od.append(np.c_[p[:-1], p[1:]])
+        return np.asarray(od)
+
     def polylines_to_polygons(self):
-        """Close an array representing a sequence of points, so that the
-        first and last point are identical.  These arrays are used to construct
-        polygons and closed-loop polylines.
+        """Return a polygon Geo type from a polyline Geo.  It is assumed that
+        the polylines form closed-loops, otherwise use ``close_polylines``.
         """
         if self.K == 2:
-            print("Already classed as a polygon")
+            print("Already classed as a polygon.")
             return self
+        polygons = self.copy()
+        polygons.K = 2
+        return polygons
+
+    def polygons_to_polylines(self):
+        """Return a polyline Geo type from a polygon Geo.
+        """
+        if self.K == 1:
+            print("Already classed as a polyline.")
+            return self
+        polylines = self.copy()
+        polylines.K = 1
+        return polylines
+
+    def polys_to_points(self, keep_order=True):
+        """Convert all feature vertices to an ndarray of points.
+        NaN's are removed.  Optionally, retain point order"""
+        uni, idx = np.unique(self, True, axis=0)
+        if keep_order:
+            uni = self[np.sort(idx)]
+        uni = uni[~np.isnan(uni[:, 0])]
+        return np.asarray(uni)
+
+    def close_polylines(self, out_kind=1):
+        """Attempt to produce closed-loop polylines (1) or polygons (2)
+        from polylines.  Multipart features are converted to single part.
+        """
         polys = []
         for s in self.bits:  # shape as bits
             if len(s) > 2:
@@ -702,32 +880,18 @@ class Geo(np.ndarray):
                     polys.append(s)
                 else:
                     polys.append(np.concatenate((s, s[..., :1, :]), axis=0))
-        return np.asarray(polys)
-
-    def od_pairs(self):
-        """Construct origin-destination pairs for traversing around the
-        perimeter of polygons or along polylines or between sequences
-        of points.
-        """
-        od = []
-        for p in self.bits:
-            od.append(np.c_[p[:-1], p[1:]])
-        return np.asarray(od)
-
-    def unique_pnts(self, keep_order=True):
-        """Convert all feature vertices to points. NaN's are removed.
-        Optionally retain point order"""
-        uni, idx = np.unique(self, True, axis=0)
-        if keep_order:
-            uni = self[np.sort(idx)]
-        uni = uni[~np.isnan(uni[:, 0])]
-        return np.asarray(uni)
+        outGeo = _updateGeo(polys, K=out_kind, id_too=None, Info=None)
+        return outGeo
 
     def densify_by_distance(self, spacing=1):
-        """Calls _pnts_on_line_ for geo bits"""
-        out = []
+        """Densify poly features by a specified distance.  Converts multipart
+        to singlepart features during the process.
+        Calls ``_pnts_on_line_`` for Geo bits
+        """
+        polys = []
         for a in self.bits:
-            out.append(_pnts_on_line_(a, spacing))
+            polys.append(_pnts_on_line_(a, spacing))
+        out = _updateGeo(polys, K=self.K)
         return out
 
     def polys_to_segments(self, by_part=True):
@@ -752,49 +916,31 @@ class Geo(np.ndarray):
 
     #
     #----------------End of class definition-
-# ==== update Geo array, or create one from a list of arrays ================
-#
-def _updateGeo(a_2d,  K=None, id_too=None, Info=None):
-    """Create a new Geo from a list of arrays.
-
-    Parameters
-    ----------
-    a_2d : list/tuple/array
-        Some form of nested 2D array-like structure that can be stacked
-    K : integer
-        Points (0), polylines (1) or polygons (2)
-    id_too : array-like
-        If None, then the structure will be created.
-    Info : text (optional)
-        Provide any information that will help in identifying the array.
-    Returns
-    -------
-    A new Geo array is returned given the inputs.
-    """
-    if K not in (0, 1, 2):
-        print("Output type not specified")
-        return None
-    if id_too is None:
-        id_too = []
-        for i, a in enumerate(a_2d):
-            id_too.append((i, len(a)))
-    a_2d = np.vstack(a_2d)
-    id_too = np.array(id_too)
-    I = id_too[:, 0]
-    too = np.cumsum(id_too[:, 1])
-    frum = np.concatenate(([0], too))
-    IFT = np.array(list(zip(I, frum, too)))
-    new_geo = Geo(a_2d, IFT, K, Info)
-    return new_geo
 
 # ===== Working with Geo ndarrays. ==========================================
-#
+#  Keep for now
+#def _alterGeo_(vals, K):
+#    """Alter Geo called by Geo.pull
+#    """
+#    id_too = []
+#    for i, a in enumerate(vals):
+#        id_too.append((i, len(a)))
+#    arr = np.vstack(vals)
+#    id_too = np.array(id_too)
+#    I = id_too[:, 0]
+#    too = np.cumsum(id_too[:, 1])
+#    frum = np.concatenate(([0], too))
+#    IFT = np.array(list(zip(I, frum, too)))
+#    new_geo = Geo(arr, IFT, K)
+#    return new_geo
+
+
 def _o_ring_(arr):
     """Collect the outer ring of a shape.  An outer ring is separated from
     its inner ring, a hole, by a ``null_pnt``.  Each shape is examined for
     these and the outer ring is split off for each part of the shape.
     Called by::
-        angles, outer_rings, is_convex and convex_hulls    
+        angles, outer_rings, is_convex and convex_hulls
     """
     nan_check = np.isnan(arr[:, 0])
     if np.any(nan_check):  # split at first nan to do outer
@@ -802,7 +948,7 @@ def _o_ring_(arr):
         arr = np.split(arr, w)[0]
     return arr
 
-def _angles_(a, inside, in_deg):
+def _angles_(a, inside=True, in_deg=True):
     """Worker for Geo.angles. sequential points, a, b, c.
 
     Parameters
@@ -814,7 +960,7 @@ def _angles_(a, inside, in_deg):
     """
     #
     a = _o_ring_(a)             # work with the outer rings only
-    dx, dy = a[0] - a[-1]  
+    dx, dy = a[0] - a[-1]
     if np.allclose(dx, dy):     # closed loop, remove duplicate
         a = a[:-1]
     ba = a - np.roll(a, 1, 0)   # just as fastish as concatenate
@@ -842,7 +988,7 @@ def _ch_(points):
         return (xa - xo)*(yb - yo) - (ya - yo)*(xb - xo)
     # ----
     points = points[~np.isnan(points[:, 0])]
-    uni, idx = np.unique(points, return_index=True, axis=0)
+    _, idx = np.unique(points, return_index=True, axis=0)
     points = points[idx]
     if len(points) <= 3:
         return points
@@ -862,18 +1008,6 @@ def _ch_(points):
     return ch
 
 
-def _multi_to_single_(a, info=""):
-    """Convert multipart shapes to singleparts and return a new Geo array.
-    """
-    if not hasattr(a, 'IFT'):
-        print("Requires a Geo array")
-        return None
-    ift = a.IFT
-    data = np.vstack(a.parts)
-    ift[:, 0] = np.arange(len(a.parts))
-    new_geo = Geo(data, IFT=ift, Kind=a.K, Info=info)
-    return new_geo
-        
 def _pnts_on_line_(a, spacing=1):  # densify by distance
     """Add points, at a fixed spacing, to an array representing a line.
     **See**  ``densify_by_distance`` for documentation.
@@ -957,36 +1091,6 @@ def _nan_split_(arr):
         return np.asarray(subs)
     return arr
 
-def assemble(arrs, Info=""):
-    """Reassemble the arrays from ``parts``"""
-    a_2d = []
-    id_leng = []
-    IFT_in = []
-    for i, ar in enumerate(arrs):
-        IFT_in.append(getattr(ar, 'IFT', None))
-        s = np.isnan(ar[:, 0])
-        if np.any(s):
-            w = np.where(s)[0]
-            ss = np.split(ar, w)
-            a_2d.append(ss[0])
-            id_leng.append((i, len(ss[0])))
-            for j in range(1, len(ss)):
-                s0 = ss[j] #[1:]
-                a_2d.append(s0)  # for i in ss[1:])
-                id_leng.append((i, len(s0)))
-        else:
-            a_2d.append(ar)
-            id_leng.append((i, len(ar)))
-    a_2d = np.vstack(a_2d)
-    id_leng = np.array(id_leng)
-    I = id_leng[:, 0]
-    too = np.cumsum(id_leng[:, 1])
-    frum = np.concatenate(([0], too))
-    IFT = np.array(list(zip(I, frum, too)))
-    IFT_in = np.array(IFT_in)
-    info = "{} assemble".format(Info)
-    g = Geo(a_2d, IFT_in, Info=info)
-    return g, a_2d, IFT, IFT_in #out, id_leng
 
 # ===========================================================================
 # ----print section  ------------------------------------
@@ -1170,7 +1274,7 @@ if __name__ == "__main__":
     """optional location for parameters"""
     #msg = _demo_()
 # in_fc3 = r"C:\Arc_projects\Canada\Canada.gdb\Ontario_LCConic"
-    
+
 '''
 in_fc2 = r"C:/Arc_projects/CoordGeom/CoordGeom.gdb/Shape2"
 SR = getSR(in_fc2)
