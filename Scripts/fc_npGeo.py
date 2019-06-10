@@ -69,6 +69,7 @@ import sys
 from textwrap import dedent  #, indent
 import numpy as np
 from numpy.lib.recfunctions import structured_to_unstructured as stu
+from numpy.lib.recfunctions import unstructured_to_structured as uts
 
 import arcpy
 from npGeo import Geo
@@ -135,8 +136,11 @@ def arrays_Geo(in_arrays):
     Parameters
     ----------
     in_arrays : list
-        in_arrays can be created by adding existing 2D arrays to the list or
-        from those produced from ``poly2arrays``.
+        ``in_arrays`` can be created by adding existing 2D arrays to the list
+         or produced from the conversion of poly features to arrays using
+        ``poly2arrays``.
+    Kind : integer
+        Points (0), polylines (1) or polygons (2)
 
     Returns
     -------
@@ -529,8 +533,8 @@ def _demo_(in_fc, kind, info=None):
     shapes = fc_shapes(in_fc)
     # ---- Do the work ----
     tmp, IFT = fc_geometry(in_fc)
-#    m = np.nanmin(tmp, axis=0)
-    m = [300000., 5000000.]
+    m = np.nanmin(tmp, axis=0)
+#    m = [300000., 5000000.]
     a = tmp  - m
     g = Geo(a, IFT, kind, info)
     frmt = """
@@ -549,18 +553,18 @@ def _demo_(in_fc, kind, info=None):
 if __name__ == "__main__":
     """optional location for parameters"""
 
-    # All polygon shapes
-    in_fc0 = r"C:/Arc_projects/CoordGeom/CoordGeom.gdb/Polygons"
-    SR, sh0, IFT0, s0 = _demo_(in_fc0, 2, 's0')
-    # Single multipart polygon shape
-    in_fc1 = r"C:/Arc_projects/CoordGeom/CoordGeom.gdb/Shape1"
-    SR1, sh1, IFT1, s1 = _demo_(in_fc1, 2, False)  # multipart
-    # Above plus one shape to the right
+#    # All polygon shapes
+#    in_fc0 = r"C:/Arc_projects/CoordGeom/CoordGeom.gdb/Polygons"
+#    SR, sh0, IFT0, s0 = _demo_(in_fc0, 2, 's0')
+#    # Single multipart polygon shape
+#    in_fc1 = r"C:/Arc_projects/CoordGeom/CoordGeom.gdb/Shape1"
+#    SR1, sh1, IFT1, s1 = _demo_(in_fc1, 2, False)  # multipart
+#    # Above plus one shape to the right
     in_fc2 = r"C:/Arc_projects/CoordGeom/CoordGeom.gdb/Shape2"
     SR, sh2, IFT2, s2 = _demo_(in_fc2, 2, 's2')
-    # Ontario large file
-    #in_fc3 = r"C:\Arc_projects\Canada\Canada.gdb\Ontario_LCConic"
-    #SR3, sh3, IFT3, s3 = _demo_(in_fc3, 2, 's3', False)
+#    # Ontario large file
+#    in_fc = r"C:\Arc_projects\Canada\Canada.gdb\Ontario_LCConic"
+#    SR, sh, IFT, s = _demo_(in_fc, 2, 's')
     #
     # ---- Get the shapes that you want by changing s0
     #shps = [s0.get(i) for i in range(5)]

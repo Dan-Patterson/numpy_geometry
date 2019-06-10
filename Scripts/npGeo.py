@@ -10,7 +10,7 @@ Script : npGeo.py
 Author :
     Dan_Patterson@carleton.ca
 
-Modified : 2019-06-06
+Modified : 2019-06-09
     Initial creation period 2019-05
 
 Purpose : geometry tools
@@ -297,11 +297,11 @@ class Geo(np.ndarray):
         # --- other properties
         self.N = len(np.unique(self.IDs))  # sample size, unique shapes
         if self.shape[1] >= 2:             # X,Y and XY initialize
-            self.X = self[:, 0]
-            self.Y = self[:, 1]
-            self.XY = self[:, :2]
+            self.X = arr[:, 0]
+            self.Y = arr[:, 1]
+            self.XY = arr[:, :2]
         if self.shape[1] >= 3:   # add Z, although not implemented
-            self.Z = self[:, 2]  # directly, but kept for future additions
+            self.Z = arr[:, 2]  # directly, but kept for future additions
         else:
             self.Z = None
         return self
@@ -682,7 +682,13 @@ class Geo(np.ndarray):
     #
     # ---- return altered geometry
     #
-    def move(self, dx=0, dy=0):
+    def moveto_origin(self):
+        """Shift the dataset so that the origin is the lower-left corner.
+        see also ``translate``"""
+        dx, dy = np.nanmin(self.XY, axis=0)        
+        return Geo(self.XY + [-dx, -dy], self.IFT)
+
+    def shift(self, dx=0, dy=0):
         """see ``translate``"""
         return Geo(self.XY + [dx, dy], self.IFT)
 
@@ -845,7 +851,7 @@ class Geo(np.ndarray):
         """
         if self.K == 2:
             print("Already classed as a polygon.")
-            return self
+            return None
         polygons = self.copy()
         polygons.K = 2
         return polygons
@@ -855,7 +861,7 @@ class Geo(np.ndarray):
         """
         if self.K == 1:
             print("Already classed as a polyline.")
-            return self
+            return None
         polylines = self.copy()
         polylines.K = 1
         return polylines
@@ -917,24 +923,8 @@ class Geo(np.ndarray):
     #
     #----------------End of class definition-
 
-# ===== Working with Geo ndarrays. ==========================================
-#  Keep for now
-#def _alterGeo_(vals, K):
-#    """Alter Geo called by Geo.pull
-#    """
-#    id_too = []
-#    for i, a in enumerate(vals):
-#        id_too.append((i, len(a)))
-#    arr = np.vstack(vals)
-#    id_too = np.array(id_too)
-#    I = id_too[:, 0]
-#    too = np.cumsum(id_too[:, 1])
-#    frum = np.concatenate(([0], too))
-#    IFT = np.array(list(zip(I, frum, too)))
-#    new_geo = Geo(arr, IFT, K)
-#    return new_geo
-
-
+# ===== Workers with Geo and ndarrays. ==========================================
+#
 def _o_ring_(arr):
     """Collect the outer ring of a shape.  An outer ring is separated from
     its inner ring, a hole, by a ``null_pnt``.  Each shape is examined for
