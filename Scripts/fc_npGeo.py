@@ -10,7 +10,7 @@ Script :
 Author : 
     Dan_Patterson@carleton.ca
 
-Modified : 2019-05-29
+Modified : 2019-06-10
     Creation date during 2019 as part of ``arraytools``.
 
 Purpose : Tools for working with poly features as an array class
@@ -140,7 +140,7 @@ def arrays_Geo(in_arrays):
          or produced from the conversion of poly features to arrays using
         ``poly2arrays``.
     Kind : integer
-        Points (0), polylines (1) or polygons (2)
+        MultiPoints (0), polylines (1) or polygons (2)
 
     Returns
     -------
@@ -228,7 +228,7 @@ def fc_geometry(in_fc, SR=None):
     Parameters
     ----------
     in_fc : text
-        Path to the input featureclass
+        Path to the input featureclass.  Points not supported.
     SR : spatial reference
        Spatial reference object, name or id
 
@@ -240,33 +240,114 @@ def fc_geometry(in_fc, SR=None):
 
     See Also
     --------
-    **arrays_Geo** to produce ``Geo`` objects directly pre-existing arrays, or
-    arrays derived form existing arcpy poly objects which originated from esri
-    featureclasses.
+    Use **arrays_Geo** to produce ``Geo`` objects directly pre-existing arrays,
+     or arrays derived form existing arcpy poly objects which originated from
+     esri featureclasses.
 
     Notes
     -----
+    Multipoint, polylines and polygons and its variants are supported.
+
+    **Point and Multipoint featureclasses**
+
+    >>> cent = arcpy.da.FeatureClassToNumPyArray(pnt_fc,
+                                             ['OID@', 'SHAPE@X', 'SHAPE@Y'])
+
+    For multipoints, use
+
+    >>> allpnts = arcpy.da.FeatureClassToNumPyArray(multipnt_fc,
+                                                ['OID@', 'SHAPE@X', 'SHAPE@Y']
+                                                explode_to_points=True)
+
+    **IFT array structure**
+
     To see the ``IFT`` output as a structured array, use the following.
 
     >>> dt = np.dtype({'names': ['ID', 'From', 'To'], 'formats': ['<i4']*3})
     >>> z = IFT.view(dtype=dt).squeeze()
     >>> prn_tbl(z)  To see the output in tabular form
+
+    **Flatten geometry tests**
+
+    >>> %timeit fc_geometry(in_fc2, SR)
+    105 ms ± 1.04 ms per loop (mean ± std. dev. of 7 runs, 10 loops each)
+    ...
+    >>> %%timeit
+    ... cur = arcpy.da.SearchCursor(in_fc2, 'SHAPE@', None, SR)
+    ... p = [row[0] for row in cur]
+    ... sh = [[i for i in itertools.chain.from_iterable(shp)] for shp in p]
+    ... pnts = [[[pt.X, pt.Y] if pt else null_pnt for pt in lst] for lst in sh]
+    4.4 ms ± 21.4 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
+    """
+    msg = """
+    Use arcpy.FeatureClassToNumPyArray for Point files.
+    MultiPoint, Polyline and Polygons and its variants are supported.
     """
     # ----
+    def _multipnt_(in_fc, SR):
+        """Convert multipoint geometry to array"""
+        pnts = arcpy.da.FeatureClassToNumPyArray(in_fc,
+                   ['OID@', 'SHAPE@X', 'SHAPE@Y'],
+                   spatial_reference=SR,
+                   explode_to_points=True
+                   )
+        id_len = np.vstack(np.unique(pnts['OID@'], return_counts=True)).T
+        a_2d = stu(pnts[['SHAPE@X', 'SHAPE@Y']])  # ---- use ``stu`` to convert
+        return id_len, a_2d
+    # 
+    def _polytypes_(in_fc, SR):
+        """Convert polylines/polygons geomeetry to array"""
+        null_pnt = (np.nan, np.nan)
+        id_len = []
+        a_2d = []
+        with arcpy.da.SearchCursor(in_fc,
+                                   ['OID@', 'SHAPE@'],
+                                   None, SR) as cursor:
+            for row in cursor:
+                sub = []
+                for arr in row[1]:
+                    pnts = [[pt.X, pt.Y] if pt else null_pnt for pt in arr]
+                    sub.append(np.asarray(pnts))
+                    id_len.extend([(row[0], len(pnts))])
+                a_2d.extend([j for i in sub for j in i])
+        # ----
+        id_len = np.array(id_len)
+        a_2d = np.asarray(a_2d)
+        return id_len, a_2d
+    #
+    # ---- Check and process section ----------------------------------------
+    desc = arcpy.da.Describe(in_fc)
+    fc_kind = desc['shapeType']
+    SR = desc['spatialReference']
+    if fc_kind == "Point":
+        print(dedent(msg))
+        return None
+    elif fc_kind == "Multipoint":
+        id_len, a_2d = _multipnt_(in_fc, SR)
+    else:
+        id_len, a_2d = _polytypes_(in_fc, SR)
+    # ---- Return and send out
+    ids = id_len[:, 0]
+    too = np.cumsum(id_len[:, 1])
+    frum = np.concatenate(([0], too))
+    from_to = np.array(list(zip(frum, too)))
+    IFT = np.c_[ids, from_to]
+    return a_2d, IFT
+
+def fc_g2(in_fc, SR=None):
+    """variant"""
     desc = arcpy.da.Describe(in_fc)
     SR = desc['spatialReference']
-    #geom_kind = desc['shapeType']
     null_pnt = (np.nan, np.nan)
     id_len = []
     a_2d = []
-    with arcpy.da.SearchCursor(in_fc, 'SHAPE@', None, SR) as cursor:
-        for p_id, row in enumerate(cursor):
+    with arcpy.da.SearchCursor(in_fc, ['OID@', 'SHAPE@'], None, SR) as cursor:
+        for row in cursor:
             sub = []
-            for arr in row[0]:
+            for arr in row[1]:
                 pnts = [[pt.X, pt.Y] if pt else null_pnt for pt in arr]
                 sub.append(np.asarray(pnts))
-                id_len.extend([(p_id, len(pnts))])
-            #id_len.extend([(p_id, len(k)) for k in sub])
+                id_len.extend([(row[0], len(pnts))])
             a_2d.extend([j for i in sub for j in i])
     # ----
     id_len = np.array(id_len)
@@ -277,7 +358,6 @@ def fc_geometry(in_fc, SR=None):
     from_to = np.array(list(zip(frum, too)))
     IFT = np.c_[ids, from_to] # np.array(list(zip(ids, frum, too)))
     return a_2d, IFT
-
 
 def fc_data(in_fc):
     """Pull all editable attributes from a featureclass tables.  During the
