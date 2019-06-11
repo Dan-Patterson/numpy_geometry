@@ -1,13 +1,16 @@
-# npGeo
-A numpy geometry class and functions that work with arcpy and ESRI featureclasses
+# NumPy and Geometry
 
-This is a work in progress, so bear with me.  The intent of the Geo class is to treat the geometry of featureclasses as one entity.  Most approaches I have see so far tend to construct the geometric representations of geometries using some variant of arcpy cursors.
+A numpy geometry class and functions that work with arcpy and ESRI featureclasses is provided here to facilitate working with vector geometry using the ndarray as its base.
 
-When trying to work with numpy and the geometries, this creates problems since geometry is rarely simple shapes.  Object arrays containing the coordinates are the norm.  What I set out to do was create a uniform 2D array of coordinates with np.nan values separating the parts of a particular shape and a companion array which denotes the feature ID and the from-to point pairs.  This is similar to the FeatureClassToNumPy array approach, but that particular function and its inverse, are only useful for simple singlepart geometries.
+This is a work in progress, so bear with me.  The intent of the Geo class is to treat the geometry of featureclasses as one entity.  See **npGeo.py** in the Scripts section for details.  Converting esri's arcpy geometry objects to array representations is contained in **fc_npGeo.py**. Most approaches I have see so far tend to construct the geometric representations of geometries using some variant of arcpy cursors.
 
-I will document and build on thes tools set with examples.  I am only working with featureclasses stored in a file geodatabase.
+When trying to work with numpy and the geometries, this creates problems since geometry is rarely a collection of simple shapes (eg. rectangles, circles, triangles).  Object arrays containing the coordinates are the norm.  An object array is created when the number of points per feature and/or feature part are not uniform.  For example, a square with a triangular hole in it, will have an outer ring, oriented clockwise consisting of a list of 5 points with the first and last point being the same.  The triangular hole will be represented by 4 points oriented counterclockwise.  Now that arrangement of points can be used to represent a polygon, a closed-loop polyline or a multipoint.  The same points can be used to represent 3 distinctly different geometric objects.
 
-**Some links**
+What I set out to do was create a uniform 2D array of coordinates with np.nan values separating the parts of a particular shape and a companion array which denotes the feature ID and the from-to point pairs.  This is similar to the FeatureClassToNumPy array approach, but that particular function and its inverse, are only useful for simple singlepart geometries.
+
+I will document and build on these tools set with examples.  I am only working with featureclasses stored in a file geodatabase.
+
+# Some links
 
 [Geometry in NumPy](https://community.esri.com/blogs/dan_patterson/2019/03/17/geometry-in-numpy-1)
 
@@ -33,8 +36,6 @@ Consider the following multipart shapes.  The first shape has is second part sli
 The centroids of each part are shown on the image.  These locations have been confirmed using arcpy and npGeo methods.
 
 The point coordinates with (300,000 m, 5,000,000 m, MTM 9) subtracted from their values.  So the data are in a projected coordinate system and all further measures will be in planar/metric units.
-
-
 
 
 
@@ -82,8 +83,8 @@ pnt shape  part  X       Y
  038     1         25.00   24.00
 ``` 
  
- This shape (s2) is simply represented by the last 2 columns, the first 2 columns are solely for printing purposes.
- The sequence of points is identified by their Id and From and To points (IFT)
+This shape (s2) is simply represented by the last 2 columns, the first 2 columns are solely for printing purposes.
+The sequence of points is identified by their Id and From and To points (IFT)
 
 ```
 s2.IFT 
