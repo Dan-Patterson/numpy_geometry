@@ -1,6 +1,6 @@
 # Scripts
 
-**fc_npGeo.py**
+## fc_npGeo.py
 
 The methods used to convert esri geometries to an appropriate array format.
 This script will require you have a valid license for ArcGIS Pro since esri FeatureClasses in a File Geodatabase need to be read and their arcpy geometries extracted and converted to numpy arrays.
@@ -12,7 +12,7 @@ If you wish to clone their distribution or modify the existing one, some guidanc
 
 <a href="url"><img src="https://github.com/Dan-Patterson/npGeo/blob/master/images/clones2.png" align="center" height="200" width="auto" ></a>
 
-**npGeo.py**
+## npGeo.py
 
 This is where the Geo class is housed along with methods an properties applicable to it.  The Geo class inherits from the numpy ndarray and methods applied to Geo arrays generally returns arrays of that class.
 
