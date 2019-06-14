@@ -10,7 +10,7 @@ Script : npGeo.py
 Author :
     Dan_Patterson@carleton.ca
 
-Modified : 2019-06-09
+Modified : 2019-06-13
     Initial creation period 2019-05
 
 Purpose : geometry tools
@@ -111,6 +111,7 @@ from textwrap import dedent
 import numpy as np
 #from numpy.lib.recfunctions import structured_to_unstructured as stu
 from numpy.lib.recfunctions import unstructured_to_structured as uts
+from scipy.spatial import ConvexHull as CH
 
 ft = {'bool': lambda x: repr(x.astype(np.int32)),
       'float_kind': '{: 0.1f}'.format}
@@ -197,13 +198,10 @@ def _updateGeo(a_2d, K=None, id_too=None, Info=None):
     A new Geo array is returned given the inputs.
     """
     if K not in (0, 1, 2):
-        print("Output type not specified")
+        print("Output type not specified, or not in (0, 1, 2)")
         return None
     if id_too is None:
         id_too = [(i, len(a)) for i, a in enumerate(a_2d)]
-#        id_too = []
-#        for i, a in enumerate(a_2d):
-#            id_too.append((i, len(a)))
     a_2d = np.vstack(a_2d)
     id_too = np.array(id_too)
     I = id_too[:, 0]
@@ -216,7 +214,7 @@ def _updateGeo(a_2d, K=None, id_too=None, Info=None):
 
 def Geo_array(in_geo):
     """Reconstruct the input arrays from the Geo array"""
-    return np.asarray([in_geo.get(i) for i in range(in_geo.N)])
+    return np.asarray([in_geo.get(i) for i in np.unique(in_geo.IDs)])
 
 # ===========================================================================
 #
@@ -362,7 +360,7 @@ class Geo(np.ndarray):
     def pnts(self):
         """Point count for shapes excluding null points."""
         return np.array([(i, len(p[~np.isnan(p[:, 0])]))
-                         for i, p in enumerate(self.shapes)])
+                         for i, p in enumerate(self.shapes)]) # start at 0
 
     @property
     def shapes(self):
@@ -388,8 +386,8 @@ class Geo(np.ndarray):
 
     @property
     def bits(self):
-        """Deconstruct the 2D array then parts of a piece if
-        a piece contains multiple parts.
+        """Deconstruct the 2D array then parts of a piece if a piece contains
+        multiple parts.  Keeps the outer ring of parts with holes.
         """
         out = []
         prts = self.parts
@@ -407,20 +405,13 @@ class Geo(np.ndarray):
     #
     @property
     def areas(self):
-        """Area for the sub arrays using _e_area for the calculations"""
-        def _e_area(a):
-            """Mini e_area, used by areas and centroids"""
-            x0, y1 = (a.T)[:, 1:]
-            x1, y0 = (a.T)[:, :-1]
-            e0 = np.einsum('...i,...i->...i', x0, y0)
-            e1 = np.einsum('...i,...i->...i', x1, y1)
-            return np.nansum((e0 - e1)*0.5)
-        # ----
+        """Area for the sub arrays using _e_area for the calculations.  Uses
+        ``_area_part_`` to calculate the area
+        """
         if self.K != 2:
             print("Polygons required")
             return None
-        chunks = self.parts
-        subs = [_e_area(i) for i in chunks]           # call to _e_area
+        subs = [_area_part_(i) for i in self.parts]   # call to _area_part_
         totals = np.bincount(self.IDs, weights=subs)  # weight by IDs' area
         return totals
 
@@ -434,21 +425,10 @@ class Geo(np.ndarray):
 
     @property
     def centroids(self):
-        """Centroid of the polygons.
+        """Centroid of the polygons.  Uses ``_area_centroid_`` to calculate
+        values for each shape part.  The centroid is weighted by area for
+        multipart features.
         """
-        def _cal_(p):
-            """calculate area and centroid"""
-            #x, y = p.T
-            x0, y1 = (p.T)[:, 1:]
-            x1, y0 = (p.T)[:, :-1]
-            e0 = np.einsum('...i,...i->...i', x0, y0)
-            e1 = np.einsum('...i,...i->...i', x1, y1)
-            area = np.nansum((e0 - e1)*0.5)
-            t = e1 - e0
-            area = np.nansum((e0 - e1)*0.5)
-            x_c = np.nansum((x1 + x0) * t, axis=0) / (area * 6.0)
-            y_c = np.nansum((y1 + y0) * t, axis=0) / (area * 6.0)
-            return np.asarray([-x_c, -y_c]), area
         # ----
         def weighted(x_y, I, areas):
             """Weighted coordinate by area, x_y is either the x or y"""
@@ -467,7 +447,7 @@ class Geo(np.ndarray):
             parts_ = self.FT[self.IDs == ID]
             out = np.asarray([np.asarray(self.XY[p[0]:p[1]]) for p in parts_])
             for prt in out:
-                cen, area = _cal_(prt)
+                area, cen = _area_centroid_(prt) #---- determine both
                 centr.append(cen)
                 areas.append(area)
         centr = np.asarray(centr)
@@ -729,7 +709,7 @@ class Geo(np.ndarray):
     #  convex_hulls, minimum area bounding rectangle
     #  **see also** extent properties above
     #
-    def convex_hulls(self, by_part=False):
+    def convex_hulls(self, by_part=False, threshold=50):
         """Convex hull for shapes.
 
         by_part : boolean
@@ -742,8 +722,10 @@ class Geo(np.ndarray):
             shps = self.shapes
         ch_out = []
         for s in shps:  # ---- run convex hull, _ch_, on point groups
-            h = _ch_(s)
-            ch_out.append(h)
+            ch_out.append(_ch_(s, threshold))
+        for i, c in enumerate(ch_out):  # check for closed
+            if np.all(c[0] != c[-1]):
+                ch_out[i] = np.vstack((c, c[0]))
         return ch_out
 
     def min_area_rect(self):
@@ -756,13 +738,26 @@ class Geo(np.ndarray):
             LBRT = np.concatenate((np.nanmin(a, axis=0), np.nanmax(a, axis=0)))
             dx, dy = np.diff(LBRT.reshape(2, 2), axis=0).squeeze()
             return dx * dy, LBRT
+
+        def _extents_(a):
+            """Extents are returned as L(eft), B(ottom), R(ight), T(op)
+            """
+            def _sub_(i):
+                """Extent of a sub-array in an object array"""
+                return np.concatenate((np.nanmin(i, axis=0),
+                                       np.nanmax(i, axis=0)))
+            # ----
+            p_ext = [_sub_(i) for i in a]
+            return np.asarray(p_ext)
         # ----
-        o_rings = self.outer_rings(asGeo=True)
-        ang_ = o_rings.angles(True, True)
-        xt = o_rings.extents(True)  # centre of the extent shape and part
-        cent_ = np.c_[np.mean(xt[:, :2], axis=1), np.mean(xt[:, 2:], axis=1)]
+        chs = self.convex_hulls(False, 50)
+        ang_ = [_angles_(i) for i in chs]
+        xt = _extents_(chs)
+        cent_ = np.c_[np.mean(xt[:, 0::2], axis=1),
+                      np.mean(xt[:, 1::2], axis=1)]
         rects = []
-        for i, p in enumerate(o_rings.parts):
+        for i, p in enumerate(chs):
+            # ---- np.radians(np.unique(np.round(ang_[i], 2))) # --- round
             uni_ = np.radians(np.unique(ang_[i]))
             area_old, LBRT = _extent_area_(p)
             for angle in uni_:
@@ -773,12 +768,12 @@ class Geo(np.ndarray):
                 Xmin, Ymin, Xmax, Ymax = LBRT
                 vals = [area_, Xmin, Ymin, Xmax, Ymax]
                 if area_ < area_old:
-                    min_area = area_
+                    #min_area = area_
                     area_old = area_
                     Xmin, Ymin, Xmax, Ymax = LBRT
-                    vals = [min_area, Xmin, Ymin, Xmax, Ymax]
+                    vals = [Xmin, Ymin, Xmax, Ymax]  # min_area, 
             rects.append(vals)
-        return rects
+        return np.asarray(rects)
     #
     #---- conversions --------------------------------------------------------
     #
@@ -838,7 +833,7 @@ class Geo(np.ndarray):
 
         Returns
         -------
-        A 2D ndarray is returned of origin-distination pairs.
+        A 2D ndarray of origin-distination pairs is returned.
         """
         od = []
         for p in self.bits:
@@ -867,7 +862,7 @@ class Geo(np.ndarray):
         return polylines
 
     def polys_to_points(self, keep_order=True):
-        """Convert all feature vertices to an ndarray of points.
+        """Convert all feature vertices to an ndarray of unique points.
         NaN's are removed.  Optionally, retain point order"""
         uni, idx = np.unique(self, True, axis=0)
         if keep_order:
@@ -920,6 +915,40 @@ class Geo(np.ndarray):
         out = [_poly_segments_(s) for s in shps]
         return out
 
+    # ---- info section
+    #
+    def info(self, prn=True):
+        """Convert an IFT array to full information.
+
+        Parameters
+        ----------
+        prn : boolean
+            If True, the top and bottom 25 records will be printed.
+            If False, the information will be returned and one can use
+            ``prn_tbl`` for more control over the tabular output.
+
+        Notes
+        -----
+        Point count will include any null_pnts used to separate inner and
+        outer rings.
+
+        To see the data structure, use ``prn_geo``.
+        """
+        ift = self.IFT
+        ids = ift[:, 0]
+        _, cnts = np.unique(ids, return_counts=True)
+        part_count = np.concatenate([np.arange(i) for i in cnts])
+        pnts = np.array([len(p) for p in self.parts])
+        too = ift[:, 2]
+        frum = ift[:, 1]
+        id_len2 = np.stack((ids, part_count, pnts, frum, too), axis=-1)
+        dt = np.dtype({'names':['IDs', 'Part', 'Points', 'From_ID', 'To_ID'],
+                       'formats': ['i4', 'i4','i4','i4','i4']})
+        IFT_2 = uts(id_len2, dtype=dt)
+        if prn:
+            prn_tbl(IFT_2)
+        else:
+            return IFT_2   
     #
     #----------------End of class definition-
 
@@ -937,6 +966,29 @@ def _o_ring_(arr):
         w = np.where(np.isnan(arr[:, 0]))[0]
         arr = np.split(arr, w)[0]
     return arr
+
+def _area_part_(a):
+    """Mini e_area, used by areas and centroids"""
+    x0, y1 = (a.T)[:, 1:]
+    x1, y0 = (a.T)[:, :-1]
+    e0 = np.einsum('...i,...i->...i', x0, y0)
+    e1 = np.einsum('...i,...i->...i', x1, y1)
+    return np.nansum((e0 - e1)*0.5)
+
+def _area_centroid_(a):
+    """Calculate area and centroid for a singlepart polygon, `a`.  This is also
+    used to calculate area and centroid for a Geo array's parts.
+    """
+    x0, y1 = (a.T)[:, 1:]
+    x1, y0 = (a.T)[:, :-1]
+    e0 = np.einsum('...i,...i->...i', x0, y0)
+    e1 = np.einsum('...i,...i->...i', x1, y1)
+    area = np.nansum((e0 - e1)*0.5)
+    t = e1 - e0
+    area = np.nansum((e0 - e1)*0.5)
+    x_c = np.nansum((x1 + x0) * t, axis=0) / (area * 6.0)
+    y_c = np.nansum((y1 + y0) * t, axis=0) / (area * 6.0)
+    return area, np.asarray([-x_c, -y_c])
 
 def _angles_(a, inside=True, in_deg=True):
     """Worker for Geo.angles. sequential points, a, b, c.
@@ -967,8 +1019,17 @@ def _angles_(a, inside=True, in_deg=True):
         angles = np.degrees(ang)
     return angles
 
-def _ch_(points):
-    """Calculates the convex hull for given points.
+def _ch_scipy(points):
+    """Convex hull using scipy.spatial.ConvexHull. Remove null_pnts, calculate
+    the hull, derive the vertices and reorder clockwise.
+    """
+    p_nonan = points[~np.isnan(points[:, 0])]
+    out = CH(p_nonan)
+    return out.points[out.vertices][::-1]
+
+def _ch_simple_(in_points):
+    """Calculates the convex hull for given points.  Removes null_pnts, finds
+    the unique points, then determines the hull from the remaining
     """
     def _x_(o, a, b):
         """Cross-product for vectors o-a and o-b"""
@@ -977,11 +1038,11 @@ def _ch_(points):
         xb, yb = b
         return (xa - xo)*(yb - yo) - (ya - yo)*(xb - xo)
     # ----
-    points = points[~np.isnan(points[:, 0])]
-    _, idx = np.unique(points, return_index=True, axis=0)
+    points = in_points[~np.isnan(in_points[:, 0])]
+    uni, idx = np.unique(points, return_index=True, axis=0)
     points = points[idx]
     if len(points) <= 3:
-        return points
+        return in_points
     # Build lower hull
     lower = []
     for p in points:
@@ -995,8 +1056,17 @@ def _ch_(points):
             upper.pop()
         upper.append(p)
     ch = np.array(lower[:-1] + upper)[::-1]  # sort clockwise
+    if np.all(ch[0] != ch[-1]):
+        ch = np.vstack((ch, ch[0]))
     return ch
 
+def _ch_(points, threshold=50):
+    """Perform a convex hull using either simple methods or scipy's"""
+    points = points[~np.isnan(points[:, 0])]
+    if len(points) > threshold:
+        return _ch_scipy(points)
+    else:
+        return _ch_simple_(points)
 
 def _pnts_on_line_(a, spacing=1):  # densify by distance
     """Add points, at a fixed spacing, to an array representing a line.

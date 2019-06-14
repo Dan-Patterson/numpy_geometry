@@ -10,7 +10,7 @@ Script :
 Author : 
     Dan_Patterson@carleton.ca
 
-Modified : 2019-06-10
+Modified : 2019-06-13
     Creation date during 2019 as part of ``arraytools``.
 
 Purpose : Tools for working with poly features as an array class
@@ -220,6 +220,26 @@ def getSR(in_fc, verbose=False):
     return SR
 
 
+def fc_composition(in_fc, SR=None):
+    """Featureclass geometry composition in terms of shapes, shape parts, and
+    point counts for each part.
+    """
+    if SR is None:
+        SR = getSR(in_fc)    
+    with arcpy.da.SearchCursor(in_fc, 'SHAPE@', spatial_reference=SR) as cur:
+        len_lst = []
+        for p_id, row in enumerate(cur):
+            p = row[0]
+            parts = p.partCount
+            num_pnts = np.asarray([p[i].count for i in range(parts)])
+            IDs = np.repeat(p_id, parts)
+            part_count = np.arange(parts)
+            too = np.cumsum(num_pnts)
+            result = np.stack((IDs, part_count, num_pnts, too), axis=-1)
+            len_lst.append(result)
+    fc_comp = np.vstack(len_lst)
+    return fc_comp
+
 # ---- Used to create the inputs for the Geo class
 #
 def fc_geometry(in_fc, SR=None):
@@ -294,24 +314,30 @@ def fc_geometry(in_fc, SR=None):
         id_len = np.vstack(np.unique(pnts['OID@'], return_counts=True)).T
         a_2d = stu(pnts[['SHAPE@X', 'SHAPE@Y']])  # ---- use ``stu`` to convert
         return id_len, a_2d
-    # 
+    # ----
     def _polytypes_(in_fc, SR):
         """Convert polylines/polygons geomeetry to array"""
         null_pnt = (np.nan, np.nan)
         id_len = []
         a_2d = []
-        with arcpy.da.SearchCursor(in_fc,
-                                   ['OID@', 'SHAPE@'],
-                                   None, SR) as cursor:
-            for row in cursor:
+        with arcpy.da.SearchCursor(in_fc, 'SHAPE@', None, SR) as cursor:
+            for p_id, row in enumerate(cursor):
                 sub = []
-                for arr in row[1]:
+                IDs =[]
+                num_pnts = []
+                parts = row[0].partCount
+                for arr in row[0]:                    
                     pnts = [[pt.X, pt.Y] if pt else null_pnt for pt in arr]
                     sub.append(np.asarray(pnts))
-                    id_len.extend([(row[0], len(pnts))])
+                    IDs.append(p_id)                   
+                    num_pnts.append(len(pnts))
+                part_count = np.arange(parts)
+                #too = np.cumsum(num_pnts)
+                result = np.stack((IDs, part_count, num_pnts), axis=-1)
+                id_len.append(result)
                 a_2d.extend([j for i in sub for j in i])
         # ----
-        id_len = np.array(id_len)
+        id_len = np.vstack(id_len)  #np.array(id_len)
         a_2d = np.asarray(a_2d)
         return id_len, a_2d
     #
@@ -328,11 +354,16 @@ def fc_geometry(in_fc, SR=None):
         id_len, a_2d = _polytypes_(in_fc, SR)
     # ---- Return and send out
     ids = id_len[:, 0]
-    too = np.cumsum(id_len[:, 1])
+    too = np.cumsum(id_len[:, 2])
     frum = np.concatenate(([0], too))
     from_to = np.array(list(zip(frum, too)))
     IFT = np.c_[ids, from_to]
-    return a_2d, IFT
+    id_len2 = np.hstack((id_len, IFT[:, 1:]))
+    dt = np.dtype({'names':['IDs', 'Part', 'Points', 'From_ID', 'To_ID'],
+                   'formats': ['i4', 'i4','i4','i4','i4']})
+    IFT_2 = uts(id_len2, dtype=dt)
+    return a_2d, IFT, IFT_2
+
 
 def fc_g2(in_fc, SR=None):
     """variant"""
@@ -612,7 +643,7 @@ def _demo_(in_fc, kind, info=None):
     SR = getSR(in_fc)
     shapes = fc_shapes(in_fc)
     # ---- Do the work ----
-    tmp, IFT = fc_geometry(in_fc)
+    tmp, IFT, IFT_2 = fc_geometry(in_fc)
     m = np.nanmin(tmp, axis=0)
 #    m = [300000., 5000000.]
     a = tmp  - m
@@ -625,7 +656,7 @@ def _demo_(in_fc, kind, info=None):
     k_dict = {0:'Points', 1:'Polylines/lines', 2:'Polygons'}
     print(dedent(frmt).format(k_dict[kind], IFT))
     #arr_poly_fc(a1, p_type='POLYGON', gdb=gdb, fname='a1_test', sr=SR, ids=ids)
-    return SR, shapes, IFT, g
+    return SR, shapes, IFT, IFT_2, g
 
 
 # ===========================================================================
@@ -641,9 +672,10 @@ if __name__ == "__main__":
 #    SR1, sh1, IFT1, s1 = _demo_(in_fc1, 2, False)  # multipart
 #    # Above plus one shape to the right
     in_fc2 = r"C:/Arc_projects/CoordGeom/CoordGeom.gdb/Shape2"
-    SR, sh2, IFT2, s2 = _demo_(in_fc2, 2, 's2')
+#    in_fc2 = r"C:/Arc_projects/CoordGeom/CoordGeom.gdb/Shape2_multipnts"
+    SR, sh2, IFT2, IFT_2, s2 = _demo_(in_fc2, 2, 's2')
 #    # Ontario large file
-#    in_fc = r"C:\Arc_projects\Canada\Canada.gdb\Ontario_LCConic"
+    in_fc = r"C:\Arc_projects\Canada\Canada.gdb\Ontario_LCConic"
 #    SR, sh, IFT, s = _demo_(in_fc, 2, 's')
     #
     # ---- Get the shapes that you want by changing s0
