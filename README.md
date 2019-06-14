@@ -92,7 +92,24 @@ array([[ 0,  0, 11],    1st shape, 1st part, points 0 to 11 (but not including 1
        [ 0, 11, 21],    1st shape, 2nd part                  following array slicing format)
        [ 1, 21, 30],    2nd shape, 1st part
        [ 1, 30, 39]])   2nd shape, 2nd part
-```       
+```
+I added another method to the pack to expand upon the IFT information. 
+```
+prn_tbl(s2.info(False))
+
+....  IDs    Part    Points    From_ID    To_ID  
+------------------------------------------------
+ 000     0       0        11          0       11
+ 001     0       1        10         11       21
+ 002     1       0         9         21       30
+ 003     1       1         9         30       39
+ 004     2       0         4         39       43
+```
+As is shown **prn_tbl** produces a nicely labelled output from the structured array that can be returned from the **Geo.info** method.
+A quick survey shows repetition of the shape ID in the *Part* column.  The *Points* for each part are given, from which the *From_ID* and *To_ID* values are derived.
+
+
+----
 The methods and functions that will be shown use this information in their processing.  In this fashion, it is possible to try and optimize the derivation of properties and application of functions by using the whole point sequence of their subgroupings.
 
 This will obviously not be possible in all situations, but every bit helps.
