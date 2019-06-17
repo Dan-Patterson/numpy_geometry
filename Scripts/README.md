@@ -1,5 +1,15 @@
 # Scripts
+----
+The following scripts are listed in this folder and the documentation guide
 
+1. _common.py
+2. fc_npGeo.py
+3. npGeo.py
+
+Links to other documentation will be provided as appropriate
+
+
+----
 ## _common.py
 
 Some useful functions to access and documenet featureclass information
@@ -100,6 +110,8 @@ OID_    Shape_Length    Shape_Area    CENTROID_X    CENTROID_Y    INSIDE_X     I
  002      3           21.50         16.00     300013.00    5000022.67    300013.00    5000022.67
  ```
 
+
+----
 ## fc_npGeo.py
 
 The methods used to convert esri geometries to an appropriate array format.
@@ -112,6 +124,8 @@ If you wish to clone their distribution or modify the existing one, some guidanc
 
 <a href="url"><img src="https://github.com/Dan-Patterson/npGeo/blob/master/images/clones2.png" align="center" height="200" width="auto" ></a>
 
+
+----
 ## npGeo.py
 
 This is where the Geo class is housed along with methods an properties applicable to it.  The Geo class inherits from the numpy ndarray and methods applied to Geo arrays generally returns arrays of that class.
