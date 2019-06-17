@@ -4,10 +4,10 @@
 fc_npGeo
 ========
 
-Script : 
+Script :
     fc_npGeo.py
 
-Author : 
+Author :
     Dan_Patterson@carleton.ca
 
 Modified : 2019-06-13
@@ -74,17 +74,15 @@ from numpy.lib.recfunctions import unstructured_to_structured as uts
 import arcpy
 from npGeo import Geo
 
-__all__ = ['FLOATS', 'INTS', 'NUMS',    # constants
-           'arcpy', 'np', 'stu',        # imports
-           'sys', 'dedent', 'Geo',
-           '_check', '_demo_',
-           '_make_nulls_', 'getSR',     # featureclass methods
-           'fc_data', 'fc_geometry',
-           'fc_shapes', 'poly2array',
-           'array_poly', 'arrays_Geo',  # array methods
-           'geometry_fc',
-           'prn_q', 'prn_tbl'           # printing
-           ]
+__all__ = [
+    'FLOATS', 'INTS', 'NUMS',                    # constants
+    'arcpy', 'np', 'stu', 'sys', 'dedent',       # imports
+    'Geo', '_check', '_demo_',
+    '_make_nulls_', 'getSR', 'fc_data',          # featureclass methods
+    'fc_geometry', 'fc_shapes', 'poly2array',
+    'array_poly', 'arrays_Geo', 'geometry_fc',   # array methods
+    'prn_q', 'prn_tbl'           # printing
+    ]
 # ---- Constants -------------------------------------------------------------
 #
 script = sys.argv[0]
@@ -220,12 +218,12 @@ def getSR(in_fc, verbose=False):
     return SR
 
 
-def fc_composition(in_fc, SR=None):
+def fc_composition(in_fc, SR=None, prn=True, start=0, end=10):
     """Featureclass geometry composition in terms of shapes, shape parts, and
     point counts for each part.
     """
     if SR is None:
-        SR = getSR(in_fc)    
+        SR = getSR(in_fc)
     with arcpy.da.SearchCursor(in_fc, 'SHAPE@', spatial_reference=SR) as cur:
         len_lst = []
         for p_id, row in enumerate(cur):
@@ -237,8 +235,33 @@ def fc_composition(in_fc, SR=None):
             too = np.cumsum(num_pnts)
             result = np.stack((IDs, part_count, num_pnts, too), axis=-1)
             len_lst.append(result)
-    fc_comp = np.vstack(len_lst)
-    return fc_comp
+    tmp = np.vstack(len_lst)
+    too = np.cumsum(tmp[:, 2])
+    frum = np.concatenate(([0], too))
+    frum_too = np.array(list(zip(frum, too)))
+    fc_comp = np.hstack((tmp[:, :3], frum_too)) #, axis=0)
+    dt = np.dtype({'names':['IDs', 'Part', 'Points', 'From_pnt', 'To_pnt'],
+                   'formats': ['i4', 'i4', 'i4', 'i4', 'i4']})
+    fc = uts(fc_comp, dtype=dt)
+    if prn:
+        frmt = """\n{}\nShapes :   {}\nParts  :   {:,}\n  max  :   {}\n""" + \
+        """Points :   {:,}\n  min  :   {}\n  median : {}\n  max  :   {:,}"""
+        uni, cnts = np.unique(fc['IDs'], return_counts=True)
+        a0, a1 = [fc['Part'] + 1, fc['Points']]
+        args = [in_fc, len(uni), np.sum(cnts), np.max(a0),
+                np.sum(a1), np.min(a1), int(np.median(a1)), np.max(a1)]
+        msg = dedent(frmt).format(*args)
+        print(msg)
+        # ---- to structured and print
+        frmt = "{:>8} "*5
+        start, end = sorted([abs(int(i)) if isinstance(i, (int, float))
+                             else 0 for i in [start, end]])
+        end = min([fc.shape[0], end])
+        print(frmt.format(*fc.dtype.names))
+        for i in range(start, end):
+            print(frmt.format(*fc[i]))
+        return None
+    return fc
 
 # ---- Used to create the inputs for the Geo class
 #
@@ -254,15 +277,15 @@ def fc_geometry(in_fc, SR=None):
 
     Returns
     -------
-    ``a_2d, IFT`` (ids_from_to), where ``a_2d`` are the points as a 2D array,
+    ``a_2d, IFT`` (ids_from_to), where a_2d are the points as a 2D array,
     ``IFT``represent the id numbers (which are repeated for multipart shapes),
-    and the from-to pairs of the feature parts
+    and the from-to pairs of the feature parts.
 
     See Also
     --------
-    Use **arrays_Geo** to produce ``Geo`` objects directly pre-existing arrays,
-     or arrays derived form existing arcpy poly objects which originated from
-     esri featureclasses.
+    Use ``arrays_Geo`` to produce ``Geo`` objects directly pre-existing arrays,
+    or arrays derived form existing arcpy poly objects which originated from
+    esri featureclasses.
 
     Notes
     -----
@@ -306,11 +329,10 @@ def fc_geometry(in_fc, SR=None):
     # ----
     def _multipnt_(in_fc, SR):
         """Convert multipoint geometry to array"""
-        pnts = arcpy.da.FeatureClassToNumPyArray(in_fc,
-                   ['OID@', 'SHAPE@X', 'SHAPE@Y'],
+        pnts = arcpy.da.FeatureClassToNumPyArray(
+                   in_fc, ['OID@', 'SHAPE@X', 'SHAPE@Y'],
                    spatial_reference=SR,
-                   explode_to_points=True
-                   )
+                   explode_to_points=True)
         id_len = np.vstack(np.unique(pnts['OID@'], return_counts=True)).T
         a_2d = stu(pnts[['SHAPE@X', 'SHAPE@Y']])  # ---- use ``stu`` to convert
         return id_len, a_2d
@@ -323,13 +345,13 @@ def fc_geometry(in_fc, SR=None):
         with arcpy.da.SearchCursor(in_fc, 'SHAPE@', None, SR) as cursor:
             for p_id, row in enumerate(cursor):
                 sub = []
-                IDs =[]
+                IDs = []
                 num_pnts = []
                 parts = row[0].partCount
-                for arr in row[0]:                    
+                for arr in row[0]:
                     pnts = [[pt.X, pt.Y] if pt else null_pnt for pt in arr]
                     sub.append(np.asarray(pnts))
-                    IDs.append(p_id)                   
+                    IDs.append(p_id)
                     num_pnts.append(len(pnts))
                 part_count = np.arange(parts)
                 #too = np.cumsum(num_pnts)
@@ -348,7 +370,7 @@ def fc_geometry(in_fc, SR=None):
     if fc_kind == "Point":
         print(dedent(msg))
         return None
-    elif fc_kind == "Multipoint":
+    if fc_kind == "Multipoint":
         id_len, a_2d = _multipnt_(in_fc, SR)
     else:
         id_len, a_2d = _polytypes_(in_fc, SR)
@@ -359,8 +381,8 @@ def fc_geometry(in_fc, SR=None):
     from_to = np.array(list(zip(frum, too)))
     IFT = np.c_[ids, from_to]
     id_len2 = np.hstack((id_len, IFT[:, 1:]))
-    dt = np.dtype({'names':['IDs', 'Part', 'Points', 'From_ID', 'To_ID'],
-                   'formats': ['i4', 'i4','i4','i4','i4']})
+    dt = np.dtype({'names':['IDs', 'Part', 'Points', 'From_pnt', 'To_pnt'],
+                   'formats': ['i4', 'i4', 'i4', 'i4', 'i4']})
     IFT_2 = uts(id_len2, dtype=dt)
     return a_2d, IFT, IFT_2
 
@@ -545,7 +567,7 @@ def _check(a):
     return a.shape, a.ndim, a.dtype.kind, np.nanmin(a), np.nanmax(a)
 
 
-def prn_tbl(a, rows_m=25, names=None, deci=2, width=100):
+def prn_tbl(a, rows_m=20, names=None, deci=2, width=100):
     """Format a structured array with a mixed dtype.  Derived from
     arraytools.frmts and the prn_rec function therein.
 
@@ -618,7 +640,11 @@ def prn_tbl(a, rows_m=25, names=None, deci=2, width=100):
     header = "\n{}\n{}".format(header, "-"*len(header))
     txt = [header]
     for idx, i in enumerate(range(a.shape[0])):
-        txt.append(" {:>03.0f} ".format(idx) + row_frmt.format(*a[i]) + tail)
+        if idx == rows_m:
+            txt.append("...")
+        else:
+            t = " {:>03.0f} ".format(idx) + row_frmt.format(*a[i]) + tail
+            txt.append(t)
     msg = "\n".join([i for i in txt])
     print(msg)
     # return row_frmt, hdr2  # uncomment for testing
@@ -675,8 +701,8 @@ if __name__ == "__main__":
 #    in_fc2 = r"C:/Arc_projects/CoordGeom/CoordGeom.gdb/Shape2_multipnts"
     SR, sh2, IFT2, IFT_2, s2 = _demo_(in_fc2, 2, 's2')
 #    # Ontario large file
-    in_fc = r"C:\Arc_projects\Canada\Canada.gdb\Ontario_LCConic"
-#    SR, sh, IFT, s = _demo_(in_fc, 2, 's')
+#    in_fc = r"C:\Arc_projects\Canada\Canada.gdb\Ontario_LCConic"
+#    SR, sh, IFT, IFT_2, s = _demo_(in_fc, 2, 's')
     #
     # ---- Get the shapes that you want by changing s0
     #shps = [s0.get(i) for i in range(5)]

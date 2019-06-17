@@ -125,14 +125,15 @@ INTS = np.typecodes['AllInteger']
 NUMS = FLOATS + INTS
 TwoPI = np.pi*2.
 
-__all__ = ['FLOATS', 'INTS', 'NUMS', 'TwoPI',  # constants
-           'Geo', 'arrays_Geo', 'Geo_array',    # class and from, to methods
-           '_angles_', '_ch_',                  # helpers
-           '_o_ring_', '_pnts_on_line_',
-           '_poly_segments_', '_updateGeo',
-           'prn_geo', 'prn_tbl',                # printing
-           '_simplify_lines_',
-           '_nan_split_']    # unfinished
+__all__ = [
+    'FLOATS', 'INTS', 'NUMS', 'TwoPI',  # constants
+    'Geo', 'arrays_Geo', 'Geo_array',    # class and from, to methods
+    '_angles_', '_ch_',                  # helpers
+    '_o_ring_', '_pnts_on_line_',
+    '_poly_segments_', '_updateGeo',
+    'prn_geo', 'prn_tbl',                # printing
+    '_simplify_lines_',
+    '_nan_split_']    # unfinished
 # ===========================================================================
 # ---- Construct the Geo array from a list of ndarrays or an ndarray and
 #       deconstruct, thevGeo array back to its origins
@@ -143,8 +144,8 @@ def arrays_Geo(in_arrays, Kind=2, Info=None):
     Parameters
     ----------
     in_arrays : list
-        ``in_arrays`` can be created by adding existing 2D arrays to the list
-         or produced from the conversion of poly features to arrays using
+        in_arrays can be created by adding existing 2D arrays to the list
+        or produced from the conversion of poly features to arrays using
         ``poly2arrays``.
     Kind : integer
         Points (0), polylines (1) or polygons (2)
@@ -193,6 +194,7 @@ def _updateGeo(a_2d, K=None, id_too=None, Info=None):
         If None, then the structure will be created.
     Info : text (optional)
         Provide any information that will help in identifying the array.
+
     Returns
     -------
     A new Geo array is returned given the inputs.
@@ -229,11 +231,12 @@ class Geo(np.ndarray):
     Normal ndarray parameters including shape, ndim, dtype
 
     - is_multipart : array of boolean
-    - parts : ndarray of ids and counts
+    - part_cnt : ndarray of ids and counts
     - pnts : ndarray of ids and counts
     - shapes : the points for polyline, polygons
     - parts : multipart shapes and/or outer and inner rings for holes
     - bits : the final divisions to individual bits constituting the shape
+    - geometry : areas, centers, centroids, lengths also
 
     Parameters
     ----------
@@ -665,7 +668,7 @@ class Geo(np.ndarray):
     def moveto_origin(self):
         """Shift the dataset so that the origin is the lower-left corner.
         see also ``translate``"""
-        dx, dy = np.nanmin(self.XY, axis=0)        
+        dx, dy = np.nanmin(self.XY, axis=0)
         return Geo(self.XY + [-dx, -dy], self.IFT)
 
     def shift(self, dx=0, dy=0):
@@ -702,18 +705,20 @@ class Geo(np.ndarray):
                 ch = np.einsum('ij,jk->ik', chunk-cent, R) + cent
                 out.append(ch)
         info = "{} rotate".format(self.Info)
-        out = _updateGeo(np.vstack(out), self.K, self.IFT, Info=info)
-        return out
+        return _updateGeo(np.vstack(out), self.K, self.IFT, Info=info)
     #
     # ---- changes to geometry, derived from geometry
     #  convex_hulls, minimum area bounding rectangle
     #  **see also** extent properties above
     #
     def convex_hulls(self, by_part=False, threshold=50):
-        """Convex hull for shapes.
+        """Convex hull for shapes.  Calls ``_ch_`` to control method used.
 
         by_part : boolean
             False for whole shape.  True for shape parts if present.
+        threshold : integer
+            Points... less than threshold uses simple CH method, greater than,
+            uses scipy
         """
         # ----
         if by_part:
@@ -738,7 +743,7 @@ class Geo(np.ndarray):
             LBRT = np.concatenate((np.nanmin(a, axis=0), np.nanmax(a, axis=0)))
             dx, dy = np.diff(LBRT.reshape(2, 2), axis=0).squeeze()
             return dx * dy, LBRT
-
+        # ----
         def _extents_(a):
             """Extents are returned as L(eft), B(ottom), R(ight), T(op)
             """
@@ -771,7 +776,7 @@ class Geo(np.ndarray):
                     #min_area = area_
                     area_old = area_
                     Xmin, Ymin, Xmax, Ymax = LBRT
-                    vals = [Xmin, Ymin, Xmax, Ymax]  # min_area, 
+                    vals = [Xmin, Ymin, Xmax, Ymax]  # min_area,
             rects.append(vals)
         return np.asarray(rects)
     #
@@ -793,8 +798,7 @@ class Geo(np.ndarray):
             a_2d.append(np.array(p))
             id_too.append([i, len(p)])
         info = "{} fill_holes".format(self.Info)
-        new_geo = _updateGeo(a_2d, K, id_too, info)  # run update
-        return new_geo
+        return _updateGeo(a_2d, K, id_too, info)  # run update
 
     def holes_to_shape(self):
         """Return holes in polygon shapes.  Returns a Geo class or None"""
@@ -814,8 +818,7 @@ class Geo(np.ndarray):
                 id_too.append([i, len(p_new)])
         if not a_2d:  # ---- if empty
             return None
-        new_geo = _updateGeo(a_2d, K, id_too)    # run update
-        return new_geo
+        return _updateGeo(a_2d, K, id_too)    # run update
 
     def multipart_to_singlepart(self, info=""):
         """Convert multipart shapes to singleparts and return a new Geo array.
@@ -823,8 +826,7 @@ class Geo(np.ndarray):
         ift = self.IFT
         data = np.vstack(self.parts)
         ift[:, 0] = np.arange(len(self.parts))
-        new_geo = Geo(data, IFT=ift, Kind=self.K, Info=info)
-        return new_geo
+        return Geo(data, IFT=ift, Kind=self.K, Info=info)
 
     def od_pairs(self):
         """Construct origin-destination pairs for traversing around the
@@ -881,8 +883,7 @@ class Geo(np.ndarray):
                     polys.append(s)
                 else:
                     polys.append(np.concatenate((s, s[..., :1, :]), axis=0))
-        outGeo = _updateGeo(polys, K=out_kind, id_too=None, Info=None)
-        return outGeo
+        return _updateGeo(polys, K=out_kind, id_too=None, Info=None)
 
     def densify_by_distance(self, spacing=1):
         """Densify poly features by a specified distance.  Converts multipart
@@ -892,8 +893,7 @@ class Geo(np.ndarray):
         polys = []
         for a in self.bits:
             polys.append(_pnts_on_line_(a, spacing))
-        out = _updateGeo(polys, K=self.K)
-        return out
+        return _updateGeo(polys, K=self.K)
 
     def polys_to_segments(self, by_part=True):
         """Polyline or polygons boundaries segmented to individual lines.
@@ -912,18 +912,17 @@ class Geo(np.ndarray):
             shps = self.parts
         else:
             shps = self.shapes
-        out = [_poly_segments_(s) for s in shps]
-        return out
+        return [_poly_segments_(s) for s in shps]
 
     # ---- info section
     #
-    def info(self, prn=True):
+    def info(self, prn=True, start=0, end=10):
         """Convert an IFT array to full information.
 
         Parameters
         ----------
         prn : boolean
-            If True, the top and bottom 25 records will be printed.
+            If True, the top and bottom ``rows`` will be printed.
             If False, the information will be returned and one can use
             ``prn_tbl`` for more control over the tabular output.
 
@@ -942,13 +941,37 @@ class Geo(np.ndarray):
         too = ift[:, 2]
         frum = ift[:, 1]
         id_len2 = np.stack((ids, part_count, pnts, frum, too), axis=-1)
-        dt = np.dtype({'names':['IDs', 'Part', 'Points', 'From_ID', 'To_ID'],
-                       'formats': ['i4', 'i4','i4','i4','i4']})
+        dt = np.dtype({'names':['IDs', 'Part', 'Points', 'From_pnt', 'To_pnt'],
+                       'formats': ['i4', 'i4', 'i4', 'i4', 'i4']})
         IFT_2 = uts(id_len2, dtype=dt)
+        frmt = """
+        Shapes :   {}
+        Parts  :   {:,}
+        Points :   {:,}
+          min  :   {}
+          median : {}
+          max  :   {:,}"""
+        shps = IFT_2['IDs'][-1] + 1  # ---- zero-indexed, hence add 1
+        _, cnts = np.unique(IFT_2['Part'], return_counts=True)
+        p0 = np.sum(cnts)
+        p3 = np.sum(IFT_2['Points'])
+        p4 = np.min(IFT_2['Points'])
+        p5 = np.median(IFT_2['Points'])
+        p6 = np.max(IFT_2['Points'])
+        msg = dedent(frmt).format(shps, p0, p3, p4, p5, p6)
         if prn:
-            prn_tbl(IFT_2)
+            frmt = "{:>8} "*5
+            start, end = sorted([abs(int(i)) if isinstance(i, (int, float))
+                                 else 0
+                                 for i in [start, end]])
+            print(msg)
+            print(frmt.format(*IFT_2.dtype.names))
+            N = IFT_2.shape[0]
+            for i in range(min(N, end)):
+                print(frmt.format(*IFT_2[i]))
+            #prn_tbl(IFT_2, rows)
         else:
-            return IFT_2   
+            return IFT_2
     #
     #----------------End of class definition-
 
@@ -1039,7 +1062,7 @@ def _ch_simple_(in_points):
         return (xa - xo)*(yb - yo) - (ya - yo)*(xb - xo)
     # ----
     points = in_points[~np.isnan(in_points[:, 0])]
-    uni, idx = np.unique(points, return_index=True, axis=0)
+    _, idx = np.unique(points, return_index=True, axis=0)
     points = points[idx]
     if len(points) <= 3:
         return in_points
@@ -1065,8 +1088,7 @@ def _ch_(points, threshold=50):
     points = points[~np.isnan(points[:, 0])]
     if len(points) > threshold:
         return _ch_scipy(points)
-    else:
-        return _ch_simple_(points)
+    return _ch_simple_(points)
 
 def _pnts_on_line_(a, spacing=1):  # densify by distance
     """Add points, at a fixed spacing, to an array representing a line.
@@ -1155,7 +1177,7 @@ def _nan_split_(arr):
 # ===========================================================================
 # ----print section  ------------------------------------
 #
-def prn_tbl(a, rows_m=25, names=None, deci=2, width=100):
+def prn_tbl(a, rows_m=20, names=None, deci=2, width=100):
     """Format a structured array with a mixed dtype.  Derived from
     arraytools.frmts and the prn_rec function therein.
 
@@ -1174,7 +1196,7 @@ def prn_tbl(a, rows_m=25, names=None, deci=2, width=100):
         Print width in characters
     """
     def _ckw_(a, name, deci):
-        """columns `a` kind and width"""
+        """array `a` c(olumns) k(ind) and w(idth)"""
         c_kind = a.dtype.kind
         if (c_kind in FLOATS) and (deci != 0):  # float with decimals
             c_max, c_min = np.round([np.nanmin(a), np.nanmax(a)], deci)
@@ -1187,7 +1209,7 @@ def prn_tbl(a, rows_m=25, names=None, deci=2, width=100):
             c_width = len(str(a))
         c_width = max(len(name), c_width) + deci
         return [c_kind, c_width]
-
+    # ----
     def _col_format(pairs, deci):
         """Assemble the column format"""
         form_width = []
@@ -1228,7 +1250,11 @@ def prn_tbl(a, rows_m=25, names=None, deci=2, width=100):
     header = "\n{}\n{}".format(header, "-"*len(header))
     txt = [header]
     for idx, i in enumerate(range(a.shape[0])):
-        txt.append(" {:>03.0f} ".format(idx) + row_frmt.format(*a[i]) + tail)
+        if idx == rows_m:
+            txt.append("...")
+        else:
+            t = " {:>03.0f} ".format(idx) + row_frmt.format(*a[i]) + tail
+            txt.append(t)
     msg = "\n".join([i for i in txt])
     print(msg)
     # return row_frmt, hdr2  # uncomment for testing
@@ -1272,7 +1298,7 @@ def prn_geo(a, rows_m=100, names=None, deci=2, width=100):
             c_width = len(name)
         c_width = max(len(name), c_width) + deci
         return [c_kind, c_width]
-
+    # ----
     def _col_format(pairs, deci):
         """Assemble the column format"""
         form_width = []
@@ -1336,8 +1362,7 @@ if __name__ == "__main__":
 # in_fc3 = r"C:\Arc_projects\Canada\Canada.gdb\Ontario_LCConic"
 
 '''
-in_fc2 = r"C:/Arc_projects/CoordGeom/CoordGeom.gdb/Shape2"
-SR = getSR(in_fc2)
+
 shapes = fc_shapes(in_fc2)
 
 tmp, IFT = fc_geometry(in_fc2)
