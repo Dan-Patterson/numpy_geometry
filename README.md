@@ -26,7 +26,8 @@ I will document and build on these tools set with examples.  I am only working w
 
 [Geometry: forms of the same feature](https://community.esri.com/blogs/dan_patterson/2019/05/13/geometry-forms-of-the-same-feature-7)
 
-[Links to the script documentation] (https://github.com/Dan-Patterson/npGeo/blob/master/Scripts/README.md)
+[Links to the script documentation](https://github.com/Dan-Patterson/npGeo/blob/master/Scripts/README.md)
+[Same but link to GitHub-pages](https://dan-patterson.github.io/npGeo/)
 
 
 # Multipart shapes
