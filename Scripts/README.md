@@ -1,5 +1,105 @@
 # Scripts
 
+## _common.py
+
+Some useful functions to access and documenet featureclass information
+
+```
+in_fc = 'C:/Arc_projects/CoordGeom/CoordGeom.gdb/Shape2'
+```
+**getSR(in_fc, verbose=False)**
+
+```
+getSR(in_fc, verbose=False)
+<SpatialReference object at 0x2168428a1d0[0x216842398b0]>
+
+getSR(in_fc, verbose=True)
+SR name: NAD_1983_CSRS_MTM_9  factory code: 2951
+```
+**fc_info(in_fc, prn=True)**
+
+```fc_info(in_fc, prn=True)
+
+FeatureClass:
+   C:/Arc_projects/CoordGeom/CoordGeom.gdb/Shape2
+shapeFieldName  OIDFieldName  shapeType spatialReference
+Shape           OBJECTID      Polygon   NAD_1983_CSRS_MTM_9
+```
+
+**fc_fld_info(in_fc, prn=True)**
+```
+fc_fld_info(in_fc, prn=True)
+
+FeatureClass:
+   C:/Arc_projects/CoordGeom/CoordGeom.gdb/Shape2
+Name          Type         Length Nullable  Required  
+OBJECTID      OID               4 False     True      
+Shape         Geometry          0 True      True      
+Shape_Length  Double            8 True      True      
+Shape_Area    Double            8 True      True      
+CENTROID_X    Double            8 True      False     
+CENTROID_Y    Double            8 True      False     
+INSIDE_X      Double            8 True      False     
+INSIDE_Y      Double            8 True      False     
+```
+
+**fc_geom_info(in_fc, SR=None, prn=True, start=0, num=50)**
+```
+fc_geom_info(in_fc, SR=None, prn=True, start=0, num=50)
+
+Featureclass:
+    C:/Arc_projects/CoordGeom/CoordGeom.gdb/Shape2
+   Shape    Parts   Points From_pnt   To_pnt 
+       1        2       21        0       21 
+       2        2       18       21       39 
+       3        1        4       39       43 
+```
+
+**fc_composition(in_fc, SR=None, prn=True, start=0, end=50)**
+```fc_composition(in_fc, SR=None, prn=True, start=0, end=50)
+
+C:/Arc_projects/CoordGeom/CoordGeom.gdb/Shape2
+Shapes :   3
+Parts  :   5
+  max  :   2
+Points :   43
+  min  :   4
+  median : 9
+  max  :   11
+     IDs     Part   Points From_pnt   To_pnt 
+       1        0       11        0       11 
+       1        1       10       11       21 
+       2        0        9       21       30 
+       2        1        9       30       39 
+       3        0        4       39       43 
+```
+
+**arr = tbl_arr(in_fc)**
+
+```
+arr = tbl_arr(in_fc)
+
+array([(1,  86.47,  78., 300004.72, 5000014.73, 300004.72, 5000014.73),
+       (2, 112.  , 104., 300017.5 , 5000017.  , 300015.  , 5000011.  ),
+       (3,  21.5 ,  16., 300013.  , 5000022.67, 300013.  , 5000022.67)],
+      dtype=[('OID_', '<i4'), ('Shape_Length', '<f8'), ('Shape_Area', '<f8'),
+      ('CENTROID_X', '<f8'), ('CENTROID_Y', '<f8'),
+      ('INSIDE_X', '<f8'), ('INSIDE_Y', '<f8')])
+```
+
+
+**prn_tbl(arr)**
+
+```
+prn_tbl(arr)
+
+OID_    Shape_Length    Shape_Area    CENTROID_X    CENTROID_Y    INSIDE_X     INSIDE_Y    
+------------------------------------------------------------------------------------------------
+ 000      1           86.47         78.00     300004.72    5000014.73    300004.72    5000014.73
+ 001      2          112.00        104.00     300017.50    5000017.00    300015.00    5000011.00
+ 002      3           21.50         16.00     300013.00    5000022.67    300013.00    5000022.67
+ ```
+
 ## fc_npGeo.py
 
 The methods used to convert esri geometries to an appropriate array format.
