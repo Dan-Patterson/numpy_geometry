@@ -72,7 +72,7 @@ from numpy.lib.recfunctions import structured_to_unstructured as stu
 from numpy.lib.recfunctions import unstructured_to_structured as uts
 
 import arcpy
-from npGeo import Geo
+from npGeo import *
 
 __all__ = [
     'FLOATS', 'INTS', 'NUMS',                    # constants
@@ -265,7 +265,7 @@ def fc_composition(in_fc, SR=None, prn=True, start=0, end=10):
 
 # ---- Used to create the inputs for the Geo class
 #
-def fc_geometry(in_fc, SR=None):
+def fc_geometry(in_fc, SR=None, deg=5):
     """Derive, arcpy geometry objects from a featureClass searchcursor.
 
     Parameters
@@ -273,7 +273,10 @@ def fc_geometry(in_fc, SR=None):
     in_fc : text
         Path to the input featureclass.  Points not supported.
     SR : spatial reference
-       Spatial reference object, name or id
+        Spatial reference object, name or id
+    deg : integer
+        Used to densify curves found for circles and ellipses. Values of
+        1, 2, 5 and 10 deg(rees) are appropriate.  No error checking
 
     Returns
     -------
@@ -338,22 +341,35 @@ def fc_geometry(in_fc, SR=None):
         return id_len, a_2d
     # ----
     def _polytypes_(in_fc, SR):
-        """Convert polylines/polygons geomeetry to array"""
+        """Convert polylines/polygons geometry to array"""
+        def _densify_curves_(geom, deg=deg):
+            """densify geometry for circle and ellipse (geom) at ``deg`` degree
+            increments. deg, angle = (1, 361), (2, 181), (5, 73)
+            """
+            if 'curve' in geom.JSON:
+                return geom.densify('ANGLE', 1, np.deg2rad(deg))
+            return geom
+        # ----
         null_pnt = (np.nan, np.nan)
         id_len = []
         a_2d = []
-        with arcpy.da.SearchCursor(in_fc, 'SHAPE@', None, SR) as cursor:
+        with arcpy.da.SearchCursor(in_fc, ('OID@', 'SHAPE@'), None, SR) as cursor:
             for p_id, row in enumerate(cursor):
                 sub = []
                 IDs = []
                 num_pnts = []
-                parts = row[0].partCount
-                for arr in row[0]:
+                p_id = row[0]
+                geom = row[1]
+                prt_cnt = geom.partCount
+                p_num = geom.pointCount  # ---- added
+                if (prt_cnt == 1) and (p_num <= 4):
+                    geom = _densify_curves_(geom, deg=deg)
+                for arr in geom:
                     pnts = [[pt.X, pt.Y] if pt else null_pnt for pt in arr]
                     sub.append(np.asarray(pnts))
                     IDs.append(p_id)
                     num_pnts.append(len(pnts))
-                part_count = np.arange(parts)
+                part_count = np.arange(prt_cnt)
                 #too = np.cumsum(num_pnts)
                 result = np.stack((IDs, part_count, num_pnts), axis=-1)
                 id_len.append(result)
@@ -386,31 +402,6 @@ def fc_geometry(in_fc, SR=None):
     IFT_2 = uts(id_len2, dtype=dt)
     return a_2d, IFT, IFT_2
 
-
-def fc_g2(in_fc, SR=None):
-    """variant"""
-    desc = arcpy.da.Describe(in_fc)
-    SR = desc['spatialReference']
-    null_pnt = (np.nan, np.nan)
-    id_len = []
-    a_2d = []
-    with arcpy.da.SearchCursor(in_fc, ['OID@', 'SHAPE@'], None, SR) as cursor:
-        for row in cursor:
-            sub = []
-            for arr in row[1]:
-                pnts = [[pt.X, pt.Y] if pt else null_pnt for pt in arr]
-                sub.append(np.asarray(pnts))
-                id_len.extend([(row[0], len(pnts))])
-            a_2d.extend([j for i in sub for j in i])
-    # ----
-    id_len = np.array(id_len)
-    a_2d = np.asarray(a_2d)
-    ids = id_len[:, 0]
-    too = np.cumsum(id_len[:, 1])
-    frum = np.concatenate(([0], too))
-    from_to = np.array(list(zip(frum, too)))
-    IFT = np.c_[ids, from_to] # np.array(list(zip(ids, frum, too)))
-    return a_2d, IFT
 
 def fc_data(in_fc):
     """Pull all editable attributes from a featureclass tables.  During the
@@ -486,11 +477,11 @@ def array_poly(a, p_type=None, sr=None, IFT=None):
             poly = arcpy.Polyline(arcpy.Array(aa), SR)
         return poly
     # ----
-    if not np.all([check is None for check in [p_type, sr, IFT]]):
-        msg = """
-        Missing or incorrect parameters...
-        {}"""
-        print(dedent(msg).format(dedent(array_poly.__doc__)))
+#    if not np.all([check is None for check in [p_type, sr.name, IFT]]):
+#        msg = """
+#        Missing or incorrect parameters...
+#        {}"""
+#        print(dedent(msg).format(dedent(array_poly.__doc__)))
     ids = IFT[:, 0]
     from_to = IFT[:, 1:]
     chunks = [a[f:t] for f, t in from_to]  # ---- _poly_pieces_ chunks input
@@ -502,7 +493,7 @@ def array_poly(a, p_type=None, sr=None, IFT=None):
     return out
 
 
-def geometry_fc(a, IFT, p='POLYGON', gdb=None, fname=None, sr=None):
+def geometry_fc(a, IFT, p_type=None, gdb=None, fname=None, sr=None):
     """Reform poly features from the list of arrays created by ``fc_geometry``.
 
     Parameters
@@ -531,20 +522,18 @@ def geometry_fc(a, IFT, p='POLYGON', gdb=None, fname=None, sr=None):
     -----
     The work is done by ``array_poly``.
     """
-    out = array_poly(a, p, sr, IFT)   # call array_poly and ist sub
+    if p_type is None:
+        p_type = "POLYGON"
+    out = array_poly(a, p_type, sr=sr, IFT=IFT)   # call array_poly
     name = gdb + "\\" + fname
     wkspace = arcpy.env.workspace = 'memory'  # legacy is in_memory
-    arcpy.management.CreateFeatureclass(wkspace, fname, p,
+    arcpy.management.CreateFeatureclass(wkspace, fname, p_type,
                                         spatial_reference=sr)
     arcpy.management.AddField(fname, 'ID_arr', 'LONG')
     with arcpy.da.InsertCursor(fname, ['SHAPE@', 'ID_arr']) as cur:
         for row in out:
             cur.insertRow(row)
-    out_fname = fname + "_mp"
-    arcpy.management.Dissolve(fname, out_fname, "ID_arr",
-                              multi_part="MULTI_PART",
-                              unsplit_lines="DISSOLVE_LINES")
-    arcpy.management.CopyFeatures(out_fname, name)
+    arcpy.management.CopyFeatures(fname, name)
 
 #
 # ============================================================================
@@ -664,8 +653,10 @@ def fc_shapes(in_fc, SR=None):
 
 # ===========================================================================
 # ---- demo
-def _demo_(in_fc, kind, info=None):
+def _demo_(in_fc):
     """Demo files listed in __main__ section"""
+    kind =2
+    info=None
     SR = getSR(in_fc)
     shapes = fc_shapes(in_fc)
     # ---- Do the work ----
@@ -681,7 +672,7 @@ def _demo_(in_fc, kind, info=None):
     """
     k_dict = {0:'Points', 1:'Polylines/lines', 2:'Polygons'}
     print(dedent(frmt).format(k_dict[kind], IFT))
-    #arr_poly_fc(a1, p_type='POLYGON', gdb=gdb, fname='a1_test', sr=SR, ids=ids)
+#    arr_poly_fc(a, p_type='POLYGON', gdb=gdb, fname='a_test', sr=SR, ids=ids)
     return SR, shapes, IFT, IFT_2, g
 
 
@@ -689,20 +680,4 @@ def _demo_(in_fc, kind, info=None):
 # ---- main section
 if __name__ == "__main__":
     """optional location for parameters"""
-
-#    # All polygon shapes
-#    in_fc0 = r"C:/Arc_projects/CoordGeom/CoordGeom.gdb/Polygons"
-#    SR, sh0, IFT0, s0 = _demo_(in_fc0, 2, 's0')
-#    # Single multipart polygon shape
-#    in_fc1 = r"C:/Arc_projects/CoordGeom/CoordGeom.gdb/Shape1"
-#    SR1, sh1, IFT1, s1 = _demo_(in_fc1, 2, False)  # multipart
-#    # Above plus one shape to the right
-    in_fc2 = r"C:/Arc_projects/CoordGeom/CoordGeom.gdb/Shape2"
-#    in_fc2 = r"C:/Arc_projects/CoordGeom/CoordGeom.gdb/Shape2_multipnts"
-    SR, sh2, IFT2, IFT_2, s2 = _demo_(in_fc2, 2, 's2')
-#    # Ontario large file
-#    in_fc = r"C:\Arc_projects\Canada\Canada.gdb\Ontario_LCConic"
-#    SR, sh, IFT, IFT_2, s = _demo_(in_fc, 2, 's')
-    #
-    # ---- Get the shapes that you want by changing s0
-    #shps = [s0.get(i) for i in range(5)]
+    in_fc = r"C:\Arc_projects\Free_Tools\Free_tools.gdb\Polygons"

@@ -230,30 +230,27 @@ class Geo(np.ndarray):
     ----------
     Normal ndarray parameters including shape, ndim, dtype
 
-    - is_multipart : array of boolean
-    - part_cnt : ndarray of ids and counts
-    - pnts : ndarray of ids and counts
-    - shapes : the points for polyline, polygons
-    - parts : multipart shapes and/or outer and inner rings for holes
-    - bits : the final divisions to individual bits constituting the shape
-    - geometry : areas, centers, centroids, lengths also
-
-    Parameters
-    ----------
-    arr : array-like
-        A 2D array-like array-like sequence of points with shape (N, 2).
-    IFT : array
-        Defines, the I(d)F(rom)T(o) values identifying object parts if
-        ``arr`` represents polylines or polygons.  Shape (N, 3) required.
-    Kind : integer
-        Shape dimension point (0), polyline (1), or polygon (2).
+    is_multipart :
+        array of boolean
+    part_cnt :
+        ndarray of ids and counts
+    pnts :
+        ndarray of ids and counts
+    shapes :
+        the points for polyline, polygons
+    parts :
+        multipart shapes and/or outer and inner rings for holes
+    bits :
+        the final divisions to individual bits constituting the shape
+    geometry :
+        areas, centers, centroids, lengths also
 
     Notes
     -----
-    You can use ``arrays_Geo`` to produce the require 2D array from lists of
+    You can use ``arrays_Geo`` to produce the required 2D array from lists of
     array-like objects of the same dimension, or a single array.
     The IFT will be derived from breaks in the sequence and/or the
-    presence of null points.
+    presence of null points within a sequence.
 
     >>> g = Geo(a, IFT)
     >>> g.__dict__.keys()
@@ -267,8 +264,8 @@ class Geo(np.ndarray):
         Create a Geo array based on numpy ndarray.  The class focus is on
          geometry properties and methods.
 
-        Requires
-        --------
+        Parameters
+        ----------
         arr : array-like
             A 2D array sequence of points with shape (N, 2)
         IFT : array-like
@@ -494,7 +491,7 @@ class Geo(np.ndarray):
         """
         def _extent_(i):
             """Extent of a sub-array in an object array"""
-            return np.concatenate((np.nanmin(i, axis=0), np.nanmax(i, axis=0)))
+            return np.concatenate((np.nanmin(i, axis=0), np.nanmax(i, axis=0)))                                                                                      
         # ----
         if self.N == 1:
             by_part = True
