@@ -12,7 +12,7 @@ Links to other documentation will be provided as appropriate
 ----
 ## _common.py
 
-Some useful functions to access and documenet featureclass information
+Some useful functions to access and document featureclass information
 
 ```
 in_fc = 'C:/Arc_projects/CoordGeom/CoordGeom.gdb/Shape2'
@@ -119,6 +119,8 @@ This script will require you have a valid license for ArcGIS Pro since esri Feat
 
 Numpy is part of the distribution for ArcGIS Pro, so no other dependencies need to be made to their conda packages.
 If you wish to clone their distribution or modify the existing one, some guidance is provided here.
+
+[ArcGISPro 2.4 ... Installation, package updates and installs](https://community.esri.com/blogs/dan_patterson/2019/06/28/arcgis-pro-24-installation-package-updates-and-installs)
 
 [Clone... ArcGIS Pro ... for non administrators](https://community.esri.com/blogs/dan_patterson/2018/12/28/clone)
 
