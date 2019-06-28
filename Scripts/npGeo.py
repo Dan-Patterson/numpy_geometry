@@ -10,7 +10,7 @@ Script : npGeo.py
 Author :
     Dan_Patterson@carleton.ca
 
-Modified : 2019-06-13
+Modified : 2019-06-26
     Initial creation period 2019-05
 
 Purpose : geometry tools
@@ -113,6 +113,10 @@ import numpy as np
 from numpy.lib.recfunctions import unstructured_to_structured as uts
 from scipy.spatial import ConvexHull as CH
 
+from npgeom.fc_geo_io import (array_ift, getSR, fc_shapes,
+                              fc_geometry, poly2array)
+
+
 ft = {'bool': lambda x: repr(x.astype(np.int32)),
       'float_kind': '{: 0.1f}'.format}
 np.set_printoptions(edgeitems=5, linewidth=120, precision=2, suppress=True,
@@ -126,19 +130,19 @@ NUMS = FLOATS + INTS
 TwoPI = np.pi*2.
 
 __all__ = [
-    'FLOATS', 'INTS', 'NUMS', 'TwoPI',  # constants
-    'Geo', 'arrays_Geo', 'Geo_array',    # class and from, to methods
-    '_angles_', '_ch_',                  # helpers
-    '_o_ring_', '_pnts_on_line_',
-    '_poly_segments_', '_updateGeo',
-    'prn_geo', 'prn_tbl',                # printing
-    '_simplify_lines_',
-    '_nan_split_']    # unfinished
+    'Geo',                                          # class and
+    'arrays_to_Geo', 'updateGeo', 'Geo_to_arrays',  # from-to methods  
+    '_angles_', '_ch_','_o_ring_',                  # helpers
+    '_area_part_', '_area_centroid_',
+    '_pnts_on_line_', '_poly_segments_',
+    '_simplify_lines_'
+    ]
+#    '_nan_split_']    # unfinished
 # ===========================================================================
 # ---- Construct the Geo array from a list of ndarrays or an ndarray and
 #       deconstruct, thevGeo array back to its origins
 #
-def arrays_Geo(in_arrays, Kind=2, Info=None):
+def arrays_to_Geo(in_arrays, Kind=2, Info=None):
     """Produce a Geo class object from a list/tuple of arrays.
 
     Parameters
@@ -149,6 +153,10 @@ def arrays_Geo(in_arrays, Kind=2, Info=None):
         ``poly2arrays``.
     Kind : integer
         Points (0), polylines (1) or polygons (2)
+
+    Requires
+    --------
+    fc_geo_io.array_ift
 
     Returns
     -------
@@ -161,27 +169,14 @@ def arrays_Geo(in_arrays, Kind=2, Info=None):
     **fc_geometry** to produce ``Geo`` objects directly from arcgis pro
     featureclasses.
     """
-    id_too = []
-    a_2d = []
-    for i, p in enumerate(in_arrays):
-        if p.ndim == 2:
-            id_too.append([i, len(p)])
-            a_2d.append(p)
-        elif p.ndim == 3:
-            id_too.extend([[i, len(k)] for k in p])
-            a_2d.append([j for i in p for j in i])
-    a_2d = np.vstack(a_2d)
-    id_too = np.array(id_too)
-    I = id_too[:, 0]
-    too = np.cumsum(id_too[:, 1])
-    frum = np.concatenate(([0], too))
-    IFT = np.array(list(zip(I, frum, too)))
+    a_2d, IFT = array_ift(in_arrays)     # ---- call fc_geo_io.array_ift
     new_geo = Geo(a_2d, IFT, Kind, Info)
     return new_geo
 
+
 # ==== update Geo array, or create one from a list of arrays ================
 #
-def _updateGeo(a_2d, K=None, id_too=None, Info=None):
+def updateGeo(a_2d, K=None, id_too=None, Info=None):
     """Create a new Geo from a list of arrays.
 
     Parameters
@@ -214,9 +209,10 @@ def _updateGeo(a_2d, K=None, id_too=None, Info=None):
     return new_geo
 
 
-def Geo_array(in_geo):
+def Geo_to_arrays(in_geo):
     """Reconstruct the input arrays from the Geo array"""
-    return np.asarray([in_geo.get(i) for i in np.unique(in_geo.IDs)])
+    return np.asarray([np.asarray(in_geo.get(i))
+                       for i in np.unique(in_geo.IDs).tolist()])
 
 # ===========================================================================
 #
@@ -224,7 +220,7 @@ class Geo(np.ndarray):
     """
     Point, polyline, polygon features represented as numpy ndarrays.
     The required inputs are created using ``fc_geometry(in_fc)`` or
-    ``arrays_Geo``.
+    ``arrays_to_Geo``.
 
     Attributes
     ----------
@@ -247,7 +243,7 @@ class Geo(np.ndarray):
 
     Notes
     -----
-    You can use ``arrays_Geo`` to produce the required 2D array from lists of
+    You can use ``arrays_to_Geo`` to produce the required 2D array from lists of
     array-like objects of the same dimension, or a single array.
     The IFT will be derived from breaks in the sequence and/or the
     presence of null points within a sequence.
@@ -412,7 +408,10 @@ class Geo(np.ndarray):
             print("Polygons required")
             return None
         subs = [_area_part_(i) for i in self.parts]   # call to _area_part_
-        totals = np.bincount(self.IDs, weights=subs)  # weight by IDs' area
+        ids = self.IDs
+        if ids[0] == 1:
+            bins = ids - 1
+        totals = np.bincount(bins, weights=subs)  # weight by IDs' area
         return totals
 
     @property
@@ -468,7 +467,10 @@ class Geo(np.ndarray):
             print("polyline/polygon representation is required")
             return None
         lengs = [_cal(i) for i in self.parts]
-        totals = np.bincount(self.IDs, weights=lengs)
+        ids = self.IDs
+        if ids[0] == 1:
+            bins = ids - 1
+        totals = np.bincount(bins, weights=lengs)
         return np.asarray(totals)
     #
     # ---- methods -----------------------------------------------------------
@@ -491,7 +493,7 @@ class Geo(np.ndarray):
         """
         def _extent_(i):
             """Extent of a sub-array in an object array"""
-            return np.concatenate((np.nanmin(i, axis=0), np.nanmax(i, axis=0)))                                                                                      
+            return np.concatenate((np.nanmin(i, axis=0), np.nanmax(i, axis=0)))                                                                                   
         # ----
         if self.N == 1:
             by_part = True
@@ -554,7 +556,7 @@ class Geo(np.ndarray):
             id_too.append([i, len(p)])
         info = "{} outer_rings".format(str(self.Info))
         if asGeo:
-            return _updateGeo(a_2d, K, id_too, info)  # ---- update Geo
+            return updateGeo(a_2d, K, id_too, info)  # ---- update Geo
         return a_2d
 
     def pull(self, ID_list, asGeo=True):
@@ -702,7 +704,7 @@ class Geo(np.ndarray):
                 ch = np.einsum('ij,jk->ik', chunk-cent, R) + cent
                 out.append(ch)
         info = "{} rotate".format(self.Info)
-        return _updateGeo(np.vstack(out), self.K, self.IFT, Info=info)
+        return updateGeo(np.vstack(out), self.K, self.IFT, Info=info)
     #
     # ---- changes to geometry, derived from geometry
     #  convex_hulls, minimum area bounding rectangle
@@ -795,7 +797,7 @@ class Geo(np.ndarray):
             a_2d.append(np.array(p))
             id_too.append([i, len(p)])
         info = "{} fill_holes".format(self.Info)
-        return _updateGeo(a_2d, K, id_too, info)  # run update
+        return updateGeo(a_2d, K, id_too, info)  # run update
 
     def holes_to_shape(self):
         """Return holes in polygon shapes.  Returns a Geo class or None"""
@@ -815,7 +817,7 @@ class Geo(np.ndarray):
                 id_too.append([i, len(p_new)])
         if not a_2d:  # ---- if empty
             return None
-        return _updateGeo(a_2d, K, id_too)    # run update
+        return updateGeo(a_2d, K, id_too)    # run update
 
     def multipart_to_singlepart(self, info=""):
         """Convert multipart shapes to singleparts and return a new Geo array.
@@ -880,7 +882,7 @@ class Geo(np.ndarray):
                     polys.append(s)
                 else:
                     polys.append(np.concatenate((s, s[..., :1, :]), axis=0))
-        return _updateGeo(polys, K=out_kind, id_too=None, Info=None)
+        return updateGeo(polys, K=out_kind, id_too=None, Info=None)
 
     def densify_by_distance(self, spacing=1):
         """Densify poly features by a specified distance.  Converts multipart
@@ -890,7 +892,7 @@ class Geo(np.ndarray):
         polys = []
         for a in self.bits:
             polys.append(_pnts_on_line_(a, spacing))
-        return _updateGeo(polys, K=self.K)
+        return updateGeo(polys, K=self.K)
 
     def polys_to_segments(self, by_part=True):
         """Polyline or polygons boundaries segmented to individual lines.
@@ -932,14 +934,17 @@ class Geo(np.ndarray):
         """
         ift = self.IFT
         ids = ift[:, 0]
-        _, cnts = np.unique(ids, return_counts=True)
+        uni, cnts = np.unique(ids, return_counts=True)
         part_count = np.concatenate([np.arange(i) for i in cnts])
         pnts = np.array([len(p) for p in self.parts])
         too = ift[:, 2]
         frum = ift[:, 1]
         id_len2 = np.stack((ids, part_count, pnts, frum, too), axis=-1)
-        dt = np.dtype({'names':['IDs', 'Part', 'Points', 'From_pnt', 'To_pnt'],
-                       'formats': ['i4', 'i4', 'i4', 'i4', 'i4']})
+        dt = np.dtype({
+                'names':['IDs', 'Part', 'Points', 'From_pnt', 'To_pnt'],
+                'formats': ['i4', 'i4', 'i4', 'i4', 'i4']
+                }
+                    )
         IFT_2 = uts(id_len2, dtype=dt)
         frmt = """
         Shapes :   {}
@@ -948,7 +953,7 @@ class Geo(np.ndarray):
           min  :   {}
           median : {}
           max  :   {:,}"""
-        shps = IFT_2['IDs'][-1] + 1  # ---- zero-indexed, hence add 1
+        shps = len(uni)  # ---- zero-indexed, hence add 1
         _, cnts = np.unique(IFT_2['Part'], return_counts=True)
         p0 = np.sum(cnts)
         p3 = np.sum(IFT_2['Points'])
@@ -1157,6 +1162,7 @@ def _simplify_lines_(a, deviation=10):
     p = sub[idx]
     return a, p, ang
 
+
 # ===========================================================================
 #  Keep???
 def _nan_split_(arr):
@@ -1172,202 +1178,35 @@ def _nan_split_(arr):
 
 
 # ===========================================================================
-# ----print section  ------------------------------------
-#
-def prn_tbl(a, rows_m=20, names=None, deci=2, width=100):
-    """Format a structured array with a mixed dtype.  Derived from
-    arraytools.frmts and the prn_rec function therein.
-
-    Parameters
-    ----------
-    a : array
-        A structured/recarray
-    rows_m : integer
-        The maximum number of rows to print.  If rows_m=10, the top 5 and
-        bottom 5 will be printed.
-    names : list/tuple or None
-        Column names to print, or all if None.
-    deci : int
-        The number of decimal places to print for all floating point columns.
-    width : int
-        Print width in characters
+# ---- demo
+def _test_(in_fc):
+    """Demo files listed in __main__ section"""
+    kind = 2
+    info = None
+    SR = getSR(in_fc)
+    shapes = fc_shapes(in_fc)
+    # ---- Do the work ----
+    poly_arr = poly2array(shapes)
+    tmp, IFT, IFT_2 = fc_geometry(in_fc)
+    m = np.nanmin(tmp, axis=0)
+#    m = [300000., 5000000.]
+    a = tmp  - m
+    poly_arr = [(i - m) for p in poly_arr for i in p]
+    g = Geo(a, IFT, kind, info)
+    frmt = """
+    Type :  {}
+    IFT  :
+    {}
     """
-    def _ckw_(a, name, deci):
-        """array `a` c(olumns) k(ind) and w(idth)"""
-        c_kind = a.dtype.kind
-        if (c_kind in FLOATS) and (deci != 0):  # float with decimals
-            c_max, c_min = np.round([np.nanmin(a), np.nanmax(a)], deci)
-            c_width = len(max(str(c_min), str(c_max), key=len))
-        elif c_kind in NUMS:      # int, unsigned int, float wih no decimals
-            c_width = len(max(str(np.nanmin(a)), str(np.nanmax(a)), key=len))
-        elif c_kind in ('U', 'S', 's'):
-            c_width = len(max(a, key=len))
-        else:
-            c_width = len(str(a))
-        c_width = max(len(name), c_width) + deci
-        return [c_kind, c_width]
-    # ----
-    def _col_format(pairs, deci):
-        """Assemble the column format"""
-        form_width = []
-        dts = []
-        for c_kind, c_width in pairs:
-            if c_kind in INTS:  # ---- integer type
-                c_format = ':>{}.0f'.format(c_width)
-            elif c_kind in FLOATS: # and np.isscalar(c[0]):  # float rounded
-                c_format = ':>{}.{}f'.format(c_width, deci)
-            else:
-                c_format = "!s:<{}".format(c_width)
-            dts.append(c_format)
-            form_width.append(c_width)
-        return dts, form_width
-    # ----
-    dtype_names = a.dtype.names
-    if dtype_names is None:
-        print("Structured/recarray required")
-        return None
-    if names is None:
-        names = dtype_names
-    # ---- slice off excess rows, stack upper and lower slice using rows_m
-    if a.shape[0] > rows_m*2:
-        a = np.hstack((a[:rows_m], a[-rows_m:]))
-    # ---- get the column formats from ... _ckw_ and _col_format ----
-    pairs = [_ckw_(a[name], name, deci) for name in names]  # -- column info
-    dts, wdths = _col_format(pairs, deci)                   # format column
-    # ---- slice off excess columns
-    c_sum = np.cumsum(wdths)               # -- determine where to slice
-    N = len(np.where(c_sum < width)[0])    # columns that exceed ``width``
-    a = a[list(names[:N])]
-    # ---- Assemble the formats and print
-    tail = ['', ' ...'][N < len(names)]
-    row_frmt = "  ".join([('{' + i + '}') for i in dts[:N]])
-    hdr = ["!s:<" + "{}".format(wdths[i]) for i in range(N)]
-    hdr2 = "  ".join(["{" + hdr[i] + "}" for i in range(N)])
-    header = " ... " + hdr2.format(*names[:N]) + tail
-    header = "\n{}\n{}".format(header, "-"*len(header))
-    txt = [header]
-    for idx, i in enumerate(range(a.shape[0])):
-        if idx == rows_m:
-            txt.append("...")
-        else:
-            t = " {:>03.0f} ".format(idx) + row_frmt.format(*a[i]) + tail
-            txt.append(t)
-    msg = "\n".join([i for i in txt])
-    print(msg)
-    # return row_frmt, hdr2  # uncomment for testing
-
-def prn_geo(a, rows_m=100, names=None, deci=2, width=100):
-    """Format a structured array with a mixed dtype.  Derived from
-    arraytools.frmts and the prn_rec function therein.
-
-    Parameters
-    ----------
-    a : array
-        A structured/recarray
-    rows_m : integer
-        The maximum number of rows to print.  If rows_m=10, the top 5 and
-        bottom 5 will be printed.
-    names : list/tuple or None
-        Column names to print, or all if None.
-    deci : int
-        The number of decimal places to print for all floating point columns.
-    width : int
-        Print width in characters
-
-    Notes
-    -----
-    >>> toos = s0.IFT[:,2]
-    >>> nans = np.where(np.isnan(s0[:,0]))[0]  # array([10, 21, 31, 41]...
-    >>> dn = np.digitize(nans, too)            # array([1, 2, 3, 4]...
-    >>> ift[:, 0][dn]                          # array([1, 1, 2, 2])
-    >>> np.sort(np.concatenate((too, nans)))
-    ... array([ 5, 10, 16, 21, 26, 31, 36, 41, 48, 57, 65], dtype=int64)
-    """
-    def _ckw_(a, name, deci):
-        """columns `a` kind and width"""
-        c_kind = a.dtype.kind
-        if (c_kind in FLOATS) and (deci != 0):  # float with decimals
-            c_max, c_min = np.round([np.nanmin(a), np.nanmax(a)], deci)
-            c_width = len(max(str(c_min), str(c_max), key=len))
-        elif c_kind in NUMS:      # int, unsigned int, float wih no decimals
-            c_width = len(max(str(np.nanmin(a)), str(np.nanmax(a)), key=len))
-        else:
-            c_width = len(name)
-        c_width = max(len(name), c_width) + deci
-        return [c_kind, c_width]
-    # ----
-    def _col_format(pairs, deci):
-        """Assemble the column format"""
-        form_width = []
-        dts = []
-        for c_kind, c_width in pairs:
-            if c_kind in INTS:  # ---- integer type
-                c_format = ':>{}.0f'.format(c_width)
-            elif c_kind in FLOATS: # and np.isscalar(c[0]):  # float rounded
-                c_format = ':>{}.{}f'.format(c_width, deci[-1])
-            else:
-                c_format = "!s:^{}".format(c_width)
-            dts.append(c_format)
-            form_width.append(c_width)
-        return dts, form_width
-    # ----
-    if names is None:
-        names = ['shape', 'part', 'X', 'Y']
-    # ---- slice off excess rows, stack upper and lower slice using rows_m
-    if not hasattr(a, 'IFT'):
-        print("Requires a Geo array")
-        return None
-    ift = a.IFT
-    c = [np.repeat(ift[i, 0], ift[i, 2] - ift[i, 1])
-         for i, p in enumerate(ift[:, 0])]
-    c = np.concatenate(c)
-    # ---- p: __ shape end, p0: x parts, p1: o start of parts, pp: concatenate
-    p = np.where(np.diff(c, append=0) == 1, "___", "")
-    p0 = np.where(np.isnan(a[:, 0]), "x", "")
-    p1 = np.asarray(["" if i not in ift[:, 2] else 'o' for i in range(len(p))])
-    pp = np.asarray([p[i]+p0[i]+p1[i] for i in range(len(p))])
-    if a.shape[0] > rows_m:
-        a = a[:rows_m]
-        c = c[:rows_m]
-        p = p[:rows_m]
-    # ---- get the column formats from ... _ckw_ and _col_format ----
-    deci = [0, 0, deci, deci]
-    flds = [c, pp, a[:, 0], a[:, 1]]
-    pairs = [_ckw_(flds[n], names[n], deci[n]) for n, name in enumerate(names)]  # -- column info
-    dts, wdths = _col_format(pairs, deci)                   # format column
-    # ---- slice off excess columns
-    c_sum = np.cumsum(wdths)               # -- determine where to slice
-    N = len(np.where(c_sum < width)[0])    # columns that exceed ``width``
-    # ---- Assemble the formats and print
-    row_frmt = " {:>03.0f} " + "  ".join([('{' + i + '}') for i in dts[:N]])
-    hdr = ["!s:<" + "{}".format(wdths[i]) for i in range(N)]
-    hdr2 = "  ".join(["{" + hdr[i] + "}" for i in range(N)])
-    header = " pnt " + hdr2.format(*names[:N])
-    header = "\n{}\n{}".format(header, "-"*len(header))
-    txt = [header]
-    for i in range(a.shape[0]):
-        txt.append(row_frmt.format(i, c[i], pp[i], a[i, 0], a[i, 1]))
-    msg = "\n".join([i for i in txt])
-    print(msg)
-    # return row_frmt, hdr2  # uncomment for testing
-
+    k_dict = {0:'Points', 1:'Polylines/lines', 2:'Polygons'}
+    print(dedent(frmt).format(k_dict[kind], IFT))
+#    arr_poly_fc(a, p_type='POLYGON', gdb=gdb, fname='a_test', sr=SR, ids=ids)
+    return SR, shapes, poly_arr, a, IFT, IFT_2, g
 # ===========================================================================
 #
 if __name__ == "__main__":
     """optional location for parameters"""
-    #msg = _demo_()
-# in_fc3 = r"C:\Arc_projects\Canada\Canada.gdb\Ontario_LCConic"
-
-'''
-
-shapes = fc_shapes(in_fc2)
-
-tmp, IFT = fc_geometry(in_fc2)
-m = [300000., 5000000.]
-
-a = tmp  - m
-kind = 2
-info = None
-g = Geo(a, IFT, kind, info)
-
-'''
+    testing = True
+    if testing:
+        in_fc = r"C:\Arc_projects\Free_Tools\Free_tools.gdb\Polygons"
+        SR, shapes, poly_arr, a, IFT, IFT_2, g = _test_(in_fc)
