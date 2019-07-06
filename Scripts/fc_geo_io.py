@@ -27,34 +27,6 @@ References
 `Subclassing ndarrays
 <https://docs.scipy.org/doc/numpy/user/basics.subclassing.html>`_.
 
-**Advanced license tools**
-
-Some of the functions that you can replicate using this data class would
-include:
-
-`Feature Envelope to Polygon
-<https://pro.arcgis.com/en/pro-app/tool-reference/data-management/feature
--envelope-to-polygon.htm>`_.
-
-`Feature to Line
-<https://pro.arcgis.com/en/pro-app/tool-reference/data-management/feature
--to-line.htm>`_.
-
-`Feature to Point
-<https://pro.arcgis.com/en/pro-app/tool-reference/data-management/feature
--to-point.htm>`_.
-
-`Feature Vertices to Points
-<https://pro.arcgis.com/en/pro-app/tool-reference/data-management/feature
--vertices-to-points.htm>`_.
-
-`Minimum Bounding Geometry: circle, MABR, Extent Polygon, Convex Hull
-<https://pro.arcgis.com/en/pro-app/tool-reference/data-management/minimum
--bounding-geometry.htm>`_.
-
-`Polygon to Line
-<https://pro.arcgis.com/en/pro-app/tool-reference/data-management/polygon
--to-line.htm>`_.
 
 """
 # pylint: disable=C0103  # invalid-name
@@ -68,13 +40,12 @@ include:
 import sys
 from textwrap import dedent  #, indent
 import numpy as np
+
 from numpy.lib.recfunctions import structured_to_unstructured as stu
 from numpy.lib.recfunctions import unstructured_to_structured as uts
 
 import arcpy
-#from .npGeo import (Geo, _angles_, _area_centroid_, _area_part_, _ch_,
-#    _o_ring_, _pnts_on_line_, _poly_segments_,_simplify_lines_,
-#    prn_geo, prn_tbl)
+
 
 __all__ = [
     'poly2array', 'array_ift',     # shape to array and array conversion
@@ -281,12 +252,12 @@ def fc_data(in_fc):
     """
     flds = ['OID@', 'SHAPE@X', 'SHAPE@Y']
     null_dict, fld_names = _make_nulls_(in_fc, int_null=-999)
-    fld_names = flds + fld_names
-    new_names = ['OID_', 'X_cent', 'Y_cent']
-    a = arcpy.da.FeatureClassToNumPyArray(in_fc, fld_names,
+    flds.extend(fld_names)
+    a = arcpy.da.FeatureClassToNumPyArray(in_fc, flds,
                                           skip_nulls=False,
                                           null_value=null_dict)
-    a.dtype.names = new_names + fld_names[3:]
+    new_names = ['OID_', 'X_cent', 'Y_cent']
+    a.dtype.names = new_names + flds[3:]
     return np.asarray(a)
 
 
