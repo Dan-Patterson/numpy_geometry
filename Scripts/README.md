@@ -2,15 +2,16 @@
 ----
 The following scripts are listed in this folder and the documentation guide
 
-1. _common.py
-2. fc_npGeo.py
+1. _-init__.py
+2. npGeo_io.py
 3. npGeo.py
+4. npGeo_helpers__
 
 Links to other documentation will be provided as appropriate
 
 
 ----
-## _common.py
+## npGeo_io.py
 
 Some useful functions to access and document featureclass information
 
@@ -109,10 +110,6 @@ OID_    Shape_Length    Shape_Area    CENTROID_X    CENTROID_Y    INSIDE_X     I
  001      2          112.00        104.00     300017.50    5000017.00    300015.00    5000011.00
  002      3           21.50         16.00     300013.00    5000022.67    300013.00    5000022.67
  ```
-
-
-----
-## fc_npGeo.py
 
 The methods used to convert esri geometries to an appropriate array format.
 This script will require you have a valid license for ArcGIS Pro since esri FeatureClasses in a File Geodatabase need to be read and their arcpy geometries extracted and converted to numpy arrays.
