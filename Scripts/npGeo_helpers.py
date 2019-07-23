@@ -34,7 +34,7 @@ References:
 
 import sys
 import numpy as np
-#from numpy.lib.recfunctions import structured_to_unstructured as stu
+# from numpy.lib.recfunctions import structured_to_unstructured as stu
 from numpy.lib.recfunctions import unstructured_to_structured as uts
 from scipy.spatial import ConvexHull as CH
 
@@ -46,16 +46,14 @@ np.ma.masked_print_option.set_display('-')  # change to a single -
 
 script = sys.argv[0]  # print this should you need to locate the script
 
-__all__ =  ['_angles_', '_area_centroid_', '_area_part_', '_ch_', '_ch_scipy',
-            '_ch_simple_', '_nan_split_', '_o_ring_', '_pnts_on_line_',
-            '_polys_to_segments_', '_polys_to_unique_pnts_',
-            '_simplify_lines_']
+__all__ = ['_angles_', '_area_centroid_', '_area_part_', '_ch_', '_ch_scipy',
+           '_ch_simple_', '_nan_split_', '_o_ring_', '_pnts_on_line_',
+           '_polys_to_segments_', '_polys_to_unique_pnts_',
+           '_simplify_lines_']
 
-# ===========================================================================
-# ---- main section: testing or tool run ------------------------------------
-#
-# ===== Workers with Geo and ndarrays. ==========================================
-#
+# ===== Workers with Geo and ndarrays. =======================================
+
+
 def _o_ring_(arr):
     """Collect the outer ring of a shape.  An outer ring is separated from
     its inner ring, a hole, by a ``null_pnt``.  Each shape is examined for
@@ -69,6 +67,7 @@ def _o_ring_(arr):
         arr = np.split(arr, w)[0]
     return arr
 
+
 def _area_part_(a):
     """Mini e_area, used by areas and centroids"""
     x0, y1 = (a.T)[:, 1:]
@@ -76,6 +75,7 @@ def _area_part_(a):
     e0 = np.einsum('...i,...i->...i', x0, y0)
     e1 = np.einsum('...i,...i->...i', x1, y1)
     return np.nansum((e0 - e1)*0.5)
+
 
 def _area_centroid_(a):
     """Calculate area and centroid for a singlepart polygon, `a`.  This is also
@@ -91,6 +91,7 @@ def _area_centroid_(a):
     x_c = np.nansum((x1 + x0) * t, axis=0) / (area * 6.0)
     y_c = np.nansum((y1 + y0) * t, axis=0) / (area * 6.0)
     return area, np.asarray([-x_c, -y_c])
+
 
 def _angles_(a, inside=True, in_deg=True):
     """Worker for Geo.angles. sequential points, a, b, c.
@@ -121,6 +122,7 @@ def _angles_(a, inside=True, in_deg=True):
         angles = np.degrees(angles)
     return angles
 
+
 def _ch_scipy(points):
     """Convex hull using scipy.spatial.ConvexHull. Remove null_pnts, calculate
     the hull, derive the vertices and reorder clockwise.
@@ -128,6 +130,7 @@ def _ch_scipy(points):
     p_nonan = points[~np.isnan(points[:, 0])]
     out = CH(p_nonan)
     return out.points[out.vertices][::-1]
+
 
 def _ch_simple_(in_points):
     """Calculates the convex hull for given points.  Removes null_pnts, finds
@@ -162,12 +165,14 @@ def _ch_simple_(in_points):
         ch = np.vstack((ch, ch[0]))
     return ch
 
+
 def _ch_(points, threshold=50):
     """Perform a convex hull using either simple methods or scipy's"""
     points = points[~np.isnan(points[:, 0])]
     if len(points) > threshold:
         return _ch_scipy(points)
     return _ch_simple_(points)
+
 
 def _pnts_on_line_(a, spacing=1):  # densify by distance
     """Add points, at a fixed spacing, to an array representing a line.
@@ -183,7 +188,7 @@ def _pnts_on_line_(a, spacing=1):  # densify by distance
     """
     N = len(a) - 1                                    # segments
     dxdy = a[1:, :] - a[:-1, :]                       # coordinate differences
-    leng = np.sqrt(np.einsum('ij,ij->i', dxdy, dxdy)) # segment lengths
+    leng = np.sqrt(np.einsum('ij,ij->i', dxdy, dxdy))  # segment lengths
     steps = leng/spacing                              # step distance
     deltas = dxdy/(steps.reshape(-1, 1))              # coordinate steps
     pnts = np.empty((N,), dtype='O')                  # construct an `O` array
@@ -193,13 +198,14 @@ def _pnts_on_line_(a, spacing=1):  # densify by distance
     a0 = a[-1].reshape(1, -1)        # add the final point and concatenate
     return np.concatenate((*pnts, a0), axis=0)
 
+
 def _polys_to_unique_pnts_(a, as_structured=True):
     """Derived from polys_to_points, but allowing for recreation of original
     point order and unique points.  NaN's are removed.
     """
     good = a[~np.isnan(a.X)]
     uni, idx, _, cnts = np.unique(good, True, True,
-                                 return_counts=True, axis=0)
+                                  return_counts=True, axis=0)
     if as_structured:
         N = uni.shape[0]
         dt = [('New_ID', '<i4'), ('Xs', '<f8'), ('Ys', '<f8'), ('Num', '<i4')]
@@ -210,6 +216,7 @@ def _polys_to_unique_pnts_(a, as_structured=True):
         z['Num'] = cnts
         return z[np.argsort(z, order='New_ID')]  # dump nan coordinates
     return np.asarray(uni)
+
 
 def _polys_to_segments_(a, as_2d=True, as_structured=False):
     """Segment poly* structures into o-d pairs from start to finish
@@ -273,16 +280,16 @@ def _nan_split_(arr):
 # ===========================================================================
 # ---- main section: testing or tool run ------------------------------------
 #
-#testing = True
-#if len(sys.argv) == 1 and testing:
-#    pth = r"C:\Git_Dan\npgeom\data\Polygons.geojson"
-#    #pth = r"C:\Git_Dan\npgeom\data\Oddities.geojson"
-#    #pth = r"C:\Git_Dan\npgeom\data\Ontario_LCConic.geojson"
-#    msg = "\nRunning : {}\npath to geojson : {}".format(script, pth)
-#else:
-#    msg = "\n{}\npath to geojson : {}".format(script, None)
+# testing = True
+# if len(sys.argv) == 1 and testing:
+#     pth = r"C:\Git_Dan\npgeom\data\Polygons.geojson"
+#     #pth = r"C:\Git_Dan\npgeom\data\Oddities.geojson"
+#     #pth = r"C:\Git_Dan\npgeom\data\Ontario_LCConic.geojson"
+#     msg = "\nRunning : {}\npath to geojson : {}".format(script, pth)
+# else:
+#     msg = "\n{}\npath to geojson : {}".format(script, None)
 #
-#print(msg)
+# print(msg)
 
 # ==== Processing finished ====
 # ===========================================================================

@@ -45,7 +45,7 @@ References
 # pylint: disable=W0621  # redefining name
 
 import sys
-from textwrap import dedent  #, indent
+from textwrap import dedent  # indent
 
 import numpy as np
 from numpy.lib.recfunctions import structured_to_unstructured as stu
@@ -86,7 +86,8 @@ np.set_printoptions(edgeitems=10, linewidth=100, precision=2, suppress=True,
 # These are the main geometry to array conversions
 #
 # ---- for polyline/polygon featureclasses
-#
+
+
 def poly2array(polys):
     """Convert polyline or polygon shapes to arrays for use in the Geo class.
 
@@ -112,7 +113,8 @@ def poly2array(polys):
 
 #
 # ---- json section
-#
+
+
 def load_geojson(pth, full=False, geometry=True):
     """Load a geojson file and convert to a Geo Array.  The geojson is from the
     Features to JSON tool listed in the references.
@@ -159,7 +161,7 @@ def load_geojson(pth, full=False, geometry=True):
     <https://pro.arcgis.com/en/pro-app/tool-reference/conversion/
     json-to-features.htm>`_.
     """
-    #import json    
+    # import json
     with open(pth) as f:
         data = json.load(f)
     shapes = data['features']
@@ -273,12 +275,12 @@ def array_ift(in_arrays):
             bits = []
             for j in p:
                 for i in j:
-                    bits.append(np.asarray(i)) 
-                    bits.append(null_pnt)                
+                    bits.append(np.asarray(i))
+                    bits.append(null_pnt)
                 bits = bits[:-1]
                 stack = np.vstack(bits)
                 id_too.append([cnt, len(stack)])
-                #id_too.extend([[cnt, len(k)] for k in bits])
+                # id_too.extend([[cnt, len(k)] for k in bits])
             sub = stack
         elif kind in NUMS:
             sub = []
@@ -292,15 +294,16 @@ def array_ift(in_arrays):
         a_2d.append(subs)
     a_2d = np.vstack(a_2d)
     id_too = np.array(id_too)
-    I = id_too[:, 0]
+    ids = id_too[:, 0]
     too = np.cumsum(id_too[:, 1])
     frum = np.concatenate(([0], too))
-    IFT = np.array(list(zip(I, frum, too)))
+    IFT = np.array(list(zip(ids, frum, too)))
     return a_2d, IFT
 
 # ===========================================================================
 # ---- featureclass section, arcpy dependent via arcgisscripting
-#
+
+
 def _make_nulls_(in_fc, int_null=-999):
     """Return null values for a list of fields objects, excluding objectid
     and geometry related fields.  Throw in whatever else you want.
@@ -322,7 +325,7 @@ def _make_nulls_(in_fc, int_null=-999):
     """
     nulls = {'Double': np.nan, 'Single': np.nan, 'Float': np.nan,
              'Short': int_null, 'SmallInteger': int_null, 'Long': int_null,
-             'Integer': int_null, 'String':str(None), 'Text':str(None),
+             'Integer': int_null, 'String': str(None), 'Text': str(None),
              'Date': np.datetime64('NaT')}
     #
     desc = arcpy.da.Describe(in_fc)
@@ -369,13 +372,15 @@ def fc_composition(in_fc, SR=None, prn=True, start=0, end=10):
     too = np.cumsum(tmp[:, 2])
     frum = np.concatenate(([0], too))
     frum_too = np.array(list(zip(frum, too)))
-    fc_comp = np.hstack((tmp[:, :3], frum_too)) #, axis=0)
-    dt = np.dtype({'names':['IDs', 'Part', 'Points', 'From_pnt', 'To_pnt'],
+    fc_comp = np.hstack((tmp[:, :3], frum_too))  # axis=0)
+    dt = np.dtype({'names': ['IDs', 'Part', 'Points', 'From_pnt', 'To_pnt'],
                    'formats': ['i4', 'i4', 'i4', 'i4', 'i4']})
     fc = uts(fc_comp, dtype=dt)
-    if prn:
-        frmt = """\n{}\nShapes :   {}\nParts  :   {:,}\n  max  :   {}\n""" + \
-        """Points :   {:,}\n  min  :   {}\n  median : {}\n  max  :   {:,}"""
+    frmt = "\nFeatureclass...  {}" + \
+        "\nShapes :{:>5.0f}\nParts  :{:>5.0f}\n  max  :{:>5.0f}" + \
+        "\nPoints :{:>5.0f}\n  min  :{:>5.0f}\n  med  :{:>5.0f}" + \
+        "\n  max  :{:>5.0f}"
+    if prn:  # ':>{}.0f
         uni, cnts = np.unique(fc['IDs'], return_counts=True)
         a0, a1 = [fc['Part'] + 1, fc['Points']]
         args = [in_fc, len(uni), np.sum(cnts), np.max(a0),
@@ -416,12 +421,12 @@ def fc_data(in_fc):
     """
     flds = ['OID@', 'SHAPE@X', 'SHAPE@Y']
     null_dict, fld_names = _make_nulls_(in_fc, int_null=-999)
-    flds.extend(fld_names)
-    a = arcpy.da.FeatureClassToNumPyArray(in_fc, flds,
+    out_flds = flds + fld_names
+    a = arcpy.da.FeatureClassToNumPyArray(in_fc, out_flds,
                                           skip_nulls=False,
                                           null_value=null_dict)
     new_names = ['OID_', 'X_cent', 'Y_cent']
-    a.dtype.names = new_names + flds[3:]
+    a.dtype.names = new_names + out_flds[3:]
     return np.asarray(a)
 
 
@@ -489,7 +494,7 @@ def fc_geometry(in_fc, SR=None, deg=5):
     Use arcpy.FeatureClassToNumPyArray for Point files.
     MultiPoint, Polyline and Polygons and its variants are supported.
     """
-    # ----
+
     def _multipnt_(in_fc, SR):
         """Convert multipoint geometry to array"""
         pnts = arcpy.da.FeatureClassToNumPyArray(
@@ -499,7 +504,7 @@ def fc_geometry(in_fc, SR=None, deg=5):
         id_len = np.vstack(np.unique(pnts['OID@'], return_counts=True)).T
         a_2d = stu(pnts[['SHAPE@X', 'SHAPE@Y']])  # ---- use ``stu`` to convert
         return id_len, a_2d
-    # ----
+
     def _polytypes_(in_fc, SR):
         """Convert polylines/polygons geometry to array"""
         def _densify_curves_(geom, deg=deg):
@@ -513,7 +518,8 @@ def fc_geometry(in_fc, SR=None, deg=5):
         null_pnt = (np.nan, np.nan)
         id_len = []
         a_2d = []
-        with arcpy.da.SearchCursor(in_fc, ('OID@', 'SHAPE@'), None, SR) as cursor:
+        with arcpy.da.SearchCursor(
+                in_fc, ('OID@', 'SHAPE@'), None, SR) as cursor:
             for p_id, row in enumerate(cursor):
                 sub = []
                 IDs = []
@@ -530,12 +536,12 @@ def fc_geometry(in_fc, SR=None, deg=5):
                     IDs.append(p_id)
                     num_pnts.append(len(pnts))
                 part_count = np.arange(prt_cnt)
-                #too = np.cumsum(num_pnts)
+                # too = np.cumsum(num_pnts)
                 result = np.stack((IDs, part_count, num_pnts), axis=-1)
                 id_len.append(result)
                 a_2d.extend([j for i in sub for j in i])
         # ----
-        id_len = np.vstack(id_len)  #np.array(id_len)
+        id_len = np.vstack(id_len)  # np.array(id_len)
         a_2d = np.asarray(a_2d)
         return id_len, a_2d
     #
@@ -557,7 +563,7 @@ def fc_geometry(in_fc, SR=None, deg=5):
     from_to = np.array(list(zip(frum, too)))
     IFT = np.c_[ids, from_to]
     id_len2 = np.hstack((id_len, IFT[:, 1:]))
-    dt = np.dtype({'names':['IDs', 'Part', 'Points', 'From_pnt', 'To_pnt'],
+    dt = np.dtype({'names': ['IDs', 'Part', 'Points', 'From_pnt', 'To_pnt'],
                    'formats': ['i4', 'i4', 'i4', 'i4', 'i4']})
     IFT_2 = uts(id_len2, dtype=dt)
     return a_2d, IFT, IFT_2
@@ -672,7 +678,7 @@ def geometry_fc(a, IFT, p_type=None, gdb=None, fname=None, sr=None):
     if p_type is None:
         p_type = "POLYGON"
     out = array_poly(a, p_type, sr=sr, IFT=IFT)   # call array_poly
-    name = gdb + "\\" + fname
+    name = gdb + "/" + fname
     wkspace = arcpy.env.workspace = 'memory'  # legacy is in_memory
     arcpy.management.CreateFeatureclass(wkspace, fname, p_type,
                                         spatial_reference=sr)
@@ -681,10 +687,13 @@ def geometry_fc(a, IFT, p_type=None, gdb=None, fname=None, sr=None):
         for row in out:
             cur.insertRow(row)
     arcpy.management.CopyFeatures(fname, name)
+    return "geometry_fc complete"
 
 #
 # ============================================================================
 # ---- array dependent
+
+
 def prn_q(a, edges=3, max_lines=25, width=120, decimals=2):
     """Format a structured array by setting the width so it hopefully wraps.
     """
@@ -695,7 +704,7 @@ def prn_q(a, edges=3, max_lines=25, width=120, decimals=2):
         print("  ".join([n for n in a.dtype.names]))
         print(a)
 
-#
+
 # ---- printing based on arraytools.frmts.py using prn_rec and dependencies
 #
 def _check(a):
@@ -735,7 +744,7 @@ def prn_tbl(a, rows_m=20, names=None, deci=2, width=100):
             c_width = len(str(a))
         c_width = max(len(name), c_width) + deci
         return [c_kind, c_width]
-    # ----
+
     def _col_format(pairs, deci):
         """Assemble the column format"""
         form_width = []
@@ -743,7 +752,7 @@ def prn_tbl(a, rows_m=20, names=None, deci=2, width=100):
         for c_kind, c_width in pairs:
             if c_kind in INTS:  # ---- integer type
                 c_format = ':>{}.0f'.format(c_width)
-            elif c_kind in FLOATS: # and np.isscalar(c[0]):  # float rounded
+            elif c_kind in FLOATS:  # and np.isscalar(c[0]):  # float rounded
                 c_format = ':>{}.{}f'.format(c_width, deci)
             else:
                 c_format = "!s:<{}".format(c_width)
@@ -785,6 +794,7 @@ def prn_tbl(a, rows_m=20, names=None, deci=2, width=100):
     print(msg)
     # return row_frmt, hdr2  # uncomment for testing
 
+
 def prn_geo(a, rows_m=100, names=None, deci=2, width=100):
     """Format a structured array with a mixed dtype.  Derived from
     arraytools.frmts and the prn_rec function therein.
@@ -824,7 +834,7 @@ def prn_geo(a, rows_m=100, names=None, deci=2, width=100):
             c_width = len(name)
         c_width = max(len(name), c_width) + deci
         return [c_kind, c_width]
-    # ----
+
     def _col_format(pairs, deci):
         """Assemble the column format"""
         form_width = []
@@ -832,7 +842,7 @@ def prn_geo(a, rows_m=100, names=None, deci=2, width=100):
         for c_kind, c_width in pairs:
             if c_kind in INTS:  # ---- integer type
                 c_format = ':>{}.0f'.format(c_width)
-            elif c_kind in FLOATS: # and np.isscalar(c[0]):  # float rounded
+            elif c_kind in FLOATS:  # and np.isscalar(c[0]):  # float rounded
                 c_format = ':>{}.{}f'.format(c_width, deci[-1])
             else:
                 c_format = "!s:^{}".format(c_width)
@@ -862,8 +872,9 @@ def prn_geo(a, rows_m=100, names=None, deci=2, width=100):
     # ---- get the column formats from ... _ckw_ and _col_format ----
     deci = [0, 0, deci, deci]
     flds = [c, pp, a[:, 0], a[:, 1]]
-    pairs = [_ckw_(flds[n], names[n], deci[n]) for n, name in enumerate(names)]  # -- column info
-    dts, wdths = _col_format(pairs, deci)                   # format column
+    pairs = [_ckw_(flds[n], names[n], deci[n])
+             for n, name in enumerate(names)]  # -- column info
+    dts, wdths = _col_format(pairs, deci)      # format column
     # ---- slice off excess columns
     c_sum = np.cumsum(wdths)               # -- determine where to slice
     N = len(np.where(c_sum < width)[0])    # columns that exceed ``width``
@@ -886,7 +897,7 @@ def prn_geo(a, rows_m=100, names=None, deci=2, width=100):
 
 def gms(arr):
     """
-    Get maximum dimensions in a list/array 
+    Get maximum dimensions in a list/array
     Returns
     -------
     A list with the format - [3, 2, 4, 10, 2]. Representing the maximum
@@ -894,7 +905,7 @@ def gms(arr):
       [ID, parts, pieces, points, pair]
     """
     from collections import defaultdict
-    #
+
     def get_dimensions(arr, level=0):
         yield level, len(arr)
         try:
@@ -954,7 +965,7 @@ def flatten_to_points(iterable):
                 break
             else:
                 del stack[-2:]
-    # ----
+
     def it(iterable):
         """iterable version"""
         out = []
@@ -972,7 +983,7 @@ def flatten_to_points(iterable):
                         if rings > 0:
                             for j in range(rings):
                                 out.append([cnt, i, j])
-                                sub.append(stack[i][j]) #, stack[cnt][i]])
+                                sub.append(stack[i][j])  # stack[cnt][i]])
                             if rings > 1:
                                 sub.append([[np.nan, np.nan]])
                         else:
@@ -982,8 +993,8 @@ def flatten_to_points(iterable):
         return out, coords
     # ----
     z = gen(iterable)
-    dt = np.dtype({'names':['Xs', 'Ys', 'a', 'b', 'c', 'd'],
-                   'formats':['<f8', '<f8', '<i4', '<i4', '<i4', '<i4']})
+    dt = np.dtype({'names': ['Xs', 'Ys', 'a', 'b', 'c', 'd'],
+                   'formats': ['<f8', '<f8', '<i4', '<i4', '<i4', '<i4']})
     z0 = np.vstack(list(z))
     return uts(z0, dtype=dt)
 
@@ -1001,7 +1012,7 @@ def _test_(in_fc):
     tmp, IFT, IFT_2 = fc_geometry(in_fc)
     m = np.nanmin(tmp, axis=0)
 #    m = [300000., 5000000.]
-    a = tmp  - m
+    a = tmp - m
     poly_arr = [(i - m) for p in poly_arr for i in p]
     g = Geo(a, IFT, kind, info)
     frmt = """
@@ -1009,21 +1020,24 @@ def _test_(in_fc):
     IFT  :
     {}
     """
-    k_dict = {0:'Points', 1:'Polylines/lines', 2:'Polygons'}
+    k_dict = {0: 'Points', 1: 'Polylines/lines', 2: 'Polygons'}
     print(dedent(frmt).format(k_dict[kind], IFT))
 #    arr_poly_fc(a, p_type='POLYGON', gdb=gdb, fname='a_test', sr=SR, ids=ids)
     return SR, shapes, poly_arr, a, IFT, IFT_2, g
+
 # ===========================================================================
 # ---- main section
+
+
 if __name__ == "__main__":
     """optional location for parameters"""
     in_fc = r"C:\Git_Dan\npgeom\npgeom.gdb\Polygons"
-    #pth = r"C:\Git_Dan\npgeom\data\Polygons.geojson"
-    #pth = r"C:\Git_Dan\npgeom\data\Oddities.geojson"
-    #pth = r"C:\Git_Dan\npgeom\data\Ontario_LCConic.geojson"
+    # pth = r"C:\Git_Dan\npgeom\data\Polygons.geojson"
+    # pth = r"C:\Git_Dan\npgeom\data\Oddities.geojson"
+    # pth = r"C:\Git_Dan\npgeom\data\Ontario_LCConic.geojson"
     testing = True
     if testing:
         in_fc = r"C:\Git_Dan\npgeom\npgeom.gdb\Polygons"
-        #in_fc = r"C:\Git_Dan\npgeom\npgeom.gdb\Oddities"
-        #in_fc = r"C:\Git_Dan\npgeom\npgeom.gdb\Ontario_LCConic"
+        # in_fc = r"C:\Git_Dan\npgeom\npgeom.gdb\Oddities"
+        # in_fc = r"C:\Git_Dan\npgeom\npgeom.gdb\Ontario_LCConic"
         SR, shapes, poly_arr, a, IFT, IFT_2, g = _test_(in_fc)
