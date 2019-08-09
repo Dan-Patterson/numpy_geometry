@@ -2,10 +2,10 @@
 ----
 The following scripts are listed in this folder and the documentation guide
 
-1. _-init__.py
+1. \_\_init__.py
 2. npGeo_io.py
 3. npGeo.py
-4. npGeo_helpers__
+4. npGeo_helpers.py
 
 Links to other documentation will be provided as appropriate
 
