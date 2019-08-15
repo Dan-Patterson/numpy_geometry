@@ -11,7 +11,7 @@ Links to other documentation will be provided as appropriate
 
 
 ----
-## npGeo_io.py
+## npg_io.py
 
 Some useful functions to access and document featureclass information
 
