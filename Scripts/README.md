@@ -3,9 +3,10 @@
 The following scripts are listed in this folder and the documentation guide
 
 1. \_\_init__.py
-2. npGeo_io.py
+2. npg_io.py
 3. npGeo.py
-4. npGeo_helpers.py
+4. npg_helpers.py
+5. smallest_circle.py
 
 Links to other documentation will be provided as appropriate
 
