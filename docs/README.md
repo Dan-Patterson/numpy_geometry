@@ -1,8 +1,11 @@
 ## Docs ##
 
-Import **npgeom** and ake a subsample of some featureclass geometry objects (g).
+Import **npgeom** and take a subsample of some featureclass (in_fc) geometry objects (g).
 
 IFT refers to the feature `id` value, the `from` and `to` points.
+
+To reduce numeric problems, the value of the lower left corner is subtracted from all coordinates moving coordinate space into quadrant I.  You could also subtract the mean value of the points which would center the shapes about the x-y axis origin.
+
 ```
 Usage...
   import npgeom as npg
