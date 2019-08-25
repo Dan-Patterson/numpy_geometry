@@ -78,8 +78,9 @@ a.N    # ---- Number of features.
 4
 
 ```
-Some properties
+**Some properties**
 
+*part, counts, areas, centroids*
 ```
 a.part_cnt    # ---- number of parts for each shape formatted as [id, part count]
 array([[ 2,  2],
@@ -114,3 +115,160 @@ array([[17.5 ,  7.  ],
 a.lengths  # ---- lengths/perimeter depending on feature type.
 array([112.  , 112.  ,  16.05,  19.97,  12.65])
 ```
+
+*extents*
+
+```
+a.aoi_extent()  # ---- the extent of the whole file... aka, the area of interest
+array([ 0.  ,  0.  , 36.71, 33.  ])
+
+a.aoi_rectangle()  # ---- the aoi as a rectangle of x, y points. 
+array([[ 0.  ,  0.  ],
+       [ 0.  , 33.  ],
+       [36.71, 33.  ],
+       [36.71,  0.  ],
+       [ 0.  ,  0.  ]])
+
+a.extents(by_part=False)  # ---- the extents of each shape (Left, Bottom, Right, Top)
+Out[15]: 
+array([[ 0.  ,  0.  , 10.  , 10.  ],
+       [10.  ,  0.  , 25.  , 14.  ],
+       [10.  , 10.  , 15.  , 18.  ],
+       [12.  , 27.  , 18.  , 33.  ],
+       [ 0.  , 24.5 ,  6.  , 31.5 ],
+       [19.14, 25.33, 24.86, 28.67],
+       [12.22, 22.22, 15.77, 25.78],
+       [18.16, 18.73, 23.76, 23.18],
+       [21.29, 16.76, 27.61, 21.32],
+       [29.98, 15.41, 32.32, 20.96],
+       [26.82,  9.46, 33.18, 14.54],
+       [29.29, 22.17, 36.71, 29.83]])
+
+a.extents(by_part=True)  # ---- same as above, but the extent for multiparts is also returned
+array([[ 0.  ,  0.  , 10.  , 10.  ],
+       [ 4.  ,  4.  ,  8.  ,  8.  ],
+       [10.  ,  0.  , 20.  , 10.  ],
+       [15.  ,  4.  , 25.  , 14.  ],
+       [10.  , 10.  , 15.  , 18.  ],
+       [12.  , 27.  , 18.  , 33.  ],
+       [ 0.  , 24.5 ,  6.  , 31.5 ],
+       [19.14, 25.33, 24.86, 28.67],
+       [12.22, 22.22, 15.77, 25.78],
+       [18.16, 18.73, 23.76, 23.18],
+       [21.29, 16.76, 27.61, 21.32],
+       [29.98, 15.41, 32.32, 20.96],
+       [26.82,  9.46, 33.18, 14.54],
+       [29.29, 22.17, 36.71, 29.83]])
+
+a.extent_rectangles(False)  # ---- like the aoi.rectangles, but polygon rectangles are by 
+array([[[ 0.  ,  0.  ],     # shape (False) or by part (True)
+        [ 0.  , 10.  ],
+        [10.  , 10.  ],
+        [10.  ,  0.  ],
+        [ 0.  ,  0.  ]],
+... snip
+       [[29.29, 22.17],
+        [29.29, 29.83],
+        [36.71, 29.83],
+        [36.71, 22.17],
+        [29.29, 22.17]]])
+```
+
+*stats... mins, maxs, means*
+
+```
+a.mins(False)  # ---- maxs, maxs and means by shape (False) or by part (True)
+array([[ 0.  ,  0.  ],
+       [10.  ,  0.  ],
+       [10.  , 10.  ],
+       [12.  , 27.  ],
+       [ 0.  , 24.5 ],
+       [19.14, 25.33],
+       [12.22, 22.22],
+       [18.16, 18.73],
+       [21.29, 16.76],
+       [29.98, 15.41],
+       [26.82,  9.46],
+       [29.29, 22.17]])
+ 
+ ```
+ 
+ *retrieving shapes*
+ 
+ ```
+a.get(ID=3, asGeo=True)  # ---- a single shape as a Geo array
+Geo([[14., 10.],
+     [10., 10.],
+     [15., 18.],
+     [14., 10.]])
+
+a.get(ID=3, asGeo=False)  # ---- as an ndarray
+array([[15., 33.],
+       [18., 30.],
+       [15., 27.],
+       [12., 30.],
+       [15., 33.]])
+
+a.pull([3,4], True)  # ---- multiple shapes in the order given as a Geo array
+Geo([[14., 10.],
+     [10., 10.],
+     [15., 18.],
+     [14., 10.],
+     [15., 33.],
+     [18., 30.],
+     [15., 27.],
+     [12., 30.],
+     [15., 33.]])
+
+a.pull([3, 4], False)  # ---- and as an ndarray
+array([array([[14., 10.],
+       [10., 10.],
+       [15., 18.],
+       [14., 10.]]),
+       array([[15., 33.],
+       [18., 30.],
+       [15., 27.],
+       [12., 30.],
+       [15., 33.]])], dtype=object)
+  
+a.outer_rings(asGeo=True)  # ---- outer rings as Geo array
+Geo([[10.  , 10.  ],
+     [10.  ,  0.  ],
+     [ 0.  ,  0.  ],
+     [ 0.  , 10.  ],
+     [10.  , 10.  ],
+     ...,
+     [29.31, 24.65],
+     [29.29, 27.24],
+     [31.96, 27.25],
+     [31.96, 29.83],
+     [34.33, 29.83]])
+
+a.outer_rings(asGeo=True).IFT  # ---- note IFT changes
+array([[  1,   0,   5],
+       [  1,   5,  10],
+       [  2,  10,  20],
+       [  2,  20,  29],
+       [  3,  29,  33],
+       [  4,  33,  38],
+       [  5,  38,  45],
+       [  6,  45,  75],
+       [  7,  75,  99],
+       [  8,  99, 106],
+       [  9, 106, 113],
+       [ 10, 113, 117],
+       [ 11, 117, 123],
+       [ 12, 123, 136]])
+
+a.outer_rings(asGeo=False)  # --- as a list of arrays
+[array([[10., 10.],
+        [10.,  0.],
+        [ 0.,  0.],
+        [ 0., 10.],
+        [10., 10.]]), array([[8., 8.],
+        [8., 4.],
+        [4., 4.],
+        [4., 8.],
+        [8., 8.]]), ... snip ...
+        ]
+ ```
