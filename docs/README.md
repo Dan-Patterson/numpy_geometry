@@ -272,3 +272,21 @@ a.outer_rings(asGeo=False)  # --- as a list of arrays
         [8., 8.]]), ... snip ...
         ]
  ```
+ 
+ *point information*
+ 
+ ```
+ syntax : point_info(self, by_part=True, with_null=False)
+
+a.point_info(True, True)
+array([11, 10, 10,  9,  4,  5,  7, 30, 24,  7,  7,  4,  6, 13])
+
+a.point_info(True, False)
+array([10,  9, 10,  9,  4,  5,  7, 30, 24,  7,  7,  4,  6, 13])
+
+a.point_info(False, True)
+array([11, 10, 10,  9,  4,  5,  7, 30, 24,  7,  7,  4,  6, 13])
+
+a.point_info(False, False)
+array([19, 19,  4,  5,  7, 30, 24,  7,  7,  4,  6, 13])
+ ```
