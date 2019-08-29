@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-============
-npGeo_io.py
-============
+=========
+npg_io.py
+=========
 
 Script :
-    .../npgeom/npGeo_io.py
+    .../npgeom/npg_io.py
 
 Author :
     Dan_Patterson@carleton.ca
 
-Modified : 2019-07-29
+Modified : 2019-08-26
     Creation date during 2019 as part of ``arraytools``.
 
 Purpose : Tools for working with point and poly features as an array class
@@ -43,17 +43,16 @@ References
 # pylint: disable=R1710  # inconsistent-return-statements
 # pylint: disable=W0105  # string statement has no effect
 # pylint: disable=W0621  # redefining name
-# pylint: disable=F401   # redefining name
+# pylint: disable=W0621  # redefining name
 import sys
 from textwrap import dedent  # indent
+import json
 
 import numpy as np
 from numpy.lib.recfunctions import structured_to_unstructured as stu
 from numpy.lib.recfunctions import unstructured_to_structured as uts
 
-import json
-
-import npGeo
+from npGeo import *
 
 import arcpy
 
@@ -79,7 +78,7 @@ null_pnt = (np.nan, np.nan)  # ---- a null point
 
 ft = {'bool': lambda x: repr(x.astype(np.int32)),
       'float_kind': '{: 0.3f}'.format}
-np.set_printoptions(edgeitems=10, linewidth=100, precision=2, suppress=True,
+np.set_printoptions(edgeitems=10, linewidth=160, precision=2, suppress=True,
                     threshold=100, formatter=ft)
 
 
@@ -192,7 +191,6 @@ def geojson_Geo(pth, kind=2):
 def fc_json(in_fc, SR=None):
     """Produce arrays from the json representation of fc_shapes shapes.
     """
-    import json
     shapes = fc_shapes(in_fc, SR=SR)
     arr = []
     json_keys = [i for i in json.loads(shapes[0].JSON).keys()]
@@ -221,7 +219,7 @@ def Arrays_to_Geo(in_arrays, Kind=2, Info=None):
 
     Requires
     --------
-    fc_geo_io.array_ift
+    npg_io.array_ift
 
     Returns
     -------
@@ -234,12 +232,12 @@ def Arrays_to_Geo(in_arrays, Kind=2, Info=None):
     **fc_geometry** to produce ``Geo`` objects directly from arcgis pro
     featureclasses.
     """
-    a_2d, IFT = array_ift(in_arrays)     # ---- call fc_geo_io.array_ift
+    a_2d, IFT = array_ift(in_arrays)     # ---- call npg_io.array_ift
     return Geo(a_2d, IFT, Kind, Info)
 
 
 def Geo_to_arrays(in_geo):
-    """Reconstruct the input arrays from the Geo array"""
+    """Reconstruct the input arrays from the Geo array."""
     return np.asarray([np.asarray(in_geo.get(i))
                        for i in np.unique(in_geo.IDs).tolist()])
 
@@ -338,7 +336,7 @@ def _make_nulls_(in_fc, include_oid=True, int_null=-999):
     null_dict = {f: nulls[fld_dict[f]] for f in fld_names}
     # ---- insert the OBJECTID field
     if include_oid and desc['hasOID']:
-        oid_name = 'OID@'  #desc['OIDFieldName']
+        oid_name = 'OID@'  # desc['OIDFieldName']
         oi = {oid_name: -999}
         null_dict = dict(list(oi.items()) + list(null_dict.items()))
         fld_names.insert(0, oid_name)
@@ -440,16 +438,16 @@ def fc_data(in_fc):
     null_dict, fld_names = _make_nulls_(in_fc, include_oid=True, int_null=-999)
     if flds not in fld_names:
         new_names = out_flds = fld_names
-    if 'OID@' == fld_names[0]:
+    if fld_names[0] == 'OID@':
         out_flds = flds + fld_names[1:]
         new_names = ['OID_', 'X_cent', 'Y_cent'] + out_flds[3:]
-    a = arcpy.da.FeatureClassToNumPyArray(
-            in_fc, out_flds, skip_nulls=False, null_value=null_dict)
+    a = arcpy.da.FeatureClassToNumPyArray(in_fc, out_flds, skip_nulls=False,
+                                          null_value=null_dict)
     a.dtype.names = new_names
     return np.asarray(a)
 
 
-def fc_geometry(in_fc, SR=None, deg=5):
+def fc_geometry(in_fc, SR=None, IFT_rec=False, true_curves=False, deg=5):
     """Derive, arcpy geometry objects from a FeatureClass searchcursor.
 
     Parameters
@@ -461,6 +459,8 @@ def fc_geometry(in_fc, SR=None, deg=5):
     deg : integer
         Used to densify curves found for circles and ellipses. Values of
         1, 2, 5 and 10 deg(rees) are appropriate.  No error checking
+    IFT_rec : boolean
+        Return the ``IFT`` as a structured array as well.
 
     Returns
     -------
@@ -502,12 +502,12 @@ def fc_geometry(in_fc, SR=None, deg=5):
     >>> %timeit fc_geometry(in_fc2, SR)
     105 ms ± 1.04 ms per loop (mean ± std. dev. of 7 runs, 10 loops each)
     ...
-    >>> %%timeit
-    ... cur = arcpy.da.SearchCursor(in_fc2, 'SHAPE@', None, SR)
-    ... p = [row[0] for row in cur]
-    ... sh = [[i for i in itertools.chain.from_iterable(shp)] for shp in p]
-    ... pnts = [[[pt.X, pt.Y] if pt else null_pnt for pt in lst] for lst in sh]
-    4.4 ms ± 21.4 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
+    >>> cur = arcpy.da.SearchCursor(in_fc, 'SHAPE@', None, SR)
+    >>> polys = [row[0] for row in cur]
+    >>> pts = [[(i.X, i.Y) if i else (np.nan, np.nan)
+                for i in itertools.chain.from_iterable(shp)]
+                for shp in polys]
+    7.28 ms ± 105 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
     """
     msg = """
     Use arcpy.FeatureClassToNumPyArray for Point files.
@@ -517,15 +517,20 @@ def fc_geometry(in_fc, SR=None, deg=5):
     def _multipnt_(in_fc, SR):
         """Convert multipoint geometry to array"""
         pnts = arcpy.da.FeatureClassToNumPyArray(
-                   in_fc, ['OID@', 'SHAPE@X', 'SHAPE@Y'],
-                   spatial_reference=SR,
-                   explode_to_points=True)
+                in_fc, ['OID@', 'SHAPE@X', 'SHAPE@Y'], spatial_reference=SR,
+                explode_to_points=True
+                )
         id_len = np.vstack(np.unique(pnts['OID@'], return_counts=True)).T
         a_2d = stu(pnts[['SHAPE@X', 'SHAPE@Y']])  # ---- use ``stu`` to convert
         return id_len, a_2d
 
-    def _polytypes_(in_fc, SR):
-        """Convert polylines/polygons geometry to array"""
+    def _polytypes_(in_fc, SR, true_curves, deg):
+        """Convert polylines/polygons geometry to array.
+
+        >>> cur = arcpy.da.SearchCursor( in_fc, ('OID@', 'SHAPE@'), None, SR)
+        >>> ids = [r[0] for r in cur]
+        >>> arrs = [[j for j in r[1]] for r in cur]
+        """
         def _densify_curves_(geom, deg=deg):
             """Densify geometry for circle and ellipse (geom) at ``deg`` degree
             increments. deg, angle = (1, 361), (2, 181), (5, 73)
@@ -539,28 +544,28 @@ def fc_geometry(in_fc, SR=None, deg=5):
         a_2d = []
         with arcpy.da.SearchCursor(
                 in_fc, ('OID@', 'SHAPE@'), None, SR) as cursor:
-            for p_id, row in enumerate(cursor):
+            for row in cursor:
                 sub = []
                 IDs = []
                 num_pnts = []
                 p_id = row[0]
                 geom = row[1]
                 prt_cnt = geom.partCount
-                p_num = geom.pointCount  # ---- added
-                if (prt_cnt == 1) and (p_num <= 4):
-                    geom = _densify_curves_(geom, deg=deg)
+                if true_curves:
+                    p_num = geom.pointCount  # ---- added
+                    if (prt_cnt == 1) and (p_num <= 4):
+                        geom = _densify_curves_(geom, deg=deg)
                 for arr in geom:
                     pnts = [[pt.X, pt.Y] if pt else null_pnt for pt in arr]
                     sub.append(np.asarray(pnts))
                     IDs.append(p_id)
                     num_pnts.append(len(pnts))
                 part_count = np.arange(prt_cnt)
-                # too = np.cumsum(num_pnts)
                 result = np.stack((IDs, part_count, num_pnts), axis=-1)
                 id_len.append(result)
                 a_2d.extend([j for i in sub for j in i])
         # ----
-        id_len = np.vstack(id_len)  # np.array(id_len)
+        id_len = np.concatenate(id_len, axis=0)
         a_2d = np.asarray(a_2d)
         return id_len, a_2d
     #
@@ -574,18 +579,21 @@ def fc_geometry(in_fc, SR=None, deg=5):
     if fc_kind == "Multipoint":
         id_len, a_2d = _multipnt_(in_fc, SR)
     else:
-        id_len, a_2d = _polytypes_(in_fc, SR)
+        id_len, a_2d = _polytypes_(in_fc, SR, true_curves, deg)
     # ---- Return and send out
     ids = id_len[:, 0]
     too = np.cumsum(id_len[:, 2])
     frum = np.concatenate(([0], too))
-    from_to = np.array(list(zip(frum, too)))
-    IFT = np.c_[ids, from_to]
-    id_len2 = np.hstack((id_len, IFT[:, 1:]))
-    dt = np.dtype({'names': ['IDs', 'Part', 'Points', 'From_pnt', 'To_pnt'],
-                   'formats': ['i4', 'i4', 'i4', 'i4', 'i4']})
-    IFT_2 = uts(id_len2, dtype=dt)
-    return a_2d, IFT, IFT_2
+    from_to = np.concatenate((frum[:-1, None], too[:, None]), axis=1)
+    IFT = np.concatenate((ids[:, None], from_to), axis=1)
+    if IFT_rec:
+        id_len2 = np.concatenate((id_len, IFT[:, 1:]), axis=1)
+        dt = np.dtype(
+                {'names': ['IDs', 'Part', 'Points', 'From_pnt', 'To_pnt'],
+                 'formats': ['i4', 'i4', 'i4', 'i4', 'i4']})
+        IFT_2 = uts(id_len2, dtype=dt)
+        return a_2d, IFT, IFT_2
+    return a_2d, IFT
 
 
 def fc_shapes(in_fc, SR=None):
@@ -672,23 +680,21 @@ def geometry_fc(a, IFT, p_type=None, gdb=None, fname=None, sr=None):
     ----------
     a : array or list of arrays
         Some can be object arrays, normally created by ``pnts_arr``
-    ids : list/array
+    IFT : list/array
         Identifies which feature each input belongs to.  This enables one to
         account for multipart shapes
-    from_to : list/array
-        See ids above, denotes the actual splice elements for each feature.
-    p : string
-        Uppercase geometry type
+    p_type : string
+        Uppercase geometry type eg POLYGON.
     gdb : text
-        Geodatabase name
+        Geodatabase path and name.
     fname : text
-        Featureclass name
+        Featureclass name.
     sr : spatial reference
         name or object
 
     Returns
     -------
-    Singlepart and multipart featureclasses.
+    Singlepart and/or multipart featureclasses.
 
     Notes
     -----
@@ -801,7 +807,7 @@ def prn_tbl(a, rows_m=20, names=None, deci=2, width=100):
     hdr = ["!s:<" + "{}".format(wdths[i]) for i in range(N)]
     hdr2 = "  ".join(["{" + hdr[i] + "}" for i in range(N)])
     header = " ... " + hdr2.format(*names[:N]) + tail
-    header = "\n{}\n{}".format(header, "-"*len(header))
+    header = "{}\n{}".format(header, "-"*len(header))
     txt = [header]
     for idx, i in enumerate(range(a.shape[0])):
         if idx == rows_m:
@@ -821,7 +827,7 @@ def prn_geo(a, rows_m=100, names=None, deci=2, width=100):
     Parameters
     ----------
     a : array
-        A structured/recarray
+        A structured/recarray.
     rows_m : integer
         The maximum number of rows to print.  If rows_m=10, the top 5 and
         bottom 5 will be printed.
@@ -914,8 +920,8 @@ def prn_geo(a, rows_m=100, names=None, deci=2, width=100):
 # ==== Extras ===============================================================
 #
 def gms(arr):
-    """
-    Get maximum dimensions in a list/array
+    """Get maximum dimensions in a list/array
+
     Returns
     -------
     A list with the format - [3, 2, 4, 10, 2]. Representing the maximum
@@ -997,4 +1003,18 @@ def flatten_to_points(iterable):
 if __name__ == "__main__":
     """optional location for parameters"""
     print("\n{}".format(script))
- 
+
+"""
+lists to dictionary
+
+list1 =  [('84116', 1750),('84116', 1774),('84116', 1783),('84116',1792)]
+list2 = [('84116', 1783),('84116', 1792),('84116', 1847),('84116', 1852),
+         ('84116', 1853)]
+Lst12 = list1 + list2
+dt = [('Keys', 'U8'), ('Vals', '<i4')]
+arr = np.asarray((list1 + list2), dtype=dt)
+a0 =np.unique(arr)
+k = np.unique(arr['Keys'])
+{i : a0['Vals'][a0['Keys'] == i].tolist() for i in k}
+
+"""

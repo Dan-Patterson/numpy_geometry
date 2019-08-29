@@ -21,21 +21,19 @@ provides the base class for this package.  It is based on the numpy ndarray.
 
 >>> import npgeom as npg
 
->>> npg.npGeo_io.__all__
+>>> npg.npg_io.__all__
 ... ['poly2array', 'load_geojson', 'Arrays_to_Geo', 'Geo_to_arrays',
-... 'array_ift', '_make_nulls_', 'getSR', 'fc_composition', 'fc_data',
-... 'fc_geometry', 'fc_shapes', 'getSR', 'array_poly', 'geometry_fc',
-... 'prn_q', '_check', 'prn_tbl', 'prn_geo']
+...  'array_ift', '_make_nulls_', 'getSR', 'fc_composition', 'fc_data',
+...  'fc_geometry', 'fc_shapes', 'getSR', 'shape_to_K', 'array_poly',
+...  'geometry_fc', 'prn_q', '_check', 'prn_tbl', 'prn_geo']
 
 >>> npg.npGeo.__all__
-... ['Geo', 'Update_Geo', '_angles_', '_area_centroid_', '_area_part_',
-... '_ch_', '_ch_scipy', '_ch_simple_', '_nan_split_', '_o_ring_',
-... '_pnts_on_line_', '_polys_to_segments_', '_polys_to_unique_pnts_']
+... ['Geo', 'Update_Geo']
 
->>> npg.npGeo_helpers.__all__
+>>> npg.npg_helpers.__all__
 ... ['_angles_', '_area_centroid_', '_area_part_', '_ch_', '_ch_scipy',
-'_ch_simple_', '_nan_split_', '_o_ring_', '_pnts_on_line_',
-'_polys_to_segments_', '_polys_to_unique_pnts_', '_simplify_lines_']
+...  '_ch_simple_', '_nan_split_', '_o_ring_', '_pnts_on_line_',
+...  '_polys_to_segments_', '_polys_to_unique_pnts_', '_simplify_lines_']
 
 **Import options for arcpy functions**
 
@@ -60,10 +58,12 @@ Arcpy methods and properties needed::
     arcpy.da.FeatureClassToNumPyArray
 """
 # import numpy as np
-#pylint: disable=W0611   # unused import
-#pyflake: disable=F401    
+# pylint: disable=W0611   # unused import
+# pyflake: disable=F401
 
-from . import (npGeo, npg_io, npg_helpers, smallest_circle, _tests_)
+from . import (
+        npGeo, npg_io, npg_geom, npg_table, smallest_circle,  _tests_
+        )
 
 from .npGeo import (Geo, Update_Geo)
 
@@ -74,13 +74,15 @@ from .npg_io import (
         array_poly, geometry_fc, prn_q, _check, prn_tbl, prn_geo
         )
 
-from .npg_helpers import (
+from .npg_geom import (
         _area_centroid_, _area_part_, _o_ring_, _angles_, _ch_scipy_,
         _ch_simple_, _ch_, _dist_along_, _percent_along_, _pnts_on_line_,
-        _densify_by_dist_,
-        _polys_to_segments_, _polys_to_unique_pnts_, _simplify_lines_,
-        _tri_pnts_, unique_attributes
+        _densify_by_dist_,  _polys_to_segments_, _polys_to_unique_pnts_,
+        _simplify_lines_, _tri_pnts_
         )
+
+from .npg_table import (col_stats, crosstab_tbl, crosstab_rc, crosstab_array)
+
 
 __all_io__ = [
         'Arrays_to_Geo', 'Geo_to_arrays', '_check', '_make_nulls_',
@@ -93,8 +95,8 @@ __all_geo__ = [
         'Geo', 'Update_Geo', '_angles_', '_area_centroid_', '_area_part_',
         '_ch_', '_ch_scipy_', '_ch_simple_', '_dist_along_', '_nan_split_',
         '_o_ring_', '_percent_along_', '_pnts_on_line_', '_densify_by_dist_',
-        '_polys_to_segments_',
-        '_polys_to_unique_pnts_', '_tri_pnts_', 'unique_attributes'
+        '_polys_to_segments_', '_polys_to_unique_pnts_', '_tri_pnts_',
+        'unique_attributes'
         ]
 
 __all_helpers__ = [
@@ -104,5 +106,5 @@ __all_helpers__ = [
         ]
 
 __all__ = __all_io__ + __all_geo__ + __all_helpers__
-#__all__.sort()
+# __all__.sort()
 print("\nUsage...\n  import npgeom as npg")
