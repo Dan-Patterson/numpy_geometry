@@ -11,7 +11,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2019-08-13
+    2019-08-28
 
 Purpose :
     Tools for working with ``free`` ArcGIS Pro functionality
@@ -89,16 +89,16 @@ import arcpy
 
 import npg_io
 import npGeo
-import npg_helpers
+import npg_geom
 from npg_io import getSR, shape_to_K, fc_data, fc_geometry, geometry_fc
 from npGeo import Geo, Update_Geo
-from npg_helpers import _polys_to_unique_pnts_
+from npg_geom import _polys_to_unique_pnts_
 
 # from fc_tools import *
 
 importlib.reload(npg_io)
 importlib.reload(npGeo)
-importlib.reload(npg_helpers)
+importlib.reload(npg_geom)
 
 arcpy.env.overwriteOutput = True
 
@@ -135,11 +135,11 @@ def check_path(fc):
     """
     ---- check_path ----
 
-    Checks for a filegeodatabase and a filename. Flag files and paths
-    containing `flotsam` as being invalid
+    Checks for a file geodatabase and a filename. Files and/or paths containing
+    `flotsam` are flagged as being invalid.
 
-    Either you failed to specify the geodatabase location and filename properly
-    or you had flotsam, in the path, like...::
+    Check the geodatabase location and filename properly.  Flotsam, in the
+    path or name, consists of one or more of these characters...::
 
        \'!"#$%&\'()*+,-;<=>?@[]^`{|}~  including the `space`
 
@@ -178,7 +178,7 @@ def check_path(fc):
 # (1) ---- extent_poly section -----------------------------------------------
 #
 def extent_poly(in_fc, out_fc, kind):
-    """Feature envelop to polygon demo.
+    """Feature envelope to polygon demo.
 
     Parameters
     ----------
@@ -202,8 +202,9 @@ def extent_poly(in_fc, out_fc, kind):
     gdb, name = result
     # ---- done checks
     SR = getSR(in_fc)
-    tmp, IFT, IFT_2 = fc_geometry(in_fc, SR)
-    SR = getSR(in_fc)
+    tmp, IFT = fc_geometry(
+            in_fc, SR=SR, IFT_rec=False, true_curves=False, deg=5
+            )
     m = np.nanmin(tmp, axis=0)    # shift to bottom left of extent
     info = "extent to polygons"
     a = tmp - m
@@ -231,8 +232,9 @@ def convex_hull_polys(in_fc, out_fc, kind):
     gdb, name = result
     # ---- done checks
     SR = getSR(in_fc)
-    tmp, IFT, IFT_2 = fc_geometry(in_fc, SR)
-    SR = getSR(in_fc)
+    tmp, IFT = fc_geometry(
+            in_fc, SR=SR, IFT_rec=False, true_curves=False, deg=5
+            )
     info = "convex hulls to polygons"
     g = Geo(tmp, IFT=IFT, Kind=kind, Info=info)   # create the geo array
     ch_out = g.convex_hulls(by_part=False, threshold=50)
@@ -257,7 +259,9 @@ def f2pnts(in_fc):
     gdb, name = result
     SR = getSR(in_fc)         # getSR, shape_to_K  and fc_geometry from
     kind = shape_to_K(in_fc)  # npGeo_io
-    tmp, IFT, IFT_2 = fc_geometry(in_fc, SR)
+    tmp, IFT = fc_geometry(
+            in_fc, SR=SR, IFT_rec=False, true_curves=False, deg=5
+            )
     m = np.nanmin(tmp, axis=0)    # shift to bottom left of extent
     info = "feature to points"
     a = tmp - m
@@ -280,8 +284,10 @@ def split_at_vertices(in_fc, out_fc):
         return result[1]
     gdb, name = result
     SR = getSR(in_fc)
-    a, IFT, IFT_2 = fc_geometry(in_fc, SR)
-    ag = Geo(a, IFT)
+    tmp, IFT = fc_geometry(
+            in_fc, SR=SR, IFT_rec=False, true_curves=False, deg=5
+            )
+    ag = Geo(tmp, IFT)
 #    fr_to = ag.unique_segments()  # geo method
     fr_to = ag.polys_to_segments()
     dt = np.dtype([('X_orig', 'f8'), ('Y_orig', 'f8'),
@@ -307,9 +313,11 @@ def p_uni_pnts(in_fc, out_fc):
         return result[1]
     gdb, name = result
     SR = getSR(in_fc)
-    a, IFT, IFT_2 = fc_geometry(in_fc, SR)
+    tmp, IFT = fc_geometry(
+            in_fc, SR=SR, IFT_rec=False, true_curves=False, deg=5
+            )
     info = "unique points"
-    a = Geo(a, IFT=IFT, Kind=0, Info=info)   # create the geo array
+    a = Geo(tmp, IFT=IFT, Kind=0, Info=info)   # create the geo array
     out = _polys_to_unique_pnts_(a, as_structured=True)
     return out, SR
 
@@ -326,7 +334,9 @@ def pgon_to_pline(in_fc, out_fc):
     gdb, name = result
     SR = getSR(in_fc)
     temp = arcpy.MultipartToSinglepart_management(in_fc, r"memory\in_fc_temp")
-    a, IFT, IFT_2 = fc_geometry(temp, SR)
+    a, IFT = fc_geometry(
+            in_fc, SR=SR, IFT_rec=False, true_curves=False, deg=5
+            )
     tweet("\n(1) fc_geometry complete...")
     d = fc_data(temp)
     tweet("\n(2) featureclass data complete...")
@@ -366,7 +376,9 @@ def bounding_circles(in_fc, out_fc, kind=2):
     gdb, name = result
     SR = getSR(in_fc)         # getSR, shape_to_K  and fc_geometry from
     kind = shape_to_K(in_fc)  # npGeo_io
-    tmp, IFT, IFT_2 = fc_geometry(in_fc, SR)
+    tmp, IFT = fc_geometry(
+            in_fc, SR=SR, IFT_rec=False, true_curves=False, deg=5
+            )
     m = np.nanmin(tmp, axis=0)    # shift to bottom left of extent
     info = "bounding circles"
     a = tmp - m
@@ -490,9 +502,11 @@ def _tool_():
 # ===========================================================================
 # ---- main section: testing or tool run ------------------------------------
 #
-tool_list = ['1 extent polygons', '2 feature to point',
-             '3 split at vertices', '4 vertices to points',
-             '5 polygon to polyline', '6 frequency and statistics']
+tool_list = [
+        '1 extent polygons', '2 convex hull', '3 feature to point',
+        '4 split at vertices', '5 vertices to points', '6 polygon to polyline',
+        '7 bounding circles', '8 frequency and statistics'
+        ]
 
 if len(sys.argv) == 1:
     testing = True
