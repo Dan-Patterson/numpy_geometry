@@ -78,6 +78,7 @@ a.N    # ---- Number of features.
 4
 
 ```
+
 **Some properties**
 
 *part, counts, areas, centroids*
@@ -272,6 +273,75 @@ a.outer_rings(asGeo=False)  # --- as a list of arrays
         [8., 8.]]), ... snip ...
         ]
  ```
+ 
+ *shape information*
+ 
+is_clockwise :
+
+Check whether poly features are oriented clockwise.  Either a polygon or a closed-loop polyline are required as inputs.  The ouput returned is in the form of a structured array.  The IDs indicate all lines used to construct the feature.  For example, there are four pieces used to construct feature 1 since it is a multipart feature with holes.  Clockwise is indicated by a value of 1, counter-clockwise is 0.
+
+is_convex :
+
+A boolean array is returned indicating whether convexity is done by part or shape.
+
+is_multipart :
+
+Either as an ndarray or structured array.
+
+polygon_angles :
+
+Returns the angles, inside or outside, for polygon features.  An equivalent function exists for polylines (polyline_angles(self, fromNorth=False) )
+ ```
+g.is_clockwise(is_closed_polyline=False)
+array([( 1, 1), ( 1, 0), ( 1, 1), ( 1, 0), ( 2, 1), ( 2, 1), ( 3, 1), ( 4, 1),
+       ( 5, 1), ( 6, 1), ( 7, 1), ( 8, 1), ( 9, 1), (10, 1), (11, 1), (12, 1)],
+      dtype=[('IDs', '<i4'), ('Clockwise', '<i4')])
+
+g.is_convex(by_part=True)
+array([ True,  True, False, False,  True,  True, False, False,  True,  True,
+       False,  True, False, False])
+
+g.is_multipart(as_structured=False)
+array([[ 1,  1],
+       [ 2,  1],
+       [ 3,  0],
+       [ 4,  0],
+       [ 5,  0],
+       [ 6,  0],
+       [ 7,  0],
+       [ 8,  0],
+       [ 9,  0],
+       [10,  0],
+       [11,  0],
+       [12,  0]])
+
+g.is_multipart(as_structured=True)
+array([( 1, 1), ( 2, 1), ( 3, 0), ( 4, 0), ( 5, 0), ( 6, 0), ( 7, 0), ( 8, 0),
+       ( 9, 0), (10, 0), (11, 0), (12, 0)],
+      dtype=[('IDs', '<i4'), ('Parts', '<i4')])
+
+g.polygon_angles(inside=True, in_deg=True) 
+[array([90., 90., 90., 90.]),
+ array([90., 90., 90., 90.]),
+ array([270., 270.,  90.,  90.,  90.,  90., 180.,  90.,  90.]),
+ array([ 90.,  90.,  90.,  90., 270., 270.,  90.,  90.]),
+ array([97.13, 57.99, 24.88]),
+ array([90., 90., 90., 90.]),
+ array([ 90.,  90., 270.,  90.,  90.,  90.]),
+ array([353.82, 175.94, 175.53, 174.59, 172.74, 168.47, 156.65, 136.29, 145.78,
+        164.08, 171.1 , 173.84, 175.13, 175.77, 176.05, 176.04, 175.77, 175.13,
+        173.85, 171.08, 164.08, 145.78, 136.29, 156.65, 168.48, 172.73, 174.61,
+        175.5 , 175.96,   2.25]),
+ array([164.35, 164.35, 164.35, 164.34, 164.34, 164.37, 164.34, 164.34, 164.35,
+        164.34, 164.36, 164.34, 164.36, 164.34, 164.36, 164.34, 164.34, 164.35,
+        164.35, 164.35, 164.35, 164.34, 164.36]),
+ array([180.,  90., 180.,  90.,  90.,  90.]),
+ array([ 72.68, 270.  , 108.27,  66.08, 112.02,  90.95]),
+ array([ 30.82,  45.81, 103.37]),
+ array([226.89,  90.  ,  90.  ,  90.  ,  43.11]),
+ array([ 90.  , 270.27,  90.  ,  90.  , 269.72,  90.  ,  90.  , 270.28,  90.  ,
+         90.  , 269.72,  90.  ])]
+```
  
  *point information*
  
