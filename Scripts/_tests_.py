@@ -11,10 +11,10 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2019-08-11
+    2019-09-06
 
 Purpose :
-    Tests for the Geo class
+    Tests for the Geo class.
 
 Notes
 -----
@@ -67,7 +67,7 @@ import npgeom as npg
 
 
 ft = {'bool': lambda x: repr(x.astype(np.int32)),
-      'float_kind': '{: 0.3f}'.format}
+      'float_kind': '{: 0.2f}'.format}
 np.set_printoptions(edgeitems=10, linewidth=80, precision=2, suppress=True,
                     threshold=100, formatter=ft)
 np.ma.masked_print_option.set_display('-')  # change to a single -
@@ -85,7 +85,7 @@ def _test_(in_fc=None, full=False):
     in_fc, g = npg._tests_._test_()
     """
     if in_fc is None:
-        in_fc = r"C:\Git_Dan\npgeom\npgeom.gdb\Polygons"
+        in_fc = r"C:/Git_Dan/npgeom/npgeom.gdb/Polygons"
     kind = 2
     info = None
     SR = npg.getSR(in_fc)
@@ -95,9 +95,9 @@ def _test_(in_fc=None, full=False):
     tmp, IFT = npg.fc_geometry(in_fc)
     m = np.nanmin(tmp, axis=0)
 #    m = [300000., 5000000.]
-    a = tmp - m
+    arr = tmp - m
     poly_arr = [(i - m) for p in poly_arr for i in p]
-    g = npg.Geo(a, IFT, kind, info)
+    g = npg.Geo(arr, IFT, kind, info)
     frmt = """
     Type :  {}
     IFT  :
@@ -106,9 +106,11 @@ def _test_(in_fc=None, full=False):
     k_dict = {0: 'Points', 1: 'Polylines/lines', 2: 'Polygons'}
     print(dedent(frmt).format(k_dict[kind], IFT))
 #    arr_poly_fc(a, p_type='POLYGON', gdb=gdb, fname='a_test', sr=SR, ids=ids)
+    a = np.array([[0.,  0.], [0., 10.], [10., 10.], [10.,  0.], [0.,  0.]])
+    a = npg.arrays_to_Geo(a, Kind=2, Info=None)
     if full:
-        return SR, shapes, poly_arr, a, IFT, g
-    return in_fc, g
+        return SR, shapes, poly_arr, arr, IFT, g, a
+    return in_fc, g, a
 
 
 deg = 5.
@@ -161,7 +163,75 @@ if __name__ == "__main__":
 #        # in_fc = r"C:/Git_Dan/npgeom/npgeom.gdb/Oddities"
 #        # in_fc = r"C:/Git_Dan/npgeom/npgeom.gdb/Ontario_LCConic"
 #        returned = _test_(in_fc)
-    in_fc, g = _test_()
+#    in_fc, g, a = _test_(in_fc, False)
+    SR, shapes, poly_arr, arr, IFT, g, a = _test_(in_fc, True)
+
+"""
+arrays
+
+rectangle
+a = np.array([[0., 0.], [0., 10.], [10., 10.], [10., 0.], [0., 0.]])
+
+rectangle with hole
+a0 = np.array([[[0.,  0.], [0., 10.], [10., 10.], [10.,  0.], [0.,  0.]],
+              [[2., 2.], [8., 2.], [8., 8.], [2., 8.], [2., 2.]]])
+
+just the hole reversed
+a1 = a0[1][::-1]
+
+----
+x0, y1 = (a.T)[:, 1:]
+x1, y0 = (a.T)[:, :-1]
+e0 = np.einsum('...i,...i->...i', x0, y0)
+e1 = np.einsum('...i,...i->...i', x1, y1)
+t = e1 - e0
+area = np.nansum((e0 - e1)*0.5)
+x_c = np.nansum((x1 + x0) * t, axis=0) / (area * 6.0)
+y_c = np.nansum((y1 + y0) * t, axis=0) / (area * 6.0)
+
+t
+Out[194]: array([ 0.00, -100.00, -100.00,  0.00])
+
+area, x_c, y_c
+Out[195]: (100.0, -5.0, -5.0)
+
+----
+x0, y1 = (a0.T)[:, 1:]
+x1, y0 = (a0.T)[:, :-1]
+e0 = np.einsum('...i,...i->...i', x0, y0)
+e1 = np.einsum('...i,...i->...i', x1, y1)
+t = e1 - e0
+area = np.nansum((e0 - e1)*0.5)
+x_c = np.nansum((x1 + x0) * t, axis=0) / (area * 6.0)
+y_c = np.nansum((y1 + y0) * t, axis=0) / (area * 6.0)
+
+t
+array([[ 0.00, -12.00],
+       [-100.00,  48.00],
+       [-100.00,  48.00],
+       [ 0.00, -12.00]])
+
+area, x_c, y_c
+Out[198]: (64.0, array([-7.81,  2.81]), array([-7.81,  2.81]))
+
+----
+x0, y1 = (a1.T)[:, 1:]
+x1, y0 = (a1.T)[:, :-1]
+e0 = np.einsum('...i,...i->...i', x0, y0)
+e1 = np.einsum('...i,...i->...i', x1, y1)
+t = e1 - e0
+area = np.nansum((e0 - e1)*0.5)
+x_c = np.nansum((x1 + x0) * t, axis=0) / (area * 6.0)
+y_c = np.nansum((y1 + y0) * t, axis=0) / (area * 6.0)
+
+t
+Out[200]: array([ 12.00, -48.00, -48.00,  12.00])
+
+area, x_c, y_c
+Out[201]: (36.0, -5.0, -5.0)
+
+"""
+
 
 """
 import npgeom as npg
