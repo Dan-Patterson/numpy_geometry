@@ -31,6 +31,8 @@ Derived from arraytools ``convex_hull, mst, near, n_spaced``
 # import sys
 from textwrap import dedent
 import numpy as np
+from numpy.lib.recfunctions import unstructured_to_structured as uts
+from numpy.lib.recfunctions import repack_fields
 
 ft = {'bool': lambda x: repr(x.astype(np.int32)),
       'float_kind': '{: 0.3f}'.format}
@@ -85,7 +87,7 @@ def not_closer(a, min_d=1, ordered=False):
     diff = b - a
     d = np.einsum('ijk,ijk->ij', diff, diff)
     d = np.sqrt(d).squeeze()
-    c = ~(np.triu(d <= min_d, 1)).any(0)
+    c = ~np.triu(d <= min_d, 1).any(0)
     b = a[c]
     return b, c, d
 
@@ -197,7 +199,7 @@ def n_spaced(L=0, B=0, R=10, T=10, min_space=1, num=10, verbose=True):
         diff = b - a
         dist = np.einsum('ijk,ijk->ij', diff, diff)
         dist_arr = np.sqrt(dist).squeeze()
-        case = ~(np.triu(dist_arr <= min_space, 1)).any(0)
+        case = ~np.triu(dist_arr <= min_space, 1).any(0)
         return a[case]
     #
     cnt = 1
@@ -208,7 +210,7 @@ def n_spaced(L=0, B=0, R=10, T=10, min_space=1, num=10, verbose=True):
     while (result < num) and (cnt < 6):  # keep using random points
         a = _pnts(L, B, R, T, num)
         if cnt > 1:
-            a = np.vstack((a0, a))
+            a = np.concatenate((a0, a), axis=0)  # np.vstack((a0, a))
         a0 = _not_closer(a, min_space)
         result = len(a0)
         if verbose:
@@ -376,7 +378,7 @@ def _e_dist_(a):
     return d
 
 
-def mst(W, calc_dist=True):
+def mst(arr, calc_dist=True):
     """Determine the minimum spanning tree for a set of points represented
     by their inter-point distances. ie their `W`eights
 
@@ -395,7 +397,9 @@ def mst(W, calc_dist=True):
     -------
     pairs - the pair of nodes that form the edges
     """
-    W = W[~np.isnan(W[:, 0])]
+    arr = np.unique(arr, True, False, False, axis=0)[0]
+    W = arr[~np.isnan(arr[:, 0])]
+    a_copy = np.copy(W)
     if calc_dist:
         W = _e_dist_(W)
     if W.shape[0] != W.shape[1]:
@@ -417,7 +421,12 @@ def mst(W, calc_dist=True):
         W[pnts_seen, new_edge[1]] = np.inf
         W[new_edge[1], pnts_seen] = np.inf
         n_seen += 1
-    return np.vstack(pairs)
+    pairs = np.array(pairs)
+    frum = a_copy[pairs[:, 0]]
+    too = a_copy[pairs[:, 1]]
+    fr_to = np.concatenate((frum, too), axis=1)  # np.vstack(pairs)
+    fr_to = uts(fr_to, names=['X_orig', 'Y_orig', 'X_dest', 'Y_dest'])
+    return repack_fields(fr_to)
 
 
 def connect(a, dist_arr, edges):
@@ -486,7 +495,7 @@ def concave(points, k, pip_check=False):
         return a0
 
     def _point_in_polygon_(pnt, poly):  # pnt_in_poly(pnt, poly):  #
-        """Point is in polygon. ## fix this and use pip from arraytools
+        """Point in polygon check. ## fix this and use pip from arraytools
         """
         x, y = pnt
         N = len(poly)
@@ -512,7 +521,7 @@ def concave(points, k, pip_check=False):
         del pts
     if len(p_set) < 3:
         raise Exception("p_set length cannot be smaller than 3")
-    elif len(p_set) == 3:
+    if len(p_set) == 3:
         return p_set  # Points are a polygon already
     k = min(k, len(p_set) - 1)  # Make sure k neighbours can be found
     frst_p = cur_p = min(p_set, key=lambda x: x[1])
@@ -520,7 +529,7 @@ def concave(points, k, pip_check=False):
     p_set.remove(frst_p)  # Remove first point from p_set
     prev_ang = 0
     # ----
-    while (cur_p != frst_p or len(hull) == 1) and len(p_set) > 0:
+    while (cur_p != frst_p or len(hull) == 1) and len(p_set) != 0:
         if len(hull) == 3:
             p_set.append(frst_p)          # Add first point again
         knn_pnts = knn0(p_set, cur_p, k)  # Find nearest neighbours

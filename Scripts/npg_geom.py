@@ -41,7 +41,7 @@ How to flatten a searchcursor to points and/or None
 import sys
 import numpy as np
 
-from numpy.lib.recfunctions import unstructured_to_structured as uts
+# from numpy.lib.recfunctions import unstructured_to_structured as uts
 # from numpy.lib.recfunctions import structured_to_unstructured as stu
 # from numpy.lib.recfunctions import repack_fields
 
@@ -59,8 +59,8 @@ np.ma.masked_print_option.set_display('-')  # change to a single -
 
 script = sys.argv[0]  # print this should you need to locate the script
 
-__all__ = ['_area_centroid_', '_o_ring_', '_angles_',
-           '_ch_scipy_', '_ch_simple_',  '_ch_',
+__all__ = ['_area_centroid_', '_angles_', '_rotate_',
+           '_ch_scipy_', '_ch_simple_', '_ch_',
            '_dist_along_', '_percent_along_', '_pnts_on_line_',
            '_polys_to_unique_pnts_',
            '_simplify_lines_',
@@ -96,24 +96,13 @@ def _area_centroid_(a):
     return area, np.asarray([-x_c, -y_c])
 
 
-# ---- angle helpers
+# ---- angle helper
 #
-def _o_ring_(arr):
-    """Collect the outer ring of a shape.  An outer ring is separated from
-    its inner ring, a hole, by a ``null_pnt``.  Each shape is examined for
-    these and the outer ring is split off for each part of the shape.
-    Called by::
-        angles, outer_rings, is_convex and convex_hulls
-    """
-    nan_check = np.isnan(arr[:, 0])
-    if np.any(nan_check):  # split at first nan to do outer
-        w = np.where(np.isnan(arr[:, 0]))[0]
-        arr = np.split(arr, w)[0]
-    return arr
-
-
 def _angles_(a, inside=True, in_deg=True):
-    """Worker for Geo.angles. sequential points, a, b, c.
+    """Worker for Geo.angles. sequential points, a, b, c for the first bit in
+    a shape, so interior holes are removed in polygons and the first part of
+    a multipart shape is used.  Use multipart_to_singlepart if you want to
+    process that type.
 
     Parameters
     ----------
@@ -123,12 +112,11 @@ def _angles_(a, inside=True, in_deg=True):
         True for degrees, False for radians
     """
     #
-    a = _o_ring_(a)             # work with the outer rings only
     dx, dy = a[0] - a[-1]
     if np.allclose(dx, dy):     # closed loop, remove duplicate
         a = a[:-1]
     ba = a - np.roll(a, 1, 0)   # just as fastish as concatenate
-    bc = a - np.roll(a, -1, 0)  # but defitely cleaner
+    bc = a - np.roll(a, -1, 0)  # but definitely cleaner
     cr = np.cross(ba, bc)
     dt = np.einsum('ij,ij->i', ba, bc)
     ang = np.arctan2(cr, dt)
@@ -140,7 +128,6 @@ def _angles_(a, inside=True, in_deg=True):
     if in_deg:
         angles = np.degrees(angles)
     return angles
-
 
 # ---- convex hull helpers
 #
@@ -158,7 +145,7 @@ def _ch_simple_(in_points):
     the unique points, then determines the hull from the remaining
     """
     def _x_(o, a, b):
-        """Cross-product for vectors o-a and o-b"""
+        """Cross-product for vectors o-a and o-b... a<--o-->b"""
         xo, yo = o
         xa, ya = a
         xb, yb = b
@@ -183,7 +170,7 @@ def _ch_simple_(in_points):
         upper.append(p)
     ch = np.array(lower[:-1] + upper)[::-1]  # sort clockwise
     if np.all(ch[0] != ch[-1]):
-        ch = np.vstack((ch, ch[0]))
+        ch = np.concatenate((ch, ch[0]), axis=0)  # np.vstack((ch, ch[0]))
     return ch
 
 
@@ -203,9 +190,9 @@ def _dist_along_(a, dist=0):
     Requires
     --------
     val : number
-        `val` is assumed to be a value between 0 and to total length of the
-        poly feature.  If <= 0, the first point is returned.  If >= total
-        length the last point is returned.
+      `val` is assumed to be a value between 0 and to total length of the
+      poly feature.  If <= 0, the first point is returned.  If >= total
+      length the last point is returned.
 
     Notes
     -----
@@ -451,10 +438,10 @@ def _pnt_on_poly_(pnt, poly):
     # ---- determine the distances
     d = _e_2d_(poly, pnt)   # abbreviated edist =>  d = e_dist(poly, pnt)
     key = np.argsort(d)[0]  # dist = d[key]
-    if key == 0:
-        seg = np.vstack((poly[-1:], poly[:3]))
-    elif (key + 1) >= len(poly):
-        seg = np.vstack((poly[-2:], poly[:1]))
+    if key == 0:  # np.vstack((poly[-1:], poly[:3]))
+        seg = np.concatenate((poly[-1:], poly[:3]), axis=0)
+    elif (key + 1) >= len(poly):  # np.vstack((poly[-2:], poly[:1]))
+        seg = np.concatenate((poly[-2:], poly[:1]), axis=0)
     else:
         seg = poly[key-1:key+2]       # grab the before and after closest
     n1 = _pnt_on_seg_(seg[:-1], pnt)  # abbreviated pnt_on_seg
@@ -467,12 +454,11 @@ def _pnt_on_poly_(pnt, poly):
         ang = np.mod((450.0 - ang), 360.)
         r = (pnt[0], pnt[1], n1[0], n1[1], d1.item(), ang.item())
         return r
-    else:
-        dest = [n2[0], n2[1]]
-        ang = _line_dir_(pnt, dest)
-        ang = np.mod((450.0 - ang), 360.)
-        r = (pnt[0], pnt[1], n2[0], n2[1], d2.item(), ang.item())
-        return r
+    dest = [n2[0], n2[1]]
+    ang = _line_dir_(pnt, dest)
+    ang = np.mod((450.0 - ang), 360.)
+    r = (pnt[0], pnt[1], n2[0], n2[1], d2.item(), ang.item())
+    return r
 
 
 def _pnt_on_segment_(pnt, seg):
@@ -521,6 +507,40 @@ def p_o_p(pnts, poly):
     for i, n in enumerate(names):
         z[n] = result[:, i]
     return z
+
+
+# ---- rotate helper
+def _rotate_(geo_arr, R, about_center, clockwise):
+    """Rotation helper.
+
+    Parameters
+    ----------
+    geo_arr : array
+        The input geo array, which is split here.
+    about_center : boolean
+        True, rotated about each shape.  False, rotated about the shapes'
+        center.
+    R : array
+        The rotation matrix, passed on from Geo.rotate.
+    clockwise : boolean
+    """
+    shapes = geo_arr.shapes
+    out = []
+    if about_center:
+        uniqs = []
+        for chunk in shapes:
+            _, idx = np.unique(chunk, True, axis=0)
+            uniqs.append(chunk[np.sort(idx)])
+        cents = [np.nanmean(i, axis=0) for i in uniqs]
+        for i, chunk in enumerate(shapes):
+            ch = np.einsum('ij,jk->ik', chunk-cents[i], R) + cents[i]
+            out.append(ch)
+        return out
+    cent = np.nanmean(geo_arr, axis=0)
+    for chunk in shapes:
+        ch = np.einsum('ij,jk->ik', chunk-cent, R) + cent
+        out.append(ch)
+    return out
 
 
 # ---- triangulation, Delaunay helper

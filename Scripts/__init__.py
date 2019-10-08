@@ -57,67 +57,74 @@ Arcpy methods and properties needed::
     arcpy.da.SearchCursor
     arcpy.da.FeatureClassToNumPyArray
 """
-# import numpy as np
-
+# pylint: disable=unused-import
+# pylint: disable=W0611
 
 from . import (
         npGeo, npg_io, npg_geom, npg_table, npg_create, npg_analysis,
         smallest_circle, _tests_
-        )
+        )  # noqa
 
-from .npGeo import (Geo, Update_Geo, dirr)
+from .npGeo import (Geo, Update_Geo, dirr)  # noqa  pylint: disable=W0611
 
 from .npg_io import (
         poly2array, load_geojson, geojson_Geo, fc_json, arrays_to_Geo,
         Geo_to_arrays, array_ift, _make_nulls_, getSR, shape_to_K,
-        fc_composition, fc_data, fc_geometry, fc_shapes,
-        array_poly, geometry_fc, prn_q, _check, prn_tbl, prn_geo
-        )
+        fc_composition, fc_data, fc_geometry, fc_shapes, array_poly,
+        geometry_fc, prn_q, _check, prn_tbl, prn_geo
+        )  # noqa
 
 from .npg_geom import (
-        _area_centroid_, _o_ring_, _angles_, _ch_scipy_,
+        _area_centroid_, _angles_, _rotate_, _ch_scipy_,
         _ch_simple_, _ch_, _dist_along_, _percent_along_, _pnts_on_line_,
         _pnt_on_segment_, _polys_to_unique_pnts_,
         _simplify_lines_, _tri_pnts_,
-        )
+        )  # noqa
 
-from .npg_table import (col_stats, crosstab_tbl, crosstab_rc, crosstab_array)
+from .npg_table import (
+        col_stats, crosstab_tbl, crosstab_rc, crosstab_array
+        )  # noqa
 
-from .npg_analysis import (closest_n, distances, not_closer, n_check, n_near,
-           n_spaced, intersects, knn, knn0, mst, connect, concave
-           )
+from .npg_analysis import (
+        closest_n, distances, not_closer, n_check, n_near, n_spaced,
+        intersects, knn, knn0, mst, connect, concave
+        )  # noqa
 
 __all_io__ = [
+        '... npg_io ...',
         'arrays_to_Geo', 'Geo_to_arrays', '_check', '_make_nulls_',
         'array_ift', 'array_poly', 'fc_composition', 'fc_data',
         'fc_geometry', 'fc_shapes', 'geometry_fc', 'getSR', 'getSR',
         'load_geojson', 'poly2array', 'prn_geo', 'prn_q', 'prn_tbl',
         'shape_to_K'
-        ]
+        ]  # noqa
 __all_geo__ = [
-        'Geo', 'Update_Geo', '_angles_', '_area_centroid_', '_area_part_',
-        '_ch_', '_ch_scipy_', '_ch_simple_', '_dist_along_',
-        '_o_ring_', '_percent_along_', '_pnts_on_line_', '_densify_by_dist_',
-        '_polys_to_segments_', '_polys_to_unique_pnts_', '_tri_pnts_',
-        '_pnt_on_segment_'
-        ]
+        '... Geo class ...',
+        'Geo', 'Update_Geo', 'dirr'
+        ]  # noqa
 
 __all_geom__ = [
-        '_angles_', '_area_centroid_', '_ch_', '_ch_scipy_',
-        '_ch_simple_', '_o_ring_', '_pnts_on_line_',
-        '_polys_to_segments_', '_polys_to_unique_pnts_', '_simplify_lines_'
-        ]
+        '... geom ...',
+        '_angles_', '_area_centroid_', '_ch_', '_ch_scipy_', '_ch_simple_',
+        '_dist_along_', '_percent_along_', '_pnt_on_poly_', '_pnt_on_segment_',
+        '_pnts_in_poly_', '_pnts_on_line_', '_polys_to_unique_pnts_',
+        '_rotate_', '_simplify_lines_', '_tri_pnts_', 'ft', 'np', 'p_o_p'
+        ]  # noqa
 
-__all_analysis__ =['closest_n', 'distances', 'not_closer', 'n_check', 'n_near',
+__all_analysis__ = [
+        '... analysis ...',
+        'closest_n', 'distances', 'not_closer', 'n_check', 'n_near',
         'n_spaced', 'intersects', 'knn', 'knn0', '_dist_arr_', '_e_dist_',
         'mst', 'connect', 'concave'
-        ]
+        ]  # noqa
 
-__all_table__ =  ['crosstab_tbl', 'crosstab_rc', 'crosstab_array', 'col_stats',
+__all_table__ = [
+        '... table ...',
+        'crosstab_tbl', 'crosstab_rc', 'crosstab_array', 'col_stats',
         'group_stats'
-        ]
-__all__ = __all_io__ + __all_geo__ + __all_geom__ + __all_analysis__ + \
-          __all_table__
+        ]  # noqa
+# __all__ = __all_io__ + __all_geo__ + __all_geom__ + __all_analysis__ + \
+#           __all_table__
 # __all__.sort()
 
 
