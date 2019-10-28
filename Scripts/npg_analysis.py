@@ -40,9 +40,11 @@ np.set_printoptions(edgeitems=5, linewidth=120, precision=2, suppress=True,
                     threshold=100, formatter=ft)
 np.ma.masked_print_option.set_display('-')  # change to a single -
 
-__all__ = ['closest_n', 'distances', 'not_closer', 'n_check', 'n_near',
-           'n_spaced', 'intersects', 'knn', 'knn0', '_dist_arr_', '_e_dist_',
-           'mst', 'connect', 'concave']
+__all__ = [
+        'closest_n', 'distances', 'not_closer', 'n_check', 'n_near',
+        'n_spaced', 'intersects', 'intersection_pnt', 'knn', 'knn0',
+        '_dist_arr_', '_e_dist_', 'mst', 'connect', 'concave'
+        ]
 
 
 # ===========================================================================
@@ -251,38 +253,61 @@ def intersects(*args):
     else:
         raise AttributeError("Pass 2, 2-pnt lines or 4 points to the function")
     #
-    # ---- First check ----   np.cross(p1-p0, p3-p2 )
-    x0, y0, x1, y1, x2, y2, x3, y3 = *p0, *p1, *p2, *p3  # points to xs and ys
+    # ---- First check
+    # Given 4 points, if there are < 4 unique, then the segments intersect
+    u, cnts = np.unique((p0, p1, p2, p3), return_counts=True, axis=0)
+    if len(u) < 4:
+        intersection_pnt = u[cnts > 1]
+        return True, intersection_pnt
+
+    s10_x = p1[0] - p0[0]
+    s10_y = p1[1] - p0[1]
+    s32_x = p3[0] - p2[0]
+    s32_y = p3[1] - p2[1]
+    s02_x = p0[0] - p2[0]
+    s02_y = p0[1] - p2[1]
     #
-    # ---- First check ----   np.cross(p1-p0, p3-p2 )
-    denom = (x1 - x0) * (y3 - y2) - (x3 - x2) * (y1 - y0)
-    if denom == 0.0:
-        return False
+    # ---- Second check ----   np.cross(p1-p0, p3-p2)
+    denom = (s10_x * s32_y - s32_x * s10_y).item()
+    if denom == 0.0:  # collinear
+        return False, None
     #
-    # ---- Second check ----  np.cross(p1-p0, p0-p2 )
-    denom_gt0 = denom > 0  # denominator greater than zero
+    # ---- Third check ----  np.cross(p1-p0, p0-p2)
+    positive_denom = denom > 0.0  # denominator greater than zero
+    s_numer = (s10_x * s02_y - s10_y * s02_x).item()
+#    if (s_numer < 0) == positive_denom:
+#        return False
     #
-    s_numer = (x1 - x0) * (y0 - y2) - (y1 - y0) * (x0 - x2)
-    if (s_numer < 0) == denom_gt0:
-        return False
+    # ---- Fourth check ----  np.cross(p3-p2, p0-p2)
+    t_numer = s32_x * s02_y - s32_y * s02_x
+#    if (t_numer < 0) == positive_denom:
+#        return False
     #
-    # ---- Third check ----  np.cross(p3-p2, p0-p2)
-    t_numer = (x3 - x2) * (y0 - y2) - (y3 - y2) * (x0 - x2)
-    if (t_numer < 0) == denom_gt0:
-        return False
-    #
-    if ((s_numer > denom) == denom_gt0) or ((t_numer > denom) == denom_gt0):
-        return False
+    if ((s_numer > denom) == positive_denom) or \
+       ((t_numer > denom) == positive_denom):
+        return False, None
     #
     # ---- check to see if the intersection point is one of the input points
     # substitute p0 in the equation  These are the intersection points
     t = t_numer / denom
-    x = x0 + t * (x1 - x0)
-    y = y0 + t * (y1 - y0)
-    # be careful that you are comparing tuples to tuples, lists to lists
-    if sum([(x, y) == tuple(i) for i in [p0, p1, p2, p3]]) > 0:
-        return False
-    return True
+    intersection_point = [p0[0] + (t * s10_x), p0[1] + (t * s10_y)]
+    return True, intersection_point
+
+
+def intersection_pnt(p0, p1, p2, p3):
+    """Returns the intersection point of a polygon segment (p0->p1) and a
+    clipping polygon segment (s->e.
+
+    `<https://en.wikipedia.org/wiki/Line–line_intersection>`_.
+    """
+    x0, y0, x1, y1, x2, y2, x3, y3 = (*p0, *p1, *p2, *p3)
+    dc_x, dc_y = p2 - p3
+    dp_x, dp_y = p0 - p1
+    n1 = x2 * y3 - y2 * x3
+    n2 = x0 * y1 - y0 * x1
+    n3 = 1.0 / (dc_x * dp_y - dc_y * dp_x)
+    arr = np.array([(n1 * dp_x - n2 * dc_x), (n1 * dp_y - n2 * dc_y)])
+    return arr * n3
 
 
 def knn(p, pnts, k=1, return_dist=True):

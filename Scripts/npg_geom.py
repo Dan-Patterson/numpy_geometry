@@ -48,6 +48,8 @@ import numpy as np
 from scipy.spatial import ConvexHull as CH
 from scipy.spatial import Delaunay
 
+import npgeom as npg
+
 # import npg_io
 # from npGeo_io import fc_data
 
@@ -59,14 +61,37 @@ np.ma.masked_print_option.set_display('-')  # change to a single -
 
 script = sys.argv[0]  # print this should you need to locate the script
 
-__all__ = ['_area_centroid_', '_angles_', '_rotate_',
+__all__ = ['_area_centroid_', '_angles_',
            '_ch_scipy_', '_ch_simple_', '_ch_',
            '_dist_along_', '_percent_along_', '_pnts_on_line_',
            '_polys_to_unique_pnts_',
            '_simplify_lines_',
-           '_pnts_in_poly_', '_pnt_on_poly_', '_pnt_on_segment_',
-           '_tri_pnts_'
+           '_pnts_in_poly_', '_pnt_on_poly_', '_pnt_on_segment_', 'p_o_p',
+           '_rotate_', '_tri_pnts_'
            ]
+
+
+def extent_to_poly(extent, kind=2):
+    """Create a polygon/polyline feature from an array of x,y values.  The
+    array returned is ordered clockwise with the first and last point repeated
+    to form a closed-loop.
+
+    Parameters
+    ----------
+    extent : array-like
+        The extent is specified as four float values in the form of
+        L(eft), B(ottom), R(ight), T(op) eg. np.array([5, 5, 10, 10])
+    kind : integer
+        A value of 1 for a polyline, or 2 for a polygon.
+    """
+    if len(extent) != 4:
+        print("Check the docs...\n{}".format(extent_to_poly.__doc__))
+        return None
+    L, B, R, T = extent
+    L, R = min(L, R), max(L, R)
+    B, T = min(B, T), max(B, T)
+    ext = np.array([[L, B], [L, T], [R, T], [R, B], [L, B]])
+    return npg.Update_Geo([ext], K=kind)
 
 
 # ===== Workers with Geo and ndarrays. =======================================
@@ -128,6 +153,7 @@ def _angles_(a, inside=True, in_deg=True):
     if in_deg:
         angles = np.degrees(angles)
     return angles
+
 
 # ---- convex hull helpers
 #
@@ -510,23 +536,23 @@ def p_o_p(pnts, poly):
 
 
 # ---- rotate helper
-def _rotate_(geo_arr, R, about_center, clockwise):
+def _rotate_(geo_arr, R, as_group, clockwise):
     """Rotation helper.
 
     Parameters
     ----------
     geo_arr : array
         The input geo array, which is split here.
-    about_center : boolean
-        True, rotated about each shape.  False, rotated about the shapes'
-        center.
+    as_group : boolean
+        False, rotated about the extent center.  True, rotated about each
+        shapes' center.
     R : array
         The rotation matrix, passed on from Geo.rotate.
     clockwise : boolean
     """
     shapes = geo_arr.shapes
     out = []
-    if about_center:
+    if as_group:
         uniqs = []
         for chunk in shapes:
             _, idx = np.unique(chunk, True, axis=0)

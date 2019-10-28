@@ -51,17 +51,20 @@ import json
 import numpy as np
 from numpy.lib.recfunctions import structured_to_unstructured as stu
 from numpy.lib.recfunctions import unstructured_to_structured as uts
-from npGeo import Geo
+from npGeo import *
 import arcpy.da
 
 
 __all__ = [
-    'poly2array', 'load_geojson',   # shape to array and conversion
-    'arrays_to_Geo', 'Geo_to_arrays', 'array_ift',
-    '_make_nulls_', 'getSR', 'fc_composition',       # featureclass methods
-    'fc_data', 'fc_geometry', 'fc_shapes', 'getSR', 'shape_to_K',
+    'poly2array',   # shape to array and conversion
+    'load_geojson', 'geojson_Geo', 'fc_json',
+    'arrays_to_Geo', 'Geo_to_arrays',
+    'array_ift',
+    '_make_nulls_', 'getSR', 'shape_K', 'fc_composition',
+    'fc_data', 'fc_geometry', 'fc_shapes',
     'array_poly', 'geometry_fc',                     # convert back to fc
-    'prn_q', '_check', 'prn_tbl', 'prn_geo'          # printing
+    'prn_q', '_check', 'prn_tbl', 'prn_geo',
+    'shape_properties', 'flatten_to_points'
     ]
 
 # ---- Constants -------------------------------------------------------------
@@ -351,16 +354,16 @@ def getSR(in_fc, verbose=False):
     return SR
 
 
-def shape_to_K(in_fc):
-    """The shape type represented by the featureclass"""
+def shape_K(in_fc):
+    """The shape type represented by the featureclass.  Returns (kind, k)"""
     desc = arcpy.da.Describe(in_fc)
-    s = desc['shapeType']
-    if s == 'Polygon':
-        return 2
-    if s == 'Polyline':
-        return 1
-    if s in ('Point', 'Multipoint'):
-        return 0
+    kind = desc['shapeType']
+    if kind in ('Polygon', 'PolygonM', 'PolygonZ'):
+        return (kind, 2)
+    if kind == ('Polyline', 'PolylineM', 'PolylineZ'):
+        return (kind, 1)
+    if kind in ('Point', 'Multipoint'):
+        return (kind, 0)
 
 
 def fc_composition(in_fc, SR=None, prn=True, start=0, end=50):
@@ -742,13 +745,12 @@ def geometry_fc(a, IFT, p_type=None, gdb=None, fname=None, sr=None):
         for row in out:
             cur.insertRow(row)
     arcpy.management.CopyFeatures(fname, name)
-    return "geometry_fc complete"
+    return
+
 
 #
 # ============================================================================
 # ---- array dependent
-
-
 def prn_q(a, edges=3, max_lines=25, width=120, decimals=2):
     """Format a structured array by setting the width so it hopefully wraps.
     """

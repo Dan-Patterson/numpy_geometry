@@ -11,10 +11,30 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2019-09-06
+    2019-10-27
 
 Purpose :
     Tools for working with tabular data in the Geo class.
+
+import numpy.lib.recfunctions as rfn
+
+>>> dir(rfn)
+... ['MaskedArray', 'MaskedRecords', '__all__', '__builtins__', '__cached__',
+...  '__doc__', '__file__', '__loader__', '__name__', '__package__',
+...  '__spec__', ..., '_check_fill_value', ..., '_fix_defaults', '_fix_output',
+...  '_get_fields_and_offsets', '_get_fieldspec', '_is_string_like',
+...  '_izip_fields', '_izip_fields_flat', '_izip_records', ..., '_keep_fields',
+...  '_zip_descr', '_zip_dtype', 'absolute_import', 'append_fields',
+...  'apply_along_fields', ..., 'assign_fields_by_name', 'basestring',
+...  'division', 'drop_fields', 'find_duplicates', 'flatten_descr',
+...  'get_fieldstructure', 'get_names', 'get_names_flat', ...,
+...  'join_by', ..., 'merge_arrays', ...,
+...  'rec_append_fields', 'rec_drop_fields', 'rec_join', 'recarray',
+...  'recursive_fill_fields', 'rename_fields', 'repack_fields',
+...  'require_fields', 'stack_arrays', 'structured_to_unstructured',
+...  'suppress_warnings', ..., 'unstructured_to_structured']
+
+Useful ones: append_fields, drop_fields, _keep_fields, join_by, repack_fields
 """
 # pylint: disable=C0103  # invalid-name
 # pylint: disable=R0914  # Too many local variables
@@ -25,13 +45,13 @@ import sys
 from textwrap import dedent
 import numpy as np
 from numpy.lib.recfunctions import repack_fields
-from numpy.lib.recfunctions import append_fields
+from numpy.lib.recfunctions import append_fields, drop_fields
 from numpy.lib.recfunctions import structured_to_unstructured as stu
 # from numpy.lib.recfunctions import unstructured_to_structured as uts
 # from numpy.lib.recfunctions import _keep_fields
 
-from npgeom import npg_io
-from npg_io import prn_tbl
+import npg_io
+# from npg_io import prn_tbl
 
 ft = {'bool': lambda x: repr(x.astype(np.int32)),
       'float_kind': '{: 0.3f}'.format}
@@ -45,7 +65,7 @@ script = sys.argv[0]  # print this should you need to locate the script
 
 __all__ = [
     '_as_pivot', 'crosstab_tbl', 'crosstab_rc', 'crosstab_array',
-    'col_stats', 'calc_stats', 'numeric_fields', 'col_stats',
+    'calc_stats', 'numeric_fields', 'col_stats',
     'group_stats', 'find_a_in_b', 'find_in', 'group_sort',
     'n_largest_vals', 'n_smallest_vals', 'split_sort_slice'
     ]
@@ -63,6 +83,20 @@ def _view_(a):
     See ``structured_to_unstructured`` in np.lib.recfunctions and the imports.
     """
     return stu(a)
+
+
+def reorder_fields(a):
+    """reorder fields using rfn stuff.
+    Just a demo now...
+    """
+    from numpy.lib import recfunctions as rfn
+    a = np.array([(1, 10.), (2, 20.)],
+                 dtype=[('A', np.int64), ('B', np.float64)])
+    dt_new = [('B', np.float64), ('A', np.int64)]
+    b = np.zeros((3,), dtype=dt_new)
+    rfn.recursive_fill_fields(a, b)
+    # array([(10., 1), (20., 2), ( 0., 0)],
+    #       dtype=[('B', '<f8'), ('A', '<i8')])
 
 
 # ==== Crosstabulation tools =================================================
@@ -335,7 +369,7 @@ def col_stats(a, fields=None, deci=2, verbose=False):
     if verbose:
         args = ["="*25, "Numeric fields"]
         print("\n{}\nStatistics for... a\n{!s:>32}".format(*args))
-        prn_tbl(z)
+        npg_io.prn_tbl(z)
     return z
 
 
@@ -372,7 +406,7 @@ def group_stats(a, case_fld=None, num_flds=None, deci=2, verbose=False):
             if verbose:
                 args = ["="*25, u, "Numeric fields"]
                 print("\n{}\nStatistics for... a[{}]\n{!s:>32}".format(*args))
-                prn_tbl(z)
+                npg_io.prn_tbl(z)
             results.append([u, z])
         else:
             print("\nToo few cases... ({}) for a[{}]...".format(counts[i], u))
