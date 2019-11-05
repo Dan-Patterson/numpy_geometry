@@ -1,5 +1,9 @@
 # NumPy and Geometry
 
+**NOTE**
+This is the main working repository for *Free_tools*.  I update that when major work is complete here.
+
+----
 A numpy geometry class and functions that work with arcpy and ESRI featureclasses is provided here to facilitate working with vector geometry using the ndarray as its base.
 
 This is a work in progress, so bear with me.  The intent of the Geo class is to treat the geometry of featureclasses as one entity.  See **npGeo.py** in the Scripts section for details.  Converting esri's arcpy geometry objects to array representations is contained in **npg_io.py**. Most approaches I have see so far tend to construct the geometric representations of geometries using some variant of arcpy cursors.
