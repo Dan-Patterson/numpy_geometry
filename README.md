@@ -47,73 +47,111 @@ The point coordinates with (300,000 m, 5,000,000 m, MTM 9) subtracted from their
 
 
 ```
-pnt shape  part  X       Y     
+ npg.prn_geo(g)  # ---- Geo array representation of a polygon featureclass
+
+ pnt shape  part  X       Y     
 --------------------------------
- 000     0         10.00   20.00 
- 001     0         10.00   10.00
- 002     0          0.00   10.00
- 003     0          0.00   20.00
- 004     0         10.00   20.00
- 005     0   x       nan     nan  ---- the null point separating the inner and outer rings of the first shape
- 006     0          3.00   19.00
- 007     0          3.00   13.00
- 008     0          9.00   13.00
- 009     0          9.00   19.00
- 010     0          3.00   19.00
- 011     0   o      8.00   18.00  ---- Start of the 2nd part of the first shape
- 012     0          8.00   14.00
- 013     0          4.00   14.00
- 014     0          4.00   18.00
- 015     0          8.00   18.00
- 016     0   x       nan     nan  ---- the null point, separating the inner and outer rings of the 2nd part
- 017     0          6.00   17.00        of the first shape
- 018     0          5.00   15.00
- 019     0          7.00   15.00
- 020     0  ___     6.00   17.00
- 021     1   o     12.00   18.00  ---- the 2nd shape begins, its first part
- 022     1         12.00   12.00
- 023     1         20.00   12.00
- 024     1         20.00   10.00
- 025     1         10.00   10.00
- 026     1         10.00   20.00
- 027     1         20.00   20.00
- 028     1         20.00   18.00
- 029     1         12.00   18.00
- 030     1   o     25.00   24.00  ---- the 2nd part of the 2nd shape
- 031     1         25.00   14.00
- 032     1         15.00   14.00
- 033     1         15.00   16.00
- 034     1         23.00   16.00
- 035     1         23.00   22.00
- 036     1         15.00   22.00
- 037     1         15.00   24.00
- 038     1         25.00   24.00
+ 000     1         10.00   10.00  first point of outer ring
+ 001     1         10.00    0.00
+ 002     1          0.00    0.00   # ----  shape 1: a polygon with 3 holes
+ 003     1          0.00   10.00
+ 004     1         10.00   10.00  last point of outer ring
+ 005     1   -o     3.00    9.00  first point of first inner ring
+ 006     1          3.00    3.00
+ 007     1          9.00    3.00
+ 008     1          9.00    9.00
+ 009     1          3.00    9.00  last  point of first inner ring
+ 010     1   -o     8.00    8.00  first point of second inner ring
+ 011     1          8.00    4.00
+ 012     1          4.00    4.00
+ 013     1          4.00    8.00
+ 014     1          8.00    8.00  last point of second inner ring
+ 015     1   -o     6.00    7.00  first point of third inner ring
+ 016     1          5.00    5.00
+ 017     1          7.00    5.00
+ 018     1  ___     6.00    7.00  last point of third inner ring AND the end of the first shape
+ 019     2   -o    12.00    8.00
+ 020     2         12.00    2.00
+ 021     2         20.00    2.00
+ 022     2         20.00    0.00
+ 023     2         10.00    0.00
+ 024     2         10.00   10.00
+ 025     2         14.00   10.00
+ 026     2         20.00   10.00
+ 027     2         20.00    8.00
+ 028     2         12.00    8.00
+ 029     2   -o    25.00   14.00    # ----  shape 2: a two part polygon without holes
+ 030     2         25.00    4.00
+ 031     2         15.00    4.00
+ 032     2         15.00    6.00
+ 033     2         23.00    6.00
+ 034     2         23.00   12.00
+ 035     2         15.00   12.00
+ 036     2         15.00   14.00
+ 037     2  ___    25.00   14.00   Now... you figure out the rest ;)
+ 038     3   -o    14.00   10.00
+ 039     3         10.00   10.00
+ ... snip
+
 ``` 
  
 This shape (s2) is simply represented by the last 2 columns, the first 2 columns are solely for printing purposes.
 The sequence of points is identified by their Id and From and To points (IFT)
 
 ```
-s2.IFT 
-array([[ 0,  0, 11],    1st shape, 1st part, points 0 to 11 (but not including 11,
-       [ 0, 11, 21],    1st shape, 2nd part                  following array slicing format)
-       [ 1, 21, 30],    2nd shape, 1st part
-       [ 1, 30, 39]])   2nd shape, 2nd part
+g.IFT
+array([[  1,   0,   5,   1,   1,   0],
+       [  1,   5,  10,   0,   1,   1],
+       [  1,  10,  15,   1,   2,   0],
+       [  1,  15,  19,   0,   2,   1],
+       [  2,  19,  29,   1,   1,   0],
+       [  2,  29,  38,   1,   2,   0],
+       [  3,  38,  42,   1,   1,   0],
+   ... snip ...
+   ], dtype=int64)
+
 ```
 I added another method to the pack to expand upon the IFT information. 
 ```
-prn_tbl(s2.info(False))
+**g.info**  # ---- g.info returns extent, shape, part, point and structure information
+--------------
+Extents :
+  LL [ 300000. 5000000.]
+  UR [ 300036.71 5000033.  ]
+Shapes :    12
+Parts  :    16
+Points :   145
 
-....  IDs    Part    Points    From_ID    To_ID  
-------------------------------------------------
- 000     0       0        11          0       11
- 001     0       1        10         11       21
- 002     1       0         9         21       30
- 003     1       1         9         30       39
- 004     2       0         4         39       43
+...    OID_    From_pnt    To_pnt    Ring_type    Part_ID    Bit_seq  
+--------------------------------------------------------------------
+ 000      1           0         5            1          1          0
+ 001      1           5        10            0          1          1
+ 002      1          10        15            1          2          0
+ 003      1          15        19            0          2          1
+ 004      2          19        29            1          1          0
+ 005      2          29        38            1          2          0
+ 006      3          38        42            1          1          0
+  ... snip ...
 ```
-As is shown **prn_tbl** produces a nicely labelled output from the structured array that can be returned from the **Geo.info** method.
+There is an alternate approach...
+```
+**npg.prn_tbl(g.IFT_str)**
+
+OID_    From_pnt    To_pnt    Ring_type    Part_ID    Bit_seq  
+--------------------------------------------------------------------
+ 000      1           0         5            1          1          0
+ 001      1           5        10            0          1          1
+ 002      1          10        15            1          2          0
+ 003      1          15        19            0          2          1
+ 004      2          19        29            1          1          0
+ 005      2          29        38            1          2          0
+ 006      3          38        42            1          1          0
+ ... snip ...
+```
+As is shown **prn_tbl** produces a nicely labelled output from the structured array that can be returned from the **IFT_str** method.
 A quick survey shows repetition of the shape ID in the *Part* column.  The *Points* for each part are given, from which the *From_ID* and *To_ID* values are derived.
+
+Either approach allows you to quickly look back at geometry structure.
 
 
 ----
