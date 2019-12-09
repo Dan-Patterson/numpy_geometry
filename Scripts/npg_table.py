@@ -11,30 +11,54 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2019-10-27
+    2019-11-21
 
 Purpose :
     Tools for working with tabular data in the Geo class.
 
-import numpy.lib.recfunctions as rfn
+data types handled :
+    i : integer
+    u : unsigned integer
+    f : float
+    U : Unicode text
+>>> np.iinfo(np.int32).min # -2147483648
+>>> np.iinfo(np.int16).min # -32768
+>>> np.iinfo(np.int8).min  # -128
+>>> int_null = -99
+>>> nulls = {
+        'Double': np.nan, 'Single': np.nan, 'Float': np.nan,
+        'Short': int_null, 'SmallInteger': int_null, 'Long': int_null,
+        'Integer': int_null, 'String': str(None), 'Text': str(None),
+        'Date': np.datetime64('NaT'), 'Geometry': np.nan
+        }
+>>> nulls
+... {'Double': nan, 'Single': nan, 'Float': nan, 'Short': -99,
+...  'SmallInteger': -99, 'Long': -99, 'Integer': -99, 'String': 'None',
+...  'Text': 'None', 'Date': numpy.datetime64('NaT'), 'Geometry': nan}
 
->>> dir(rfn)
-... ["MaskedArray", "MaskedRecords", "__all__", "__builtins__", "__cached__",
-...  "__doc__", "__file__", "__loader__", "__name__", "__package__",
-...  "__spec__", ..., "_check_fill_value", ..., "_fix_defaults", "_fix_output",
-...  "_get_fields_and_offsets", "_get_fieldspec", "_is_string_like",
-...  "_izip_fields", "_izip_fields_flat", "_izip_records", ..., "_keep_fields",
-...  "_zip_descr", "_zip_dtype", "absolute_import", "append_fields",
-...  "apply_along_fields", ..., "assign_fields_by_name", "basestring",
-...  "division", "drop_fields", "find_duplicates", "flatten_descr",
-...  "get_fieldstructure", "get_names", "get_names_flat", ...,
-...  "join_by", ..., "merge_arrays", ...,
-...  "rec_append_fields", "rec_drop_fields", "rec_join", "recarray",
-...  "recursive_fill_fields", "rename_fields", "repack_fields",
-...  "require_fields", "stack_arrays", "structured_to_unstructured",
-...  "suppress_warnings", ..., "unstructured_to_structured"]
+>>> z = np.zeros(4, dtype=[('A', 'f8'), ('B', 'i4'), ('C', 'u4'), ('D', 'U5')])
+>>> z.fill(np.nan)
+>>> z
+array([(nan, -2147483648, 0, 'nan'), (nan, -2147483648, 0, 'nan'),
+       (nan, -2147483648, 0, 'nan'), (nan, -2147483648, 0, 'nan')],
+      dtype=[('A', '<f8'), ('B', '<i4'), ('C', '<u4'), ('D', '<U5')])
 
-Useful ones: append_fields, drop_fields, _keep_fields, join_by, repack_fields
+**This is good**
+
+>>> np.full(4, np.NINF, dtype=[('A', 'f8'), ('B', 'i4'),
+                               ('C', 'u4'), ('D', 'U5')])
+array([(-inf, -2147483648, 0, '-inf'), (-inf, -2147483648, 0, '-inf'),
+       (-inf, -2147483648, 0, '-inf'), (-inf, -2147483648, 0, '-inf')],
+      dtype=[('A', '<f8'), ('B', '<i4'), ('C', '<u4'), ('D', '<U5')])
+
+
+>>> import numpy.lib.recfunctions as rfn
+
+Useful ones :
+    _get_fields_and_offsets, _get_fieldspec, _keep_fields,
+    append_fields, drop_fields, find_duplicates, join_by, merge_arrays,
+    repack_fields, stack_arrays, structured_to_unstructured,
+    unstructured_to_structured
 """
 # pylint: disable=C0103  # invalid-name
 # pylint: disable=R0914  # Too many local variables
@@ -47,8 +71,8 @@ import sys
 from textwrap import dedent
 import numpy as np
 import numpy.lib.recfunctions as rfn
-from numpy.lib.recfunctions import structured_to_unstructured as stu
-from numpy.lib.recfunctions import unstructured_to_structured as uts
+# from numpy.lib.recfunctions import structured_to_unstructured as stu
+# from numpy.lib.recfunctions import unstructured_to_structured as uts
 # from numpy.lib.recfunctions import _keep_fields
 
 import npg_io
@@ -65,14 +89,21 @@ np.ma.masked_print_option.set_display("-")  # change to a single -
 script = sys.argv[0]  # print this should you need to locate the script
 
 __all__ = [
-    "_as_pivot", "crosstab_tbl", "crosstab_rc", "crosstab_array",
+    "nd2struct", "struct2nd", "_field_specs", "_append_fields", "_fill_fields",
+    "keep_fields_by_kind", "keep_fields_by_name", "merge_arrays",
+    "_prn", "_as_pivot", "crosstab_tbl", "crosstab_rc", "crosstab_array",
     "calc_stats", "_get_numeric_fields", "col_stats",
-    "group_stats", "find_a_in_b", "find_in", "group_sort",
-    "keep_fields_by_kind", "n_largest_vals", "n_smallest_vals",
-    "split_sort_slice"
+    "group_stats", "find_a_in_b", "find_in",
+    "split_sort_slice", "group_sort", "n_largest_vals", "n_smallest_vals"
     ]
 
+u_case = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+l_case = "abcdefghijklmnopqrstuvwxyz"
+flotsam = ' !"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~'  # including the space
 
+
+# ---- conversion helpers
+#
 def nd2struct(a, fld_names=None):
     """Return a view of an ndarray as structured array with a uniform dtype.
     Same as unstructured_to_structured in np.lib.recfunctions.
@@ -102,7 +133,7 @@ def nd2struct(a, fld_names=None):
     --------
     Equivalent, but faster than.
 
-    `<from numpy.lib.recfunctions import unstructured_to_structured as uts>`_.
+    >>> from numpy.lib.recfunctions import unstructured_to_structured as uts
 
     - pack_last_axis(arr, names=None) at the end
     - nd_struct(flds=None, types=None)  if you want to provide dtypes as well
@@ -128,6 +159,11 @@ def struct2nd(a):
     """Return a view of a structured array of a uniform dtype to a regular
     ndarray using the the first column dtype and length/number of columns.
 
+    Parameters
+    ----------
+    a : array
+        A structured array with named fields but a uniform dtype.
+
     Notes
     -----
     The is a quick function.  The expectation is that the array contains a
@@ -139,7 +175,205 @@ def struct2nd(a):
     return a.view((a.dtype[0], len(a.dtype.names)))  # alternate to stu
 
 
-# ==== Crosstabulation tools =================================================
+# ---- field and table tools
+#
+def _field_specs(a):
+    """Produce a list of name/dtype pairs for fields in a structured array.
+    Derived from rfn._get_fieldspec
+    The input is a structured array `a`, rather than the dtype
+
+    Parameters
+    ----------
+    a : array
+        A structured array with named fields.  If there are no names, then a
+        ``No_name`` value will be assigned.
+
+    Notes
+    -----
+    >>> z = np.arange(0, 27).reshape(9,3)
+    >>> z0 = uts(z, names=['a', 'b', 'c'])  # rfn.unstructured_to_structured
+    >>> _field_specs(z)
+    ... ['No_name', dtype('int32')]
+    >>> _field_specs(z0)
+    ... [('a', dtype('int32')), ('b', dtype('int32')), ('c', dtype('int32'))]
+
+    See also
+    --------
+    np.lib.recfunctions _get_fieldspec(dtype) for more information.
+    """
+    dt = a.dtype
+    if dt.names is None:
+        return [('No_name'), dt]
+    fields = ((name, dt.fields[name]) for name in dt.names)
+    fld_spec = [(name if len(f) == 2 else (f[2], name), f[0])
+                for name, f in fields]
+    return fld_spec
+
+
+def _append_fields(a, fld_names, fld_values=None):
+    """Add fields to an existing structured array returning a new array with
+    the new field(s).
+
+    If the number of rows in the destination array and the
+    number of fld_values are not equal a ValueError will be returned.
+    """
+    msg = "\nValueError\nThe number of fld_names and fld_values don't match."
+    fld_spec = _field_specs(a)
+    if isinstance(fld_names, str):
+        fld_names = [fld_names, ]
+        if isinstance(fld_values, np.ndarray):
+            if len(fld_values.shape) > 1:
+                print(msg)
+                return None
+            fld_values = [fld_values, ]
+    if len(fld_names) != len(fld_values):
+        print(msg)
+        return None
+    to_keep = []
+    for i, vals in enumerate(fld_values):
+        if a.size == vals.size:
+            data = np.array(vals, copy=False, subok=True).ravel()
+            to_keep.append([fld_names[i], data])
+    if len(to_keep) == 0:
+        print("\nValueError\nArrays are not of the appropriate size.")
+        return None
+    data = [d.view([(name, d.dtype)]) for (name, d) in to_keep]
+    n = len(data)
+    if n == 1:
+        new_spec = _field_specs(data[0])
+    else:
+        new_spec = []
+        for i in data:
+            new_spec.extend(_field_specs(i))
+    dt = np.dtype(fld_spec + new_spec)
+    names = list(dt.names)                    # make sure this is a list
+    out_array = np.full_like(a, 0, dtype=dt)  # the new array with new dtype
+    out_array[names[:-n]] = a
+    for i in data:
+        _fill_fields(i, out_array)
+    return out_array
+
+
+def _fill_fields(in_arr, out_arr):
+    """Fill an output array fields from an input array selection
+
+    Parameters
+    ----------
+    in_arr, out_arr : structured arrays
+        Both arrays must have the same number of records.  The fields of the
+        output array will be filled with values from the input array.
+
+    Simplified from ``recursively_fill_fields`` in
+    `<https://github.com/numpy/numpy/blob/master/numpy/lib/recfunctions.py>`_.
+    """
+    newdtype = out_arr.dtype
+    for field in newdtype.names:
+        try:
+            current = in_arr[field]
+        except ValueError:
+            continue
+        if current.dtype.names is not None:
+            _fill_fields(current, out_arr[field])
+        else:
+            out_arr[field][:len(current)] = current
+    return out_arr
+
+
+def keep_fields_by_name(in_arr, names):
+    """Return an output array with a selection of fields from the input array.
+
+    Parameters
+    ----------
+    in_arr : structured array
+        The array to pull fields/columns from.
+    names : list/tuple
+        The field names from the input array to retain.
+
+    Notes
+    -----
+    simplified from ``recursively_fill_fields`` in
+    `<https://github.com/numpy/numpy/blob/master/numpy/lib/recfunctions.py>`_.
+    """
+    newdtype = [(n, in_arr.dtype[n]) for n in names]
+    out_arr = np.empty(in_arr.shape, dtype=newdtype)
+    out_arr = _fill_fields(in_arr, out_arr)
+    return out_arr
+
+
+def keep_fields_by_kind(in_arr, field_kind=("i", "f", "U")):
+    """Reorder fields in a structured array by type and returns those that meet
+    the requirement.
+
+    Parameters
+    ----------
+    in_arr : structured array
+        The array to pull fields/columns from.
+    field_kind : list/tuple
+        i(nteger), f(loat) and U(nicode) aka string
+
+    Notes
+    -----
+    Omit the kind you do not wish to carry over.
+    The order that they are entered will be reflected in the output.
+    """
+    dt = in_arr.dtype
+    dt_names = np.asarray(dt.names)
+    dt_kind = np.asarray([dt.fields[name][0].kind for name in dt_names])
+    uni, idx = np.unique(dt_kind, True)
+    to_keep = []
+    if not isinstance(field_kind, (list, tuple)):
+        field_kind = [field_kind]
+    for k in field_kind:
+        if (k in field_kind) and (k in uni):
+            to_keep.extend(dt_names[dt_kind == k].tolist())
+    out = keep_fields_by_name(in_arr, to_keep)
+    return out
+
+
+def merge_arrays(a, others):
+    """Merge a list of structured arrays.
+
+    Parameters
+    ----------
+    a : structured array
+        The array to which all other fields will be appended in order of their
+        position in `others`.
+    others : single, or list of structured arrays
+        The array(s) that will be appended to array `a`.
+
+    Notes
+    -----
+    This partially emulate np.lib.recfunctions' merge_arrays but with fewer
+    checks
+    """
+    if not isinstance(others, (list, tuple)):
+        others = [others, ]
+    dt = list(a.dtype.names)
+    all_names = dt[:]  # copy, to make sure
+    out = []
+    for arr in others:
+        arr_names = list(arr.dtype.names)
+        new_names = []
+        for n in arr_names:
+            if n in all_names:
+                n += "_"
+            new_names.append(n)
+        if new_names != arr_names:
+            tmp = arr.view(arr.dtype)
+            tmp.dtype.names = new_names
+        all_names.extend(new_names)
+        out.append(tmp)
+    spec = _field_specs(a)
+    for i in out:
+        spec.extend(_field_specs(i))
+    z = np.zeros_like(a, dtype=dt)
+    z[list(a.dtype.names)] = a
+    for i in out:
+        z[list(i.dtype.names)] = i
+    return z
+
+
+# ---- Crosstabulation tools -------------------------------------------------
 # ---- fancy print/string formatter for crosstabulation and pivot
 def _prn(r, c, a, stat_name="Total"):
     """Fancy print formatting.
@@ -210,7 +444,7 @@ def crosstab_tbl(in_tbl, flds=None, as_pivot=True):
     -----
     None or <null> values in tables are converted to proper nodata values
     depending on the field type.  This is handled by the call to fc_data which
-    uses _make_nulls_ to do the work.
+    uses make_nulls to do the work.
     """
     a = npg_io.fc_data(in_tbl)
     if flds is None:
@@ -455,8 +689,9 @@ def group_stats(a, case_fld=None, num_flds=None, deci=2, verbose=False):
     return results
 
 
-# ---- (2) identify functions
-def find_a_in_b(a, b, a_fields=None, b_fields=None):
+# ---- finding tools -------------------------------------------------------
+# ---- (1) find array in array (ndarray or structured array version)
+def find_a_in_b(a, b, fld_names=None):
     """Find the indices of the elements in a smaller 2d array contained in
     a larger 2d array. If the arrays are stuctured with field names,then these
     need to be specified.  It should go without saying that the dtypes need to
@@ -496,15 +731,24 @@ def find_a_in_b(a, b, a_fields=None, b_fields=None):
         """from the same name in arraytools"""
         return a.view((a.dtype[0], len(a.dtype.names)))
     #
-    small, big = [a, b]
-    if a.size > b.size:
-        small, big = [b, a]
-    if a_fields is not None:
-        small = small[a_fields]
-        small = struct2nd(small)
-    if b_fields is not None:
-        big = big[b_fields]
-        big = struct2nd(big)
+    msg0 = "The array to search requires a dtype with field names"
+    msg1 = "Array columns of equal size are required."
+    if fld_names is None:
+        print(msg0)
+        return None
+    a_names = a.dtype.names
+    if a_names is None:
+        if (len(fld_names) != a.shape[-1]):
+            print(msg1)
+            return None
+    else:
+        if (len(fld_names) != len(a_names)):
+            print(msg1)
+            return None
+    if a_names is not None:
+        small = struct2nd(a)
+    big = b[fld_names]
+    big = struct2nd(big)
     if a.ndim == 1:  # last slice, if  [:2] instead, it returns both indices
         indices = np.where((big == small).all(-1))[0]
     elif a.ndim == 2:
@@ -512,6 +756,7 @@ def find_a_in_b(a, b, a_fields=None, b_fields=None):
     return indices
 
 
+# ---- (2) find object in array (structured array version)
 def find_in(a, col, what, where="in", any_case=True, pull="all"):
     """Query a recarray/structured array for values
 
@@ -640,6 +885,7 @@ def split_sort_slice(a, split_fld=None, order_fld=None):
     return ordered
 
 
+# ---- (2) group, then sort with group
 def group_sort(a, group_fld, sort_fld=None, ascend=True, sort_name=None):
     """Group records in an structured array and sort on the sort_field.  The
     order of the grouping field will be in ascending order, but the order of
@@ -693,6 +939,7 @@ def group_sort(a, group_fld, sort_fld=None, ascend=True, sort_name=None):
     return final
 
 
+# ---- (3) n-largest/smallest
 def n_largest_vals(a, group_fld=None, val_fld=None, num=1):
     """Run `split_sort_slice` to get the N largest values in the array.
     """
@@ -716,176 +963,145 @@ def n_smallest_vals(a, group_fld=None, val_fld=None, num=1):
     return np.asarray(final)
 
 
-# ---- (x) field appending
-#
-def _field_specs(a):
-    """Produce a list of name/dtype pairs for fields in a structured array.
-    Derived from rfn._get_fieldspec
-    The input is a structured array `a`, rather than the dtype
+# ---- to organize-----------------------------------------------------------
+# ---- running count
+def running_count(a, to_label=False):
+    """Perform a running count on a 1D array identifying the order number
+    of the value in the sequence.
 
-    Notes
-    -----
-    >>> z = np.arange(0, 27).reshape(9,3)
-    >>> z0 = uts(z, names=['a', 'b', 'c'])  # rfn.unstructured_to_structured
-    >>> _field_specs(z)
-    ... ['No_name', dtype('int32')]
-    >>> _field_specs(z0)
-    ... [('a', dtype('int32')), ('b', dtype('int32')), ('c', dtype('int32'))]
+    Parameters
+    ----------
+    a : array
+        1D array of values, int, float or string
+    to_label : boolean
+        Return the output as a concatenated string of value-sequence numbers if
+        True, or if False, return a structured array with a specified dtype.
 
-    See also
+    Examples
     --------
-    np.lib.recfunctions _get_fieldspec(dtype) for more information.
+    >>> a = np.random.randint(1, 10, 10)
+    >>> #  [3, 5, 7, 5, 9, 2, 2, 2, 6, 4] #
+    >>> running_count(a, False)
+    array([(3, 1), (5, 1), (7, 1), (5, 2), (9, 1), (2, 1), (2, 2),
+           (2, 3), (6, 1), (4, 1)],
+          dtype=[('Value', '<i4'), ('Count', '<i4')])
+    >>> running_count(a, True)
+    array(['3_001', '5_001', '7_001', '5_002', '9_001', '2_001', '2_002',
+           '2_003', '6_001', '4_001'],
+          dtype='<U5')
+
+    >>> b = np.array(list("zabcaabbdedbz"))
+    >>> #  ['z', 'a', 'b', 'c', 'a', 'a', 'b', 'b', 'd', 'e', 'd','b', 'z'] #
+    >>> running_count(b, False)
+    array([('z', 1), ('a', 1), ('b', 1), ('c', 1), ('a', 2), ('a', 3),
+           ('b', 2), ('b', 3), ('d', 1), ('e', 1), ('d', 2), ('b', 4),
+           ('z', 2)], dtype=[('Value', '<U1'), ('Count', '<i4')])
+    >>> running_count(b, True)
+    array(['z_001', 'a_001', 'b_001', 'c_001', 'a_002', 'a_003', 'b_002',
+           'b_003', 'd_001', 'e_001', 'd_002', 'b_004', 'z_002'], dtype='<U5')
     """
-    dt = a.dtype
-    if dt.names is None:
-        return [('No_name'), dt]
-    fields = ((name, dt.fields[name]) for name in dt.names)
-    fld_spec = [(name if len(f) == 2 else (f[2], name), f[0])
-                for name, f in fields]
-    return fld_spec
+    dt = [('Value', a.dtype.str), ('Count', '<i4')]
+    N = a.shape[0]  # used for padding
+    z = np.zeros((N,), dtype=dt)
+    idx = a.argsort(kind='mergesort')
+    s_a = a[idx]
+    neq = np.where(s_a[1:] != s_a[:-1])[0] + 1
+    run = np.ones(a.shape, int)
+    run[neq[0]] -= neq[0]
+    run[neq[1:]] -= np.diff(neq)
+    out = np.empty_like(run)
+    out[idx] = run.cumsum()
+    z['Value'] = a
+    z['Count'] = out
+    if to_label:
+        pad = int(round(np.log10(N)))
+        z = np.array(["{}_{:0>{}}".format(*i, pad) for i in list(zip(a, out))])
+    return z
 
 
-def _append_fields(a, fld_names, fld_values=None):
-    """
-    Add fields to an existing structured array returning a new array with
-    the new field(s).
-
-    If the number of rows in the destination array and the
-    number of fld_values are not equal a ValueError will be returned.
-    """
-    msg = "\nValueError\nThe number of fld_names and fld_values don't match."
-    fld_spec = _field_specs(a)
-    if isinstance(fld_names, str):
-        fld_names = [fld_names, ]
-        if isinstance(fld_values, np.ndarray):
-            if len(fld_values.shape) > 1:
-                print(msg)
-                return None
-            fld_values = [fld_values, ]
-    if len(fld_names) != len(fld_values):
-        print(msg)
-        return None
-    to_keep = []
-    for i, vals in enumerate(fld_values):
-        if a.size == vals.size:
-            data = np.array(vals, copy=False, subok=True).ravel()
-            to_keep.append([fld_names[i], data])
-    if len(to_keep) == 0:
-        print("\nValueError\nArrays are not of the appropriate size.")
-        return None
-    data = [d.view([(name, d.dtype)]) for (name, d) in to_keep]
-    n = len(data)
-    if n == 1:
-        new_spec = _field_specs(data[0])
-    else:
-        new_spec = []
-        for i in data:
-            new_spec.extend(_field_specs(i))
-    dt = np.dtype(fld_spec + new_spec)
-    names = list(dt.names)
-    out_array = np.full_like(a, 0, dtype=dt)  # the new array with new dtype
-    out_array[names[:-n]] = a
-    for i in data:
-        _fill_fields(i, out_array)
-    return out_array
-
-
-def merge_arrays(a, others):
-    """merge a list of structured arrays
-    """
-    if not isinstance(others, (list, tuple)):
-        others = [others, ]
-    n = len(others)
-    first = others.pop(0)
-    names = first.dtype.names
-    data = [first[name] for name in names]
-#    for ar in arrays[1:]:
-#        names.append(ar.dtype.names)
-#        ar_names = ar.dtype.names
-#        for nm in ar_names:
-#            data.append(ar[nm])
-#        names.append(ar_names)
-#    return _append_fields(a, names, data)
-
-
-# ---- (2) field slicing
-#
-def _fill_fields(in_arr, out_arr):
-    """Fill an output array fields from an input array selection
+def sequences(data, stepsize=0):
+    """Return an array of sequence information denoted by stepsize.
 
     Parameters
     ----------
-    in_arr, out_arr : structured arrays
-        Both arrays must have the same number of records.  The fields of the
-        output array will be filled with values from the input array.
+    data : array-like
+        List/array of values in 1D
+    stepsize : integer
+        Separation between the values.
+    If stepsize=0, sequences of equal values will be searched.  If stepsize
+    is 1, then sequences incrementing by 1 etcetera.
+    Stepsize can be both positive or negative::
 
-    Simplified from ``recursively_fill_fields`` in
-    `<https://github.com/numpy/numpy/blob/master/numpy/lib/recfunctions.py>`_.
-    """
-    newdtype = out_arr.dtype
-    for field in newdtype.names:
-        try:
-            current = in_arr[field]
-        except ValueError:
-            continue
-        if current.dtype.names is not None:
-            _fill_fields(current, out_arr[field])
-        else:
-            out_arr[field][:len(current)] = current
-    return out_arr
-
-
-def keep_fields_by_name(in_arr, names):
-    """Returns an output array with a selection of fields from the input array
-
-    Parameters
-    ----------
-    in_arr : structured array
-        The array to pull fields/columns from.
-    names : list/tuple
-        The field names from the input array to retain.
+        >>> # check for incrementing sequence by 1's
+        >>> d = [1, 2, 3, 4, 4, 5]
+        >>> s = sequences(d, 1)
+        |array([(0, 0, 4, 1, 4), (1, 4, 6, 4, 2)],
+        |      dtype=[('ID', '<i4'), ('From_', '<i4'), ('To_', '<i4'),
+        |             ('Value', '<i4'), ('Count', '<i4')])
+        >>> art.prn(s)
+        id  ID    From_   To_   Value   Count
+        ----------------------------------------
+        000     0       0     4       1       4
+        001     1       4     6       4       2
 
     Notes
     -----
-    simplified from ``recursively_fill_fields`` in
-    `<https://github.com/numpy/numpy/blob/master/numpy/lib/recfunctions.py>`_.
+    For strings, use
+
+    >>> partitions = np.where(a[1:] != a[:-1])[0] + 1
+
+    Change **N** in the expression to find other splits in the data
+
+    >>> np.split(data, np.where(np.abs(np.diff(data)) >= N)[0]+1)
+
+    Keep for now::
+
+        checking sequences of 0, 1
+        >>> a = np.array([1,0,1,1,1,0,0,0,0,1,1,0,0])
+        | np.hstack([[x.sum(), *[0]*(len(x) -1)]
+        |           if x[0] == 1
+        |           else x
+        |           for x in np.split(a, np.where(np.diff(a) != 0)[0]+1)])
+        >>> # array([1, 0, 3, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0])
+
+    References
+    -----------
+    `<https://stackoverflow.com/questions/7352684/how-to-find-the-groups-of-
+    sequences-elements-from-an-array-in-numpy>`__.
     """
-    newdtype = [(n, in_arr.dtype[n]) for n in names]
-    out_arr = np.empty(in_arr.shape, dtype=newdtype)
-    out_arr = _fill_fields(in_arr, out_arr)
-    return out_arr
-
-
-def keep_fields_by_kind(in_arr, field_kind=("i", "f", "U")):
-    """Reorder fields in a structured array by type and returns those that meet
-    the requirement.
-
-    Parameters
-    ----------
-    in_arr : structured array
-        The array to pull fields/columns from.
-    field_kind : list/tuple
-        i(nteger), f(loat) and U(nicode) aka string
-
-    Notes
-    -----
-    Omit the kind you do not wish to carry over.
-    The order that they are entered will be reflected in the output.
-    """
-    dt = in_arr.dtype
-    dt_names = np.asarray(dt.names)
-    dt_kind = np.asarray([dt.fields[name][0].kind for name in dt_names])
-    uni, idx = np.unique(dt_kind, True)
-    to_keep = []
-    if not isinstance(field_kind, (list, tuple)):
-        field_kind = [field_kind]
-    for k in field_kind:
-        if (k in field_kind) and (k in uni):
-            to_keep.extend(dt_names[dt_kind == k].tolist())
-    out = keep_fields_by_name(in_arr, to_keep)
+    #
+    a = np.array(data)
+    a_dt = a.dtype.kind
+    dt = [('ID', '<i4'), ('From_', '<i4'), ('To_', '<i4'),
+          ('Value', a.dtype.str), ('Count', '<i4'),
+          ]
+    if a_dt in ('U', 'S'):
+        seqs = np.split(a, np.where(a[1:] != a[:-1])[0] + 1)
+    elif a_dt in ('i', 'f'):
+        seqs = np.split(a, np.where(np.diff(a) != stepsize)[0] + 1)
+    vals = [i[0] for i in seqs]
+    cnts = [len(i) for i in seqs]
+    seq_num = np.arange(len(cnts))
+    too = np.cumsum(cnts)
+    frum = np.zeros_like(too)
+    frum[1:] = too[:-1]
+    out = np.array(list(zip(seq_num, frum, too, vals, cnts)), dtype=dt)
     return out
 
 
+def remove_seq_dupl(a):
+    """Remove sequential duplicates from an array.  The array is stacked with
+    the first value in the sequence to retain it.  Designed to removed
+    sequential duplicates in point arrays.
+    """
+    uni = a[np.where(a[:-1] != a[1:])[0] + 1]
+    if a.ndim == 1:
+        uni = np.hstack((a[0], uni))
+    else:
+        uni = np.vstack((a[0], uni))
+    uni = np.ascontiguousarray(uni)
+    return uni
+#
 # ==== Processing finished ====
 # ===========================================================================
 #

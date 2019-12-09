@@ -201,7 +201,7 @@ def n_spaced(L=0, B=0, R=10, T=10, min_space=1, num=10, verbose=True):
         diff = b - a
         dist = np.einsum('ijk,ijk->ij', diff, diff)
         dist_arr = np.sqrt(dist).squeeze()
-        case = ~np.triu(dist_arr <= min_space, 1).any(0)
+        case = np.any(~np.triu(dist_arr <= min_space, 1), axis=0)
         return a[case]
     #
     cnt = 1
