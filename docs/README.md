@@ -7,356 +7,448 @@ IFT refers to the feature `id` value, the `from` and `to` points.
 To reduce numeric problems, the value of the lower left corner is subtracted from all coordinates moving coordinate space into quadrant I.  You could also subtract the mean value of the points which would center the shapes about the x-y axis origin.
 
 ```
-Usage...
-  import npgeom as npg
+test2(g, kind=2)  # a polygon featureclass with 3 shapes
+```
+---------
+**Geo array creation**
+__new__(cls, g=None, IFT=None, Kind=2, Info="Geo array")
+required: g, IFT, Kind
 
-in_fc, g = _test_()
+**Properties**
+----
+```
+g      the ndarray of xy coordinates
+g.IFT  Id, From, To - shape ID, from-to points in the shape
+[[ 1  0  5  1  1  0]
+ [ 1  5 10  0  1  1]
+ [ 1 10 14  0  1  2]
+ ...
+ [ 2 50 54  0  2  2]
+ [ 2 54 58  0  2  3]
+ [ 3 58 62  1  1  0]]
 
-Type :  Polygons
-IFT  :
-[[  1   0  11]
- [  1  11  21]
- [  2  21  31]
- [  2  31  40]
- [  3  40  44]
- [  4  44  49]
- [  5  49  56]
- [  6  56  86]
- [  7  86 110]
- [  8 110 117]
- [  9 117 124]
- [ 10 124 128]
- [ 11 128 134]
- [ 12 134 147]]
+g.IDs  IFT[:, 0]   shape identifier
+[1 1 1 ... 2 2 3]
+
+g.Fr   IFT[:, 1]   shape from point
+[ 0  5 10 ... 50 54 58]
+
+g.To   IFT[:, 2]         to point
+[ 5 10 14 ... 54 58 62]
+
+g.CW   IFT[:, 3]   shape orientation (C)lock(W)ise boolean result
+[1 0 0 ... 0 0 1]
+
+g.PID  IFT[:, 4]   part identifier within a shape
+[1 1 1 ... 2 2 1]
+
+g.Bit  IFT[:, 5]   bit identifier with a shape
+[0 1 2 ... 2 3 0]
+
+g.FT   IFT[:, 1:3] from-to point pairs
+[[ 0  5]
+ [ 5 10]
+ [10 14]
+ ...
+ [50 54]
+ [54 58]
+ [58 62]]
+
+g.K ... 2 ...  shape kind 1, 2, 3 for points, polylines, polygons
+g.Info ... test ... extra information string
 ```
 
-The subsample is converted to a geoarray, so the point numbering will become different, but the feature ids remain the same.
+**Derived Properties**
+----
 ```
-a = g.pull([2, 8, 9, 10], asGeo=True)
+- sample size, unique shapes
+g.N ... 3 ...  len(uni)   #  uni, idx = np.unique(arr.IDs, True)
+g.U ... [1 2 3] ...  g.IDs[idx]
 
-a.IFT
-Out[4]: 
-array([[ 2,  0, 10],
-       [ 2, 10, 19],
-       [ 8, 19, 26],
-       [ 9, 26, 33],
-       [10, 33, 37]])
+- coordinate values
+g.X    g[:, 0]
+[ 10.00  10.00  1.50 ...  10.00  15.00  14.00]
 
-```
+g.Y    g[:, 1]
+[ 10.00  0.00  1.50 ...  10.00  18.00  10.00]
 
-Now we will step back and explore the geoarray properties.
+g.XY   g[:, :2]
+[[ 10.00  10.00]
+ [ 10.00  0.00]
+ [ 1.50  1.50]
+ ...
+ [ 10.00  10.00]
+ [ 15.00  18.00]
+ [ 14.00  10.00]]
 
-In this example we are working with polygons 2, 8, 9, 10.  Polygon 2 is a multipart polygon.  The first part is constructed from points 0 to 10 (but not including 10).  The second part, continues from points 10 to 19.
+g.g[    not implemented yet
+- identifiers by shape, part, bit
 
-```
-# ---- From the array construction properties
+g.shp_IFT
+[[ 1  0 27 -1 -1 -1]
+ [ 2 27 58 -1 -1 -1]
+ [ 3 58 62 -1 -1 -1]]
 
-a.IFT  # ---- I(d), F(rom), T(o) values, we are working with polygons 2, 8, 9, 10
-array([[ 2,  0, 10],
-       [ 2, 10, 19],
-       [ 8, 19, 26],
-       [ 9, 26, 33],
-       [10, 33, 37]])
+g.part_IFT
+[[ 1  0 18  1  1  0]
+ [ 1 18 27  1  2  0]
+ [ 2 27 36  1  1  0]
+ [ 2 36 58  1  2  0]
+ [ 3 58 62  1  1  0]]
 
-a.IDs  # ---- Just the id values
-array([ 2,  2,  8,  9, 10])
+g.bit_IFT
+[[ 1  0  5  1  1  0]
+ [ 1  5 10  0  1  1]
+ [ 1 10 14  0  1  2]
+ ...
+ [ 2 50 54  0  2  2]
+ [ 2 54 58  0  2  3]
+ [ 3 58 62  1  1  0]]
 
-a.FT   # ---- Just the from-to values
-array([[ 0, 10],
-       [10, 19],
-       [19, 26],
-       [26, 33],
-       [33, 37]])
+g.shp_ids  :[1 2 3]
+g.part_ids :[1 1 2 2 3]
+g.bit_ids  :[1 1 1 ... 2 2 3]
+g.bit_seq  :[0 1 2 ... 2 3 0]
+g.pnt_ids  :[1 1 1 ... 3 3 3]
+g.shp_pnt_cnt
+[[ 1 27]
+ [ 2 31]
+ [ 3  4]]
 
-a.K    # ---- The feature type.  Points (0), Polylines (1) and Polygons (2)
-2
+g.shp_part_cnt
+[[1 2]
+ [2 2]
+ [3 1]]
 
-a.Info  # ---- No special information
-''
+g.bit_pnt_cnt
+[[1 0 5]
+ [1 1 5]
+ [1 2 4]
+ ...
+ [2 2 4]
+ [2 3 4]
+ [3 0 4]]
 
-a.N    # ---- Number of features.
-4
+g.shapes
+[[ 10.00  10.00]
+ [ 10.00  0.00]
+ [ 1.50  1.50]
+ ...
+ [ 5.00  5.00]
+ [ 7.00  5.00]
+ [ 6.00  7.00]] ... snip
+[[ 14.00  10.00]
+ [ 10.00  10.00]
+ [ 15.00  18.00]
+ [ 14.00  10.00]]
 
-```
+g.parts
+[ 10.00  10.00] ... snip
+[[ 14.00  10.00]
+ [ 10.00  10.00]
+ [ 15.00  18.00]
+ [ 14.00  10.00]]
 
-**Some properties**
-
-*part, counts, areas, centroids*
-```
-a.part_cnt    # ---- number of parts for each shape formatted as [id, part count]
-array([[ 2,  2],
-       [ 8,  1],
-       [ 9,  1],
-       [10,  1]], dtype=int64)
-
-a.pnt_cnt     # ---- number of points
-array([[ 2, 10],
-       [ 2,  9],
-       [ 8,  7],
-       [ 9,  7],
-       [10,  4]])
- 
-a.areas    # ---- planar/euclidean areas
-array([104.  , 104.  ,  15.35,  19.47,   5.9 ])
-
-a.centers  # ---- x, y coordinates for the center 
-array([[15.33,  5.56],
-       [19.5 ,  9.  ],
-       [21.46, 20.71],
-       [23.72, 19.02],
-       [31.32, 17.85]])
-
-a.centroids  # ---- centroids... area weighted centers
-array([[17.5 ,  7.  ],
-       [17.5 ,  7.  ],
-       [20.96, 20.96],
-       [24.4 , 18.93],
-       [31.32, 17.85]])
-
-a.lengths  # ---- lengths/perimeter depending on feature type.
-array([112.  , 112.  ,  16.05,  19.97,  12.65])
-```
-
-*extents*
-
-```
-a.aoi_extent()  # ---- the extent of the whole file... aka, the area of interest
-array([ 0.  ,  0.  , 36.71, 33.  ])
-
-a.aoi_rectangle()  # ---- the aoi as a rectangle of x, y points. 
-array([[ 0.  ,  0.  ],
-       [ 0.  , 33.  ],
-       [36.71, 33.  ],
-       [36.71,  0.  ],
-       [ 0.  ,  0.  ]])
-
-a.extents(by_part=False)  # ---- the extents of each shape (Left, Bottom, Right, Top)
-Out[15]: 
-array([[ 0.  ,  0.  , 10.  , 10.  ],
-       [10.  ,  0.  , 25.  , 14.  ],
-       [10.  , 10.  , 15.  , 18.  ],
-       [12.  , 27.  , 18.  , 33.  ],
-       [ 0.  , 24.5 ,  6.  , 31.5 ],
-       [19.14, 25.33, 24.86, 28.67],
-       [12.22, 22.22, 15.77, 25.78],
-       [18.16, 18.73, 23.76, 23.18],
-       [21.29, 16.76, 27.61, 21.32],
-       [29.98, 15.41, 32.32, 20.96],
-       [26.82,  9.46, 33.18, 14.54],
-       [29.29, 22.17, 36.71, 29.83]])
-
-a.extents(by_part=True)  # ---- same as above, but the extent for multiparts is also returned
-array([[ 0.  ,  0.  , 10.  , 10.  ],
-       [ 4.  ,  4.  ,  8.  ,  8.  ],
-       [10.  ,  0.  , 20.  , 10.  ],
-       [15.  ,  4.  , 25.  , 14.  ],
-       [10.  , 10.  , 15.  , 18.  ],
-       [12.  , 27.  , 18.  , 33.  ],
-       [ 0.  , 24.5 ,  6.  , 31.5 ],
-       [19.14, 25.33, 24.86, 28.67],
-       [12.22, 22.22, 15.77, 25.78],
-       [18.16, 18.73, 23.76, 23.18],
-       [21.29, 16.76, 27.61, 21.32],
-       [29.98, 15.41, 32.32, 20.96],
-       [26.82,  9.46, 33.18, 14.54],
-       [29.29, 22.17, 36.71, 29.83]])
-
-a.extent_rectangles(False)  # ---- like the aoi.rectangles, but polygon rectangles are by 
-array([[[ 0.  ,  0.  ],     # shape (False) or by part (True)
-        [ 0.  , 10.  ],
-        [10.  , 10.  ],
-        [10.  ,  0.  ],
-        [ 0.  ,  0.  ]],
-... snip
-       [[29.29, 22.17],
-        [29.29, 29.83],
-        [36.71, 29.83],
-        [36.71, 22.17],
-        [29.29, 22.17]]])
+g.bits
+[[ 10.00  10.00]
+ [ 10.00  0.00]
+ [ 1.50  1.50]
+ [ 0.00  10.00]
+ [ 10.00  10.00]] ... snip
+[[ 14.00  10.00]
+ [ 10.00  10.00]
+ [ 15.00  18.00]
+ [ 14.00  10.00]]
 ```
 
-*stats... mins, maxs, means*
+**Methods.....**
+----
+```
+(1) g.first_bit(True) ...
+[[ 10.00  10.00]
+ [ 10.00  0.00]
+ [ 1.50  1.50]
+ ...
+ [ 10.00  10.00]
+ [ 15.00  18.00]
+ [ 14.00  10.00]]
+
+(2) g.first_bit(True).IFT ...
+[[ 1  0  5  1  1  0]
+ [ 1  5 10  1  2  0]
+ [ 2 10 19  1  1  0]
+ [ 2 19 29  1  2  0]
+ [ 3 29 33  1  1  0]]
+
+(3) g.first_part(True) ...
+[[ 10.00  10.00]
+ [ 10.00  0.00]
+ [ 1.50  1.50]
+ ...
+ [ 10.00  10.00]
+ [ 15.00  18.00]
+ [ 14.00  10.00]]
+
+(4) g.first_part(True).IFT ...
+[[ 1  0  5  1  1  0]
+ [ 1  5 10  0  1  1]
+ [ 1 10 14  0  1  2]
+ [ 1 14 18  0  1  3]
+ [ 2 18 27  1  1  0]
+ [ 3 27 31  1  1  0]]
+
+(5) g.get_shape(ID=3, asGeo=True) ...
+[[ 14.00  10.00]
+ [ 10.00  10.00]
+ [ 15.00  18.00]
+ [ 14.00  10.00]]
+
+(6) g.get_shape(ID=3, asGeo=True).IFT ...
+[[3 0 4 1 1 0]]
+
+(7) g.outer_rings(asGeo=True) ...
+[[ 10.00  10.00]
+ [ 10.00  0.00]
+ [ 1.50  1.50]
+ ...
+ [ 10.00  10.00]
+ [ 15.00  18.00]
+ [ 14.00  10.00]]
+
+(8) g.outer_rings(asGeo=True).IFT ...
+[[ 1  0  5  1  1  0]
+ [ 1  5 10  1  2  0]
+ [ 2 10 19  1  1  0]
+ [ 2 19 29  1  2  0]
+ [ 3 29 33  1  1  0]]
+
+(9) g.areas(True) ...
+[ 57.50  102.25  16.00]
+
+(10) g.areas(False) ...
+[85.0, -36.0, -1.0, -0.5, 12.0, -2.0, 52.0, 52.0, -0.25, -0.75, -0.75, 16.0]
+
+(11) g.lengths(True) ...
+[ 90.71  123.22  21.50]
+
+(12) g.lengths(False) ...
+[37.26267650163207, 24.0, 5.23606797749979,... snip ..., 21.49623888035515]
+
+(13) g.cent_shapes() ...
+[[ 4.71  6.60]
+ [ 15.35  7.18]
+ [ 13.00  12.67]]
+
+(14) g.cent_parts() ...
+[[ 5.38  5.38]
+ [ 6.25  5.75]
+ [ 19.50  9.00]
+ [ 15.33  5.56]
+ [ 13.00  12.67]]
+
+(15) g.centroids() ...
+[[ 7.65  3.56]
+ [ 16.51  6.09]
+ [ 13.00  12.67]]
+
+(16) g.aoi_extent() ...
+[ 0.00  0.00  25.00  18.00]
+
+(17) g.aoi_rectangle() ...
+[[ 0.00  0.00]
+ [ 0.00  18.00]
+ [ 25.00  18.00]
+ [ 25.00  0.00]
+ [ 0.00  0.00]]
+
+(18) g.extents(splitter="part") ...
+[[ 0.00  0.00  10.00  10.00]
+ [ 4.00  4.00  8.00  8.00]
+ [ 15.00  4.00  25.00  14.00]
+ [ 10.00  0.00  20.00  10.00]
+ [ 10.00  10.00  15.00  18.00]]
+
+(19) g.extents(splitter="shape") ...
+[[ 0.00  0.00  10.00  10.00]
+ [ 10.00  0.00  25.00  14.00]
+ [ 10.00  10.00  15.00  18.00]]
+
+(20) g.extent_centers(splitter="part") ...
+[[ 5.00  5.00]
+ [ 6.00  6.00]
+ [ 20.00  9.00]
+ [ 15.00  5.00]
+ [ 12.50  14.00]]
+
+(21) g.extent_centers(splitter="shape") ...
+[[ 5.00  5.00]
+ [ 17.50  7.00]
+ [ 12.50  14.00]]
+
+(22) g.extent_rectangles(splitter="shape") ...
+[array([[ 300000.00,  5000000.00],
+       [ 300000.00,  5000010.00],
+       [ 300010.00,  5000010.00],
+       [ 300010.00,  5000000.00],
+       [ 300000.00,  5000000.00]]), array([[ 300010.00,  5000000.00],
+       [ 300010.00,  5000014.00],
+       [ 300025.00,  5000014.00],
+       [ 300025.00,  5000000.00],
+       [ 300010.00,  5000000.00]]), array([[ 300010.00,  5000010.00],
+       [ 300010.00,  5000018.00],
+       [ 300015.00,  5000018.00],
+       [ 300015.00,  5000010.00],
+       [ 300010.00,  5000010.00]])]
+
+(23) g.extent_rectangles(splitter="part") ...
+[array([[ 300000.00,  5000000.00],
+       [ 300000.00,  5000010.00],
+       [ 300010.00,  5000010.00],
+       [ 300010.00,  5000000.00],
+       [ 300000.00,  5000000.00]]), array([[ 300004.00,  5000004.00],
+       [ 300004.00,  5000008.00],
+       [ 300008.00,  5000008.00],
+       [ 300008.00,  5000004.00],
+       [ 300004.00,  5000004.00]]), array([[ 300015.00,  5000004.00],
+       [ 300015.00,  5000014.00],
+       [ 300025.00,  5000014.00],
+       [ 300025.00,  5000004.00],
+       [ 300015.00,  5000004.00]])]
+
+(24) g.maxs(by_bit=False) ...
+[[ 10.00  10.00]
+ [ 25.00  14.00]
+ [ 15.00  18.00]]
+
+(25) g.maxs(by_bit=True) ...
+[[ 10.00  10.00]
+ [ 8.00  8.00]
+ [ 25.00  14.00]
+ [ 20.00  10.00]
+ [ 15.00  18.00]]
+
+(26) g.is_clockwise(is_closed_polyline=False) ...
+[(1, 1) (1, 0) (1, 0) ... (2, 0) (2, 0) (3, 1)]
+
+(27) g.is_convex() ...
+[1 1 0 0 1]
+
+(28) g.is_multipart(as_structured=False) ...
+[[1 1]
+ [2 1]
+ [3 0]]
+
+(29) g.polygon_angles(inside=True, in_deg=True) ...
+[array([ 90.00,  79.99,  110.02,  79.99]),
+ array([ 71.57,  90.00,  71.57,  126.87]),
+ array([ 90.00,  90.00,  90.00,  90.00,  270.00,  270.00,  90.00,  90.00]),
+ array([ 90.00,  90.00,  270.00,  270.00,  90.00,  90.00,  90.00,  90.00, 180.00]),
+ array([ 97.13,  57.99,  24.88])
+ ]
+
+(30) g.bounding_circles(angle=5, return_xyr=False) ...
+[[ 0.00  8.26]
+ [ 0.03  8.88]
+ [ 0.11  9.49]
+ ...
+ [ 9.93  16.44]
+ [ 9.87  16.85]
+ [ 9.85  17.26]]
+
+(31) g.min_area_rect(as_structured=False) ...
+[[ 139.67 -1.41 -1.41  9.49  11.41]
+ [ 23.52  3.20  4.60  8.80  8.80]
+ [ 100.00  15.00  4.00  25.00  14.00]
+ [ 100.00  10.00  0.00  20.00  10.00]
+ [ 54.02  8.55  9.74  16.45  16.58]]
+
+(32) g.triangulate(by_bit=False, as_polygon=True) ...
+[[ 3.00  9.00]
+ [ 0.00  10.00]
+ [ 10.00  10.00]
+ ...
+ [ 10.00  10.00]
+ [ 15.00  18.00]
+ [ 14.00  10.00]]
+
+(33) g.fill_holes() ...
+[[ 10.00  10.00]
+ [ 10.00  0.00]
+ [ 1.50  1.50]
+ ...
+ [ 10.00  10.00]
+ [ 15.00  18.00]
+ [ 14.00  10.00]]
+
+(34) g.holes_to_shape() ...
+[[ 3.00  9.00]
+ [ 9.00  9.00]
+ [ 9.00  3.00]
+ ...
+ [ 11.50  0.50]
+ [ 10.50  0.50]
+ [ 10.50  2.00]]
+
+(35) g.multipart_to_singlepart(info="") ...
+[[ 10.00  10.00]
+ [ 10.00  0.00]
+ [ 1.50  1.50]
+ ...
+ [ 10.00  10.00]
+ [ 15.00  18.00]
+ [ 14.00  10.00]]
+
+(36) g.od_pairs() ...
+[[ 10.00  10.00  10.00  0.00]
+ [ 10.00  0.00  1.50  1.50]
+ [ 1.50  1.50  0.00  10.00]
+ [ 0.00  10.00  10.00  10.00]]
+
+(37) g.polygons_to_polylines() ...
+[[ 10.00  10.00]
+ [ 10.00  0.00]
+ [ 1.50  1.50]
+ ...
+ [ 10.00  10.00]
+ [ 15.00  18.00]
+ [ 14.00  10.00]]
+
+(38) g.boundary() ...
+[[ 10.00  10.00]
+ [ 10.00  0.00]
+ [ 1.50  1.50]
+ ...
+ [ 10.00  10.00]
+ [ 15.00  18.00]
+ [ 14.00  10.00]]
+
+(39) g.polys_to_points(keep_order=True, as_structured=False) ...
+[[ 10.00  10.00]
+ [ 10.00  0.00]
+ [ 1.50  1.50]
+ ...
+ [ 10.50  0.50]
+ [ 11.50  0.50]
+ [ 15.00  18.00]]
+
+(40) g.densify_by_distance(spacing=1)n ...
+[[ 10.00  10.00]
+ [ 10.00  9.00]
+ [ 10.00  8.00]
+ ...
+ [ 14.13  11.05]
+ [ 14.01  10.06]
+ [ 14.00  10.00]]
+
+(41) g.densify_by_percent(percent=50) ...
+[[ 10.00  10.00]
+ [ 10.00  4.63]
+ [ 10.00  0.00]
+ ...
+ [ 15.00  18.00]
+ [ 14.25  12.00]
+ [ 14.00  10.00]]
 
 ```
-a.mins(False)  # ---- maxs, maxs and means by shape (False) or by part (True)
-array([[ 0.  ,  0.  ],
-       [10.  ,  0.  ],
-       [10.  , 10.  ],
-       [12.  , 27.  ],
-       [ 0.  , 24.5 ],
-       [19.14, 25.33],
-       [12.22, 22.22],
-       [18.16, 18.73],
-       [21.29, 16.76],
-       [29.98, 15.41],
-       [26.82,  9.46],
-       [29.29, 22.17]])
- 
- ```
- 
- *retrieving shapes*
- 
- ```
-a.get(ID=3, asGeo=True)  # ---- a single shape as a Geo array
-Geo([[14., 10.],
-     [10., 10.],
-     [15., 18.],
-     [14., 10.]])
 
-a.get(ID=3, asGeo=False)  # ---- as an ndarray
-array([[15., 33.],
-       [18., 30.],
-       [15., 27.],
-       [12., 30.],
-       [15., 33.]])
 
-a.pull([3,4], True)  # ---- multiple shapes in the order given as a Geo array
-Geo([[14., 10.],
-     [10., 10.],
-     [15., 18.],
-     [14., 10.],
-     [15., 33.],
-     [18., 30.],
-     [15., 27.],
-     [12., 30.],
-     [15., 33.]])
-
-a.pull([3, 4], False)  # ---- and as an ndarray
-array([array([[14., 10.],
-       [10., 10.],
-       [15., 18.],
-       [14., 10.]]),
-       array([[15., 33.],
-       [18., 30.],
-       [15., 27.],
-       [12., 30.],
-       [15., 33.]])], dtype=object)
-  
-a.outer_rings(asGeo=True)  # ---- outer rings as Geo array
-Geo([[10.  , 10.  ],
-     [10.  ,  0.  ],
-     [ 0.  ,  0.  ],
-     [ 0.  , 10.  ],
-     [10.  , 10.  ],
-     ...,
-     [29.31, 24.65],
-     [29.29, 27.24],
-     [31.96, 27.25],
-     [31.96, 29.83],
-     [34.33, 29.83]])
-
-a.outer_rings(asGeo=True).IFT  # ---- note IFT changes
-array([[  1,   0,   5],
-       [  1,   5,  10],
-       [  2,  10,  20],
-       [  2,  20,  29],
-       [  3,  29,  33],
-       [  4,  33,  38],
-       [  5,  38,  45],
-       [  6,  45,  75],
-       [  7,  75,  99],
-       [  8,  99, 106],
-       [  9, 106, 113],
-       [ 10, 113, 117],
-       [ 11, 117, 123],
-       [ 12, 123, 136]])
-
-a.outer_rings(asGeo=False)  # --- as a list of arrays
-[array([[10., 10.],
-        [10.,  0.],
-        [ 0.,  0.],
-        [ 0., 10.],
-        [10., 10.]]), array([[8., 8.],
-        [8., 4.],
-        [4., 4.],
-        [4., 8.],
-        [8., 8.]]), ... snip ...
-        ]
- ```
- 
- *shape information*
- 
-is_clockwise :
-
-Check whether poly features are oriented clockwise.  Either a polygon or a closed-loop polyline are required as inputs.  The ouput returned is in the form of a structured array.  The IDs indicate all lines used to construct the feature.  For example, there are four pieces used to construct feature 1 since it is a multipart feature with holes.  Clockwise is indicated by a value of 1, counter-clockwise is 0.
-
-is_convex :
-
-A boolean array is returned indicating whether convexity is done by part or shape.
-
-is_multipart :
-
-Either as an ndarray or structured array.
-
-polygon_angles :
-
-Returns the angles, inside or outside, for polygon features.  An equivalent function exists for polylines (polyline_angles(self, fromNorth=False) )
- ```
-g.is_clockwise(is_closed_polyline=False)
-array([( 1, 1), ( 1, 0), ( 1, 1), ( 1, 0), ( 2, 1), ( 2, 1), ( 3, 1), ( 4, 1),
-       ( 5, 1), ( 6, 1), ( 7, 1), ( 8, 1), ( 9, 1), (10, 1), (11, 1), (12, 1)],
-      dtype=[('IDs', '<i4'), ('Clockwise', '<i4')])
-
-g.is_convex(by_part=True)
-array([ True,  True, False, False,  True,  True, False, False,  True,  True,
-       False,  True, False, False])
-
-g.is_multipart(as_structured=False)
-array([[ 1,  1],
-       [ 2,  1],
-       [ 3,  0],
-       [ 4,  0],
-       [ 5,  0],
-       [ 6,  0],
-       [ 7,  0],
-       [ 8,  0],
-       [ 9,  0],
-       [10,  0],
-       [11,  0],
-       [12,  0]])
-
-g.is_multipart(as_structured=True)
-array([( 1, 1), ( 2, 1), ( 3, 0), ( 4, 0), ( 5, 0), ( 6, 0), ( 7, 0), ( 8, 0),
-       ( 9, 0), (10, 0), (11, 0), (12, 0)],
-      dtype=[('IDs', '<i4'), ('Parts', '<i4')])
-
-g.polygon_angles(inside=True, in_deg=True) 
-[array([90., 90., 90., 90.]),
- array([90., 90., 90., 90.]),
- array([270., 270.,  90.,  90.,  90.,  90., 180.,  90.,  90.]),
- array([ 90.,  90.,  90.,  90., 270., 270.,  90.,  90.]),
- array([97.13, 57.99, 24.88]),
- array([90., 90., 90., 90.]),
- array([ 90.,  90., 270.,  90.,  90.,  90.]),
- array([353.82, 175.94, 175.53, 174.59, 172.74, 168.47, 156.65, 136.29, 145.78,
-        164.08, 171.1 , 173.84, 175.13, 175.77, 176.05, 176.04, 175.77, 175.13,
-        173.85, 171.08, 164.08, 145.78, 136.29, 156.65, 168.48, 172.73, 174.61,
-        175.5 , 175.96,   2.25]),
- array([164.35, 164.35, 164.35, 164.34, 164.34, 164.37, 164.34, 164.34, 164.35,
-        164.34, 164.36, 164.34, 164.36, 164.34, 164.36, 164.34, 164.34, 164.35,
-        164.35, 164.35, 164.35, 164.34, 164.36]),
- array([180.,  90., 180.,  90.,  90.,  90.]),
- array([ 72.68, 270.  , 108.27,  66.08, 112.02,  90.95]),
- array([ 30.82,  45.81, 103.37]),
- array([226.89,  90.  ,  90.  ,  90.  ,  43.11]),
- array([ 90.  , 270.27,  90.  ,  90.  , 269.72,  90.  ,  90.  , 270.28,  90.  ,
-         90.  , 269.72,  90.  ])]
-```
- 
- *point information*
- 
- ```
- syntax : point_info(self, by_part=True, with_null=False)
-
-a.point_info(True, True)
-array([11, 10, 10,  9,  4,  5,  7, 30, 24,  7,  7,  4,  6, 13])
-
-a.point_info(True, False)
-array([10,  9, 10,  9,  4,  5,  7, 30, 24,  7,  7,  4,  6, 13])
-
-a.point_info(False, True)
-array([11, 10, 10,  9,  4,  5,  7, 30, 24,  7,  7,  4,  6, 13])
-
-a.point_info(False, False)
-array([19, 19,  4,  5,  7, 30, 24,  7,  7,  4,  6, 13])
- ```
