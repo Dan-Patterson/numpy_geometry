@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""
-=====
-utils
-=====
+r"""\
+
+npg_utils
+---------
 
 Script :
     utils.py
@@ -11,10 +11,11 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2019-10-31
+    2019-12-121
 
-Purpose :
-    tools for working with numpy arrays.  From arraytools.utils
+Purpose
+-------
+Tools for working with numpy arrays.  From arraytools.utils
 
 References
 ----------
@@ -23,8 +24,8 @@ References
 `<http://pro.arcgis.com/en/pro-app/arcpy/data-access/tabletonumpyarray.htm>`_.
 
 
-Useage:
--------
+Useage
+------
 
 **doc_func(func=None)** : see get_func and get_modu
 
@@ -110,6 +111,7 @@ __all__ = ['time_deco',
            'get_func',
            'get_modu',
            'dirr',
+           'find_def',
            '_wrapper',
            '_utils_help_'
            ]
@@ -515,6 +517,28 @@ def dirr(obj, colwise=False, cols=4, sub=None, prn=True):
         print(txt_out)
     else:
         return txt_out
+
+
+def find_def(defs, module_name):
+    """
+    find_def
+    Find occurences of a function in a module
+
+    np.lookfor(what, module=None, import_modules=True, regenerate=False,
+            output=None):
+
+    Parameters
+    ----------
+    defs : text singleton or list
+        The name of a def or a list of them.  These are what is being searched.
+    module_name : name, no quotes
+        The name of the module that was imported.
+    """
+    if not isinstance(defs, (list, tuple)):
+        defs = [defs]
+    for i in defs:
+        print("\n{}\n".format("="*20, i))
+        np.lookfor(i, module_name)
 
 
 # ----------------------------------------------------------------------

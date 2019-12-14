@@ -1,18 +1,23 @@
 # -*- coding: UTF-8 -*-
-"""
-===========
+"""Sample scatterplot and line plotting, in 2D and 3D.
+
+The Geo class is used for the input arrays.
+
 npg_plots
-===========
+---------
 
-Script : npg_plots.py
+Script :
+    npg_plots.py
 
-Author : Dan_Patterson@carleton.ca
+Author :
+    Dan_Patterson@carleton.ca
 
-Modified : 2019-11-09
+Modified :
+    2019-12-12
 
-Purpose:
---------
-    Sample scatterplot and line plotting, in 2D and 3D
+Purpose
+-------
+Sample scatterplot and line plotting, in 2D and 3D
 
 Notes
 -----
@@ -40,11 +45,12 @@ References
 
 import sys
 import numpy as np
-import npgeom as npg
-import npg_create
+# import npg_create
+# import npgeom as npg
 
 # import matplotlib
 import matplotlib.pyplot as plt
+from matplotlib.collections import LineCollection
 # import matplotlib.lines as lines
 from matplotlib.markers import MarkerStyle
 
@@ -111,7 +117,7 @@ def plot_2d(pnts, label_pnts=False, connect=False,
     `<https://matplotlib.org/>`_.
     """
     def scatter_params(plt, fig, ax, title="Title", ax_lbls=None):
-        """Default parameters for plots
+        """Assign default parameters for plots.
 
         Notes
         -----
@@ -142,13 +148,13 @@ def plot_2d(pnts, label_pnts=False, connect=False,
         plt.scatter(X, Y, s=10, c=color, linewidths=None, marker=marker)
 
     def _line(p, plt, color, marker, linewdth):
-        """Connect the"""
+        """Connect the points with lines."""
         X, Y = p[:, 0], p[:, 1]
         plt.plot(X, Y, color=color, marker=marker, linestyle='solid',
                  linewidth=linewdth)
 
     def _label_pnts(pnts, plt):
-        """as it says"""
+        """Label the points."""
         lbl = np.arange(len(pnts))
         for label, xpt, ypt in zip(lbl, pnts[:, 0], pnts[:, 1]):
             plt.annotate(label, xy=(xpt, ypt), xytext=(2, 2), size=12,
@@ -196,7 +202,7 @@ def plot_2d(pnts, label_pnts=False, connect=False,
 
 
 def plot_3d(a):
-    """Plot an xyz sequence in 3d
+    """Plot an xyz sequence in 3d.
 
     Parameters
     ----------
@@ -239,13 +245,15 @@ def plot_3d(a):
 
 def plot_polygons(arr, outline=True):
     """Plot poly boundaries.
-    When using the Geo class, pass ``arr.bits`` to it
-    """
 
-    def _line(p, plt):  # , color, marker, linewdth):
-        """Connect the"""
+    When using the Geo class, pass `arr.bits` to it.
+    """
+    def _line(p, plt):  # , arrow=True):  # , color, marker, linewdth):
+        """Connect the points."""
         X, Y = p[:, 0], p[:, 1]
         plt.plot(X, Y, color='black', linestyle='solid', linewidth=2)
+#        if arrow:
+#            plt.arrow(X, Y, 0.2, 0.2)
 
     fig, ax = plt.subplots(1, 1)
     ax.set_aspect('equal', adjustable='box')
@@ -256,16 +264,47 @@ def plot_polygons(arr, outline=True):
             plt.fill(*zip(*shape))
     plt.show()
 
+
+def plot_mesh(x=None, y=None, ax=None):
+    """Plot a meshgrid/fishnet given x and y ranges.
+
+    Parameters
+    ----------
+    x, y : arrays
+        Arrays of sequential values representing the x and y ranges
+    Requires
+    --------
+    If not initially imported, add this to the script or function.
+    
+    >>> from matplotlib.collections import LineCollection
+    
+    https://stackoverflow.com/questions/47295473/how-to-plot-using-
+    matplotlib-python-colahs-deformed-grid
+    """
+    if x is None or y is None:
+        x, y = np.meshgrid(np.linspace(0,1, 11), np.linspace(0, 0.6, 7))
+        
+    segs1 = np.stack((x[:, [0, -1]], y[:, [0, -1]]), axis=2)
+    segs2 = np.stack((x[[0, -1], :].T, y[[0, -1], :].T), axis=2)
+    # fig, ax = plt.subplots(1, 1)
+    ax = ax or plt.gca()
+    # ax.scatter(x, y)
+    ax.add_collection(LineCollection(np.concatenate((segs1, segs2))))
+    ax.autoscale(enable=True, axis='both', tight=None)
+    # ax.set_aspect('equal', adjustable='box')
+    plt.show()
+
+
 # use hexs to demonstrate
-hexs = npg_create.hex_flat(dx=1, dy=1, cols=4, rows=3)
+# hexs = npg_create.hex_flat(dx=1, dy=1, cols=4, rows=3)
 # def demo():
-#    x1 = [-1,-1,10,10,-1]; y1 = [-1,10,10,-1,-1]
-#    x2 = [21,21,29,29,21]; y2 = [21,29,29,21,21]
-#    shapes = [[x1,y1],[x2,y2]]
-#    for shape in shapes:
-#      x,y = shape
-#      plt.plot(x,y)
-#    plt.show()
+#     x1 = [-1,-1,10,10,-1]; y1 = [-1,10,10,-1,-1]
+#     x2 = [21,21,29,29,21]; y2 = [21,29,29,21,21]
+#     shapes = [[x1,y1],[x2,y2]]
+#     for shape in shapes:
+#       x,y = shape
+#       plt.plot(x,y)
+#     plt.show()
 """
 see this for holes
 
@@ -311,22 +350,22 @@ plt.show()
 #    return row_col
 #
 #
-#def generate():
+# def generate():
 #    plt.show()
 #    #plt.close()
 # ----------------------------------------------------------------------------
 # ---- running script or testing code section ----
+
+
 def _demo():
-    """Plot 20 points which have a minimum 1 unit point spacing
-    :
-    """
+    """Plot 20 points which have a minimum 1 unit point spacing."""
     a = np.array([[0.4, 0.5], [1.2, 9.1], [1.2, 3.6], [1.9, 4.6],
                   [2.9, 5.9], [4.2, 5.5], [4.3, 3.0], [5.1, 8.2],
                   [5.3, 9.5], [5.5, 5.7], [6.1, 4.0], [6.5, 6.8],
                   [7.1, 7.6], [7.3, 2.0], [7.4, 1.0], [7.7, 9.6],
                   [8.5, 6.5], [9.0, 4.7], [9.6, 1.6], [9.7, 9.6]])
     plot_2d(a, title='Points no closer than... test',
-            r_c=False, ax_lbls=None, pnt_labels=True)
+            ax_lbls=None, pnt_labels=True)
     return a
 
 

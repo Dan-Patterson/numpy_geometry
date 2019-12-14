@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""
-=========
-npg_io.py
-=========
+r"""\
+
+npg_io
+------
 
 Script :
     .../npgeom/npg_io.py
@@ -10,16 +10,16 @@ Script :
 Author :
     Dan_Patterson@carleton.ca
 
-Modified : 2019-11-21
+Modified : 2019-12-12
     Creation date during 2019 as part of ``arraytools``.
 
-Purpose : Tools for working with point and poly features as an array class
-    Requires npGeo to implement the array geometry class.
-
+Purpose
+-------
+Tools for working with point and poly features as an array class.
+Requires npGeo to implement the array geometry class.
 
 See Also
 --------
-
 __init__ :
     `__init__.py` has further information on arcpy related functionality.
 npGeo :
@@ -33,8 +33,6 @@ References
 
 `Subclassing ndarrays
 <https://docs.scipy.org/doc/numpy/user/basics.subclassing.html>`_.
-
-
 """
 # pylint: disable=C0330  # Wrong hanging indentation
 # pylint: disable=E0611  # stifle the arcgisscripting
@@ -52,6 +50,7 @@ import sys
 # from textwrap import indent  # dedent,
 import json
 import numpy as np
+# import npgeom as npg
 # from numpy.lib.recfunctions import structured_to_unstructured as stu
 # from numpy.lib.recfunctions import unstructured_to_structured as uts
 # import npGeo
@@ -73,7 +72,7 @@ np.set_printoptions(edgeitems=10, linewidth=160, precision=2, suppress=True,
                     threshold=100, formatter=ft)
 
 __all__ = [
-    'dtype_info', 'load_npy', 'save_npy', 'load_txt', 'save_txt',
+    'dtype_info', 'load_geo', 'save_geo', 'load_txt', 'save_txt',
     'load_geojson',
     'prn_q', '_check', 'prn_tbl', 'prn_geo',
     ]
@@ -82,8 +81,9 @@ __all__ = [
 # ---- (1) arrays : in and out------------------------------------------------
 #
 def dtype_info(a, as_string=False):
-    """Return dtype information for a structured/recarray as either tuples
-    or as strings.
+    """Return dtype information for a structured/recarray.
+
+    Output can be tuples or strings.
 
     Examples
     --------
@@ -110,27 +110,47 @@ def dtype_info(a, as_string=False):
     return names, formats
 
 
-def load_npy(f_name, all_info=False):
-    """load a well formed `npy` file representing a structured array
+def load_geo(f_name, all_info=True):
+    """Load a well formed `npy` file representing a structured array.
 
-    Returns an array, the description, field names and their size.
+    An array, the description, field names and their size are returned.
     """
-    a = np.load(f_name)
+    npzfiles = np.load(f_name)
+    f = npzfiles.files
+    g = npzfiles['g']
+    print("\nLoading...{}\nArrays included...{}".format(f_name, f))
     if all_info:
-        desc = a.dtype.descr
-        nms = a.dtype.names
-        sze = [i[1] for i in a.dtype.descr]
-        return a, desc, nms, sze
-    return a
+        desc = g.dtype.descr
+        nms = g.dtype.names
+        sze = [i[1] for i in g.dtype.descr]
+        return g, desc, nms, sze
+    return g
 
 
-def save_npy(a, f_name):
+def save_geo(g, fname, folder):
     """Save an array as an npy file.
 
+    Parameters
+    ----------
+    g : Geo array
+        A complete Geo array
+    fname : text
+        Filename without file extention.
+    folder : text
+        A local folder.  It will be checked for path name compliance.
     The type of data in each column is arbitrary.  It will be cast to the
     given dtype at runtime
     """
-    np.save(f_name, a)
+    check = all([hasattr(g, i) for i in ['IFT', 'K', 'XT', 'SR']])
+    if not check:
+        print("Not a fully formed Geo array")
+        return None
+    IFT, K, XT, SR = [g.IFT, g.K, g.XT, g.SR]  # g is a Geo array
+    folder = folder.replace("\\", "/")
+    out_name = "{}/{}.npz".format(folder, fname)
+    np.savez(out_name, g=g, ift=IFT, kind=K, extents=XT, spatial_ref=SR)
+    print("\nGeo array saved to ... {} ...".format(out_name))
+    return
 
 
 def load_txt(name="arr.txt", data_type=None):
@@ -188,11 +208,12 @@ def save_txt(a, name="arr.txt", sep=", ", dt_hdr=True):
 # ---- (2) json section ------------------------------------------------------
 #
 def load_geojson(pth, full=False, geometry=True):
-    """Load a geojson file and convert to a Geo Array.  The geojson is from the
-    Features to JSON tool listed in the references.
+    """Load a geojson file and convert to a Geo Array.
 
-    Requires
-    --------
+    The geojson is from the Features to JSON tool listed in the references.
+
+    Parameters
+    ----------
     pth : file path
         Full file path to the geojson file.
     full : boolean
@@ -251,8 +272,7 @@ def load_geojson(pth, full=False, geometry=True):
 # printing based on arraytools.frmts.py using prn_rec and dependencies
 #
 def prn_q(a, edges=3, max_lines=25, width=120, decimals=2):
-    """Format a structured array by setting the width so it hopefully wraps.
-    """
+    """Format a structured array by setting the width so it wraps."""
     width = min(len(str(a[0])), width)
     with np.printoptions(edgeitems=edges, threshold=max_lines, linewidth=width,
                          precision=decimals, suppress=True, nanstr='-n-'):
@@ -262,13 +282,14 @@ def prn_q(a, edges=3, max_lines=25, width=120, decimals=2):
 
 
 def _check(a):
-    """Check dtype and max value for formatting information"""
+    """Check dtype and max value for formatting information."""
     return a.shape, a.ndim, a.dtype.kind, np.min(a), np.max(a)
 
 
 def prn_tbl(a, rows_m=20, names=None, deci=2, width=75):
-    """Format a structured array with a mixed dtype.  Derived from
-    arraytools.frmts and the prn_rec function therein.
+    """Format a structured array with a mixed dtype.
+
+    Derived from arraytools.frmts and the prn_rec function therein.
 
     Parameters
     ----------
@@ -286,7 +307,7 @@ def prn_tbl(a, rows_m=20, names=None, deci=2, width=75):
         Print width in characters
     """
     def _ckw_(a, name, deci):
-        """array `a` c(olumns) k(ind) and w(idth)"""
+        """Array `a` c(olumns) k(ind) and w(idth)."""
         c_kind = a.dtype.kind
         if (c_kind in FLOATS) and (deci != 0):  # float with decimals
             c_max, c_min = np.round([np.min(a), np.max(a)], deci)
@@ -301,7 +322,7 @@ def prn_tbl(a, rows_m=20, names=None, deci=2, width=75):
         return [c_kind, c_width]
 
     def _col_format(pairs, deci):
-        """Assemble the column format"""
+        """Assemble the column format."""
         form_width = []
         dts = []
         for c_kind, c_width in pairs:
@@ -351,8 +372,9 @@ def prn_tbl(a, rows_m=20, names=None, deci=2, width=75):
 
 
 def prn_geo(a, rows_m=100, names=None, deci=2, width=75):
-    """Format a structured array with a mixed dtype.  Derived from
-    arraytools.frmts and the prn_rec function therein.
+    """Format a structured array with a mixed dtype.
+
+    Derived from arraytools.frmts and the prn_rec function therein.
 
     Parameters
     ----------
@@ -378,7 +400,7 @@ def prn_geo(a, rows_m=100, names=None, deci=2, width=75):
     ... array([ 5, 10, 16, 21, 26, 31, 36, 41, 48, 57, 65], dtype=int64)
     """
     def _ckw_(a, name, deci):
-        """columns `a` kind and width"""
+        """Columns `a` kind and width."""
         c_kind = a.dtype.kind
         if (c_kind in FLOATS) and (deci != 0):  # float with decimals
             c_max, c_min = np.round([np.min(a), np.max(a)], deci)
@@ -391,7 +413,7 @@ def prn_geo(a, rows_m=100, names=None, deci=2, width=75):
         return [c_kind, c_width]
 
     def _col_format(pairs, deci):
-        """Assemble the column format"""
+        """Assemble the column format."""
         form_width = []
         dts = []
         for c_kind, c_width in pairs:
@@ -451,7 +473,7 @@ def prn_geo(a, rows_m=100, names=None, deci=2, width=75):
 # ----  Extras ---------------------------------------------------------------
 #
 def gms(arr):
-    """Get maximum dimensions in a list/array
+    """Get the maximum dimension in a list/array.
 
     Returns
     -------

@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""
-=======
+r"""\
+
 npg_arc
-=======
+-------
 
 Script :
     npg_arc.py
@@ -11,14 +11,14 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2019-11-21
+    2019-12-10
 
-Purpose :
-    Tests for the Geo class.
+Purpose
+-------
+Working with numpy and arcpy.
 
 Notes
 -----
-
 >>> dir(arcgisscripting.da)
 ['ContingentFieldValue', 'ContingentValue', 'DatabaseSequence', 'Describe',
  'Domain', 'Editor', 'ExtendTable', 'FeatureClassToNumPyArray', 'InsertCursor',
@@ -33,22 +33,23 @@ Notes
 Time tests
 ----------
 
-a0 = fc_geo_Geo(in_fc)
-a1 = fc_sc_Geo(in_fc)
-a2 = fc_nparray_Geo(in_fc, kind=2, info="")
+>>> a0 = fc_geo_Geo(in_fc)
+>>> a1 = fc_sc_Geo(in_fc)
+>>> a2 = fc_nparray_Geo(in_fc, kind=2, info="")
 
-%timeit fc_geo_Geo(in_fc)  # a0
+>>> %timeit fc_geo_Geo(in_fc)  # a0
 3.28 s ± 194 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
 
-%timeit fc_sc_Geo(in_fc)   # a1
+>>> %timeit fc_sc_Geo(in_fc)   # a1
 3.7 s ± 349 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
 
-%timeit fc_nparray_Geo(in_fc, kind=2, info="")  # a2
+>>> %timeit fc_nparray_Geo(in_fc, kind=2, info="")  # a2
 386 ms ± 93.6 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
 
 
 References
 ----------
+None
 """
 # pylint: disable=C0103  # invalid-name
 # pylint: disable=R0914  # Too many local variables
@@ -76,29 +77,34 @@ from arcpy.da import (
 # from arcpy.geoprocessing import gp
 from arcpy.geoprocessing import env
 from arcpy.management import (
-        AddField, CopyFeatures, CreateFeatureclass, Delete, DeleteFeatures
-        )
+        AddField, CopyFeatures, CreateFeatureclass, DeleteFeatures
+        )  # Delete
 
 
 script = sys.argv[0]  # print this should you need to locate the script
 
 __all__ = [
-        '_area_part_', '_cw_', '_array_shape_finder_', 'get_SR', 'get_shapes',
-        'get_geo_interface', 'get_shape_K', 'get_fc_composition',
-        'get_fc_field_properties', 'get_shape_properties',
-        'fc_nparray_Geo', 'id_fr_to', 'fc2na',               # option 1
-        'fc_geo_Geo', 'shape_finder', 'flat', 'fc_gi_Geo',   # option 2
-        'fc_sc_Geo', 'fc_parser', 'ift_maker', 'fc2na',      # option 3
-        'Geo_to_fc', 'array_poly', 'geometry_fc',            # to fc
-        'make_nulls', 'fc_data', 'tbl_data',                 # attributes
-        'poly2array'
+        '_area_part_', '_cw_', 'array_shape_finder', 'poly_shape_finder',
+        'get_SR', 'get_shapes', 'get_geo_interface', 'get_shape_K',
+        'get_fc_composition', 'get_fc_field_properties',
+        'get_shape_properties',
+        'fc_nparray_Geo', 'id_fr_to',            # option 1
+        'Geo_to_fc', 'geo_poly',                 # to fc
+        'make_nulls', 'fc_data', 'tbl_data',     # attributes
+        'fc_geo_Geo', 'shape_finder', 'flat',    # option 2
+        'fc_gi_Geo',
+        'fc_sc_Geo', 'fc_parser', 'ift_maker',   # option 3
+        'fc2na', 'array_poly', 'geometry_fc',
+        'poly2array', '_flat',                   # geometry to array
+        '_del_none', '_poly_arr_',               # extras
+        '__geo_interface__'
         ]
 
 
 # ---- (1) General helpers ---------------------------------------------------
 # ---- clockwise checker
 def _area_part_(a):
-    """Mini e_area, used by areas and centroids"""
+    """Mini e_area, used by areas and centroids."""
     x0, y1 = (a.T)[:, 1:]
     x1, y0 = (a.T)[:, :-1]
     e0 = np.einsum('...i,...i->...i', x0, y0)
@@ -107,14 +113,15 @@ def _area_part_(a):
 
 
 def _cw_(a):
-    """clockwise"""
+    """Clockwise test."""
     return 1 if _area_part_(a) > 0. else 0
 
 
 # ---- array/list shape finder for nested structures
 def array_shape_finder(arr):  # -> array
-    """Provides the array shape for each part and bit of a nested
-    list/array. (Designed to take uneven nested lists).
+    """Return the array shape for each part and bit of a nested list/array.
+
+    This is designed to take uneven nested lists.
 
     See Also
     --------
@@ -137,13 +144,15 @@ def array_shape_finder(arr):  # -> array
 
 
 def poly_shape_finder(polys):  # -> array
-    """Determine the structure of arcobject geometry objects with respect to
-    parts and points etcetera.
+    """Determine the structure of arcobject geometry objects.
+
+    Information is returned with respect to parts and points etcetera.
 
     Parameters
     ----------
     polys : arcobject object
         This can be a list or a single object.
+
     See Also
     --------
     ``get_geo_interface(in_fc, SR=None)``  produces the array to use
@@ -153,7 +162,7 @@ def poly_shape_finder(polys):  # -> array
     np.diff(np.cumsum([i is None for i in z]), prepend=0)
     """
     def psf(poly, cnt):
-        """ """
+        """Polgon shape finder."""
         out = []
         for i, arr in enumerate(poly):
             if hasattr(arr, '__len__'):
@@ -177,7 +186,7 @@ def poly_shape_finder(polys):  # -> array
 #
 # Spatial reference object
 def get_SR(in_fc, verbose=False):
-    """Return the spatial reference of a featureclass"""
+    """Return the spatial reference of a featureclass."""
     desc = Describe(in_fc)
     SR = desc['spatialReference']
     if verbose:
@@ -187,8 +196,9 @@ def get_SR(in_fc, verbose=False):
 
 # Featureclass to shapes, using a searchcursor
 def get_shapes(in_fc, SR=None):
-    """Featureclass to arcpy shapes.  Returns polygon, polyline, multipoint,
-    or points.
+    """Featureclass to arcpy shapes.
+ 
+    Returns polygon, polyline, multipoint, or points.
     """
     if SR is None:
         SR = get_SR(in_fc)
@@ -420,7 +430,7 @@ def fc_nparray_Geo(in_fc, geom_kind=2, info=""):
     return out
 
 
-# ---- helper function
+# helper function
 def id_fr_to(a, oids):
     """Produce the id, from, to point indices used by fc_nparray_Geo.
 
@@ -482,7 +492,6 @@ def Geo_to_fc(geo, gdb=None, name=None, kind=None, SR=None):
         for row in polys:
             cur.insertRow(row)
     CopyFeatures("tmp", out_name)
-    
     return
 
 

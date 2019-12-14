@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""
-========
+"""Geometry focused methods that work with Geo arrays or np.ndarrays.
+
 npg_geom
-========
+--------
 
 Script :
     npg_geom.py
@@ -11,24 +11,48 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2019-11-21
+    2019-12-12
 
-Purpose :
-    Geometry focused methods that work with Geo arrays or np.ndarrays.
-    In the case of the former, the methods may be being called from Geo methods
-    in such things as a list comprehension.
+Purpose
+-------
+Geometry focused methods that work with Geo arrays or np.ndarrays.
+In the case of the former, the methods may be being called from Geo methods
+in such things as a list comprehension.
 
 Notes
 -----
+See references for origin of this quote.
 
-How to flatten a searchcursor to points and/or None
+"For an Esri polygon to be simple, all intersections have to occur at
+vertices. In general, it follows from 'a valid Esri polygon must have
+such structure that the interior of the polygon can always be unambiguously
+determined to be to the right of every segment', that"::
 
->>> in_fc = "C:/Git_Dan/npgeom/npgeom.gdb/Polygons"
->>> SR = npg.getSR(in_fc)
->>> with arcpy.da.SearchCursor(in_fc, ('OID@', 'SHAPE@'), None, SR) as c:
-...     pnts = [[[[p for p in arr] for arr in r[1]]] for r in c]
->>> c.reset()  # don't forget to reset the cursor
+    - segments can touch other segments only at the end points,
+    - segments have non-zero length,
+    - outer rings are clockwise and holes are counterclockwise,
+      each polygon ring has non-zero area.
+    - order of the rings does not matter,
+    - rings can be self-tangent,
+    - rings can not overlap.
+
+How to flatten a searchcursor to points and/or None::
+
+    in_fc = "C:/Git_Dan/npgeom/npgeom.gdb/Polygons"
+    SR = npg.getSR(in_fc)
+    with arcpy.da.SearchCursor(in_fc, ('OID@', 'SHAPE@'), None, SR) as c:
+        pnts = [[[[p for p in arr] for arr in r[1]]] for r in c]
+    c.reset()  # don't forget to reset the cursor
+
+References
+----------
+See comment by Serge Tolstov in:
+
+`Geometry checks
+<https://community.esri.com/thread/244587-check-geometry-fails-in-shared
+-origin-edge-case>`_.
 """
+
 # pylint: disable=R0904  # pylint issue
 # pylint: disable=C0103  # invalid-name
 # pylint: disable=E0611  # stifle the arcgisscripting
@@ -48,9 +72,7 @@ import numpy as np
 from scipy.spatial import ConvexHull as CH
 from scipy.spatial import Delaunay
 
-import npgeom as npg
-from npg_helpers import keep_points
-
+# import npgeom as npg
 # import npg_io
 # from npGeo_io import fc_data
 
@@ -68,14 +90,16 @@ __all__ = ['extent_to_poly',
            '_dist_along_', '_percent_along_', '_pnts_on_line_',
            '_polys_to_unique_pnts_', '_simplify_lines_',
            '_pnts_in_poly_', '_pnt_on_poly_', '_pnt_on_segment_', 'p_o_p',
-           '_rotate_', '_tri_pnts_', '_crossing_num_', 'p_in_p'
+           '_rotate_', '_tri_pnts_', '_crossing_num_', 'p_in_p',
+           'in_hole_check', 'pnts_in_pnts'
            ]
 
 
 def extent_to_poly(extent, kind=2):
-    """Create a polygon/polyline feature from an array of x,y values.  The
-    array returned is ordered clockwise with the first and last point repeated
-    to form a closed-loop.
+    """Create a polygon/polyline feature from an array of x,y values.
+
+    The array returned is ordered clockwise with the first and last point
+    repeated to form a closed-loop.
 
     Parameters
     ----------
@@ -100,8 +124,9 @@ def extent_to_poly(extent, kind=2):
 # ---- area and centroid helpers
 #
 def _area_centroid_(a):
-    """Calculate area and centroid for a singlepart polygon, `a`.  This is also
-    used to calculate area and centroid for a Geo array's parts.
+    """Calculate area and centroid for a singlepart polygon, `a`.
+
+    This is also used to calculate area and centroid for a Geo array's parts.
 
     Notes
     -----
@@ -125,10 +150,11 @@ def _area_centroid_(a):
 
 
 def _angles_(a, inside=True, in_deg=True):
-    """Worker for Geo.angles. Sequential points, a, b, c for the first bit in
-    a shape, so interior holes are removed in polygons and the first part of
-    a multipart shape is used.  Use multipart_to_singlepart if you want to
-    process that type.
+    """Worker for Geo.angles.
+
+    Sequential points, a, b, c for the first bit in a shape, so interior holes
+    are removed in polygons and the first part of a multipart shape is used.
+    Use multipart_to_singlepart if you want to  process that type.
 
     Parameters
     ----------
@@ -157,8 +183,7 @@ def _angles_(a, inside=True, in_deg=True):
 
 
 def _angles2_(a, inside=True, in_deg=True):
-    """reworked angle to simplify and speed up ``roll`` and crossproduct.
-    """
+    """Reworked angle to simplify and speed up ``roll`` and crossproduct."""
     # ----
     def _x_(a):
         """Cross product."""
@@ -166,7 +191,7 @@ def _angles2_(a, inside=True, in_deg=True):
         bc = a - np.concatenate((a[1:], a[0, None]), axis=0)
         return np.cross(ba, bc), ba, bc
     # ----
-    if np.allclose(a[0], a[-1]):     # closed loop, remove duplicate
+    if np.allclose(a[0], a[-1]):                 # closed loop, remove dupl.
         a = a[:-1]
     cr, ba, bc = _x_(a)
     dt = np.einsum('ij,ij->i', ba, bc)
@@ -184,19 +209,24 @@ def _angles2_(a, inside=True, in_deg=True):
 # ---- convex hull helpers
 #
 def _ch_scipy_(points):
-    """Convex hull using scipy.spatial.ConvexHull. Remove null_pnts, calculate
+    """Convex hull using scipy.spatial.ConvexHull.
+
+    Remove null_pnts, calculate
     the hull, derive the vertices and reorder clockwise.
     """
     out = CH(points)
-    return out.points[out.vertices][::-1]
+    ch = out.points[out.vertices][::-1]
+    return np.concatenate((ch, [ch[0]]), axis=0)
 
 
 def _ch_simple_(points):
-    """Calculates the convex hull for given points.  Removes null_pnts, finds
-    the unique points, then determines the hull from the remaining
+    """Calculate the convex hull for given points.
+
+    Removes null_pnts, finds the unique points, then determines the hull from
+    the remaining.
     """
     def _x_(o, a, b):
-        """Cross-product for vectors o-a and o-b... a<--o-->b"""
+        """Cross-product for vectors o-a and o-b... a<--o-->b."""
         xo, yo = o
         xa, ya = a
         xb, yb = b
@@ -220,7 +250,7 @@ def _ch_simple_(points):
         upper.append(p)
     ch = np.array(lower[:-1] + upper)[::-1]  # sort clockwise
     if np.all(ch[0] != ch[-1]):
-        ch = np.concatenate((ch, ch[0]), axis=0)  # np.vstack((ch, ch[0]))
+        ch = np.concatenate((ch, [ch[0]]), axis=0)  # np.vstack((ch, ch[0]))
     return ch
 
 
@@ -236,8 +266,8 @@ def _ch_(points, threshold=50):
 def _dist_along_(a, dist=0):
     """Add a point along a poly feature at a distance from the start point.
 
-    Requires
-    --------
+    Parameters
+    ----------
     val : number
       `val` is assumed to be a value between 0 and to total length of the
       poly feature.  If <= 0, the first point is returned.  If >= total
@@ -254,7 +284,7 @@ def _dist_along_(a, dist=0):
 
     See Also
     --------
-    _percent_along : function
+    _percent_along_ : function
         Similar to this function but measures distance as a percentage.
     """
     dxdy = a[1:, :] - a[:-1, :]                        # coordinate differences
@@ -276,17 +306,18 @@ def _dist_along_(a, dist=0):
 
 def _percent_along_(a, percent=0):
     """Add a point along a poly feature at a distance from the start point.
+
     The distance is specified as a percentage of the total poly feature length.
 
     See Also
     --------
-    _dist_along : function
+    _dist_along_ : function
         Similar to this function but measures distance as a finite value from
         the start point.
 
     Requires
     --------
-    Called by ``pnt_on_poly``.
+    Called by `pnt_on_poly`.
     """
     if percent > 1.:
         percent /= 100.
@@ -310,7 +341,8 @@ def _percent_along_(a, percent=0):
 
 def _pnts_on_line_(a, spacing=1, is_percent=False):  # densify by distance
     """Add points, at a fixed spacing, to an array representing a line.
-    **See**  ``densify_by_distance`` for documentation.
+
+    **See**  `densify_by_distance` for documentation.
 
     Parameters
     ----------
@@ -322,9 +354,9 @@ def _pnts_on_line_(a, spacing=1, is_percent=False):  # densify by distance
     is_percent : boolean
         Express the densification as a percent of the total length.
 
-    Requires
-    --------
-    Called by ``pnt_on_poly``.
+    Notes
+    -----
+    Called by `pnt_on_poly`.
     """
     N = len(a) - 1                                    # segments
     dxdy = a[1:, :] - a[:-1, :]                       # coordinate differences
@@ -347,10 +379,11 @@ def _pnts_on_line_(a, spacing=1, is_percent=False):  # densify by distance
 # ---- poly conversion helpers
 #
 def _polys_to_unique_pnts_(a, as_structured=True):
-    """Derived from polys_to_points, but allowing for recreation of original
-    point order and unique points.
+    """Based on `polys_to_points`.
+
+    Allows for recreation of original point order and unique points.
     """
-    uni, idx, _, cnts = np.unique(a, True, True, return_counts=True, axis=0)
+    uni, idx, cnts = np.unique(a, True, return_counts=True, axis=0)
     if as_structured:
         N = uni.shape[0]
         dt = [('New_ID', '<i4'), ('Xs', '<f8'), ('Ys', '<f8'), ('Num', '<i4')]
@@ -364,8 +397,7 @@ def _polys_to_unique_pnts_(a, as_structured=True):
 
 
 def _simplify_lines_(a, deviation=10):
-    """Simplify array
-    """
+    """Simplify array."""
     ang = _angles2_(a, inside=True, in_deg=True)
     idx = (np.abs(ang - 180.) >= deviation)
     sub = a[1: -1]
@@ -375,14 +407,14 @@ def _simplify_lines_(a, deviation=10):
 
 # ---- points in or on geometries --------------------------------------------
 def pnts_in_Geo_extents(pnts, geo):
-    """Same as pnts_in_ext without the `outside` check and return.
+    """`pnts_in_ext` without the `outside` check and return.
 
     Example
     -------
-    Three polygons and their extent.
+    Three polygons and their extent:
+
     >>> # ---- extent Geo    and  IFT for each shape
     >>> ext = g.extents_pnts(False, True)  # by part not bit
-    >>> ext
     >>> Geo([[ 0.,  0.],  LB array([[0, 0, 2, 0, 1, 0],
     ...      [10., 10.],  RT
     ...      [10.,  0.],  LB        [1, 2, 4, 0, 1, 0],
@@ -391,10 +423,10 @@ def pnts_in_Geo_extents(pnts, geo):
     ...      [15., 18.]]) RT
     >>> ext = np.array([[400, 400], [600, 600]])
     >>> pnts = np.array([[1., 1], [2.5, 2.5], [4.5, 4.5], [5., 5],
-    ...                   [6, 6], [10, 10], [12., 12], [12, 16]])
+        ...              [6, 6], [10, 10], [12., 12], [12, 16]])
     """
     def _crossing_num_(pnts, poly):
-        """The implementation of pnply."""
+        """Implement `pnply`."""
         xs = poly[:, 0]
         ys = poly[:, 1]
         dx = np.diff(xs)
@@ -431,9 +463,10 @@ def pnts_in_Geo_extents(pnts, geo):
 
 
 def _pnts_in_poly_(pnts, poly):
-    """Points in polygon, implemented using crossing number largely derived
-    from **pnpoly** in its various incarnations.
+    """Points in polygon.
 
+    Implemented using crossing number largely derived from **pnpoly** in its
+    various incarnations.
     This version does a ``within extent`` test to pre-process the points.
     Points meeting this condition are passed on to the crossing number section.
 
@@ -450,14 +483,14 @@ def _pnts_in_poly_(pnts, poly):
     Helpers from From arraytools.pntinply.
     """
     def _in_ext_(pnts, ext):
-        """ Returns the points within an extent."""
+        """Return the points within an extent."""
         LB, RT = ext
         comp = np.logical_and(LB < pnts, pnts <= RT)
         idx = np.logical_and(comp[..., 0], comp[..., 1])
         return pnts[idx]
 
     def _crossing_num_(pnts, poly):
-        """The implementation of pnply."""
+        """`pnply` implementation."""
         xs = poly[:, 0]
         ys = poly[:, 1]
         dx = np.diff(xs)
@@ -484,7 +517,7 @@ def _pnts_in_poly_(pnts, poly):
 def _pnt_on_poly_(pnt, poly):
     """Find closest point location on a polygon/polyline.
 
-    See : ``p_o_p`` for batch running of multiple points to a polygon.
+    See : `p_o_p` for batch running of multiple points to a polygon.
 
     Parameters
     ----------
@@ -502,9 +535,9 @@ def _pnt_on_poly_(pnt, poly):
 
     Notes
     -----
-    ``e_dist`` is represented by _e_2d and pnt_on_seg by its equivalent below.
+    `e_dist` is represented by _e_2d and pnt_on_seg by its equivalent below.
 
-    ``_line_dir_`` is from it's equivalent line_dir included here.
+    `_line_dir_` is from it's equivalent line_dir included here.
 
     This may be as simple as finding the closest point on the edge, but if
     needed, an orthogonal projection onto a polygon/line edge will be done.
@@ -512,12 +545,12 @@ def _pnt_on_poly_(pnt, poly):
     same.
     """
     def _e_2d_(a, p):
-        """ array points to point distance... mini e_dist"""
+        """Array points to point distance... mini e_dist."""
         diff = a - p[None, :]
         return np.sqrt(np.einsum('ij,ij->i', diff, diff))
 
     def _pnt_on_seg_(seg, pnt):
-        """mini pnt_on_seg function normally required by pnt_on_poly"""
+        """Mini pnt_on_seg function normally required by pnt_on_poly."""
         x0, y0, x1, y1, dx, dy = *pnt, *seg[0], *(seg[1] - seg[0])
         dist_ = dx*dx + dy*dy  # squared length
         u = ((x0 - x1)*dx + (y0 - y1)*dy)/dist_
@@ -526,7 +559,7 @@ def _pnt_on_poly_(pnt, poly):
         return xy
 
     def _line_dir_(orig, dest):
-        """mini line direction function"""
+        """Mini line direction function."""
         orig = np.atleast_2d(orig)
         dest = np.atleast_2d(dest)
         dxy = dest - orig
@@ -565,6 +598,7 @@ def _pnt_on_poly_(pnt, poly):
 
 def _pnt_on_segment_(pnt, seg):
     """Orthogonal projection of a point onto a 2 point line segment.
+
     Returns the intersection point, if the point is between the segment end
     points, otherwise, it returns the distance to the closest endpoint.
 
@@ -596,8 +630,7 @@ def _pnt_on_segment_(pnt, seg):
 
 
 def p_o_p(pnts, poly):
-    """Main runner to run multiple points to a polygon.
-    """
+    """Run multiple points to a polygon."""
     result = []
     for p in pnts:
         result.append(_pnt_on_poly_(p, poly))
@@ -651,16 +684,16 @@ def _rotate_(geo_arr, R, as_group):
 def _tri_pnts_(pnts):
     """Triangulate the points and return the triangles.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     pnts : array
         Points for a shape or a group of points in array format.
         Either geo.shapes or np.ndarray.
     out : array
         An array of triangle points.
 
-    Notes:
-    ------
+    Notes
+    -----
     The simplices are ordered counterclockwise, this is reversed in this
     implementation.
 
@@ -688,7 +721,7 @@ def _tri_pnts_(pnts):
 #
 
 def _crossing_num_(pnts, poly, line=True):
-    """Crossing Number for point in polygon.  See ``p_in_p``.
+    """Crossing Number for point in polygon.  See `p_in_p`.
 
     Parameters
     ----------
@@ -727,37 +760,12 @@ def _crossing_num_(pnts, poly, line=True):
         is_in.append(cn % 2)  # either even or odd (0, 1)
     return pnts[np.nonzero(is_in)]
 
-"""
-ys = poly[:, 1]
-xs = poly[:, 0]
-py = pnts[:, 1]
-px = pnts[:, 0]
-c0 = (ys[:-1] < py[:, None])
-c1 = (py[:, None] < ys[1:])
-c2 = (ys[:-1] > py[:, None])
-c3 = (py[:, None] > ys[1:])
-
-c01 = c0 * c1
-c23 = c2 * c3
-c01 | c23       #(c0 * c1) | (c2 * c3)  # or c01 = c0 * c1
-r, col  = np.nonzero(c01)
-
-vt_num = (py[:, None] - ys[:-1])
-vt_denom =  dy[:-1][col]
-
-xs[:-1][:, None]
-
-(dy[:, None][col] - ys[:-1][col])/dy[:, None][col]
-
-px[:, None] == xs  x check
-dx[:, None] * dx[1:]
-"""
-
 
 def p_in_p(pnts, geo):
-    """
-    Geo array implementation of ``pntply`` with crossing number to determine
-     if a point is completely inside or on the boundary of a polygon.
+    """Geo array implementation of `pntply`.
+
+     Crossing number is used to determine whether a point is completely inside
+     or on the boundary of a polygon.
 
     Parameters
     ----------
@@ -767,10 +775,10 @@ def p_in_p(pnts, geo):
         The Geo array of singlepart polygons.
 
     >>> # g  # a Geo array
-    >>> extents = g.extents(by_bit=True)
+    >>> extents = g.extents(splitter="part")
     >>> pnts = np.array([[1., 1], [2.5, 2.5], [4.5, 4.5], [5., 5],
     ...                  [6, 6], [10, 10], [12., 12], [12, 16]])
-    >>> out, hole_pnts = p_i_p = (pnts, g)
+    >>> out, inside_pnts = p_in_p(pnts, g)
     >>> ids, ps = zip(*out)
 
     comp = np.logical_and(extents[:, 0:2] <= pnts[:, None],
@@ -789,13 +797,14 @@ def p_in_p(pnts, geo):
     ift, ps = zip(*out)
     """
     # ---- Determine points in the extents of each feature in g
+    uniq, common = pnts_in_pnts(pnts, geo, just_common=False)
     extents = geo.extents(splitter="shape")
-    case1 = pnts[:, None] < extents[:, 2:4]
-    case0 = extents[:, 0:2] <= pnts[:, None]
+    case1 = uniq[:, None] < extents[:, 2:4]
+    case0 = extents[:, 0:2] <= uniq[:, None]
     # comp = np.logical_and(case0, case1)
     # idx = np.logical_and(comp[..., 0], comp[..., 1])
     idx = np.logical_and(case0[..., 0], case1[..., 1])
-    p_inside = [pnts[idx[:, i]] for i in range(idx.shape[-1])]
+    p_inside = [uniq[idx[:, i]] for i in range(idx.shape[-1])]
     p_h = np.vstack([i for i in p_inside if i.size > 0])
     p_h = np.unique(p_h, axis=0)
     out = []
@@ -806,11 +815,42 @@ def p_in_p(pnts, geo):
             cn = _crossing_num_(p, poly, False)
             if cn.size > 0:
                 out.append([geo.shp_IFT[i], cn])
-    geom_pnts = keep_points(geo, p_h)
-    out.append([np.array([-1, -1, -1, -1, -1, -1], 'i8'), geom_pnts])
+    if common is not None:
+        out.append([np.array([-1, -1, -1, -1, -1, -1], 'i8'), common])
     ift, ps = zip(*out)
     final = np.unique(np.vstack(ps), axis=0)
-    return ift, final
+    return out, ift, final
+
+
+def in_hole_check(pnts, geo):
+    """Check points are in a hole."""
+    w = np.where(geo.CW == 0)[0]
+    holes = geo.bits[w]
+    out = []
+    for h in holes:
+        inside = _crossing_num_(pnts, h, False)
+        if inside.size > 0:
+            out.append([h, inside])
+    return out
+
+
+def pnts_in_pnts(pnts, geo, just_common=True):
+    """Check to see if pnts are coincident (common) with pnts in the Geo array.
+
+    If ``just_common`` is True, only the points in both data sets will be
+    returned.  If False, then the common and unique points will be returned as
+    two separate arrays.
+    """
+    w = np.where((pnts == geo[:, None]).all(-1))[1]
+    if len(w) > 0:
+        common = np.unique(pnts[w], axis=0)
+        if just_common:
+            return common, None
+        w1 = np.where((pnts == common[:, None]).all(-1))[1]
+        idx = [i for i in np.arange(len(pnts)) if i not in w1]
+        uniq = pnts[idx]
+        return uniq, common
+    return pnts, None
 
 
 # ===========================================================================

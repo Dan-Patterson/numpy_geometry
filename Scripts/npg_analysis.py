@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""
-============
+r"""\
+
 npg_analysis
-============
+------------
 
 Script :
     npg_analysis.py
@@ -11,12 +11,15 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2019-09-07
+    2019-12-12
 
-Purpose :
-    Analysis tools for the Geom class.
+Purpose
+-------
+Analysis tools for the Geom class.
 
-Notes:
+Notes
+-----
+Functions use np.lib.recfunctions methods
 
 References
 ----------
@@ -50,31 +53,33 @@ __all__ = [
 # ===========================================================================
 # ---- def section: def code blocks go here ---------------------------------
 def closest_n(a, N=3, ordered=True):
-    """A shell to `n_near`, see its doc string"""
+    """See the `n_near` docstring."""
     coords, dist, n_array = n_near(a, N=N, ordered=ordered)
     return coords, dist, n_array
 
 
 def distances(a, b):
-    """Distances for 2D arrays using einsum.  Based on a simplified version
-    of e_dist in arraytools.
+    """Distances for 2D arrays using einsum.
+
+    Based on a simplified version of e_dist in arraytools.
     """
     diff = a[:, None] - b
     return np.sqrt(np.einsum('ijk,ijk->ij', diff, diff))
 
 
 def not_closer(a, min_d=1, ordered=False):
-    """Find the points that are separated by a distance greater than
-     min_d.  This ensures a degree of point spacing
+    """Find the points separated by a distance greater than min_d.
+
+    This ensures a degree of point spacing.
 
     Parameters
     ----------
-     `a` : coordinates
-         2D array of coordinates.
-     `min_d` : number
-         Minimum separation distance.
-     `ordered` : boolean
-         Order the input points.
+    a : coordinates
+        2D array of coordinates.
+    min_d : number
+        Minimum separation distance.
+     ordered : boolean
+        Order the input points.
 
     Returns
     -------
@@ -95,7 +100,7 @@ def not_closer(a, min_d=1, ordered=False):
 
 
 def n_check(a):  # N=3, order=True):
-    """n_check prior to running n_near analysis
+    """Run n_check prior to running n_near analysis.
 
     Parameters
     ----------
@@ -114,8 +119,10 @@ def n_check(a):  # N=3, order=True):
 
 
 def n_near(a, N=3, ordered=True):
-    """Return the coordinates and distance to the nearest N points within
-      an 2D numpy array, 'a', with optional ordering of the inputs.
+    """Nearest N point analysis.
+
+    Return the coordinates and distances to the nearest ``N`` points in a
+    2D numpy array, ``a``.  The results can be ordered if needed.
 
     Parameters
     ----------
@@ -176,7 +183,7 @@ def n_near(a, N=3, ordered=True):
 
 
 def n_spaced(L=0, B=0, R=10, T=10, min_space=1, num=10, verbose=True):
-    """Produce num points within the bounds specified by the extent (L,B,R,T)
+    """Produce num points within the bounds specified by the extent (L,B,R,T).
 
     Parameters
     ----------
@@ -190,7 +197,7 @@ def n_spaced(L=0, B=0, R=10, T=10, min_space=1, num=10, verbose=True):
     """
     #
     def _pnts(L, B, R, T, num):
-        """Create the points"""
+        """Create the points."""
         xs = (R-L) * np.random.random_sample(size=num) + L
         ys = (T-B) * np.random.random_sample(size=num) + B
         return np.array(list(zip(xs, ys)))
@@ -229,7 +236,7 @@ def n_spaced(L=0, B=0, R=10, T=10, min_space=1, num=10, verbose=True):
 # ==== intersection
 #
 def intersects(*args):
-    """Line intersection check.  Two lines or 4 points that form the lines.
+    """Line intersection check.  Inputs are two lines or 4 points.
 
     Parameters
     ----------
@@ -237,12 +244,12 @@ def intersects(*args):
         p0, p1 -> line 1
         p2, p3 -> line 2
 
-    Returns:
-    --------
+    Returns
+    -------
     boolean, if the segments do intersect
 
-    References:
-    -----------
+    References
+    ----------
     `<https://stackoverflow.com/questions/563198/how-do-you-detect-where-two-
     line-segments-intersect#565282>`_.
     """
@@ -295,9 +302,13 @@ def intersects(*args):
 
 
 def intersection_pnt(p0, p1, p2, p3):
-    """Returns the intersection point of a polygon segment (p0->p1) and a
-    clipping polygon segment (s->e.
+    """Return an intersection point.
 
+    The intersection point is for a polygon segment (p0->p1) and a
+    clipping polygon segment (s->e).
+
+    References
+    ----------
     `<https://en.wikipedia.org/wiki/Line–line_intersection>`_.
     """
     x0, y0, x1, y1, x2, y2, x3, y3 = (*p0, *p1, *p2, *p3)
@@ -311,12 +322,11 @@ def intersection_pnt(p0, p1, p2, p3):
 
 
 def knn(p, pnts, k=1, return_dist=True):
-    """
-    Calculates k nearest neighbours for a given point.
+    """Calculate the `k` nearest neighbours for a given point.
 
-    Parameters:
-    -----------
-    p :array
+    Parameters
+    ----------
+    p : array
         x,y reference point
     pnts : array
         Points array to examine
@@ -327,16 +337,13 @@ def knn(p, pnts, k=1, return_dist=True):
     -------
     Array of k-nearest points and optionally their distance from the source.
     """
-
     def _remove_self_(p, pnts):
-        """Remove a point which is duplicated or itself from the array
-        """
+        """Remove a point which is duplicated or itself from the array."""
         keep = ~np.all(pnts == p, axis=1)
         return pnts[keep]
 
     def _e_2d_(p, a):
-        """ array points to point distance... mini e_dist
-        """
+        """Return point to point distance for array (mini e_dist)."""
         diff = a - p[np.newaxis, :]
         return np.einsum('ij,ij->i', diff, diff)
 
@@ -351,8 +358,7 @@ def knn(p, pnts, k=1, return_dist=True):
 
 
 def knn0(pnts, p, k):
-    """Calculates `k` nearest neighbours for a given point, `p`, relative to
-     otherpoints.
+    """Calculate the `k` nearest neighbours for a given point, `p`.
 
     Parameters
     ----------
@@ -378,7 +384,7 @@ def knn0(pnts, p, k):
 # ---- minimum spanning tree
 #
 def _dist_arr_(a, verbose=False):
-    """Minimum spanning tree prep... """
+    """Minimum spanning tree preparation."""
     a = a[~np.isnan(a[:, 0])]
     idx = np.lexsort((a[:, 1], a[:, 0]))  # sort X, then Y
     # idx= np.lexsort((a[:, 0], a[:, 1]))  # sort Y, then X
@@ -394,8 +400,10 @@ def _dist_arr_(a, verbose=False):
 
 
 def _e_dist_(a):
-    """Return a 2D square-form euclidean distance matrix.  For other
-    dimensions, use e_dist in ein_geom.py"""
+    """Return a 2D square-form euclidean distance matrix.
+
+    For other dimensions, use e_dist in ein_geom.py
+    """
     b = a.reshape(np.prod(a.shape[:-1]), 1, a.shape[-1])
     diff = a - b
     d = np.sqrt(np.einsum('ijk,ijk->ij', diff, diff)).squeeze()
@@ -404,8 +412,9 @@ def _e_dist_(a):
 
 
 def mst(arr, calc_dist=True):
-    """Determine the minimum spanning tree for a set of points represented
-    by their inter-point distances. ie their `W`eights
+    """Determine the minimum spanning tree for a set of points.
+
+    The spanning tree uses the inter-point distances as their `W`eights
 
     Parameters
     ----------
@@ -455,7 +464,7 @@ def mst(arr, calc_dist=True):
 
 
 def connect(a, dist_arr, edges):
-    """Return the full spanning tree, with points, connections and distance
+    """Return the full spanning tree, with points, connections and distance.
 
     Parameters
     ----------
@@ -483,7 +492,7 @@ def connect(a, dist_arr, edges):
 #
 # ---- concave hull
 def concave(points, k, pip_check=False):
-    """Calculates the concave hull for given points
+    """Return the concave hull for given points.
 
     Parameters
     ----------
@@ -499,8 +508,8 @@ def concave(points, k, pip_check=False):
     knn0, intersects, angle, point_in_polygon : functions
         Functions used by `concave`
 
-    Notes:
-    ------
+    Notes
+    -----
     This recursively calls itself to check concave hull.
 
     p_set : The working copy of the input points
@@ -512,16 +521,14 @@ def concave(points, k, pip_check=False):
     PI = np.pi
 
     def _angle_(p0, p1, prv_ang=0):
-        """Angle between two points and the previous angle, or zero.
-        """
+        """Return the angle between two points and the previous angle, or."""
         ang = np.arctan2(p0[1] - p1[1], p0[0] - p1[0])
         a0 = (ang - prv_ang)
         a0 = a0 % (PI * 2) - PI
         return a0
 
     def _point_in_polygon_(pnt, poly):  # pnt_in_poly(pnt, poly):  #
-        """Point in polygon check. ## fix this and use pip from arraytools
-        """
+        """Point in polygon check. ## fix this and use pip from arraytools."""
         x, y = pnt
         N = len(poly)
         for i in range(N):
@@ -585,7 +592,7 @@ def concave(points, k, pip_check=False):
 
 
 def _demo():
-    """ """
+    """Demonstration."""
     # L, R, B, T = [300000, 300100, 5025000, 5025100]
     L, B, R, T = [1, 1, 10, 10]
     tol = 1

@@ -1,26 +1,29 @@
 # -*- coding: utf-8 -*-
-"""
-=======
-_tests_
-=======
+r"""\
+
+npg_helpers
+-----------
 
 Script :
-    _tests_.py
+    npg_helpers.py
 
 Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2019-010-27
+    2019-12-12
 
-Purpose :
-    Tests for the Geo class.
+Purpose
+-------
+Helper functions for npgeom.
 
 Notes
 -----
+None
 
-References:
-
+References
+----------
+None
 """
 # pylint: disable=C0103  # invalid-name
 # pylint: disable=R0914  # Too many local variables
@@ -28,7 +31,7 @@ References:
 # pylint: disable=W0105  # string statement has no effect
 
 import sys
-from textwrap import dedent
+# from textwrap import dedent
 
 import numpy as np
 
@@ -62,6 +65,8 @@ def compare_2d(arr, look_for, unique=True, invert=False, return_idx=False):
     ...        [10., 10.]])
     """
     result = (arr[:, None] == look_for).all(-1).any(-1)
+    if sum(result) == 0:
+        return None
     if invert:
         result = ~result
     idx = np.where(result)[0]
@@ -75,14 +80,14 @@ def compare_2d(arr, look_for, unique=True, invert=False, return_idx=False):
 
 def keep_points(arr, look_for, **kwargs):
     """Keep points in ``arr`` that match those in ``look_for``.
+
     See ``compare_2d``
     """
     return compare_2d(arr, look_for, invert=False, return_idx=False)
 
 
 def remove_points(arr, look_for, **kwargs):
-    """Remove points from ``arr`` that match those in ``look_for``.
-    """
+    """Remove points from ``arr`` that match those in ``look_for``."""
     return compare_2d(arr, look_for, invert=True, return_idx=False)
 
 

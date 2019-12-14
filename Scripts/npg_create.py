@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""
-==========
+r"""\
+
 npg_create
-==========
+----------
 
 Script :
     npg_create.py
@@ -11,16 +11,19 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2019-09-06
+    2019-12-12
 
-Purpose :
-    Tools for creating arrays of various geometric shapes
+Purpose
+-------
+Tools for creating arrays of various geometric shapes.
 
 Notes
 -----
 Originally part of the `arraytools` module.
 
 References
+----------
+None yet.
 
 """
 # pylint: disable=C0103  # invalid-name
@@ -58,8 +61,11 @@ __all__ = ['code_grid', 'rot_matrix',
 
 
 def code_grid(cols=1, rows=1, zero_based=False, shaped=True, bottom_up=False):
-    """produce spreadsheet like labelling, either zero or 1 based
-    see: code_grid.py for more details
+    """Produce spreadsheet like labelling, either zero or 1 based.
+
+    See Also
+    --------
+    ``code_grid.py`` for more details
     """
     alph = list(" ABCDEFGHIJKLMNOPQRSTUVWXYZ")
     UC = [("{}{}").format(alph[i], alph[j]).strip()
@@ -81,7 +87,7 @@ def code_grid(cols=1, rows=1, zero_based=False, shaped=True, bottom_up=False):
 # ---- helpers ---- rot_matrix -----------------------------------------------
 #
 def rot_matrix(angle=0, nm_3=False):
-    """Return the rotation matrix given points and rotation angle
+    """Return the rotation matrix given points and rotation angle.
 
     Parameters
     ----------
@@ -110,7 +116,7 @@ def rot_matrix(angle=0, nm_3=False):
 #      triangle, xy-grid --
 #
 def arc_(radius=100, start=0, stop=1, step=0.1, xc=0.0, yc=0.0):
-    """Create an arc from a specified radius, centre and start/stop angles
+    """Create an arc from a specified radius, centre and start/stop angles.
 
     Parameters
     ----------
@@ -139,7 +145,7 @@ def arc_(radius=100, start=0, stop=1, step=0.1, xc=0.0, yc=0.0):
 
 
 def arc_sector(outer=10, inner=9, start=1, stop=6, step=0.1):
-    """Form an arc sector bounded by a distance specified by two radii
+    """Form an arc sector bounded by a distance specified by two radii.
 
     Parameters
     ----------
@@ -233,8 +239,7 @@ def circle_mini(radius=1.0, theta=10.0, xc=0.0, yc=0.0):
 
 
 def circle_ring(outer=100, inner=0, theta=10, rot=0, scale=1, xc=0.0, yc=0.0):
-    """Create a multi-ring buffer around a center point (xc, yc).  AKA, a
-    buffer ring.
+    """Create a multi-ring buffer around a center point (xc, yc).
 
     Parameters
     ----------
@@ -271,15 +276,19 @@ def circle_ring(outer=100, inner=0, theta=10, rot=0, scale=1, xc=0.0, yc=0.0):
 
 
 def circ_3pa(arr):
-    """same as circ3p but with 3 pnt arr"""
+    """Return a circle given a 3 point array.
+
+    This is the same as ``circ3p`` but with a 3 pnt arr.
+    """
     p, q, r = arr
     cx, cy, radius = circ_3p(p, q, r)
     return cx, cy, radius
 
 
 def circ_3p(p, q, r):
-    """Three point circle center and radius.  A check is made for three points
-    on a line.
+    """Return a three point circle center and radius.
+
+    A check is made for three points on a line.
     """
     temp = q[0] * q[0] + q[1] * q[1]
     bc = (p[0] * p[0] + p[1] * p[1] - temp) / 2
@@ -338,8 +347,7 @@ def hex_flat(dx=1, dy=1, cols=1, rows=1):
 
 
 def hex_pointy(dx=1, dy=1, cols=1, rows=1):
-    """Pointy hex angles, convert to sin, cos, zip and send.  Also called
-    ``traverse hexagons`` by some.
+    """Create pointy hexagons. Also called ``traverse hexagons``.
 
     Parameters
     ----------
@@ -364,7 +372,7 @@ def hex_pointy(dx=1, dy=1, cols=1, rows=1):
 
 
 def mesh_xy(L=0, B=0, R=5, T=5, dx=1, dy=1, as_rec=True):
-    """Create a mesh of coordinates within the specified X, Y ranges
+    """Create a mesh of coordinates within the specified X, Y ranges.
 
     Parameters
     ----------
@@ -396,7 +404,7 @@ def mesh_xy(L=0, B=0, R=5, T=5, dx=1, dy=1, as_rec=True):
 
 
 def pyramid(core=9, steps=10, incr=(1, 1), posi=True):
-    """Create a pyramid see pyramid_demo.py"""
+    """Create a pyramid.  See pyramid_demo.py."""
     a = np.array([core])
     a = np.atleast_2d(a)
     for i in range(1, steps):
@@ -460,7 +468,8 @@ def triangle(dx=1, dy=1, cols=1, rows=1):
 
 
 def pnt_from_dist_bearing(orig=(0, 0), bearings=None, dists=None, prn=False):
-    """Point locations given distance and bearing from an origin.
+    """Return point locations given distance and bearing from an origin.
+
     Calculate the point coordinates from distance and angle.
 
     References
@@ -530,8 +539,10 @@ def pnt_from_dist_bearing(orig=(0, 0), bearings=None, dists=None, prn=False):
 
 
 def xy_grid(x, y=None, top_left=True):
-    """Create a 2D array of locations from x, y values.  The values need not
-    be uniformly spaced just sequential. Derived from `meshgrid` in References.
+    """Create a 2D array of locations from x, y values.
+
+    The values need not  be uniformly spaced just sequential.
+    Derived from `meshgrid` in References.
 
     Parameters
     ----------
@@ -565,8 +576,9 @@ def xy_grid(x, y=None, top_left=True):
 
 def transect_lines(N=5, orig=None, dist=1, x_offset=0, y_offset=0,
                    bearing=0, as_ndarray=True):
-    """Construct transect lines from origin-destination points given a
-    distance and bearing from the origin point.
+    """Construct transect lines from origin-destination points.
+
+    The distance and bearings are from the origin point.
 
     Parameters
     ----------
@@ -642,7 +654,7 @@ def transect_lines(N=5, orig=None, dist=1, x_offset=0, y_offset=0,
     /xy-to-line.htm>`_.
     """
     def _array_struct_(a, fld_names=['X', 'Y'], kinds=['<f8', '<f8']):
-        """Convert an array to a structured array"""
+        """Convert an array to a structured array."""
         dts = list(zip(fld_names, kinds))
         z = np.zeros((a.shape[0],), dtype=dts)
         for i in range(a.shape[1]):
@@ -680,8 +692,7 @@ def transect_lines(N=5, orig=None, dist=1, x_offset=0, y_offset=0,
 
 
 def spiral_archim(pnts, n, inward=False, clockwise=True):
-    """Create an Archimedes spiral in the range 0 to N points with 'n' steps
-    between each incrementstep.  You could use np.linspace.
+    """Create an Archimedes spiral in the range 0 to N points with 'n' steps.
 
     Parameters
     ----------
@@ -717,8 +728,9 @@ def spiral_archim(pnts, n, inward=False, clockwise=True):
 
 
 def repeat(seed=None, corner=[0, 0], cols=1, rows=1, angle=0):
-    """Create the array of pnts to pass on to arcpy using numpy magic to
-    produce a fishnet of the desired in_shp.
+    """Create the array of pnts to pass on to arcpy .
+
+    Numpy magic is used to produce a fishnet of the desired in_shp.
 
     Parameters
     ----------
@@ -753,7 +765,10 @@ def repeat(seed=None, corner=[0, 0], cols=1, rows=1, angle=0):
 
 
 def mini_weave(n):
-    """
+    """Inter-weave two arrays of ``n`` segments.
+
+    Parameters
+    ----------
     n : segments
        z is sliced to ensure compliance
 

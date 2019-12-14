@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""
-=========
+r"""\
+
 npg_table
-=========
+---------
 
 Script :
     npg_table.py
@@ -11,7 +11,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2019-11-21
+    2019-12-12
 
 Purpose :
     Tools for working with tabular data in the Geo class.
@@ -106,6 +106,7 @@ flotsam = ' !"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~'  # including the space
 #
 def nd2struct(a, fld_names=None):
     """Return a view of an ndarray as structured array with a uniform dtype.
+
     Same as unstructured_to_structured in np.lib.recfunctions.
 
     Parameters
@@ -156,8 +157,10 @@ def nd2struct(a, fld_names=None):
 
 
 def struct2nd(a):
-    """Return a view of a structured array of a uniform dtype to a regular
-    ndarray using the the first column dtype and length/number of columns.
+    """Return a view of a structured array.
+
+    The array must have a uniform dtype.  The view will be an ndarray
+    using the the first column dtype and length/number of columns.
 
     Parameters
     ----------
@@ -179,7 +182,8 @@ def struct2nd(a):
 #
 def _field_specs(a):
     """Produce a list of name/dtype pairs for fields in a structured array.
-    Derived from rfn._get_fieldspec
+
+    Derived from rfn._get_fieldspec.
     The input is a structured array `a`, rather than the dtype
 
     Parameters
@@ -197,7 +201,7 @@ def _field_specs(a):
     >>> _field_specs(z0)
     ... [('a', dtype('int32')), ('b', dtype('int32')), ('c', dtype('int32'))]
 
-    See also
+    See Also
     --------
     np.lib.recfunctions _get_fieldspec(dtype) for more information.
     """
@@ -211,8 +215,9 @@ def _field_specs(a):
 
 
 def _append_fields(a, fld_names, fld_values=None):
-    """Add fields to an existing structured array returning a new array with
-    the new field(s).
+    """Add fields to an existing structured array.
+
+    A new array with new field(s) will be returned.
 
     If the number of rows in the destination array and the
     number of fld_values are not equal a ValueError will be returned.
@@ -255,7 +260,7 @@ def _append_fields(a, fld_names, fld_values=None):
 
 
 def _fill_fields(in_arr, out_arr):
-    """Fill an output array fields from an input array selection
+    """Fill an output array fields from an input array selection.
 
     Parameters
     ----------
@@ -301,8 +306,9 @@ def keep_fields_by_name(in_arr, names):
 
 
 def keep_fields_by_kind(in_arr, field_kind=("i", "f", "U")):
-    """Reorder fields in a structured array by type and returns those that meet
-    the requirement.
+    """Reorder fields in a structured array by type.
+
+    The array returned will meet those requirements.
 
     Parameters
     ----------
@@ -376,8 +382,7 @@ def merge_arrays(a, others):
 # ---- Crosstabulation tools -------------------------------------------------
 # ---- fancy print/string formatter for crosstabulation and pivot
 def _prn(r, c, a, stat_name="Total"):
-    """Fancy print formatting.
-    """
+    """Fancy print formatting."""
     r = r.tolist()
     r.append(stat_name)
     c = c.tolist()
@@ -395,7 +400,7 @@ def _prn(r, c, a, stat_name="Total"):
 
 
 def _as_pivot(a):
-    """Used by ``crosstab_tbl``. Present results in pivot table format."""
+    """Present results in pivot table format. Used by ``crosstab_tbl``."""
     if a.dtype.fields is None:
         print("\n...\nStructured array with field names is required")
         return a
@@ -458,8 +463,9 @@ def crosstab_tbl(in_tbl, flds=None, as_pivot=True):
 
 # ---- (2) from two, 1D numpy ndarrays
 def crosstab_rc(row, col, reclassed=False):
-    """Crosstabulate 2 data arrays, shape (N,), using np.unique.
-    scipy.sparse has similar functionality and is faster for large arrays.
+    """Crosstabulate 2 data arrays, with shape (N,), using np.unique.
+
+    Scipy.sparse has similar functionality and is faster for large arrays.
 
     Parameters
     ----------
@@ -530,8 +536,9 @@ def crosstab_array(a, flds=None):
 # ---- Summarize tools -------------------------------------------------------
 # ---- (1) statistics functions
 def calc_stats(arr, axis=None, deci=4):
-    """Calculate stats for an array of number types, with nodata (nan, None)
-    in the column.
+    """Calculate stats for numeric arrays which may contain `nodata`.
+
+    No data will be reflected as `nan` or `None` in the column.
 
     Notes
     -----
@@ -577,8 +584,7 @@ def calc_stats(arr, axis=None, deci=4):
 
 
 def _get_numeric_fields(a, fields):
-    """Determine numeric fields in a structured/recarray.
-    """
+    """Determine numeric fields in a structured/recarray."""
     num_flds = []
     dt_names = a.dtype.names
     dt_kind = a.dtype.kind
@@ -599,9 +605,11 @@ def _get_numeric_fields(a, fields):
 
 
 def col_stats(a, fields=None, deci=2, verbose=False):
-    """Calculate statistics for a structured/recarray with or without specified
-    fields.  Efforts have been made to check for all possible scenarios, but
-    human intelligence should prevail when one decides what to throw at it.
+    """Calculate statistics for a structured/recarray.
+
+    The fields need not be specified.  Efforts have been made to check for all
+    possible scenarios, but human intelligence should prevail when one decides
+    what to throw at it.
 
     Parameters
     ----------
@@ -692,10 +700,12 @@ def group_stats(a, case_fld=None, num_flds=None, deci=2, verbose=False):
 # ---- finding tools -------------------------------------------------------
 # ---- (1) find array in array (ndarray or structured array version)
 def find_a_in_b(a, b, fld_names=None):
-    """Find the indices of the elements in a smaller 2d array contained in
-    a larger 2d array. If the arrays are stuctured with field names,then these
-    need to be specified.  It should go without saying that the dtypes need to
-    be the same.
+    """Find the indices of the elements between two, 2D arrays.
+
+    Normally you are looking for elements in the smaller 2d array that are
+    contained in the larger 2d array. If the arrays are stuctured with field
+    names,then these need to be specified.  It should go without saying that
+    the dtypes need to be the same.
 
     Parameters
     ----------
@@ -728,7 +738,7 @@ def find_a_in_b(a, b, fld_names=None):
     several-values-in-a-numpy-array/38674038#38674038>`_.
     """
     def struct2nd(a):
-        """from the same name in arraytools"""
+        """Based on the same function in arraytools."""
         return a.view((a.dtype[0], len(a.dtype.names)))
     #
     msg0 = "The array to search requires a dtype with field names"
@@ -758,7 +768,7 @@ def find_a_in_b(a, b, fld_names=None):
 
 # ---- (2) find object in array (structured array version)
 def find_in(a, col, what, where="in", any_case=True, pull="all"):
-    """Query a recarray/structured array for values
+    """Query a recarray/structured array for values.
 
     Parameters
     ----------
@@ -834,17 +844,18 @@ def find_in(a, col, what, where="in", any_case=True, pull="all"):
 # ---- sorting and slicing --------------------------------------------------
 # ---- (1) row sorting and slicing
 def split_sort_slice(a, split_fld=None, order_fld=None):
-    """Split a structured array into groups of common values based on the
-    split_fld, key field.  Once the array is split, the array is sorted on a
-    val_fld and sliced for the largest or smallest `num` records.
+    """Split a structured array into groups of common values.
+
+    The common values are based on the key field, `split_fld`.  Once the array
+    is split, the array is sorted on the `order_fld` and sliced for the
+    largest or smallest `num` records.
 
     See Also
     --------
     Documentation is shown in `group_sort`
-
     """
     def _split_(a, fld):
-        """split unsorted array"""
+        """Split unsorted array."""
         out = []
         uni, _ = np.unique(a[fld], True)
         for _, j in enumerate(uni):
@@ -887,9 +898,10 @@ def split_sort_slice(a, split_fld=None, order_fld=None):
 
 # ---- (2) group, then sort with group
 def group_sort(a, group_fld, sort_fld=None, ascend=True, sort_name=None):
-    """Group records in an structured array and sort on the sort_field.  The
-    order of the grouping field will be in ascending order, but the order of
-    the sort_fld can sort internally within the group.
+    """Group records in an structured array and sort on the sort_field.
+
+    The order of the grouping field will be in ascending order, but the order
+    of the sort_fld can sort internally within the group.
 
     Parameters
     ----------
@@ -941,8 +953,7 @@ def group_sort(a, group_fld, sort_fld=None, ascend=True, sort_name=None):
 
 # ---- (3) n-largest/smallest
 def n_largest_vals(a, group_fld=None, val_fld=None, num=1):
-    """Run `split_sort_slice` to get the N largest values in the array.
-    """
+    """Run `split_sort_slice` to get the N largest values in the array."""
     ordered = split_sort_slice(a, split_fld=group_fld, order_fld=val_fld)
     final = []
     for r in ordered:
@@ -953,8 +964,7 @@ def n_largest_vals(a, group_fld=None, val_fld=None, num=1):
 
 
 def n_smallest_vals(a, group_fld=None, val_fld=None, num=1):
-    """Run `split_sort_slice` to get the N smallest values in the array.
-    """
+    """Run `split_sort_slice` to get the N smallest values in the array."""
     ordered = split_sort_slice(a, split_fld=group_fld, order_fld=val_fld)
     final = []
     for r in ordered:
@@ -966,8 +976,9 @@ def n_smallest_vals(a, group_fld=None, val_fld=None, num=1):
 # ---- to organize-----------------------------------------------------------
 # ---- running count
 def running_count(a, to_label=False):
-    """Perform a running count on a 1D array identifying the order number
-    of the value in the sequence.
+    """Perform a running count on a 1D array.
+
+    The order number of the value in the sequence is returned.
 
     Parameters
     ----------
@@ -1065,7 +1076,7 @@ def sequences(data, stepsize=0):
         >>> # array([1, 0, 3, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0])
 
     References
-    -----------
+    ----------
     `<https://stackoverflow.com/questions/7352684/how-to-find-the-groups-of-
     sequences-elements-from-an-array-in-numpy>`__.
     """
@@ -1090,9 +1101,10 @@ def sequences(data, stepsize=0):
 
 
 def remove_seq_dupl(a):
-    """Remove sequential duplicates from an array.  The array is stacked with
-    the first value in the sequence to retain it.  Designed to removed
-    sequential duplicates in point arrays.
+    """Remove sequential duplicates from an array.
+
+    The array is stacked with the first value in the sequence to retain it.
+    Designed to removed sequential duplicates in point arrays.
     """
     uni = a[np.where(a[:-1] != a[1:])[0] + 1]
     if a.ndim == 1:
@@ -1101,7 +1113,8 @@ def remove_seq_dupl(a):
         uni = np.vstack((a[0], uni))
     uni = np.ascontiguousarray(uni)
     return uni
-#
+
+
 # ==== Processing finished ====
 # ===========================================================================
 #
