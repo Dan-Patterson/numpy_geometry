@@ -18,15 +18,43 @@ required: g, IFT, Kind
 ----
 ```
 g      the ndarray of xy coordinates
-g.IFT  Id, From, To - shape ID, from-to points in the shape
-[[ 1  0  5  1  1  0]
- [ 1  5 10  0  1  1]
- [ 1 10 14  0  1  2]
- ...
- [ 2 50 54  0  2  2]
- [ 2 54 58  0  2  3]
- [ 3 58 62  1  1  0]]
+g.T  # ---- g.T shown
+# ---- Geo[[Xs], [Ys]]
 
+Geo([[ 10.0,  10.0,  1.5,  0.0,  10.0,  3.0,  3.0,  9.0,  9.0,  3.0,  2.0,
+       1.0,  2.0,  2.0,  2.0,  1.0,  1.0,  2.0,  8.0,  8.0,  4.0,  5.0,  8.0,
+       6.0,  5.0,  7.0,  6.0,  25.0,  25.0,  15.0,  15.0,  23.0,  23.0,  15.0,
+       15.0,  25.0,  20.0,  20.0,  12.0,  12.0,  20.0,  20.0,  10.0,  10.0,
+       14.0,  20.0,  11.0,  12.0,  12.0,  11.0,  10.5,  10.5,  11.5,  10.5,
+       10.5,  10.5,  11.5,  10.5,  14.0,  10.0,  15.0,  14.0],
+     [ 10.0,  0.0,  1.5,  10.0,  10.0,  9.0,  3.0,  3.0,  9.0,  9.0,  7.0,
+       7.0,  5.0,  7.0,  8.0,  9.0,  8.0,  8.0,  8.0,  4.0,  4.0,  7.0,  8.0,
+       7.0,  5.0,  5.0,  7.0,  14.0,  4.0,  4.0,  6.0,  6.0,  12.0,  12.0,
+       14.0,  14.0,  10.0,  8.0,  8.0,  2.0,  2.0,  0.0,  0.0,  10.0,  10.0,
+       10.0,  9.0,  8.5,  9.0,  9.0,  8.5,  7.0,  7.0,  8.5,  2.0,  0.5,  0.5,
+       2.0,  10.0,  10.0,  18.0,  10.0]])
+```
+The structure and relationships between the array elements is given in the ``IFT`` property.
+
+g.IFT  ==> Id, From, To - shape ID, from-to points in the shape
+
+```
+g.IFT
+array([[ 1,  0,  5,  1,  1,  0],
+       [ 1,  5, 10,  0,  1,  1],
+       [ 1, 10, 14,  0,  1,  2],
+       [ 1, 14, 18,  0,  1,  3],
+       [ 1, 18, 23,  1,  2,  0],
+       [ 1, 23, 27,  0,  2,  1],
+       [ 2, 27, 36,  1,  1,  0],
+       [ 2, 36, 46,  1,  2,  0],
+       [ 2, 46, 50,  0,  2,  1],
+       [ 2, 50, 54,  0,  2,  2],
+       [ 2, 54, 58,  0,  2,  3],
+       [ 3, 58, 62,  1,  1,  0]], dtype=int64)
+```
+Geo array ==> shape identification (IDs), from (FR), to (To), clockwise (CW), part ids (PID), bit ids (Bit), from-to (FT), shape type (K), information string (Info)
+```
 g.IDs  IFT[:, 0]   shape identifier
 [1 1 1 ... 2 2 3]
 
@@ -60,6 +88,13 @@ g.Info ... test ... extra information string
 
 **Derived Properties**
 ----
+shape, part, and bit        : N, part_cnt, bit_cnt
+
+shape, part and bit ids     : shp_ids, part_ids, bit_ids
+
+shape, part and bit counts  : shp_IFT, part_IFT, bit_IFT
+
+x, y and XY coordinates     : X, Y, XY)
 ```
 - sample size, unique shapes
 g.N ... 3 ...  len(uni)   #  uni, idx = np.unique(arr.IDs, True)
