@@ -113,7 +113,7 @@ array([[  1,   0,   5,   1,   1,   0],
 ```
 I added another method to the pack to expand upon the IFT information. 
 ```
-**g.info**  # ---- g.info returns extent, shape, part, point and structure information
+g.info  # ---- g.info returns extent, shape, part, point and structure information
 --------------
 Extents :
   LL [ 300000. 5000000.]
@@ -135,7 +135,7 @@ Points :   145
 ```
 There is an alternate approach...
 ```
-**npg.prn_tbl(g.IFT_str)**
+npg.prn_tbl(g.IFT_str)
 
 OID_    From_pnt    To_pnt    Ring_type    Part_ID    Bit_seq  
 --------------------------------------------------------------------
