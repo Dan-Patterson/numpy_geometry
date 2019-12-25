@@ -49,7 +49,7 @@ The point coordinates with (300,000 m, 5,000,000 m, MTM 9) subtracted from their
 ```
  npg.prn_geo(g)  # ---- Geo array representation of a polygon featureclass
 
- pnt shape  part  X       Y     
+ pnt shape  part     X       Y     
 --------------------------------
  000     1         10.00   10.00  first point of outer ring
  001     1         10.00    0.00
@@ -137,7 +137,7 @@ There is an alternate approach...
 ```
 npg.prn_tbl(g.IFT_str)
 
-OID_    From_pnt    To_pnt    Ring_type    Part_ID    Bit_seq  
+...    OID_    From_pnt    To_pnt    Ring_type    Part_ID    Bit_seq  
 --------------------------------------------------------------------
  000      1           0         5            1          1          0
  001      1           5        10            0          1          1
