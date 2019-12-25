@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
-r"""\
-
+r"""
+-----------
 npg_helpers
 -----------
+
+General helper functions.
+
+----
 
 Script :
     npg_helpers.py
@@ -34,6 +38,8 @@ import sys
 # from textwrap import dedent
 
 import numpy as np
+
+__all__ = ['compare_2d']
 
 
 def compare_2d(arr, look_for, unique=True, invert=False, return_idx=False):
@@ -79,10 +85,7 @@ def compare_2d(arr, look_for, unique=True, invert=False, return_idx=False):
 
 
 def keep_points(arr, look_for, **kwargs):
-    """Keep points in ``arr`` that match those in ``look_for``.
-
-    See ``compare_2d``
-    """
+    """Keep points in ``arr`` that match those in ``look_for``."""
     return compare_2d(arr, look_for, invert=False, return_idx=False)
 
 
@@ -96,5 +99,5 @@ script = sys.argv[0]  # print this should you need to locate the script
 # ---- main section
 if __name__ == "__main__":
     """optional location for parameters"""
-    in_fc = r"C:\Git_Dan\npgeom\npgeom.gdb\Polygons"
-    in_fc = r"C:\Git_Dan\npgeom\npgeom.gdb\Polygons2"
+    in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\Polygons"
+    in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\Polygons2"

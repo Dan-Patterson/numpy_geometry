@@ -1,10 +1,14 @@
 # -*- coding: UTF-8 -*-
-"""Sample scatterplot and line plotting, in 2D and 3D.
+"""
+---------
+npg_plots
+---------
+
+Sample scatterplot and line plots, in 2D and 3D.
 
 The Geo class is used for the input arrays.
 
-npg_plots
----------
+----
 
 Script :
     npg_plots.py
@@ -13,11 +17,13 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2019-12-12
+    2019-12-19
 
 Purpose
 -------
-Sample scatterplot and line plotting, in 2D and 3D
+Sample scatterplot and line plotting, in 2D and 3D.
+alterior motive is to also represent the line and polygon geometries as
+... ``graphs``.
 
 Notes
 -----
@@ -39,6 +45,10 @@ References
 `<https://matplotlib.org/api/_as_gen/matplotlib.pyplot.figure.html>`_.
 
 `<https://matplotlib.org/api/_as_gen/matplotlib.pyplot.subplots.html>`_.
+
+`random color discussion
+<https://stackoverflow.com/questions/14720331/how-to-generate-random-
+colors-in-matplotlib>`_.
 
 """
 # ---- imports, formats, constants ----
@@ -62,7 +72,7 @@ np.ma.masked_print_option.set_display('-')
 
 script = sys.argv[0]
 
-__all__ = ['plot_2d', 'plot_3d']
+__all__ = ['plot_2d', 'plot_3d', 'plot_polygons', 'plot_mesh']
 
 
 # ---- functions ----
@@ -244,27 +254,68 @@ def plot_3d(a):
 
 
 def plot_polygons(arr, outline=True):
-    """Plot poly boundaries.
+    """Plot Geo array poly boundaries.
 
-    When using the Geo class, pass `arr.bits` to it.
+    Parameters
+    ----------
+    arr : ndarray or Geo array
+        If the arrays is a Geo array, it will convert it to `arr.bits`.
+    outline : boolean
+        True, returns the outline of the polygon.  False, fills the polygon
+
+    References
+    ----------
+    `random color generation in matplotlib
+    <https://stackoverflow.com/questions/14720331/how-to-generate-random-
+    colors-in-matplotlib>`_.
+
+    See module docs for general references.
     """
     def _line(p, plt):  # , arrow=True):  # , color, marker, linewdth):
         """Connect the points."""
         X, Y = p[:, 0], p[:, 1]
         plt.plot(X, Y, color='black', linestyle='solid', linewidth=2)
-#        if arrow:
-#            plt.arrow(X, Y, 0.2, 0.2)
-
+    # ----
+    if hasattr(arr, 'IFT'):
+        cw = arr.CW
+        shapes = arr.bits
+    else:
+        shapes = np.copy(arr)
     fig, ax = plt.subplots(1, 1)
+    plt.tight_layout(pad=0.2, h_pad=0.1, w_pad=0.1)
     ax.set_aspect('equal', adjustable='box')
-    for shape in arr:
-        if outline:
-            _line(shape, plt)  # see line for options
+    # cmap = plt.cm.get_cmap(plt.cm.viridis, 143)  # default colormap
+    cmap = plt.cm.get_cmap('hsv', len(shapes))
+    for i, shape in enumerate(shapes):
+        if outline:   # _line(shape, plt)  # alternate, see line for options
+            plt.fill(*zip(*shape), facecolor='none', edgecolor='black',
+                     linewidth=3)
         else:
-            plt.fill(*zip(*shape))
+            if cw[i] == 0:
+                clr = "w"
+            else:
+                clr = cmap(i)  # clr=np.random.random(3,)  # clr = "b"
+            plt.fill(*zip(*shape), facecolor=clr)
+    # ----
     plt.show()
+    return plt
 
 
+# def preamble(fo):
+#     """The SVG preamble and styles.
+
+#     https://scipython.com/blog/depicting-a-torus-as-an-svg-image/
+#     """
+#     print('<?xml version="1.0" encoding="utf-8"?>\n'
+#           '<svg xmlns="http://www.w3.org/2000/svg"\n' + ' '*5 +
+#           'xmlns:xlink="http://www.w3.org/1999/xlink" width="{}" height="{}" >'.format(width, height), file=fo)
+
+#     print("""
+#         <defs>
+#         <style type="text/css"><![CDATA[""", file=fo)
+#     print('path {stroke-width: 1.5px; stroke: #000;}', file=fo)
+#     print("""]]></style>
+#     </defs>""", file=fo)
 def plot_mesh(x=None, y=None, ax=None):
     """Plot a meshgrid/fishnet given x and y ranges.
 
@@ -275,15 +326,13 @@ def plot_mesh(x=None, y=None, ax=None):
     Requires
     --------
     If not initially imported, add this to the script or function.
-    
     >>> from matplotlib.collections import LineCollection
-    
+
     https://stackoverflow.com/questions/47295473/how-to-plot-using-
     matplotlib-python-colahs-deformed-grid
     """
     if x is None or y is None:
-        x, y = np.meshgrid(np.linspace(0,1, 11), np.linspace(0, 0.6, 7))
-        
+        x, y = np.meshgrid(np.linspace(0, 1, 11), np.linspace(0, 0.6, 7))
     segs1 = np.stack((x[:, [0, -1]], y[:, [0, -1]]), axis=2)
     segs2 = np.stack((x[[0, -1], :].T, y[[0, -1], :].T), axis=2)
     # fig, ax = plt.subplots(1, 1)
@@ -368,6 +417,173 @@ def _demo():
             ax_lbls=None, pnt_labels=True)
     return a
 
+
+# ----------------------------------------------------------------------
+def svg(self, scale_factor=1, fill_color=None):
+    if self.is_empty:
+        return '<g />'
+    if fill_color is None:
+        fill_color = "#66cc99" if self.is_valid else "#ff3333"
+    rings = []
+    s = ""
+    for ring in self['rings']:
+        rings = ring
+        exterior_coords = [
+            ["{},{}".format(*c) for c in rings]]
+        path = " ".join([
+            "M {} L {} z".format(coords[0], " L ".join(coords[1:]))
+            for coords in exterior_coords])
+        s += (
+            '<path fill-rule="evenodd" fill="{2}" stroke="#555555" '
+            'stroke-width="{0}" opacity="0.6" d="{1}" />'
+        ).format(2. * scale_factor, path, fill_color)
+    return s
+
+
+'''
+_repr_svg_
+
+# r"C:/arc_pro/bin/Python/envs/arcgispro-py3/Lib/site-packages/arcgis/
+geometry/_types.py"
+
+line 391
+
+
+def _repr_svg_(self):
+    """SVG representation for iPython notebook"""
+    svg_top = '<svg xmlns="http://www.w3.org/2000/svg" ' \
+        'xmlns:xlink="http://www.w3.org/1999/xlink" '
+    if self.is_empty:
+        return svg_top + '/>'
+    else:
+        # Establish SVG canvas that will fit all the data + small space
+        xmin, ymin, xmax, ymax = self.extent
+        if xmin == xmax and ymin == ymax:
+            # This is a point; buffer using an arbitrary size
+            xmin, ymin, xmax, ymax = self.buffer(1).extent
+        else:
+            # Expand bounds by a fraction of the data ranges
+            expand = 0.04  # or 4%, same as R plots
+            widest_part = max([xmax - xmin, ymax - ymin])
+            expand_amount = widest_part * expand
+            xmin -= expand_amount
+            ymin -= expand_amount
+            xmax += expand_amount
+            ymax += expand_amount
+        dx = xmax - xmin
+        dy = ymax - ymin
+        width = min([max([100., dx]), 300])
+        height = min([max([100., dy]), 300])
+        try:
+            scale_factor = max([dx, dy]) / max([width, height])
+        except ZeroDivisionError:
+            scale_factor = 1.
+        view_box = "{0} {1} {2} {3}".format(xmin, ymin, dx, dy)
+        transform = "matrix(1,0,0,-1,0,{0})".format(ymax + ymin)
+        return svg_top + (
+            'width="{1}" height="{2}" viewBox="{0}" '
+            'preserveAspectRatio="xMinYMin meet">'
+            '<g transform="{3}">{4}</g></svg>').format(view_box, width,
+                                                       height, transform,
+                                                       self.svg(scale_factor)
+                                                       )
+
+
+
+multipoint svg
+
+#----------------------------------------------------------------------
+def svg(self, scale_factor=1., fill_color=None):
+    """Returns a group of SVG circle elements for the MultiPoint geometry.
+
+    Parameters
+    ==========
+    scale_factor : float
+        Multiplication factor for the SVG circle diameters.  Default is 1.
+    fill_color : str, optional
+        Hex string for fill color. Default is to use "#66cc99" if
+        geometry is valid, and "#ff3333" if invalid.
+    """
+    if self.is_empty:
+        return '<g />'
+    if fill_color is None:
+        fill_color = "#66cc99" if self.is_valid else "#ff3333"
+    return '<g>' + \
+           ''.join(('<circle cx="{0.x}" cy="{0.y}" r="{1}" '
+                    'stroke="#555555" stroke-width="{2}" fill="{3}" opacity="0.6" />'
+                    ).format(Point({'x': p[0], 'y': p[1]}), 3 * scale_factor, 1 * scale_factor, fill_color) \
+                   for p in self['points']) + \
+           '</g>'
+               
+point svg
+    def svg(self, scale_factor=1, fill_color=None):
+        """Returns SVG circle element for the Point geometry.
+
+        Parameters
+        ==========
+        scale_factor : float
+            Multiplication factor for the SVG circle diameter.  Default is 1.
+        fill_color : str, optional
+            Hex string for fill color. Default is to use "#66cc99" if
+            geometry is valid, and "#ff3333" if invalid.
+        """
+        if self.is_empty:
+            return '<g />'
+        if fill_color is None:
+            fill_color = "#66cc99" if self.is_valid else "#ff3333"
+        return (
+            '<circle cx="{0.x}" cy="{0.y}" r="{1}" '
+            'stroke="#555555" stroke-width="{2}" fill="{3}" opacity="0.6" />'
+            ).format(self, 3 * scale_factor, 1 * scale_factor, fill_color)
+
+polygon svg
+    #----------------------------------------------------------------------
+    def svg(self, scale_factor=1,fill_color=None):
+        if self.is_empty:
+            return '<g />'
+        if fill_color is None:
+            fill_color = "#66cc99" if self.is_valid else "#ff3333"
+        rings = []
+        s = ""
+        for ring in self['rings']:
+            rings = ring
+            exterior_coords = [
+                ["{},{}".format(*c) for c in rings]]
+            path = " ".join([
+                "M {} L {} z".format(coords[0], " L ".join(coords[1:]))
+                for coords in exterior_coords])
+            s += (
+            '<path fill-rule="evenodd" fill="{2}" stroke="#555555" '
+            'stroke-width="{0}" opacity="0.6" d="{1}" />'
+            ).format(2. * scale_factor, path, fill_color)
+        return s
+
+
+polyline svg
+    def svg(self, scale_factor=1, stroke_color=None):
+        """Returns SVG polyline element for the LineString geometry.
+
+        Parameters
+        ==========
+        scale_factor : float
+            Multiplication factor for the SVG stroke-width.  Default is 1.
+        stroke_color : str, optional
+            Hex string for stroke color. Default is to use "#66cc99" if
+            geometry is valid, and "#ff3333" if invalid.
+        """
+        if self.is_empty:
+            return '<g />'
+        if stroke_color is None:
+            stroke_color = "#66cc99" if self.is_valid else "#ff3333"
+        paths = []
+        for path in self['paths']:
+            pnt_format = " ".join(["{0},{1}".format(*c) for c in path])
+            s = ('<polyline fill="none" stroke="{2}" stroke-width="{1}" '
+                 'points="{0}" opacity="0.8" />').format(pnt_format, 2. * scale_factor, stroke_color)
+            paths.append(s)
+        return "<g>" + "".join(paths) + "</g>"
+
+'''
 
 # ---------------------------------------------------------------------
 if __name__ == "__main__":

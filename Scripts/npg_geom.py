@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
-"""Geometry focused methods that work with Geo arrays or np.ndarrays.
+"""
+--------------------------------------
+  npg_geom: Geometry focused methods
+--------------------------------------
 
-npg_geom
---------
+Geometry focused methods that work with Geo arrays or np.ndarrays.
+
+----
 
 Script :
     npg_geom.py
@@ -53,14 +57,10 @@ See comment by Serge Tolstov in:
 -origin-edge-case>`_.
 """
 
-# pylint: disable=R0904  # pylint issue
-# pylint: disable=C0103  # invalid-name
-# pylint: disable=E0611  # stifle the arcgisscripting
-# pylint: disable=R0914  # Too many local variables
-# pylint: disable=R1710  # inconsistent-return-statements
-# pylint: disable=W0105  # string statement has no effect
-# pylint: disable=W0201  # attribute defined outside __init__... none in numpy
-# pylint: disable=W0621  # redefining name
+# pylint: disable=C0103, C0302, C0326, C0415, E0611, E1136, E1121
+# pylint: disable=R0904, R0914
+# pylint: disable=W0201, W0212, W0221, W0612, W0621, W0105
+# pylint: disable=R0902
 
 import sys
 import numpy as np
@@ -84,15 +84,16 @@ np.ma.masked_print_option.set_display('-')  # change to a single -
 
 script = sys.argv[0]  # print this should you need to locate the script
 
-__all__ = ['extent_to_poly',
-           '_area_centroid_', '_angles_', '_angles2_',
-           '_ch_scipy_', '_ch_simple_', '_ch_',
-           '_dist_along_', '_percent_along_', '_pnts_on_line_',
-           '_polys_to_unique_pnts_', '_simplify_lines_',
-           '_pnts_in_poly_', '_pnt_on_poly_', '_pnt_on_segment_', 'p_o_p',
-           '_rotate_', '_tri_pnts_', '_crossing_num_', 'p_in_p',
-           'in_hole_check', 'pnts_in_pnts'
-           ]
+__all__ = [
+    'extent_to_poly', 'eucl_dist',
+    '_area_centroid_', '_angles_', '_angles2_',
+    '_ch_scipy_', '_ch_simple_', '_ch_',
+    '_dist_along_', '_percent_along_', '_pnts_on_line_',
+    '_polys_to_unique_pnts_', '_simplify_lines_',
+    '_pnts_in_poly_', '_pnt_on_poly_', '_pnt_on_segment_', 'p_o_p',
+    '_rotate_', '_tri_pnts_', '_crossing_num_', 'p_in_p',
+    'in_hole_check', 'pnts_in_pnts'
+]
 
 
 def extent_to_poly(extent, kind=2):
@@ -116,8 +117,51 @@ def extent_to_poly(extent, kind=2):
     L, R = min(L, R), max(L, R)
     B, T = min(B, T), max(B, T)
     ext = np.array([[L, B], [L, T], [R, T], [R, B], [L, B]])
-    # return npg.Update_Geo([ext], K=kind)
-    return ext
+    return npg.arrays_to_Geo([ext], kind=kind, info="extent to poly")
+
+
+# ==== ====================================================
+# ---- distance related
+def eucl_dist(a, b, metric='euclidean'):
+    """Distance calculation for 1D, 2D and 3D points using einsum
+
+    Parameters
+    ----------
+    a, b : array like
+        Inputs, list, tuple, array in 1, 2 or 3D form
+    metric : string
+        euclidean ('e', 'eu'...), sqeuclidean ('s', 'sq'...),
+
+    Notes
+    -----
+    mini e_dist for 2d points array and a single point
+
+    >>> def e_2d(a, p):
+            diff = a - p[np.newaxis, :]  # a and p are ndarrays
+            return np.sqrt(np.einsum('ij,ij->i', diff, diff))
+
+    >>> a.shape  # (5, 2)
+    >>> a[:, np.newaxis]  # (5, 1, 2)
+    >>> (np.prod(a.shape[:-1]), 1, a.shape[-1])  # (5, 1, 2)
+
+    See Also
+    --------
+    `arraytools` has more functions and documentation.
+    """
+    a = np.asarray(a)
+    b = np.atleast_2d(b)
+    if a.ndim == 1:
+        a = a.reshape(1, 1, a.shape[0])
+    if a.ndim >= 2:
+        a = a[:, np.newaxis]  # see old version above
+    if b.ndim > 2:
+        b = b[:, np.newaxis]  # ditto
+    diff = a - b
+    dist_arr = np.einsum('ijk,ijk->ij', diff, diff)
+    if metric[:1] == 'e':
+        dist_arr = np.sqrt(dist_arr)
+    dist_arr = np.squeeze(dist_arr)
+    return dist_arr
 
 
 # ===== Workers with Geo and ndarrays. =======================================
@@ -143,7 +187,7 @@ def _area_centroid_(a):
     e0 = np.einsum('...i,...i->...i', x0, y0)
     e1 = np.einsum('...i,...i->...i', x1, y1)
     t = e1 - e0
-    area = np.sum((e0 - e1)*0.5)
+    area = np.sum((e0 - e1) * 0.5)
     x_c = np.sum((x1 + x0) * t, axis=0) / (area * 6.0)
     y_c = np.sum((y1 + y0) * t, axis=0) / (area * 6.0)
     return area, np.asarray([-x_c, -y_c])
@@ -172,7 +216,7 @@ def _angles_(a, inside=True, in_deg=True):
     cr = np.cross(ba, bc)
     dt = np.einsum('ij,ij->i', ba, bc)
     ang = np.arctan2(cr, dt)
-    TwoPI = np.pi*2.
+    TwoPI = np.pi * 2.
     if inside:
         angles = np.where(ang < 0, ang + TwoPI, ang)
     else:
@@ -196,7 +240,7 @@ def _angles2_(a, inside=True, in_deg=True):
     cr, ba, bc = _x_(a)
     dt = np.einsum('ij,ij->i', ba, bc)
     ang = np.arctan2(cr, dt)
-    TwoPI = np.pi*2.
+    TwoPI = np.pi * 2.
     if inside:
         angles = np.where(ang < 0, ang + TwoPI, ang)
     else:
@@ -230,7 +274,7 @@ def _ch_simple_(points):
         xo, yo = o
         xa, ya = a
         xb, yb = b
-        return (xa - xo)*(yb - yo) - (ya - yo)*(xb - xo)
+        return (xa - xo) * (yb - yo) - (ya - yo) * (xb - xo)
     # ----
     _, idx = np.unique(points, return_index=True, axis=0)
     points = points[idx]
@@ -363,11 +407,11 @@ def _pnts_on_line_(a, spacing=1, is_percent=False):  # densify by distance
     leng = np.sqrt(np.einsum('ij,ij->i', dxdy, dxdy))  # segment lengths
     if is_percent:                                    # as percentage
         spacing = abs(spacing)
-        spacing = min(spacing/100, 1.)
+        spacing = min(spacing / 100, 1.)
         steps = (sum(leng) * spacing) / leng          # step distance
     else:
-        steps = leng/spacing                          # step distance
-    deltas = dxdy/(steps.reshape(-1, 1))              # coordinate steps
+        steps = leng / spacing                          # step distance
+    deltas = dxdy / (steps.reshape(-1, 1))              # coordinate steps
     pnts = np.empty((N,), dtype='O')                  # construct an `O` array
     for i in range(N):              # cycle through the segments and make
         num = np.arange(steps[i])   # the new points
@@ -419,7 +463,7 @@ def pnts_in_Geo_extents(pnts, geo):
     ...      [10., 10.],  RT
     ...      [10.,  0.],  LB        [1, 2, 4, 0, 1, 0],
     ...      [25., 14.],  RT
-    ...      [10., 10.],  LB        [2, 4, 6, 0, 1, 0]], dtype=int64)
+    ...      [10., 10.],  LB        [2, 4, 6, 0, 1, 0]], dtype=int32)
     ...      [15., 18.]]) RT
     >>> ext = np.array([[400, 400], [600, 600]])
     >>> pnts = np.array([[1., 1], [2.5, 2.5], [4.5, 4.5], [5., 5],
@@ -435,9 +479,9 @@ def pnts_in_Geo_extents(pnts, geo):
         for pnt in pnts:
             cn = 0    # the crossing number counter
             x, y = pnt
-            for i in range(len(poly)-1):      # edge from V[i] to V[i+1]
-                if np.logical_or((ys[i] <= y < ys[i+1]),
-                                 (ys[i] >= y > ys[i+1])):
+            for i in range(len(poly) - 1):      # edge from V[i] to V[i+1]
+                if np.logical_or((ys[i] <= y < ys[i + 1]),
+                                 (ys[i] >= y > ys[i + 1])):
                     vt = (y - ys[i]) / dy[i]  # compute x-coordinate
                     if x < (xs[i] + vt * dx[i]):
                         cn += 1
@@ -459,7 +503,7 @@ def pnts_in_Geo_extents(pnts, geo):
     for poly in geo.bits:  # outer_rings(False):
         c_n = _crossing_num_(pnts, poly)
         inside.append(c_n)
-    return idx_t,  p_inside, inside  # , x0, y0, pnts_by_extent, comb
+    return idx_t, p_inside, inside  # , x0, y0, pnts_by_extent, comb
 
 
 def _pnts_in_poly_(pnts, poly):
@@ -501,9 +545,9 @@ def _pnts_in_poly_(pnts, poly):
         for pnt in inside:
             cn = 0    # the crossing number counter
             x, y = pnt
-            for i in range(len(poly)-1):      # edge from V[i] to V[i+1]
-                if np.logical_or((ys[i] <= y < ys[i+1]),
-                                 (ys[i] >= y > ys[i+1])):
+            for i in range(len(poly) - 1):      # edge from V[i] to V[i+1]
+                if np.logical_or((ys[i] <= y < ys[i + 1]),
+                                 (ys[i] >= y > ys[i + 1])):
                     vt = (y - ys[i]) / dy[i]  # compute x-coordinate
                     if x < (xs[i] + vt * dx[i]):
                         cn += 1
@@ -552,10 +596,10 @@ def _pnt_on_poly_(pnt, poly):
     def _pnt_on_seg_(seg, pnt):
         """Mini pnt_on_seg function normally required by pnt_on_poly."""
         x0, y0, x1, y1, dx, dy = *pnt, *seg[0], *(seg[1] - seg[0])
-        dist_ = dx*dx + dy*dy  # squared length
-        u = ((x0 - x1)*dx + (y0 - y1)*dy)/dist_
+        dist_ = dx * dx + dy * dy  # squared length
+        u = ((x0 - x1) * dx + (y0 - y1) * dy) / dist_
         u = max(min(u, 1), 0)  # u must be between 0 and 1
-        xy = np.array([dx, dy])*u + [x1, y1]
+        xy = (np.array([dx, dy]) * u) + [x1, y1]  # noqa
         return xy
 
     def _line_dir_(orig, dest):
@@ -578,7 +622,7 @@ def _pnt_on_poly_(pnt, poly):
     elif (key + 1) >= len(poly):  # np.vstack((poly[-2:], poly[:1]))
         seg = np.concatenate((poly[-2:], poly[:1]), axis=0)
     else:
-        seg = poly[key-1:key+2]       # grab the before and after closest
+        seg = poly[key - 1: key + 2]       # grab the before and after closest
     n1 = _pnt_on_seg_(seg[:-1], pnt)  # abbreviated pnt_on_seg
     d1 = np.linalg.norm(n1 - pnt)
     n2 = _pnt_on_seg_(seg[1:], pnt)   # abbreviated pnt_on_seg
@@ -621,10 +665,10 @@ def _pnt_on_segment_(pnt, seg):
     >>> d = np.linalg.norm(np.cross(p1-p0, p0-p))/np.linalg.norm(p1-p0)
     """
     x0, y0, x1, y1, dx, dy = *pnt, *seg[0], *(seg[1] - seg[0])
-    dist_ = dx*dx + dy*dy  # squared length
-    u = ((x0 - x1)*dx + (y0 - y1)*dy)/dist_
+    dist_ = dx * dx + dy * dy  # squared length
+    u = ((x0 - x1) * dx + (y0 - y1) * dy) / dist_
     u = max(min(u, 1), 0)
-    xy = np.array([dx, dy])*u + [x1, y1]
+    xy = np.array([dx, dy]) * u + [x1, y1]
     d = xy - pnt
     return xy, np.hypot(d[0], d[1])
 
@@ -669,12 +713,12 @@ def _rotate_(geo_arr, R, as_group):
             uniqs.append(chunk[np.sort(idx)])
         cents = [np.mean(i, axis=0) for i in uniqs]
         for i, chunk in enumerate(shapes):
-            ch = np.einsum('ij,jk->ik', chunk-cents[i], R) + cents[i]
+            ch = np.einsum('ij,jk->ik', chunk - cents[i], R) + cents[i]
             out.append(ch)
         return out
     cent = np.mean(geo_arr, axis=0)
     for chunk in shapes:
-        ch = np.einsum('ij,jk->ik', chunk-cent, R) + cent
+        ch = np.einsum('ij,jk->ik', chunk - cent, R) + cent
         out.append(ch)
     return out
 
@@ -742,20 +786,20 @@ def _crossing_num_(pnts, poly, line=True):
     for pnt in pnts:
         cn = 0    # the crossing number counter
         x, y = pnt
-        for i in range(N-1):
+        for i in range(N - 1):
             if line:
-                c0 = (ys[i] <= y < ys[i+1])
-                c1 = (ys[i] >= y > ys[i+1])
+                c0 = (ys[i] <= y < ys[i + 1])
+                c1 = (ys[i] >= y > ys[i + 1])
             else:
-                c0 = (ys[i] < y < ys[i+1])
-                c1 = (ys[i] > y > ys[i+1])
+                c0 = (ys[i] < y < ys[i + 1])
+                c1 = (ys[i] > y > ys[i + 1])
             if c0 | c1:
                 vt = (y - ys[i]) / dy[i]  # compute x-coordinate
                 if line:
                     if (x == xs[i]) or (x < (xs[i] + vt * dx[i])):  # include
                         cn += 1
                 else:
-                    if (x < (xs[i] + vt * dx[i])):  # exclude pnts on line
+                    if x < (xs[i] + vt * dx[i]):  # exclude pnts on line
                         cn += 1
         is_in.append(cn % 2)  # either even or odd (0, 1)
     return pnts[np.nonzero(is_in)]

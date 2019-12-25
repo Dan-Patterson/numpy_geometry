@@ -1,8 +1,13 @@
 # -*- coding: utf-8 -*-
-r"""\
+r"""
+-------------------------------------------
+  npg_arc: Functions that require `arcpy`
+-------------------------------------------
 
-npg_arc
--------
+The functions include those related to featureclasses, their properties and
+conversion to Geo arrays and other data formats.
+
+----
 
 Script :
     npg_arc.py
@@ -49,10 +54,12 @@ Time tests
 
 References
 ----------
-None
+None (yet).
 """
-# pylint: disable=C0103  # invalid-name
-# pylint: disable=R0914  # Too many local variables
+# pylint: disable=C0103, C0302, C0415, E0611, E1136, E1121, R0904, R0914,
+# pylint: disable=W0201, W0212, W0221, W0612, W0621, W0105
+# pylint: disable=R0902
+
 # pylint: disable=R1710  # inconsistent-return-statements
 # pylint: disable=W0105  # string statement has no effect
 
@@ -66,39 +73,44 @@ from numpy.lib.recfunctions import repack_fields
 from numpy.lib.recfunctions import structured_to_unstructured as stu
 from numpy.lib.recfunctions import unstructured_to_structured as uts
 
-import npgeom as npg
+if 'npg' not in list(locals().keys()):
+    import npgeom as npg
 
-from arcpy import Array, Exists, ListFields, Point, Polygon, Polyline
+import json
+from arcpy import (
+    Array, Exists, ListFields, Multipoint, Point, Polygon, Polyline
+)
+
 from arcpy.da import (
-        Describe, InsertCursor, SearchCursor, FeatureClassToNumPyArray,
-        TableToNumPyArray
-        )  # ExtendTable, NumPyArrayToTable,  UpdateCursor
+    Describe, InsertCursor, SearchCursor, FeatureClassToNumPyArray,
+    TableToNumPyArray
+)  # ExtendTable, NumPyArrayToTable,  UpdateCursor
 
 # from arcpy.geoprocessing import gp
 from arcpy.geoprocessing import env
 from arcpy.management import (
-        AddField, CopyFeatures, CreateFeatureclass, DeleteFeatures
-        )  # Delete
+    AddField, CopyFeatures, CreateFeatureclass, Delete
+)  # DeleteFeatures
 
 
 script = sys.argv[0]  # print this should you need to locate the script
 
 __all__ = [
-        '_area_part_', '_cw_', 'array_shape_finder', 'poly_shape_finder',
-        'get_SR', 'get_shapes', 'get_geo_interface', 'get_shape_K',
-        'get_fc_composition', 'get_fc_field_properties',
-        'get_shape_properties',
-        'fc_nparray_Geo', 'id_fr_to',            # option 1
-        'Geo_to_fc', 'geo_poly',                 # to fc
-        'make_nulls', 'fc_data', 'tbl_data',     # attributes
-        'fc_geo_Geo', 'shape_finder', 'flat',    # option 2
-        'fc_gi_Geo',
-        'fc_sc_Geo', 'fc_parser', 'ift_maker',   # option 3
-        'fc2na', 'array_poly', 'geometry_fc',
-        'poly2array', '_flat',                   # geometry to array
-        '_del_none', '_poly_arr_',               # extras
-        '__geo_interface__'
-        ]
+    '_area_part_', '_cw_', 'poly_shape_finder',
+    'get_SR', 'get_shapes', 'get_geo_interface', 'get_shape_K',
+    'get_fc_composition', 'get_fc_field_properties',
+    'get_shape_properties',
+    'fc_nparray_Geo', 'id_fr_to',            # option 1, use this ***
+    'Geo_to_fc', 'geo_poly', 'view_poly'     # back to fc
+    'make_nulls', 'fc_data', 'tbl_data',     # get attributes
+    'fc_geo_Geo', 'flat',                    # option 2
+    'fc_gi_Geo',
+    'fc_sc_Geo', 'fc_parser', 'ift_maker',   # option 3
+    'fc2na', 'array_poly', 'geometry_fc',
+    'poly2array', '_flat',                   # geometry to array
+    '_del_none', '_poly_arr_',               # extras
+    '__geo_interface__'
+]
 
 
 # ---- (1) General helpers ---------------------------------------------------
@@ -115,32 +127,6 @@ def _area_part_(a):
 def _cw_(a):
     """Clockwise test."""
     return 1 if _area_part_(a) > 0. else 0
-
-
-# ---- array/list shape finder for nested structures
-def array_shape_finder(arr):  # -> array
-    """Return the array shape for each part and bit of a nested list/array.
-
-    This is designed to take uneven nested lists.
-
-    See Also
-    --------
-    ``get_geo_interface(in_fc, SR=None)``  produces the array to use
-    """
-    main = []
-    arr = np.asarray(arr)
-    cnt = 0
-    for i, a in enumerate(arr):
-        info = []
-        if hasattr(a, '__len__'):
-            a0 = np.asarray(a)
-            for j, a1 in enumerate(a0):
-                if hasattr(a1, '__len__'):
-                    a1 = np.asarray(a1)
-                    info.append([cnt, j, a1.shape])
-        main.append(np.asarray(info))
-        cnt += 1
-    return np.vstack(main)
 
 
 def poly_shape_finder(polys):  # -> array
@@ -162,12 +148,17 @@ def poly_shape_finder(polys):  # -> array
     np.diff(np.cumsum([i is None for i in z]), prepend=0)
     """
     def psf(poly, cnt):
-        """Polgon shape finder."""
+        """Polgon shape finder.
+
+        Find out where `None` if any is located (`w`) and subtract its
+        length from the `arr` length.  Adjust the `w` values accordingly
+        to derive the endpoints of each bit.
+        """
         out = []
         for i, arr in enumerate(poly):
             if hasattr(arr, '__len__'):
                 w = np.where([p is None for p in arr])[0].tolist()
-                out.append([cnt, i, len(arr), w])
+                out.append([cnt, i, len(arr) - len(w), w - np.arange(len(w))])
         return out
     # ----
     main = []
@@ -196,8 +187,8 @@ def get_SR(in_fc, verbose=False):
 
 # Featureclass to shapes, using a searchcursor
 def get_shapes(in_fc, SR=None):
-    """Featureclass to arcpy shapes.
- 
+    """Return arcpy shapes from a featureclass.
+
     Returns polygon, polyline, multipoint, or points.
     """
     if SR is None:
@@ -209,12 +200,13 @@ def get_shapes(in_fc, SR=None):
 
 # Featureclass to geo_interface
 def get_geo_interface(in_fc, SR=None):
-    """Featureclass to arcpy shapes.  Returns polygon, polyline, multipoint,
-    or points.
+    """Featureclass to arcpy shapes.
+
+    Returns polygon, polyline, multipoint, or points.
 
     See Also
     --------
-    _array_shape_finder_(arr)  to derive the structure of ``out``
+    npg.shape_finder(arr)  to derive the structure of ``out``
     """
     if SR is None:
         SR = get_SR(in_fc)
@@ -228,7 +220,7 @@ def get_geo_interface(in_fc, SR=None):
 
 # geometry shape class to Geo shape class
 def get_shape_K(in_fc):
-    """The shape type represented by the featureclass.  Returns (kind, k)"""
+    """Return shape type for a featureclass.  Returns (kind, k)"""
     desc = Describe(in_fc)
     kind = desc['shapeType']
     if kind in ('Polygon', 'PolygonM', 'PolygonZ'):
@@ -241,7 +233,9 @@ def get_shape_K(in_fc):
 
 # Featureclass composition
 def get_fc_composition(in_fc, SR=None, prn=True, start=0, end=50):
-    """Featureclass geometry composition in terms of shapes, shape parts, and
+    """Return featureclass geometry composition.
+
+    The information returned is includes the shapes, shape parts, and
     point counts for each part.
     """
     if SR is None:
@@ -291,7 +285,7 @@ def get_fc_composition(in_fc, SR=None, prn=True, start=0, end=50):
 
 # fields information
 def get_fc_field_properties(in_fc, verbose=True):
-    """ """
+    """Return field properties for featureclasses."""
     flds = ListFields(in_fc)   # arcpy.ListFields
     names = [f.name for f in flds]
     types = [f.type for f in flds]
@@ -310,8 +304,7 @@ def get_fc_field_properties(in_fc, verbose=True):
 
 
 def get_shape_properties(a_shape, prn=True):
-    """Get some basic shape geometry properties
-    """
+    """Get some basic shape geometry properties"""
     coords = a_shape.__geo_interface__['coordinates']
     sr = a_shape.spatialReference
     props = ['type', 'isMultipart', 'partCount', 'pointCount', 'area',
@@ -330,13 +323,13 @@ def get_shape_properties(a_shape, prn=True):
 
 
 # ============================================================================
-# ---- (3) fc_nparray_Geo section
+# ---- (3a) fc_nparray_Geo section
 # ---- ** use this one **
 # fc -> nparray -> Geo  uses FeatureClassToNumpyArray ---------------
 #
 # -- main function --
 def fc_nparray_Geo(in_fc, geom_kind=2, info=""):
-    """FeatureClassToNumPyArray to Geo array
+    """Convert a FeatureClassToNumPyArray to a Geo array.
 
     This works with the geometry only.  Skip the attributes for later.  The
     processing requirements are listed below.  Just copy and paste.
@@ -363,11 +356,11 @@ def fc_nparray_Geo(in_fc, geom_kind=2, info=""):
         return np.sum((e0 - e1)*0.5)
 
     def cw(a):
-        """clockwise"""
+        """Clockwise check."""
         return 1 if _area_part_(a) > 0. else 0
 
     def cw2(b):
-        """clockwise"""
+        """Clockwise check."""
         return 0 if np.sum(np.cross(b[:-1], b[1:])) > 0. else 1
     # ---- (1) Foundational steps
     # Create the array, extract the object id values.
@@ -377,9 +370,9 @@ def fc_nparray_Geo(in_fc, geom_kind=2, info=""):
     kind = geom_kind
     sp_ref = get_SR(in_fc)
     a = FeatureClassToNumPyArray(
-            in_fc, ['OID@', 'SHAPE@X', 'SHAPE@Y'],
-            spatial_reference=sp_ref, explode_to_points=True
-            )
+        in_fc, ['OID@', 'SHAPE@X', 'SHAPE@Y'],
+        spatial_reference=sp_ref, explode_to_points=True
+    )
     oids = a['OID@']
     xy = a[['SHAPE@X', 'SHAPE@Y']]
     mn = [np.min(xy['SHAPE@X']), np.min(xy['SHAPE@Y'])]
@@ -398,7 +391,7 @@ def fc_nparray_Geo(in_fc, geom_kind=2, info=""):
     # ---- (3) Construct the IFT data using ``id_fr_to`` to carry the load.
     IFT_ = np.asarray(id_fr_to(xy, oids))
     cols = IFT_.shape[0]
-    IFT = np.full((cols, 6), -1, dtype=np.int64)
+    IFT = np.full((cols, 6), -1, dtype=np.int32)
     IFT[:, :3] = IFT_
     #
     # ---- (4) clockwise check for polygon parts to identify outer/inner rings
@@ -415,7 +408,7 @@ def fc_nparray_Geo(in_fc, geom_kind=2, info=""):
         part_ids = np.concatenate(parts)
         ar = np.where(IFT[:, 3] == 1)[0]
         ar0 = np.stack((ar[:-1], ar[1:])).T
-        pnt_nums = np.zeros(IFT.shape[0], dtype=np.int64)
+        pnt_nums = np.zeros(IFT.shape[0], dtype=np.int32)
         for (i, j) in ar0:  # now provide the point numbers per part per shape
             pnt_nums[i:j] = np.arange((j - i))  # smooth!!!
     else:
@@ -432,7 +425,7 @@ def fc_nparray_Geo(in_fc, geom_kind=2, info=""):
 
 # helper function
 def id_fr_to(a, oids):
-    """Produce the id, from, to point indices used by fc_nparray_Geo.
+    """Produce the ``id, from, to`` point indices used by fc_nparray_Geo.
 
     NOTE : no error checking.
 
@@ -470,9 +463,9 @@ def id_fr_to(a, oids):
 
 
 # ============================================================================
-# ---- (4) Back to featureclass ----------------------------------------------
+# ---- (3b) Back to featureclass ----------------------------------------------
 def Geo_to_fc(geo, gdb=None, name=None, kind=None, SR=None):
-    """ """
+    """Return a FeatureClass from a Geo array."""
     SR = SR
     if kind in (None, 0, 1, 2):
         print("\n ``kind`` must be one of Polygon, Polyline or Point.")
@@ -495,7 +488,8 @@ def Geo_to_fc(geo, gdb=None, name=None, kind=None, SR=None):
     return
 
 
-def geo_poly(geo, sr, kind="Polygon"):
+# ---- Use this to convert Geo to arcpy shapes
+def geo_poly(geo, sr, kind="Polygon", as_singlepart=True):
     """Create poly features from a Geo array.
 
     Parameters
@@ -506,11 +500,20 @@ def geo_poly(geo, sr, kind="Polygon"):
         Output geometry type.
     geo_poly is called by Geo_to_fc.
     arr2poly does the actual poly construction
+
+    >>> ps = geo_poly(g, sr=g.SR, kind="Polygon", as_singlepart=True)
+    >>> ps  # returns the single part representation of the polygon
+    [(<Polygon object at 0x25f07f4d7f0[0x25f09232968]>, 1),
+     (<Polygon object at 0x25f07f4d668[0x25f092327d8]>, 1),
+     (<Polygon object at 0x25f07f4d160[0x25f09232828]>, 2),
+     (<Polygon object at 0x25f07f4d208[0x25f092324b8]>, 2),
+     (<Polygon object at 0x25f07f4d4a8[0x25f0af15558]>, 3)]
     """
     # ---- helper
     def arr2poly(a, SR):
-        """Construct the poly feature from a potentially nested list/array of
-        lists or arrays.
+        """Construct the poly feature from lists or arrays.
+
+        The inputs may be nested and mixed in content.
         """
         aa = []
         for pairs in a:
@@ -528,8 +531,11 @@ def geo_poly(geo, sr, kind="Polygon"):
         p_type = "POLYGON"
     elif "line" in kind.lower():
         p_type = "POLYLINE"
-    b_ift = geo.bit_IFT
-    uni, idx = np.unique(b_ift[:, [0, 4]], True, axis=0)
+    if as_singlepart:
+        b_ift = geo.bit_IFT
+        uni, idx = np.unique(b_ift[:, [0, 4]], True, axis=0)
+    else:
+        uni, idx = np.unique(geo.IDs, True, axis=0)
     ifts = np.split(geo.IFT, idx[1:])
     out = []
     for ift in ifts:
@@ -545,12 +551,53 @@ def geo_poly(geo, sr, kind="Polygon"):
     return polys
 
 
+def view_poly(geo, id_num=1, view_as=2):
+    """View a poly feature as an SVG in the console.
+
+    Parameters
+    ----------
+    geo : Geo array
+        The Geo array part to view.
+    id_num : integer
+        The shape in the Geo array to view.
+    view_as : integer
+        Polygon = 2, Polygon = 1, Multipoint = 0
+
+    Notes
+    -----
+    These provide information on the content of the svg representation.
+
+    >>> p0.__getSVG__()
+    >>> p0._repr_svg_()
+    f = [" M {},{} " + "L {},{} "*(len(b) - 1) for b in g0.bits]
+    ln = [f[i].format(*b.ravel()) for i, b in enumerate(g0.bits)]
+    st = "".join(ln) + "z"
+    """
+    if id_num not in (geo.IDs):
+        msg = "Id ... {} ... not found.\n Use geo.IDs to see their values"
+        print(msg.format(id_num))
+        return
+    shp = geo.get_shape(id_num)
+    z = [Array([Point(*i) for i in b]) for b in shp.bits]
+    if view_as == 2:
+        return Polygon(Array(z))
+    elif view_as == 1:
+        return Polyline(Array(z))
+    else:
+        zz = []
+        for i in z:
+            zz.extend(i)
+        return Multipoint(Array(zz))
+
+
 # ============================================================================
-# ---- (5) attribute data
+# ---- (3c) attribute data
 # Change FC <null> to a useful nodata value
 def make_nulls(in_fc, include_oid=True, int_null=-999):
-    """Return null values for a list of fields objects, excluding objectid
-    and geometry related fields.  Throw in whatever else you want.
+    """Return null values for a list of fields objects.
+
+    Thes excludes objectid and geometry related fields.
+    Throw in whatever else you want.
 
     Parameters
     ----------
@@ -592,8 +639,9 @@ def make_nulls(in_fc, include_oid=True, int_null=-999):
 
 # Featureclass attribute data
 def fc_data(in_fc):
-    """Pull all editable attributes from a featureclass tables.  During the
-    process, <null> values are changed to an appropriate type.
+    """Pull all editable attributes from a featureclass tables.
+
+    During the process, <null> values are changed to an appropriate type.
 
     Parameters
     ----------
@@ -609,16 +657,17 @@ def fc_data(in_fc):
     flds = ["OID@", "SHAPE@", "SHAPE@X", "SHAPE@Y", "SHAPE@XY"]
     new_names = [[i, i.replace("@", "_")][i in flds] for i in fld_names]
     a = FeatureClassToNumPyArray(
-            in_fc, fld_names, skip_nulls=False, null_value=null_dict
-            )
+        in_fc, fld_names, skip_nulls=False, null_value=null_dict
+    )
     a.dtype.names = new_names
     return np.asarray(a)
 
 
 # Featureclass table attribute data
 def tbl_data(in_tbl):
-    """Pull all editable attributes from a featureclass tables.  During the
-    process, <null> values are changed to an appropriate type.
+    """Pull all editable attributes from a featureclass tables.
+
+    During the process, <null> values are changed to an appropriate type.
 
     Parameters
     ----------
@@ -638,18 +687,18 @@ def tbl_data(in_tbl):
         out_flds = flds + fld_names[1:]
         new_names = ['OID_', 'X_cent', 'Y_cent'] + out_flds[3:]
     a = TableToNumPyArray(
-            in_tbl, out_flds, skip_nulls=False, null_value=null_dict
-            )
+        in_tbl, out_flds, skip_nulls=False, null_value=null_dict
+    )
     a.dtype.names = new_names
     return np.asarray(a)
 
 
 # =========================================================================
-# ---- (6) fc_geo_Geo section
+# ---- (4) fc_geo_interface_Geo section
 #  fc -> __geo_interface__ -> to Geo
 #
 def fc_geo_Geo(in_fc):
-    """Shell to run fc_parser
+    """Shell to run `fc_parser`.
 
     subs, xys, polys = fc_to_Geo(in_fc)
     """
@@ -659,39 +708,40 @@ def fc_geo_Geo(in_fc):
     return g
 
 
-def shape_finder(arr, oid):
-    """Provides the structure of an array/list which may be uneven and nested.
+# def shape_finder(arr, ids=None):
+#     """Provide the structure of an array/list which may be uneven and nested.
 
-    Parameters   ***** fix *****
-    ----------
-    arr : array-like
-        An array of objects. In this case points.
-    oid : integer
-        The object ID value
-    """
-    main = []
-    arr = np.asarray(arr).squeeze()
-    cnt = 0
-    for i, a in enumerate(arr):
-        info = []
-        if hasattr(a, '__len__'):
-            a0 = np.asarray(a)
-            for j, a1 in enumerate(a0):
-                if hasattr(a1, '__len__'):
-                    a1 = np.asarray(a1)
-                    if len(a1.shape) > 2:
-                        info.append([oid[i], cnt, j, *a1.shape])
-                    else:
-                        info.append([oid[i], cnt, i, j, *a1.shape]) # *a.shape])
-        main.append(np.asarray(info))
-        cnt += 1
-    return main #np.vstack(main)
+#     Parameters
+#     ----------
+#     arr : array-like
+#         An array of objects. In this case points.
+#     ids : integer
+#         The object ID values for each shape. If ``None``, then values will be
+#         returned as a sequence from zero to the length of ``arr``.
+#     """
+#     main = []
+#     if ids is None:
+#         ids = np.arange(len(arr))
+#     arr = np.asarray(arr).squeeze()
+#     cnt = 0
+#     for i, a in enumerate(arr):
+#         info = []
+#         if hasattr(a, '__len__'):
+#             a0 = np.asarray(a)
+#             for j, a1 in enumerate(a0):
+#                 if hasattr(a1, '__len__'):
+#                     a1 = np.asarray(a1)
+#                     if len(a1.shape) >= 2:
+#                         info.append([ids[i], cnt, j, *a1.shape])
+#         main.append(np.asarray(info))
+#         cnt += 1
+#     return main  # np.vstack(main)
 
 
 def flat(l):
-    """ just does the basic flattening but doesn't yield where things are"""
+    """Flatten input. Basic flattening but doesn't yield where things are"""
     def _flat(l, r):
-        """doc"""
+        """Recursive flattener."""
         if not isinstance(l[0], (list, np.ndarray, tuple)):  # added [0]
             r.append(l)
         else:
@@ -703,13 +753,13 @@ def flat(l):
 
 # ----
 def fc_gi_Geo(in_fc):
-    """FeatureClass __geo_interface__ to Geo parser
+    """Convert FeatureClass __geo_interface__ to Geo array.
 
     Requires
     --------
-    ``shape_finder`` and ``flat`` are needed.
+    ``npg.shape_finder`` and ``flat`` are needed.
     """
-    # ---- Gather the geometry objects and run them through ``shape_finder``.
+    # ---- Gather the geometry objects and run ``npg.shape_finder``.
     SR = get_SR(in_fc)
     polys = []  # to store the arcpy polygons
     data = []   # coordinates for the geometry
@@ -718,7 +768,7 @@ def fc_gi_Geo(in_fc):
             oid, shp = r[0], r[1]
             polys.append(shp)
             coords = shp.__geo_interface__['coordinates']  # ---- shape - array
-            shps = shape_finder(coords, oid)  # ---- shape_finder
+            shps = npg.shape_finder(coords, oid)  # ---- in npGeo
             data.append([oid, shps, coords])
     # ---- construct ift
     ift_inf = np.vstack([d[1] for d in data])
@@ -735,7 +785,7 @@ def fc_gi_Geo(in_fc):
 
 
 # =========================================================================
-# ---- (7) fc_sc_Geo section
+# ---- (5) fc_sc_Geo section
 # fc searchcursor to Geo
 #
 def fc_sc_Geo(in_fc):
@@ -751,8 +801,10 @@ def fc_sc_Geo(in_fc):
 
 
 def fc_parser(in_fc):
-    """Examines polygon featureclass (in_fc), geometry and returns
+    """Examine polygon featureclass (in_fc) geometry.
 
+    Returns
+    -------
     subs : list
         A nested list enabling on to identify the components of polygon shapes.
         A shape can be multipart (parts), and each part can have holes (bits).
@@ -767,11 +819,12 @@ def fc_parser(in_fc):
         Just in case you want to use them for testing. Remove that return
         object from this function if you don't need them.
     """
-
     def _geom_(geom):
-        """The worker, that gathers the required information for each shape.
+        """Gather the required information for each shape.
+
         It examines the Polygon geometry, determines whether there are
-        multiple parts and/or holes in the parts."""
+        multiple parts and/or holes in the parts.
+        """
         out = [len(geom)]
         coords = []
         for prt, part in enumerate(geom):
@@ -811,7 +864,7 @@ def fc_parser(in_fc):
 
 
 def ift_maker(subs):
-    """make the ift from the subs"""
+    """Make the ift from the subs."""
     tmp = []
     c0 = []
     c1 = []
@@ -824,14 +877,14 @@ def ift_maker(subs):
         parts = sub[1][0]  # number of parts
         tot_pnts = 0
         tot_parts = 0
-        for i in range(1, parts+1):
+        for i in range(1, parts + 1):
             part, num_pnts, num_parts, spl, whr = sub[1][i]  # main split
             c1.extend(whr)
-            c4.append(np.full(num_parts, fill_value=part+1, dtype='int64'))
+            c4.append(np.full(num_parts, fill_value=part+1, dtype='int32'))
             c5.append(np.arange(num_parts))
             tot_pnts += num_pnts
             tot_parts += num_parts
-        tp = np.full(tot_parts, fill_value=id_val, dtype='int64')
+        tp = np.full(tot_parts, fill_value=id_val, dtype='int32')
         tmp.append(tp)  # tot_parts))
     # ----
     c0 = np.concatenate(tmp)
@@ -849,7 +902,7 @@ def ift_maker(subs):
 # ============================================================================
 # -- helpers, or standalone --
 def fc2na(in_fc):
-    """FeatureClassToNumPyArray shorthand
+    """Return FeatureClassToNumPyArray.  Shorthand interface.
 
     Get the geometry from a featureclass and clean it up.  This involves
     shifting the coordinates to the 0,0 origin and rounding them.
@@ -865,8 +918,8 @@ def fc2na(in_fc):
         The coordinates in ``a`` as an ndarray.
     """
     arr = FeatureClassToNumPyArray(
-            in_fc, ['OID@', 'SHAPE@X', 'SHAPE@Y'], explode_to_points=True
-            )
+        in_fc, ['OID@', 'SHAPE@X', 'SHAPE@Y'], explode_to_points=True
+    )
     oids, x, y = [arr[name] for name in ['OID@', 'SHAPE@X', 'SHAPE@Y']]
     m = [np.min(x), np.min(y)]
     a = np.empty((len(x), ), dtype=np.dtype([('X', 'f8'), ('Y', 'f8')]))
@@ -876,92 +929,11 @@ def fc2na(in_fc):
     return oids, a, xy
 
 
-# ===========================================================================
-#
-def Geo_to_fc_old(
-        shps, oids, gdb=None, name=None, p_type=None, SR=None, IFT=None
-        ):
-    """
-    Assemble the poly features from array(s).
-
-    Parameters
-    ----------
-    shps : a list of arrays
-        Point array, used to construct the geometry
-    gdb : file geodatabase
-        Full path to the gdb.
-    fname : string
-        Name for the output featureclass.
-    p_type : text
-        POLYGON or POLYLINE
-    sr : spatial reference
-        Spatial reference object, name or id.
-    IFT : array
-        If none, it will be created.
-
-    Notes
-    -----
-    Polyline or polygon features can be created from the array data.  The
-    features can be multipart with or without interior rings.
-
-    Outer rings are ordered clockwise, inner rings (holes) are ordered
-    counterclockwise.  For polylines, there is no concept of order.
-    Splitting is modelled after _nan_split_(arr).
-    """
-    def _arr_poly_(shp, SR, p_type):
-        """Slices the array where nan values appear, splitting them off during
-        the process.
-        """
-        subs = []
-        s = np.isnan(shp[:, 0])
-        if np.any(s):
-            w = np.where(s)[0]
-            ss = np.split(shp, w)
-            subs = [ss[0]]
-            subs.extend(i[1:] for i in ss[1:])
-        else:
-            subs.append(shp)
-        aa = []
-        for sub in subs:
-            aa.append([Point(*pairs) for pairs in sub])
-        if p_type.upper() == 'POLYGON':
-            poly = Polygon(Array(aa), SR)
-        elif p_type.upper() == 'POLYLINE':
-            poly = Polyline(Array(aa), SR)
-        return poly
-    # ----
-    if p_type is None:
-        p_type = "POINT"
-    elif 'oin' in p_type:
-        p_type = "POINT"
-    elif 'gon' in p_type:
-        p_type = "POLYGON"
-    elif 'line' in p_type:
-        p_type = 'POLYLINE'
-    a_2d, ift = npg.array_ift(shps)
-    polys = []
-    for shp in shps:
-        p = _arr_poly_(shp, SR, p_type)  # ----makes polys of chunks
-        polys.append(p)
-    out = list(zip(polys, oids))
-    #
-    out_name = gdb.replace("\\", "/") + "/" + name
-    wkspace = env.workspace = 'memory'  # legacy is in_memory
-    CreateFeatureclass(wkspace, name, p_type, spatial_reference=SR)
-    AddField(name, 'ID_arr', 'LONG')
-    with InsertCursor(name, ['SHAPE@', 'ID_arr']) as cur:
-        for row in out:
-            cur.insertRow(row)
-    CopyFeatures(name, out_name)
-    return
-
-
-
 # Array to poly features
 def array_poly(a, p_type=None, sr=None, IFT=None):
-    """
-    Used by ``geometry_fc`` to assemble the poly features from array(s).
-    This can be used separately.
+    """Assemble poly features from arrays.
+
+    Used by `geometry_fc` or it can be used separately.
 
     Parameters
     ----------
@@ -984,9 +956,7 @@ def array_poly(a, p_type=None, sr=None, IFT=None):
     Splitting is modelled after _nan_split_(arr).
     """
     def _arr_poly_(arr, SR, as_type):
-        """Slices the array where nan values appear, splitting them off during
-        the process.
-        """
+        """Slice the array where nan values appear, splitting them off."""
         subs = []
         s = np.isnan(arr[:, 0])
         if np.any(s):
@@ -1017,7 +987,7 @@ def array_poly(a, p_type=None, sr=None, IFT=None):
 
 
 def geometry_fc(a, IFT, p_type=None, gdb=None, fname=None, sr=None):
-    """Reform poly features from the list of arrays created by ``fc_geometry``.
+    """Form poly features from the list of arrays created by `fc_geometry`.
 
     Parameters
     ----------
@@ -1058,7 +1028,7 @@ def geometry_fc(a, IFT, p_type=None, gdb=None, fname=None, sr=None):
 
 
 # ============================================================================
-# ---- (8) Geometry to array -------------------------------------------------
+# ---- (6) Geometry to array -------------------------------------------------
 #
 def poly2array(polys):
     """Convert polyline or polygon shapes to arrays for use in the Geo class.
@@ -1087,7 +1057,7 @@ def poly2array(polys):
 
 
 def _flat(l, r):
-    """doc"""
+    """Flatten iterable."""
     if not isinstance(l[0], (list, np.ndarray, tuple)):  # added [0]
         r.append(l)
     else:
@@ -1096,15 +1066,13 @@ def _flat(l, r):
     return r
 
 
-# return _flat(l, [])
-
 # ---- EXTRAS and TESTS
 
 def _del_none(a, cond=None):
-    """delete equiv"""
+    """Delete equivalent"""
     def _xy_(part):
         return [(p.X, p.Y) for p in part]
-
+    # ----
     idx = np.where(np.isin(a, None))[0]
     xys = np.delete(a, idx)
     splitter = idx - np.arange(len(idx))
@@ -1116,12 +1084,27 @@ def _del_none(a, cond=None):
     return final, out  # xys, splitter, final
 
 
+# ---- (7) JSON, GeoJSON section ---------------------------------------------
+#
+def fc_json(in_fc, SR=None):
+    """Produce arrays from the json representation of get_shapes shapes."""
+    shapes = get_shapes(in_fc, SR=SR)
+    if SR is None:
+        SR = get_SR(in_fc)
+    arr = []
+    json_keys = [i for i in json.loads(shapes[0].JSON).keys()]
+    geom_key = json_keys[0]
+    for s in shapes:
+        arr.append(json.loads(s.JSON)[geom_key])
+    return arr
+
+
 """
 Notes
 p0 .... a polygon
 p0[0] . its array
 np.where(np.isin(p0[0], None))[0]
-array([ 5, 11, 16], dtype=int64)
+array([ 5, 11, 16], dtype=int32)
 
 # now
 z = np.where(np.isin(p0[0], None), 1, 0)
@@ -1132,10 +1115,10 @@ z = np.array([1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1])
 
 # use
 z = np.isin(p0[0], None, 0, 1)  # see above
-w0 = np.where(z == 0)[0]        # array([ 5, 11, 16], dtype=int64)
-w1 = w0 + 1                     # array([ 6, 12, 17], dtype=int64)
+w0 = np.where(z == 0)[0]        # array([ 5, 11, 16], dtype=int32)
+w1 = w0 + 1                     # array([ 6, 12, 17], dtype=int32)
 w01 = np.sort(np.concatenate((w0, w1)))
-                                #  array([ 5,  6, 11, 12, 16, 17], dtype=int64)
+                                #  array([ 5,  6, 11, 12, 16, 17], dtype=int32)
 s = np.split(z, w01)
 [array([1, 1, 1, 1, 1]), array([0]), array([1, 1, 1, 1, 1]),
  array([0]), array([1, 1, 1, 1]), array([0]), array([1, 1, 1, 1])]
@@ -1159,7 +1142,8 @@ def _z(a):
 
 
 def _poly_arr_(poly):
-    """ return coordinates of nested objects
+    """Return coordinates of nested objects.
+
     w = np.isin(part, None)
     s = np.where(w)[0]
     bits = np.split(part, s)
@@ -1179,6 +1163,7 @@ def _poly_arr_(poly):
 
 
 def __geo_interface__(self):
+    """Geo interface function."""
     def split_part(a_part):
         part_list = []
         for item in a_part:
@@ -1199,5 +1184,5 @@ def __geo_interface__(self):
 # ---- main section
 if __name__ == "__main__":
     """optional location for parameters"""
-    in_fc = r"C:\Git_Dan\npgeom\npgeom.gdb\Polygons"
-    in_fc = r"C:\Git_Dan\npgeom\npgeom.gdb\Polygons2"
+    in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\Polygons"
+    in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\Polygons2"

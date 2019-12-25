@@ -1,8 +1,15 @@
 # -*- coding: utf-8 -*-
-r"""\
+r"""
+------------------------------------------
+  npg_io: Input/Output related functions
+------------------------------------------
 
-npg_io
-------
+Load and save Geo arrays like you can with numpy arrays.  All required
+information is saved in the standard `.npz` format for easy packing and
+unpacking.  Json and GeoJSON are supported.  Specialized print functions
+facilitate the viewing of the Geo array geometry and attribute information.
+
+----
 
 Script :
     .../npgeom/npg_io.py
@@ -10,7 +17,7 @@ Script :
 Author :
     Dan_Patterson@carleton.ca
 
-Modified : 2019-12-12
+Modified : 2019-12-15
     Creation date during 2019 as part of ``arraytools``.
 
 Purpose
@@ -21,11 +28,12 @@ Requires npGeo to implement the array geometry class.
 See Also
 --------
 __init__ :
-    `__init__.py` has further information on arcpy related functionality.
+    The `.../npgeom/__init__.py` script has further information on arcpy
+    related functionality.
 npGeo :
     A fuller description of the Geo class, its methods and properties is given
-    there.  This script focuses on getting arcpy or geojson geometry into
-    numpy arrays.
+    `.../npgeom/npGeo`.  This script focuses on getting arcpy or geojson
+    geometry into numpy arrays.
 
 References
 ----------
@@ -34,25 +42,21 @@ References
 `Subclassing ndarrays
 <https://docs.scipy.org/doc/numpy/user/basics.subclassing.html>`_.
 """
-# pylint: disable=C0330  # Wrong hanging indentation
-# pylint: disable=E0611  # stifle the arcgisscripting
-# pylint: disable=E265   # blocked comment thing
-# pylint: disable=E1101  # ditto for arcpy
-# pylint: disable=R1710  # inconsistent-return-statements
-# pylint: disable=W0105  # string statement has no effect
-# pylint: disable=W0621  # redefining name
-# pylint: disable=W0614  # unused import ... from wildcard import
-
-# pylint: disable=C0103, C0302, C0415, E1136, E1121, R0904, R0914, W0212, W0221
-# pylint: disable=R0902,  # attribute defined outside __init__... none in numpy
+# pylint: disable=C0103, C0302, C0330, C0415
+# pylint: disable=E0611, E1101, E1136, E1121
+# pylint: disable=R0902, R0904, R0914
+# pylint: disable=W0105, W0201, W0212, W0221, W0612, W0614, W0621, W0105
 
 import sys
-# from textwrap import indent  # dedent,
+# from textwrap import indent, dedent
 import json
 import numpy as np
-# import npgeom as npg
+
+import npGeo
+
+# ---- Keep for now.
 # from numpy.lib.recfunctions import structured_to_unstructured as stu
-# from numpy.lib.recfunctions import unstructured_to_structured as uts
+from numpy.lib.recfunctions import unstructured_to_structured as uts
 # import npGeo
 # from npGeo import *
 
@@ -68,14 +72,16 @@ null_pnt = (np.nan, np.nan)  # ---- a null point
 
 ft = {'bool': lambda x: repr(x.astype(np.int32)),
       'float_kind': '{: 0.3f}'.format}
-np.set_printoptions(edgeitems=10, linewidth=160, precision=2, suppress=True,
-                    threshold=100, formatter=ft)
+np.set_printoptions(
+    edgeitems=10, linewidth=160, precision=2, suppress=True,
+    threshold=100, formatter=ft
+)
 
 __all__ = [
     'dtype_info', 'load_geo', 'save_geo', 'load_txt', 'save_txt',
     'load_geojson',
-    'prn_q', '_check', 'prn_tbl', 'prn_geo',
-    ]
+    'prn_q', 'prn_tbl', 'prn_geo',
+]
 
 
 # ---- (1) arrays : in and out------------------------------------------------
@@ -105,26 +111,57 @@ def dtype_info(a, as_string=False):
     names = list(a.dtype.names)  # [i[0] for i in dt]
     formats = [i[1] for i in dt]
     if as_string and names is not None:
-        names = ", ".join([i for i in names])
-        formats = ", ".join([i for i in formats])
+        names = ", ".join(names)
+        formats = ", ".join(formats)
     return names, formats
 
 
-def load_geo(f_name, all_info=True):
+def load_geo(f_name, suppress_extras=True):
     """Load a well formed `npy` file representing a structured array.
 
-    An array, the description, field names and their size are returned.
+    Unpack an npz file containing a geo array.
+
+    Returns
+    -------
+    geo : Geo array
+        The Geo array is created within this function and returned along with
+        the base arrays, (`arrs`) and the list of array names (`names`), if
+        ``suppress_extras`` is False.
+    arrs : arrays
+        The arrays within the npz,
+    names : list
+        A list of the array names which you use to slice particular arrays..
+    suppress_extras : boolean
+        If False, only the Geo array is returned, otherwise, the Geo array,
+        the constituent arrays and their names are returned.
+
+    Example
+    -------
+    >>> f_name = "c:/temp/arr.npz"
+    >>> geo, arrs, names = npg.load_geo(f_name)
+    >>> arr_names = arrs.files  # returns the list of array names inside
+    arr0 = arrs[0]
+    An array or arrays. The description, field names and their size of each
+    are returned.
     """
-    npzfiles = np.load(f_name)
-    f = npzfiles.files
-    g = npzfiles['g']
-    print("\nLoading...{}\nArrays included...{}".format(f_name, f))
-    if all_info:
-        desc = g.dtype.descr
-        nms = g.dtype.names
-        sze = [i[1] for i in g.dtype.descr]
-        return g, desc, nms, sze
-    return g
+    arrs = np.load(f_name)
+    names = arrs.files  # array names
+    print("\nLoading...{}\nArrays include...{}".format(f_name, names))
+    frmt = "({}) name : {}\n  shape : {}\n  descr. : {}"
+    for i, name in enumerate(names):
+        tmp = arrs[name]
+        shp = tmp.shape
+        desc = tmp.dtype.descr
+        print(frmt.format(i, name, shp, desc))
+    n0, n1, n2, n3, n4 = names
+    geo = npGeo.Geo(arrs[n0],
+                    IFT=arrs[n1],
+                    Kind=int(arrs[n2]),
+                    Extent=arrs[n3],
+                    SR=arrs[n4])
+    if suppress_extras:
+        return geo
+    return geo, arrs, names
 
 
 def save_geo(g, fname, folder):
@@ -194,19 +231,19 @@ def save_txt(a, name="arr.txt", sep=", ", dt_hdr=True):
         if True, add dtype names to the header of the file
 
     """
-    a_names = ", ".join(i for i in a.dtype.names)
+    a_names = ", ".join(a.dtype.names)
     hdr = ["", a_names][dt_hdr]  # use "" or names from input array
     s = np.array(a.tolist(), dtype=np.unicode_)
     widths = [max([len(i) for i in s[:, j]])
               for j in range(s.shape[1])]
     frmt = sep.join(["%{}s".format(i) for i in widths])
-    # vals = ", ".join([i[1] for i in a.dtype.descr])
     np.savetxt(name, a, fmt=frmt, header=hdr, comments="")
     print("\nFile saved...")
 
 
+# ============================================================================
 # ---- (2) json section ------------------------------------------------------
-#
+# load json and geojson information
 def load_geojson(pth, full=False, geometry=True):
     """Load a geojson file and convert to a Geo Array.
 
@@ -228,23 +265,28 @@ def load_geojson(pth, full=False, geometry=True):
         result is a nested dictionary::
 
     >>> data
-    ... {'type':
+    ... {'type':                                  # first feature
     ...  'crs': {'type': 'name', 'properties': {'name': 'EPSG:2951'}},
-    ...  'features': [{'type': 'Feature',
-    ...    'id': 1,
-    ...    'geometry': {'type':  'MultiPolygon',
-    ...     'coordinates': snip},  # coordinate values
-    ...     'properties': snip }}, # attribute values from table
-    ... {'type': ... repeat}
+    ...  'features':
+    ...     [{'type': 'Feature',
+    ...       'id': 1,
+    ...       'geometry': {'type':  'MultiPolygon',
+    ...                    'coordinates': snip},  # coordinate values
+    ...       'properties': snip }},              # attribute values from table
+    ... {'type':                                  # next feature
+    ...  ... repeat}
 
-    geometry : list
-        A list of lists representing the features, their parts *for multipart
+        geometry : list
+        A list of lists representing the features, their parts (for multipart
         features) and inner holes (for polygons).
 
     References
     ----------
     `geojson specification in detail
     <https://geojson.org/>`_.
+
+    `Wikipedia link
+    <https://en.wikipedia.org/wiki/GeoJSON>`_.
 
     `Features to JSON
     <https://pro.arcgis.com/en/pro-app/tool-reference/conversion/
@@ -254,11 +296,13 @@ def load_geojson(pth, full=False, geometry=True):
     <https://pro.arcgis.com/en/pro-app/tool-reference/conversion/
     json-to-features.htm>`_.
     """
-    # import json
+    # import json  # required if run outside
     with open(pth) as f:
         data = json.load(f)
-    shapes = data['features']
-    coords = [s['geometry']['coordinates'] for s in shapes]
+    keys = list(data.keys())
+    if 'features' in keys:
+        shapes = data['features']
+        coords = [s['geometry']['rings'] for s in shapes]
     if full and geometry:
         return data, coords
     if full:
@@ -267,23 +311,36 @@ def load_geojson(pth, full=False, geometry=True):
         return coords
 
 
+def geojson_Geo(pth, kind=2, info=None):
+    """Convert GeoJSON file to Geo array using `npGeo.arrays_to_Geo`.
+
+    Parameters
+    ----------
+    pth : string
+        Full path to the geojson file.
+    kind : integer
+        Polygon, Polyline or Point type are identified as either 2, 1, or 0.
+    info : text
+        Supplementary information.
+    """
+    coords = load_geojson(pth)
+    # a_2d, ift, extents = npGeo._arr_ift_(coords)
+    return npGeo.arrays_to_Geo(coords, kind=kind, info=info)
+    # return npGeo.Geo(a_2d, IFT=ift, Extent=extents, Kind=kind)
+
+
 # ============================================================================
 # ---- (3) Print etc ---------------------------------------------------------
 # printing based on arraytools.frmts.py using prn_rec and dependencies
-#
+
 def prn_q(a, edges=3, max_lines=25, width=120, decimals=2):
     """Format a structured array by setting the width so it wraps."""
     width = min(len(str(a[0])), width)
     with np.printoptions(edgeitems=edges, threshold=max_lines, linewidth=width,
                          precision=decimals, suppress=True, nanstr='-n-'):
         print("\nArray fields/values...:")
-        print("  ".join([n for n in a.dtype.names]))
+        print("  ".join(a.dtype.names))
         print(a)
-
-
-def _check(a):
-    """Check dtype and max value for formatting information."""
-    return a.shape, a.ndim, a.dtype.kind, np.min(a), np.max(a)
 
 
 def prn_tbl(a, rows_m=20, names=None, deci=2, width=75):
@@ -312,7 +369,7 @@ def prn_tbl(a, rows_m=20, names=None, deci=2, width=75):
         if (c_kind in FLOATS) and (deci != 0):  # float with decimals
             c_max, c_min = np.round([np.min(a), np.max(a)], deci)
             c_width = len(max(str(c_min), str(c_max), key=len))
-        elif c_kind in NUMS:      # int, unsigned int, float wih no decimals
+        elif c_kind in NUMS:  # int, unsigned int, float with no decimals
             c_width = len(max(str(np.min(a)), str(np.max(a)), key=len))
         elif c_kind in ('U', 'S', 's'):
             c_width = len(max(a, key=len))
@@ -328,7 +385,7 @@ def prn_tbl(a, rows_m=20, names=None, deci=2, width=75):
         for c_kind, c_width in pairs:
             if c_kind in INTS:  # ---- integer type
                 c_format = ':>{}.0f'.format(c_width)
-            elif c_kind in FLOATS:  # and np.isscalar(c[0]):  # float rounded
+            elif c_kind in FLOATS:
                 c_format = ':>{}.{}f'.format(c_width, deci)
             else:
                 c_format = "!s:<{}".format(c_width)
@@ -343,7 +400,7 @@ def prn_tbl(a, rows_m=20, names=None, deci=2, width=75):
     if names is None:
         names = dtype_names
     # ---- slice off excess rows, stack upper and lower slice using rows_m
-    if a.shape[0] > rows_m*2:
+    if a.shape[0] > rows_m * 2:
         a = np.hstack((a[:rows_m], a[-rows_m:]))
     # ---- get the column formats from ... _ckw_ and _col_format ----
     pairs = [_ckw_(a[name], name, deci) for name in names]  # -- column info
@@ -358,7 +415,7 @@ def prn_tbl(a, rows_m=20, names=None, deci=2, width=75):
     hdr = ["!s:<" + "{}".format(wdths[i]) for i in range(N)]
     hdr2 = "  ".join(["{" + hdr[i] + "}" for i in range(N)])
     header = " ... " + hdr2.format(*names[:N]) + tail
-    header = "{}\n{}".format(header, "-"*len(header))
+    header = "{}\n{}".format(header, "-" * len(header))
     txt = [header]
     for idx, i in enumerate(range(a.shape[0])):
         if idx == rows_m:
@@ -366,7 +423,7 @@ def prn_tbl(a, rows_m=20, names=None, deci=2, width=75):
         else:
             t = " {:>03.0f} ".format(idx) + row_frmt.format(*a[i]) + tail
             txt.append(t)
-    msg = "\n".join([i for i in txt])
+    msg = "\n".join(txt)
     print(msg)
     # return row_frmt, hdr2  # uncomment for testing
 
@@ -389,15 +446,6 @@ def prn_geo(a, rows_m=100, names=None, deci=2, width=75):
         The number of decimal places to print for all floating point columns.
     width : int
         Print width in characters.
-
-    Notes
-    -----
-    >>> toos = s0.IFT[:,2]
-    >>> nans = np.where(np.isnan(s0[:,0]))[0]  # array([10, 21, 31, 41]...
-    >>> dn = np.digitize(nans, too)            # array([1, 2, 3, 4]...
-    >>> ift[:, 0][dn]                          # array([1, 1, 2, 2])
-    >>> np.sort(np.concatenate((too, nans)))
-    ... array([ 5, 10, 16, 21, 26, 31, 36, 41, 48, 57, 65], dtype=int64)
     """
     def _ckw_(a, name, deci):
         """Columns `a` kind and width."""
@@ -441,7 +489,7 @@ def prn_geo(a, rows_m=100, names=None, deci=2, width=75):
     p = np.where(np.diff(c, append=0) == 1, "___", "")
     p1 = np.asarray(["" if i not in ift[:, 2] else 'o' for i in range(len(p))])
     p0 = np.asarray(["-" if i == 'o' else "" for i in p1])
-    pp = np.asarray([p[i]+p0[i]+p1[i] for i in range(len(p))])
+    pp = np.asarray([p[i] + p0[i] + p1[i] for i in range(len(p))])
     if a.shape[0] > rows_m:
         a = a[:rows_m]
         c = c[:rows_m]
@@ -460,11 +508,11 @@ def prn_geo(a, rows_m=100, names=None, deci=2, width=75):
     hdr = ["!s:<" + "{}".format(wdths[i]) for i in range(N)]
     hdr2 = "  ".join(["{" + hdr[i] + "}" for i in range(N)])
     header = " pnt " + hdr2.format(*names[:N])
-    header = "\n{}\n{}".format(header, "-"*len(header))
+    header = "\n{}\n{}".format(header, "-" * len(header))
     txt = [header]
     for i in range(a.shape[0]):
         txt.append(row_frmt.format(i, c[i], pp[i], a[i, 0], a[i, 1]))
-    msg = "\n".join([i for i in txt])
+    msg = "\n".join(txt)
     print(msg)
     # return row_frmt, hdr2  # uncomment for testing
 
@@ -503,6 +551,13 @@ def gms(arr):
 if __name__ == "__main__":
     """optional location for parameters"""
     print("\n{}".format(script))
+
+"""
+'C:/Git_Dan/npgeom/Polygons2_geo.geojson'
+'C:/Git_Dan/npgeom/data/Polygons2_esrijson.json'
+'C:/Git_Dan/npgeom/data/Polygons2_geojson.json'
+'C:/Git_Dan/npgeom/data/g.npz'
+"""
 
 """
 lists to dictionary
