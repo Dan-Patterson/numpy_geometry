@@ -1,4 +1,4 @@
-## Docs ##
+## Geo array basics ##
 
 Import **npgeom** and take a subsample of some featureclass (in_fc) geometry objects (g).
 
