@@ -1,21 +1,36 @@
 # -*- coding: utf-8 -*-
-"""
-==================
-npgeom.__init__.py
-==================
+r"""
+npgeom
+======
+
+**npgeom module __init__ file**
+
+Normal usage:
+
+    >>> import npgeom as npg
+
+Script :
+    npgeom.__init__.py.
 
 Author :
-    Dan_Patterson@carleton.ca
+    Dan Patterson
+- Dan_Patterson@carleton.ca
+- https://github.com/Dan-Patterson
 
-Modified : 2019-09-06
+Modified : 2019-12-24
     Creation date during 2019 as part of ``arraytools``.
 
-Purpose : Tools for working with point and poly features as an array class
-    Requires npGeo to implement the array geometry class.
+Purpose
+-------
+Tools for working with point and poly features as an array class.
+Requires npGeo to implement the array geometry class.
+
+See Also
+--------
+Many links and references in ``_npgeom_notes_.py``.
 
 Notes
 -----
-
 Import suggestion and package properties and methods.  The Geo class in npGeo
 provides the base class for this package.  It is based on the numpy ndarray.
 
@@ -23,12 +38,14 @@ provides the base class for this package.  It is based on the numpy ndarray.
 
 >>> npg.npg_io.__all__
 ... ['poly2array', 'load_geojson', 'arrays_to_Geo', 'Geo_to_arrays',
-...  'array_ift', '_make_nulls_', 'getSR', 'fc_composition', 'fc_data',
-...  'fc_geometry', 'fc_shapes', 'getSR', 'shape_to_K', 'array_poly',
+...  'array_ift', 'make_nulls', 'get_SR', 'fc_composition', 'fc_data',
+...  'fc_geometry', 'get_shapes', 'get_SR', 'shape_to_K', 'array_poly',
 ...  'geometry_fc', 'prn_q', '_check', 'prn_tbl', 'prn_geo']
 
 >>> npg.npGeo.__all__
-... ['Geo', 'Update_Geo']
+... ['Geo', 'arrays_to_Geo', '_arr_ift_', 'Geo_to_arrays', '_fill_float_array',
+...  'dirr', 'geo_info', 'check_geometry', 'shape_finder', '_pnts_in_geo',
+...  '_svg']
 
 >>> npg.npg_helpers.__all__
 ... ['_angles_', '_area_centroid_', '_ch_', '_ch_scipy',
@@ -56,80 +73,80 @@ Arcpy methods and properties needed::
     arcpy.da.InsertCursor
     arcpy.da.SearchCursor
     arcpy.da.FeatureClassToNumPyArray
+
+Spyder and conda
+----------------
+When using spyder, you can access conda.
+
+Currently use IPython line magics and change your directory to where conda.exe
+resides.
+
+>>> cd C:\arc_pro\bin\Python\Scripts
+>>> conda list  # will provide a listing of your packages
+
+Note:  Python resides in this folder
+
+>>> C:\arc_pro\bin\Python\envs\arcgispro-py3
+
 """
+# pyflakes: disable=F0401
 # pylint: disable=unused-import
 # pylint: disable=W0611
+
+import sys
 import numpy as np
 
 from . import (
-        npGeo, npg_io, npg_geom, npg_table, npg_create, npg_analysis,
-        smallest_circle, _tests_
-        )  # noqa
+    npGeo, npg_io, npg_geom, npg_helpers, npg_table, npg_create,
+    npg_analysis, npg_utils, smallest_circle,
+)
 
-from .npGeo import (Geo, Update_Geo, dirr, geo_info)  # noqa
-
-from .npg_io import (
-        poly2array, load_geojson, geojson_Geo, fc_json, arrays_to_Geo,
-        Geo_to_arrays, array_ift, _make_nulls_, getSR, shape_K,
-        fc_composition, fc_data, fc_geometry, fc_shapes, array_poly,
-        geometry_fc, prn_q, _check, prn_tbl, prn_geo,
-        shape_properties, flatten_to_points
-        )  # noqa
-
-from .npg_geom import (
-        _area_centroid_, _angles_, _rotate_, _ch_scipy_,
-        _ch_simple_, _ch_, _dist_along_, _percent_along_, _pnts_on_line_,
-        _pnt_on_segment_, _polys_to_unique_pnts_,
-        _simplify_lines_, _tri_pnts_,
-        )  # noqa
-
-from .npg_table import (
-        col_stats, crosstab_tbl, crosstab_rc, crosstab_array
-        )  # noqa
-
-from .npg_analysis import (
-        closest_n, distances, not_closer, n_check, n_near, n_spaced,
-        intersects, knn, knn0, mst, connect, concave
-        )  # noqa
-
-__all_io__ = [
-        '__all_io__',
-        'arrays_to_Geo', 'Geo_to_arrays', '_check', '_make_nulls_',
-        'array_ift', 'array_poly', 'fc_composition', 'fc_data',
-        'fc_geometry', 'fc_shapes', 'geometry_fc', 'getSR', 'getSR',
-        'load_geojson', 'poly2array', 'prn_geo', 'prn_q', 'prn_tbl',
-        'shape_to_K'
-        ]  # noqa
-__all_geo__ = [
-        '__all_geo__',
-        'Geo', 'Update_Geo', 'dirr', 'geo_info'
-        ]  # noqa
-
-__all_geom__ = [
-        '__all_geom__',
-        '_angles_', '_area_centroid_', '_ch_', '_ch_scipy_', '_ch_simple_',
-        '_dist_along_', '_percent_along_', '_pnt_on_poly_', '_pnt_on_segment_',
-        '_pnts_in_poly_', '_pnts_on_line_', '_polys_to_unique_pnts_',
-        '_rotate_', '_simplify_lines_', '_tri_pnts_', 'ft', 'np', 'p_o_p'
-        ]  # noqa
-
-__all_analysis__ = [
-        '__all_analysis__',
-        'closest_n', 'distances', 'not_closer', 'n_check', 'n_near',
-        'n_spaced', 'intersects', 'knn', 'knn0', '_dist_arr_', '_e_dist_',
-        'mst', 'connect', 'concave'
-        ]  # noqa
-
-__all_table__ = [
-        '__all_table__',
-        'crosstab_tbl', 'crosstab_rc', 'crosstab_array', 'col_stats',
-        'group_stats'
-        ]  # noqa
-args = [__all_io__, __all_geo__, __all_geom__, __all_analysis__,
-        __all_table__]
-__all__ = np.concatenate([np.asarray(a) for a in args]).tolist()
-
-# __all__.sort()
+from . npGeo import *
+from . npg_io import *
+from . npg_geom import *
+from . npg_helpers import *
+from . npg_table import *
+from . npg_create import *
+from . npg_analysis import *
+from . npg_utils import *
+from . smallest_circle import *
 
 
-print("\nUsage...\n  import npgeom as npg")
+__all__ = [
+    'npGeo', 'npg_io', 'npg_geom', 'npg_helpers', 'npg_table',
+    'npg_create', 'npg_analysis', 'npg_utils', 'smallest_circle'
+]
+
+__all__.extend(npGeo.__all__)
+__all__.extend(npg_io.__all__)
+__all__.extend(npg_geom.__all__)
+__all__.extend(npg_helpers.__all__)
+__all__.extend(npg_table.__all__)
+__all__.extend(npg_create.__all__)
+__all__.extend(npg_analysis.__all__)
+# __all__.extend(smallest_circle.__all__)
+__all__.sort()
+
+
+msg = """
+----------------------------------------------
+---- ... (n)um(p)y (g)eometry ... npg ... ----
+location
+... {}
+python version and location ...
+... {}
+... {}
+numpy version ...
+... {}
+Usage...
+... import npgeom as npg
+
+Modules not imported by default...
+... npg_arc
+... npg_plots
+
+----------------------------------------------
+"""
+
+print(msg.format(__path__[0], sys.version, sys.exec_prefix, np.__version__))
+del msg
