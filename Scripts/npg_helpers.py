@@ -39,11 +39,11 @@ import sys
 
 import numpy as np
 
-__all__ = ['compare_2d']
+__all__ = ['compare_geom', 'keep_geom', 'remove_geom']
 
 
-def compare_2d(arr, look_for, unique=True, invert=False, return_idx=False):
-    """Look for duplicates in two 2D arrays.
+def compare_geom(arr, look_for, unique=True, invert=False, return_idx=False):
+    """Look for duplicates in two 2D arrays.  This can be points or segments.
 
     ** can use to find duplicates between 2 arrays ie compare_arrays **
 
@@ -84,14 +84,15 @@ def compare_2d(arr, look_for, unique=True, invert=False, return_idx=False):
     return out
 
 
-def keep_points(arr, look_for, **kwargs):
+def keep_geom(arr, look_for, **kwargs):
     """Keep points in ``arr`` that match those in ``look_for``."""
-    return compare_2d(arr, look_for, invert=False, return_idx=False)
+    return compare_geom(arr, look_for, invert=False, return_idx=False)
 
 
-def remove_points(arr, look_for, **kwargs):
+def remove_geom(arr, look_for, **kwargs):
     """Remove points from ``arr`` that match those in ``look_for``."""
-    return compare_2d(arr, look_for, invert=True, return_idx=False)
+    return compare_geom(arr, look_for, unique=False,
+                        invert=True, return_idx=False)
 
 
 script = sys.argv[0]  # print this should you need to locate the script

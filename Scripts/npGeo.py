@@ -16,7 +16,7 @@ Script : npGeo.py
 Author :
     Dan_Patterson@carleton.ca
 
-Modified : 2019-12-24
+Modified : 2019-12-31
     Initial creation period 2019-05.
 
 Purpose
@@ -185,7 +185,7 @@ if 'npg' not in list(locals().keys()):
 
 # noqa: E501
 ft = {"bool": lambda x: repr(x.astype(np.int32)),
-      "float_kind": '{: 0.4f}'.format}
+      "float_kind": '{: 0.2f}'.format}
 np.set_printoptions(
     edgeitems=10, linewidth=120, precision=2, suppress=True, threshold=200,
     formatter=ft
@@ -709,7 +709,7 @@ class Geo(np.ndarray):
         """Split points by shape or by parts for each shape.
 
         **keep for now**
-        Use self.parts or self.shapes directly.
+        Use self.bits, self.parts or self.shapes directly.
 
         Parameters
         ----------
@@ -717,6 +717,9 @@ class Geo(np.ndarray):
             split by (b)it, (p)art (s)hape
         """
         case = splitter[0].lower()
+        if case not in ('b', 'p', 's'):
+            print("\nSplitter not in by (b)it, (p)art (s)hape")
+            return None
         if case == "b":
             return self.bits
         elif case == "p":
@@ -882,8 +885,8 @@ class Geo(np.ndarray):
         # ----
         if self.N == 1:
             splitter = "bit"
-        parts = self.split_by(splitter)
-        return np.asarray([_extent_(p) for p in parts])
+        chunks = self.split_by(splitter)
+        return np.asarray([_extent_(c) for c in chunks])
 
     def extent_centers(self, splitter="shape"):
         """Return extent centers.
@@ -1262,7 +1265,7 @@ class Geo(np.ndarray):
 
         See Also
         --------
-        polys_to_segments
+        ``polys_to_segments``
         """
         od = [np.concatenate((p[:-1], p[1:]), axis=1) for p in self.bits]
         return np.asarray(od)
@@ -1377,7 +1380,7 @@ class Geo(np.ndarray):
 
     # ---- segments for poly* boundaries
     #
-    def polys_to_segments(self, as_basic=True, as_3d=False):
+    def polys_to_segments(self, as_basic=True, shifted=False, as_3d=False):
         """Segment poly* structures into o-d pairs from start to finish.
 
         Parameters
@@ -1387,6 +1390,8 @@ class Geo(np.ndarray):
             [X_orig', Y_orig', 'X_orig', 'Y_orig'] as an ndarray.
             If False, the content is returned as a structured array with the
             same content and ids and length.
+        shifted : boolean
+            True, shifts the coordinates back to their original extent space.
         as_3d : boolean
             True, the point pairs are returned as a 3D array in the form
             [[X_orig', Y_orig'], ['X_orig', 'Y_orig']], without the distances.
@@ -1404,7 +1409,10 @@ class Geo(np.ndarray):
                                     for b in self.bits], axis=0)
             return fr_to
         #
-        b_vals = [b + self.LL for b in self.bits]  # shift to orig extent
+        if shifted:
+            b_vals = [b + self.LL for b in self.bits]  # shift to orig extent
+        else:
+            b_vals = [b for b in self.bits]
         fr_to = np.concatenate([np.concatenate((b[:-1], b[1:]), axis=1)
                                 for b in b_vals], axis=0)
         # ---- shortcut to 3d from-to representation
@@ -1414,15 +1422,19 @@ class Geo(np.ndarray):
             return fr_to.reshape(s0, s1//2, s1//2)
         # ----structured array section
         # add bit ids and lengths to the output array
-        b_ids = self.bit_ids
-        segs = np.asarray([[b_ids[i], len(b) - 1]
+        b_ids = self.IFT
+        # segs = np.asarray([[b_ids[i], len(b) - 1]
+        #                    for i, b in enumerate(b_vals)])
+        segs = np.asarray([[[b_ids[i][0], *(b_ids[i][-2:])], len(b) - 1]
                            for i, b in enumerate(b_vals)])
-        s_ids = np.concatenate([np.repeat(i[0], i[1]) for i in segs])
+        s_ids = np.concatenate([np.tile(i[0], i[1]).reshape(-1, 3)
+                                for i in segs], axis=0)
         dist = (np.sqrt(np.sum((fr_to[:, :2] - fr_to[:, 2:4])**2, axis=1)))
-        fr_to = np.hstack((fr_to, s_ids.reshape(-1, 1), dist.reshape(-1, 1)))
+        fr_to = np.hstack((fr_to, s_ids, dist.reshape(-1, 1)))
         dt = np.dtype([('X_orig', 'f8'), ('Y_orig', 'f8'),
                        ('X_dest', 'f8'), ('Y_dest', 'f8'),
-                       ('Orig_id', 'i4'), ('Length', 'f8')])
+                       ('Orig_id', 'i4'), ('Part', 'i4'), ('Seq_ID', 'i4'),
+                       ('Length', 'f8')])
         fr_to = uts(fr_to, dtype=dt)
         return repack_fields(fr_to)
 
@@ -1621,6 +1633,58 @@ class Geo(np.ndarray):
                 return self[np.lexsort((self.X, self.Y))]
             return self[np.lexsort((-self.X, self.Y))]
 
+    def radial_sort(self, as_Geo=True):
+        """Sort the coordinates of polygon/polyline features.
+
+        The features will be sorted so that their first coordinate is in the
+        lower left quadrant (SW) as best as possible.  Outer rings are sorted
+        clockwise and interior rings, counterclockwise.  Existing duplicates
+        are removed to clean features, hence, the dup_first to provide closure
+        for polygons.
+
+        Returns
+        -------
+        Geo array, with points radially sorted (about their center).
+
+        Notes
+        -----
+        Angles relative to the x-axis.
+        >>> rad = np.arange(-6, 7.)*np.pi/6
+        >>> np.degrees(rad)
+        ... array([-180., -150., -120., -90., -60., -30.,  0.,
+        ...          30., 60., 90., 120., 150., 180.])
+
+        References
+        ----------
+        `<https://stackoverflow.com/questions/35606712/numpy-way-to-sort-out-a
+        -messy-array-for-plotting>`_.
+        """
+        def _radsrt_(a, dup_first=False):
+            """Worker for radial sort."""
+            uniq = np.unique(a, axis=0)
+            cent = np.mean(uniq, axis=0)
+            dxdy = uniq - cent
+            angles = np.arctan2(dxdy[:, 1], dxdy[:, 0])
+            idx = angles.argsort()
+            srted = uniq[idx]
+            if dup_first:
+                return np.concatenate((srted, [srted[0]]), axis=0)[::-1]
+            return srted
+        # ----
+        ift = self.IFT
+        cw = self.CW
+        kind = self.K
+        dup_first = False
+        if kind == 2:
+            dup_first = True
+        tmp = []
+        for i, a in enumerate(self.bits):
+            arr = _radsrt_(a, dup_first)
+            if cw[i] == 0:
+                arr = arr[::-1]
+            tmp.append(arr)
+        return npg.Geo(np.vstack(tmp), IFT=ift)
+
     # ---- (7) info section -------------------------------------------------
     # ---- points, dupl_pnts
 
@@ -1640,15 +1704,15 @@ class Geo(np.ndarray):
         print(dedent(docs))
         npg_io.prn_tbl(self.IFT_str)
 
-    def point_info(self, by_part=True):
+    def point_info(self, splitter="bit"):
         """Point count by feature or parts of feature.
 
         Parameters
         ----------
-        by part: boolean
-            True for each feature part or False for the whole feature.
+        splitter : b, p, s
+            split by (b)it, (p)art (s)hape
         """
-        chunks = self.split_by(by_part)
+        chunks = self.split_by(splitter)
         return np.array([len(i) for i in chunks])
 
     def dupl_pnts(self, as_structured=True):
@@ -1696,8 +1760,7 @@ def _arr_ift_(in_arrays):
     Notes
     -----
     Called by `arrays_to_Geo`.
-    Use `fc_geometry` to produce `Geo` objects directly from arcgis pro
-    featureclasses.
+    Use `fc_geometry` to produce `Geo` objects directly from FeatureClasses.
     """
     id_too = []
     a_2d = []
@@ -1716,7 +1779,7 @@ def _arr_ift_(in_arrays):
                 if isinstance(j, (list, tuple)):
                     j = np.asarray(j)
                 if len(j.shape) == 2:
-                    bits.append(np.asarray(j).squeeze())  # append and no squ
+                    bits.append(np.asarray(j).squeeze())
                     x = [cnt, b_id, len(j)]
                     id_too.append(x)
                     b_id += 1
@@ -1795,6 +1858,8 @@ def arrays_to_Geo(in_arrays, kind=2, info=None):
     **npg_arc.fc_geometry** to produce `Geo` objects directly from arcgis pro
     featureclasses.
     """
+    if kind == 2:  # check for proper polygon points
+        in_arrays = [i for i in in_arrays if len(np.unique(i, axis=0)) >= 3]
     a_2d, ift, extent = _arr_ift_(in_arrays)     # ---- call _arr_ift_
     rows, cols = ift.shape
     z0 = np.full((rows, 6), fill_value=-1, dtype=ift.dtype)
@@ -1812,8 +1877,9 @@ def arrays_to_Geo(in_arrays, kind=2, info=None):
             z0[:, 4] = np.concatenate(fix_prt)
             w = np.where(z0[:, 3] == 1)[0]
             dif = w[1:] - w[:-1]
-            fix_seq = np.concatenate([np.arange(i) for i in dif])
-            z0[:len(fix_seq), 5] = fix_seq
+            if len(dif) > 1:  # *** added
+                fix_seq = np.concatenate([np.arange(i) for i in dif])
+                z0[:len(fix_seq), 5] = fix_seq
             g = Geo(a_2d, z0, Kind=kind, Extent=extent, Info=info)
     return g
 

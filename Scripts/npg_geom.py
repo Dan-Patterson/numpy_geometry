@@ -15,7 +15,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2019-12-12
+    2019-12-30
 
 Purpose
 -------
@@ -72,7 +72,8 @@ import numpy as np
 from scipy.spatial import ConvexHull as CH
 from scipy.spatial import Delaunay
 
-# import npgeom as npg
+import npgeom as npg
+from npgeom.npg_helpers import compare_geom
 # import npg_io
 # from npGeo_io import fc_data
 
@@ -91,8 +92,8 @@ __all__ = [
     '_dist_along_', '_percent_along_', '_pnts_on_line_',
     '_polys_to_unique_pnts_', '_simplify_lines_',
     '_pnts_in_poly_', '_pnt_on_poly_', '_pnt_on_segment_', 'p_o_p',
-    '_rotate_', '_tri_pnts_', '_crossing_num_', 'p_in_p',
-    'in_hole_check', 'pnts_in_pnts'
+    '_rotate_', '_tri_pnts_', '_in_extent_', '_line_crosses_', 'clip_',
+    '_crossing_num_', 'p_in_p', 'in_hole_check', 'pnts_in_pnts'
 ]
 
 
@@ -449,7 +450,8 @@ def _simplify_lines_(a, deviation=10):
     return a, p, ang
 
 
-# ---- points in or on geometries --------------------------------------------
+# ----------------------------------------------------------------------------
+# ---- points in or on geometries
 def pnts_in_Geo_extents(pnts, geo):
     """`pnts_in_ext` without the `outside` check and return.
 
@@ -736,10 +738,10 @@ def _tri_pnts_(pnts):
     out : array
         An array of triangle points.
 
-    Notes
-    -----
-    The simplices are ordered counterclockwise, this is reversed in this
-    implementation.
+    .. note::
+
+       The simplices are ordered counterclockwise, this is reversed in this
+       implementation.
 
     References
     ----------
@@ -755,14 +757,217 @@ def _tri_pnts_(pnts):
     z = np.zeros((len(simps), 4), dtype='int32')
     z[:, :3] = simps
     z[:, 3] = simps[:, 0]
-    z = z[:, ::-1]
+    z = z[:, ::-1]                               # reorder clockwise
     new_pnts = p[z] + avg
     new_pnts = new_pnts.reshape(-1, 2)
     return new_pnts
 
 
+# ----------------------------------------------------------------------------
+# ---- clip polygons
+#
+def _in_extent_(pnts, extent):
+    """Return the points within an extent.
+
+    Parameters
+    ----------
+    pnts : array
+        An Nx2 array representing point objects.
+    extent : array-like
+        A 1x4, as [x0, y0, x1, y1] where the first pair is the left-bottom
+        and the second pair is the right-top coordinate.
+    """
+    LB, RT = extent[:2], extent[2:]
+    return np.any(LB < pnts) & np.any(pnts <= RT)
+
+
+def _inside_outside_crosses_(p0, p1, p2, p3):
+    """
+    Determine whether a line segment (p0-->p1) is crossed by a cutting/clipping
+    segment (p2-->p3).
+
+    Parameters
+    ----------
+    p0, p1, p2, p3 : point
+        See `_line_crosses_` for description
+
+    Returns
+    -------
+    - -1 both segment points are outside the clipping segment.
+    - 0  the segment points cross the clipping segment with one point inside.
+         and one point outside.
+    - 1  both segment points are inside the clipping segment.
+
+    """
+    a, b = _line_crosses_(p0, p1, p2, p3)
+    if a and b:
+        return 1
+    elif a or b:
+        return 0
+    elif not a and not b:
+        return -1
+
+
+def _line_crosses_(p0, p1, p2, p3):
+    """Determine if a line is `inside` another line segment.
+
+    Parameters
+    ----------
+    p0, p1, p2, p3 : array-like
+        X,Y coordinates of the subject line (p0-->p1) and the clipping line
+        (p2-->p3).
+
+    Returns
+    -------
+    The result indicates which points, if any, are on the inward bound side of
+    a polygon (aka, right side). The clip edge (p2-->p3) is for clockwise
+    oriented polygons and its segments. If `a` or `b` are True, then both are
+    inside.  False for both means that they are on the outside of the clipping
+    segment.
+    """
+    x0, y0, x1, y1, x2, y2, x3, y3 = (*p0, *p1, *p2, *p3)
+    dc_x = x3 - x2
+    dc_y = y3 - y2
+    # ---- check p0 and p1 separately and return the result
+    a = (y0 - y2) * dc_x <= (x0 - x2) * dc_y
+    b = (y1 - y2) * dc_x <= (x1 - x2) * dc_y
+    return a, b
+
+
+def _intersect_(p0, p1, p2, p3):
+    """Intersect point and two segments.
+
+    Returns the intersection point of a polygon segment and a clipping
+    polygon segment.  `_line_right_side_` checks whether the line segments
+    cross.
+    """
+    x0, y0, x1, y1, x2, y2, x3, y3 = (*p0, *p1, *p2, *p3)
+    dc_x, dc_y = p2 - p3
+    dp_x, dp_y = p0 - p1
+    n1 = x2 * y3 - y2 * x3
+    n2 = x0 * y1 - y0 * x1
+    n3 = 1.0 / (dc_x * dp_y - dc_y * dp_x)
+    arr = np.array([(n1 * dp_x - n2 * dc_x), (n1 * dp_y - n2 * dc_y)])
+    return arr * n3
+
+
+def clip_(poly, clipper, is_polygon=True):
+    """Variant of clip_poly.
+
+    Parameters
+    ----------
+    poly, clipper : array-like
+        The poly feature to clip. The `clipper` must form a closed-loop.
+
+    References
+    ----------
+    Adapted from Rosetta Code Python example:
+
+    `<https://rosettacode.org/wiki/Sutherland-Hodgman_polygon_clipping>`_.
+
+    `<http://geomalgorithms.com/a09-_intersect-3.html>`_.
+
+    `<https://codereview.stackexchange.com/questions/166702/cythonized-
+    sutherland-hogman-algorithm>`_.
+
+    For testing notes, see ``_npgeom_notes_.py``
+
+    """
+    # ----
+    empty_array = np.array([])
+    clip_extent = np.concatenate(
+        (np.min(clipper, axis=0), np.max(clipper, axis=0))
+    )
+    if not _in_extent_(poly, clip_extent):
+        return empty_array
+    output = np.copy(poly)  # Don't modify original list.
+    if np.all(poly[0] == poly[-1]):
+        poly = np.asarray(poly[1:])        # normally poly[:-1])
+    if np.all(clipper[0] == clipper[-1]):
+        clipper = np.asarray(clipper[1:])  # normally clipper[:-1]
+    result = []
+    strt = clipper[-1]         # Start with first vertex in clip polygon.
+    for end in clipper:
+        inputList = output
+        output = []
+        if len(inputList) == 0:
+            break
+        p0 = inputList[-1]  # Previous vertex.
+        for p1 in inputList:
+            a, b = _line_crosses_(p0, p1, strt, end)
+            if b:
+                if not a:  # point is inside.
+                    output.append(_intersect_(p0, p1, strt, end))  # intersect
+                output.append(p1)           # now add the point.
+            elif a:
+                output.append(_intersect_(p0, p1, strt, end))  # intersect
+            p0 = np.copy(p1)  # remember vertex for next edge.
+        if len(output) < 1:
+            return empty_array
+        strt = np.copy(end)  # remember clip vertex for next edge.
+        if len(output) > 0:  # form a closed-loop if poly is a polygon
+            if is_polygon:
+                result = np.concatenate((output, [output[0]]), axis=0)
+            else:
+                result = np.concatenate(([output]), axis=0)
+    return np.asarray(result)
+
+
+def dissolve(g, plot=False):
+    """Dissolves shared boundaries in geometries.
+
+    Parameters
+    ----------
+    g : Geo array
+        The array to dissolve.
+    plot : boolean
+        True, to produce a plot of the segments forming the new geometry.
+
+    Returns
+    -------
+    A new Geo array
+
+    """
+    from npgeom.npg_plots import plot_polygons
+    bit_segs = g.od_pairs()
+    bit_ift = g.bit_IFT
+    common = g.common_segments()
+    shape_segs = np.concatenate(bit_segs, axis=0)
+    out = compare_geom(shape_segs, common, unique=False, invert=True,
+                       return_idx=False
+                       )
+    pairs = np.array(list(zip(out[:, :2], out[:, -2:])))
+    seq = np.concatenate(pairs, axis=0)
+    uni, idx, inv = np.unique(seq, True, True, axis=0)
+    uni_ordered = uni[inv]
+    if plot:
+        plot_polygons(pairs)
+    return seq, uni_ordered
+
+
 # ---- Not included yet -----------------------------------------------------
 #
+def segments_to_polys(self):
+    """Return segments from one of the above to their original form."""
+    return np.vstack([i.reshape(2, 2) for i in self])
+
+
+def _pnt_right_side_(p, strt, end):
+    """Determine if a point is `inside` a line segment.
+
+    Parameters
+    ----------
+    p, strt, end : array-like
+        X,Y coordinates of the subject point and the start and end of the line.
+
+    Returns whether or not a point is inside (right-side) the current
+    clip edge for a clockwise oriented polygon and its segments.
+    """
+    x, y, x0, y0, x1, y1 = *p, *strt, *end
+    dx = x1 - x0
+    dy = y1 - y0
+    return dx * (y - y0) <= dy * (x - x0)
+
 
 def _crossing_num_(pnts, poly, line=True):
     """Crossing Number for point in polygon.  See `p_in_p`.
@@ -773,7 +978,7 @@ def _crossing_num_(pnts, poly, line=True):
         Points are an N-2 array of point objects determined to be within the
         extent of the input polygons.
     poly : polygon array
-        Polygon is an N-2 array of point objects that form the clockwise
+        Polygon is an Nx2 array of point objects that form the clockwise
         boundary of the polygon.
     """
     xs = poly[:, 0]
@@ -879,7 +1084,8 @@ def in_hole_check(pnts, geo):
 
 
 def pnts_in_pnts(pnts, geo, just_common=True):
-    """Check to see if pnts are coincident (common) with pnts in the Geo array.
+    """
+    Check to see if pnts are coincident (common) with pnts in the Geo array.
 
     If ``just_common`` is True, only the points in both data sets will be
     returned.  If False, then the common and unique points will be returned as

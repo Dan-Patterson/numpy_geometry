@@ -17,7 +17,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2019-12-19
+    2019-12-31
 
 Purpose
 -------
@@ -153,9 +153,9 @@ def plot_2d(pnts, label_pnts=False, connect=False,
         return
 
     def _scatter(p, plt, color, marker):
-        """Do the actual point plotting."""
+        """Do the actual point plotting. Change `s` to increase marker size."""
         X, Y = p[:, 0], p[:, 1]
-        plt.scatter(X, Y, s=10, c=color, linewidths=None, marker=marker)
+        plt.scatter(X, Y, s=30, c=color, linewidths=None, marker=marker)
 
     def _line(p, plt, color, marker, linewdth):
         """Connect the points with lines."""
@@ -164,41 +164,47 @@ def plot_2d(pnts, label_pnts=False, connect=False,
                  linewidth=linewdth)
 
     def _label_pnts(pnts, plt):
-        """Label the points."""
+        """Label the points. Note: to skips the last label for polygons, use
+        zip(lbl[:-1], pnts[:-1, 0], pnts[:-1, 1])
+        """
         lbl = np.arange(len(pnts))
-        for label, xpt, ypt in zip(lbl, pnts[:, 0], pnts[:, 1]):
+        for label, xpt, ypt in zip(lbl[:], pnts[:, 0], pnts[:, 1]):
             plt.annotate(label, xy=(xpt, ypt), xytext=(2, 2), size=12,
                          textcoords='offset points', ha='left', va='bottom')
 
     # ---- main plotting routine
     fig, ax = plt.subplots(1, 1)
     ax.set_aspect('equal', adjustable='box')
-    markers = MarkerStyle.filled_markers  # set default marker style
+    markers = ('o', 'v', '^', '<', '>', '8', 's', 'p', '*', 'h', 'H',
+               'D', 'd', 'P', 'X')  # MarkerStyle.filled_markers
     # ---- set basic parameters ----
     scatter_params(plt, fig, ax, title, ax_lbls)
-    if isinstance(pnts, (list, tuple)):
+    if hasattr(pnts, 'IFT'):  # Geo array
+        mn = pnts.mins(by_bit=True)
+        mx = pnts.maxs(by_bit=True)
+        pnts = pnts.bits  # convert to object array
+    elif isinstance(pnts, (list, tuple)):
         mn = np.min([i.min(axis=0) for i in pnts], axis=0)
         mx = np.max([i.max(axis=0) for i in pnts], axis=0)
-        buff = (mx - mn) * 0.05  # 5% space buffer
-        x_min, y_min = np.floor(mn - buff)
-        x_max, y_max = np.ceil(mx + buff)
-    else:
-        mn = pnts.min(axis=0)
-        mx = pnts.max(axis=0)
-        buff = (mx - mn) * 0.05  # 5% space buffer
-        x_min, y_min = np.floor(mn - buff)
-        x_max, y_max = np.ceil(mx + buff)
+    elif isinstance(pnts, np.ndarray):
+        if pnts.dtype.kind == 'O':
+            mn = np.min([i.min(axis=0) for i in pnts], axis=0)
+            mx = np.max([i.max(axis=0) for i in pnts], axis=0)
+        else:
+            mn = pnts.min(axis=0)
+            mx = pnts.max(axis=0)
+    buff = (mx - mn) * 0.05  # 5% space buffer
+    x_min, y_min = np.floor(mn - buff)
+    x_max, y_max = np.ceil(mx + buff)
     #
     plt.xlim(x_min, x_max)
     plt.ylim(y_min, y_max)
     if invert_y:
         plt.ylim(y_max, y_min)
     # ---- enable multiple point files ----
-    if isinstance(pnts, np.ndarray):
-        pnts = [pnts]
-    if isinstance(pnts, (list, tuple)):
+    if isinstance(pnts, (list, tuple, np.ndarray)):
         colors = ['black', 'blue', 'green', 'red',
-                  'darkgrey', 'darkblue', 'darkred', 'darkgreen', 'grey']
+                  'darkgrey', 'darkblue', 'darkred', 'darkgreen', 'grey'] * 2
         for i, p in enumerate(pnts):
             marker = markers[i]  # see markers = MarkerStyle.filled_markers
             color = colors[i]
@@ -265,9 +271,6 @@ def plot_polygons(arr, outline=True):
 
     References
     ----------
-    `random color generation in matplotlib
-    <https://stackoverflow.com/questions/14720331/how-to-generate-random-
-    colors-in-matplotlib>`_.
 
     See module docs for general references.
     """
@@ -282,6 +285,9 @@ def plot_polygons(arr, outline=True):
     else:
         shapes = np.copy(arr)
     fig, ax = plt.subplots(1, 1)
+    fig.set_figheight = 8
+    fig.set_figwidth = 8
+    fig.dpi = 200
     plt.tight_layout(pad=0.2, h_pad=0.1, w_pad=0.1)
     ax.set_aspect('equal', adjustable='box')
     # cmap = plt.cm.get_cmap(plt.cm.viridis, 143)  # default colormap

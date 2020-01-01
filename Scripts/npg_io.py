@@ -17,7 +17,7 @@ Script :
 Author :
     Dan_Patterson@carleton.ca
 
-Modified : 2019-12-15
+Modified : 2019-12-30
     Creation date during 2019 as part of ``arraytools``.
 
 Purpose
@@ -68,7 +68,6 @@ FLOATS = np.typecodes['AllFloat']
 INTS = np.typecodes['AllInteger']
 NUMS = FLOATS + INTS
 
-null_pnt = (np.nan, np.nan)  # ---- a null point
 
 ft = {'bool': lambda x: repr(x.astype(np.int32)),
       'float_kind': '{: 0.3f}'.format}
@@ -108,7 +107,7 @@ def dtype_info(a, as_string=False):
     names = a.dtype.names
     if names is None:
         return dt
-    names = list(a.dtype.names)  # [i[0] for i in dt]
+    names = list(a.dtype.names)
     formats = [i[1] for i in dt]
     if as_string and names is not None:
         names = ", ".join(names)
@@ -121,6 +120,14 @@ def load_geo(f_name, suppress_extras=True):
 
     Unpack an npz file containing a geo array.
 
+    Parameters
+    ----------
+    f_name : text
+        Full path and filename.
+    suppress_extras : boolean
+        If False, only the Geo array is returned, otherwise, the Geo array,
+        the constituent arrays and their names are returned.
+
     Returns
     -------
     geo : Geo array
@@ -131,9 +138,7 @@ def load_geo(f_name, suppress_extras=True):
         The arrays within the npz,
     names : list
         A list of the array names which you use to slice particular arrays..
-    suppress_extras : boolean
-        If False, only the Geo array is returned, otherwise, the Geo array,
-        the constituent arrays and their names are returned.
+
 
     Example
     -------
@@ -164,19 +169,19 @@ def load_geo(f_name, suppress_extras=True):
     return geo, arrs, names
 
 
-def save_geo(g, fname, folder):
+def save_geo(g, f_name, folder):
     """Save an array as an npy file.
 
     Parameters
     ----------
     g : Geo array
         A complete Geo array
-    fname : text
-        Filename without file extention.
+    f_name : text
+        Filename without file extension or path.
     folder : text
         A local folder.  It will be checked for path name compliance.
     The type of data in each column is arbitrary.  It will be cast to the
-    given dtype at runtime
+    given dtype at runtime.
     """
     check = all([hasattr(g, i) for i in ['IFT', 'K', 'XT', 'SR']])
     if not check:
@@ -184,14 +189,14 @@ def save_geo(g, fname, folder):
         return None
     IFT, K, XT, SR = [g.IFT, g.K, g.XT, g.SR]  # g is a Geo array
     folder = folder.replace("\\", "/")
-    out_name = "{}/{}.npz".format(folder, fname)
+    out_name = "{}/{}.npz".format(folder, f_name)
     np.savez(out_name, g=g, ift=IFT, kind=K, extents=XT, spatial_ref=SR)
     print("\nGeo array saved to ... {} ...".format(out_name))
     return
 
 
 def load_txt(name="arr.txt", data_type=None):
-    """Read the structured/recarray created by save_txt.
+    """Read a structured/recarray created by save_txt.
 
     Parameters
     ----------
@@ -200,7 +205,7 @@ def load_txt(name="arr.txt", data_type=None):
     delimiter : string
         Use a comma delimiter by default.
     skip_header : int
-        Number of rows to skip at the beginning
+        Number of rows to skip at the beginning.
     names : boolean
         If `True`, the first row contains the field names.
     encoding :
@@ -217,18 +222,18 @@ def load_txt(name="arr.txt", data_type=None):
 
 
 def save_txt(a, name="arr.txt", sep=", ", dt_hdr=True):
-    """Save a NumPy structured, recarray to text.
+    """Save a NumPy structured/recarray to text.
 
     Parameters
     ----------
     a : array
-        input array
+        Input array.
     fname : filename
-        output filename and path otherwise save to script folder
+        Output filename and path otherwise save to script folder.
     sep : separator
-        column separater, include a space if needed
+        Column separater, include a space if needed.
     dt_hdr : boolean
-        if True, add dtype names to the header of the file
+        If True, add dtype names to the header of the file.
 
     """
     a_names = ", ".join(a.dtype.names)
@@ -247,7 +252,7 @@ def save_txt(a, name="arr.txt", sep=", ", dt_hdr=True):
 def load_geojson(pth, full=False, geometry=True):
     """Load a geojson file and convert to a Geo Array.
 
-    The geojson is from the Features to JSON tool listed in the references.
+    The geojson is from the ``Features to JSON`` tool listed in the references.
 
     Parameters
     ----------
@@ -343,6 +348,42 @@ def prn_q(a, edges=3, max_lines=25, width=120, decimals=2):
         print(a)
 
 
+# ---- helpers
+# required for prn_tbl and prn_geo
+def _ckw_(a, name, deci):
+    """Array `a` c(olumns) k(ind) and w(idth)."""
+    c_kind = a.dtype.kind
+    if (c_kind in FLOATS) and (deci != 0):  # float with decimals
+        c_max, c_min = np.round([np.min(a), np.max(a)], deci)
+        c_width = len(max(str(c_min), str(c_max), key=len))
+    elif c_kind in NUMS:  # int, unsigned int, float with no decimals
+        c_width = len(max(str(np.min(a)), str(np.max(a)), key=len))
+    elif c_kind in ('U', 'S', 's'):
+        c_width = len(max(a, key=len))
+    else:
+        c_width = len(str(a))
+    c_width = max(len(name), c_width) + deci
+    return [c_kind, c_width]
+
+
+def _col_format(pairs, deci):
+    """Assemble the column format."""
+    form_width = []
+    dts = []
+    for c_kind, c_width in pairs:
+        if c_kind in INTS:  # ---- integer type
+            c_format = ':>{}.0f'.format(c_width)
+        elif c_kind in FLOATS:
+            c_format = ':>{}.{}f'.format(c_width, deci)
+        else:
+            c_format = "!s:<{}".format(c_width)
+        dts.append(c_format)
+        form_width.append(c_width)
+    return dts, form_width
+
+
+# ---- main print functions
+#
 def prn_tbl(a, rows_m=20, names=None, deci=2, width=75):
     """Format a structured array with a mixed dtype.
 
@@ -363,35 +404,6 @@ def prn_tbl(a, rows_m=20, names=None, deci=2, width=75):
     width : int
         Print width in characters
     """
-    def _ckw_(a, name, deci):
-        """Array `a` c(olumns) k(ind) and w(idth)."""
-        c_kind = a.dtype.kind
-        if (c_kind in FLOATS) and (deci != 0):  # float with decimals
-            c_max, c_min = np.round([np.min(a), np.max(a)], deci)
-            c_width = len(max(str(c_min), str(c_max), key=len))
-        elif c_kind in NUMS:  # int, unsigned int, float with no decimals
-            c_width = len(max(str(np.min(a)), str(np.max(a)), key=len))
-        elif c_kind in ('U', 'S', 's'):
-            c_width = len(max(a, key=len))
-        else:
-            c_width = len(str(a))
-        c_width = max(len(name), c_width) + deci
-        return [c_kind, c_width]
-
-    def _col_format(pairs, deci):
-        """Assemble the column format."""
-        form_width = []
-        dts = []
-        for c_kind, c_width in pairs:
-            if c_kind in INTS:  # ---- integer type
-                c_format = ':>{}.0f'.format(c_width)
-            elif c_kind in FLOATS:
-                c_format = ':>{}.{}f'.format(c_width, deci)
-            else:
-                c_format = "!s:<{}".format(c_width)
-            dts.append(c_format)
-            form_width.append(c_width)
-        return dts, form_width
     # ----
     dtype_names = a.dtype.names
     if dtype_names is None:
@@ -441,39 +453,12 @@ def prn_geo(a, rows_m=100, names=None, deci=2, width=75):
         The maximum number of rows to print.  If rows_m=10, the top 5 and
         bottom 5 will be printed.
     names : list/tuple or None
-        Column names to print, or all if None.
+        Column names to print, or all if names is None.
     deci : int
         The number of decimal places to print for all floating point columns.
     width : int
         Print width in characters.
     """
-    def _ckw_(a, name, deci):
-        """Columns `a` kind and width."""
-        c_kind = a.dtype.kind
-        if (c_kind in FLOATS) and (deci != 0):  # float with decimals
-            c_max, c_min = np.round([np.min(a), np.max(a)], deci)
-            c_width = len(max(str(c_min), str(c_max), key=len))
-        elif c_kind in NUMS:      # int, unsigned int, float wih no decimals
-            c_width = len(max(str(np.min(a)), str(np.max(a)), key=len))
-        else:
-            c_width = len(name)
-        c_width = max(len(name), c_width) + deci
-        return [c_kind, c_width]
-
-    def _col_format(pairs, deci):
-        """Assemble the column format."""
-        form_width = []
-        dts = []
-        for c_kind, c_width in pairs:
-            if c_kind in INTS:  # ---- integer type
-                c_format = ':>{}.0f'.format(c_width)
-            elif c_kind in FLOATS:  # and np.isscalar(c[0]):  # float rounded
-                c_format = ':>{}.{}f'.format(c_width, deci[-1])
-            else:
-                c_format = "!s:^{}".format(c_width)
-            dts.append(c_format)
-            form_width.append(c_width)
-        return dts, form_width
     # ----
     if names is None:
         names = ['shape', 'part', 'X', 'Y']

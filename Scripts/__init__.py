@@ -29,6 +29,11 @@ See Also
 --------
 Many links and references in ``_npgeom_notes_.py``.
 
+.. note::
+
+   This double dot, note thing produces a nice blue colored box with the
+   note inside.
+
 Notes
 -----
 Import suggestion and package properties and methods.  The Geo class in npGeo
@@ -114,7 +119,8 @@ from . smallest_circle import *
 
 __all__ = [
     'npGeo', 'npg_io', 'npg_geom', 'npg_helpers', 'npg_table',
-    'npg_create', 'npg_analysis', 'npg_utils', 'smallest_circle'
+    'npg_create', 'npg_analysis', 'npg_utils', 'npg_helpers',
+    'smallest_circle'
 ]
 
 __all__.extend(npGeo.__all__)

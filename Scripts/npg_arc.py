@@ -16,7 +16,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2019-12-10
+    2019-12-30
 
 Purpose
 -------
@@ -24,33 +24,7 @@ Working with numpy and arcpy.
 
 Notes
 -----
->>> dir(arcgisscripting.da)
-['ContingentFieldValue', 'ContingentValue', 'DatabaseSequence', 'Describe',
- 'Domain', 'Editor', 'ExtendTable', 'FeatureClassToNumPyArray', 'InsertCursor',
- 'ListContingentValues', 'ListDatabaseSequences', 'ListDomains',
- 'ListFieldConflictFilters', 'ListReplicas', 'ListSubtypes', 'ListVersions',
- 'NumPyArrayToFeatureClass', 'NumPyArrayToTable', 'Replica', 'SearchCursor',
- 'TableToNumPyArray', 'UpdateCursor', 'Version', 'Walk',
- '__doc__', '__loader__', '__name__', '__package__', '__spec__',
- '_internal_eq', '_internal_sd', '_internal_vb']
-
-
-Time tests
-----------
-
->>> a0 = fc_geo_Geo(in_fc)
->>> a1 = fc_sc_Geo(in_fc)
->>> a2 = fc_nparray_Geo(in_fc, kind=2, info="")
-
->>> %timeit fc_geo_Geo(in_fc)  # a0
-3.28 s ± 194 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
-
->>> %timeit fc_sc_Geo(in_fc)   # a1
-3.7 s ± 349 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
-
->>> %timeit fc_nparray_Geo(in_fc, kind=2, info="")  # a2
-386 ms ± 93.6 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
-
+See `_npgeom_notes_.py` for extra notes.
 
 References
 ----------
@@ -101,7 +75,7 @@ __all__ = [
     'get_fc_composition', 'get_fc_field_properties',
     'get_shape_properties',
     'fc_nparray_Geo', 'id_fr_to',            # option 1, use this ***
-    'Geo_to_fc', 'geo_poly', 'view_poly'     # back to fc
+    'Geo_to_fc', 'Geo_to_poly', 'view_poly'     # back to fc
     'make_nulls', 'fc_data', 'tbl_data',     # get attributes
     'fc_geo_Geo', 'flat',                    # option 2
     'fc_gi_Geo',
@@ -206,7 +180,7 @@ def get_geo_interface(in_fc, SR=None):
 
     See Also
     --------
-    npg.shape_finder(arr)  to derive the structure of ``out``
+    npg.shape_finder(arr)  to derive the structure of ``out``.
     """
     if SR is None:
         SR = get_SR(in_fc)
@@ -473,7 +447,7 @@ def Geo_to_fc(geo, gdb=None, name=None, kind=None, SR=None):
     #
     dx, dy = geo.LL
     geo = geo.shift(dx, dy)
-    polys = geo_poly(geo, SR, kind)
+    polys = Geo_to_poly(geo, SR, kind)
     out_name = gdb.replace("\\", "/") + "/" + name
     wkspace = env.workspace = 'memory'  # legacy is in_memory
     tmp_name = "{}\\{}".format(wkspace, "tmp")
@@ -489,7 +463,7 @@ def Geo_to_fc(geo, gdb=None, name=None, kind=None, SR=None):
 
 
 # ---- Use this to convert Geo to arcpy shapes
-def geo_poly(geo, sr, kind="Polygon", as_singlepart=True):
+def Geo_to_poly(geo, sr, kind="Polygon", as_singlepart=True):
     """Create poly features from a Geo array.
 
     Parameters
@@ -498,10 +472,10 @@ def geo_poly(geo, sr, kind="Polygon", as_singlepart=True):
     sr : spatial reference object
     kind : str
         Output geometry type.
-    geo_poly is called by Geo_to_fc.
+    Geo_to_poly is called by Geo_to_fc.
     arr2poly does the actual poly construction
 
-    >>> ps = geo_poly(g, sr=g.SR, kind="Polygon", as_singlepart=True)
+    >>> ps = Geo_to_poly(g, sr=g.SR, kind="Polygon", as_singlepart=True)
     >>> ps  # returns the single part representation of the polygon
     [(<Polygon object at 0x25f07f4d7f0[0x25f09232968]>, 1),
      (<Polygon object at 0x25f07f4d668[0x25f092327d8]>, 1),
