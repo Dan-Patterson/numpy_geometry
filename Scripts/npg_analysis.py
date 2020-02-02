@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-r"""\
-
+r"""
+------------
 npg_analysis
 ------------
 
@@ -11,7 +11,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2019-12-12
+    2020-01-14
 
 Purpose
 -------
@@ -36,6 +36,7 @@ from textwrap import dedent
 import numpy as np
 from numpy.lib.recfunctions import unstructured_to_structured as uts
 from numpy.lib.recfunctions import repack_fields
+from numpy.lib.recfunctions import structured_to_unstructured as stu
 
 ft = {'bool': lambda x: repr(x.astype(np.int32)),
       'float_kind': '{: 0.3f}'.format}
@@ -44,14 +45,14 @@ np.set_printoptions(edgeitems=5, linewidth=120, precision=2, suppress=True,
 np.ma.masked_print_option.set_display('-')  # change to a single -
 
 __all__ = [
-        'closest_n', 'distances', 'not_closer', 'n_check', 'n_near',
-        'n_spaced', 'intersects', 'intersection_pnt', 'knn', 'knn0',
-        '_dist_arr_', '_e_dist_', 'mst', 'connect', 'concave'
-        ]
+    'closest_n', 'distances', 'not_closer', 'n_check', 'n_near',
+    'n_spaced', '_x_sect_2', 'intersection_pnt', 'knn', 'knn0',
+    '_dist_arr_', '_e_dist_', 'mst', 'connect', 'concave'
+]
 
 
 # ===========================================================================
-# ---- def section: def code blocks go here ---------------------------------
+# ---- distance related
 def closest_n(a, N=3, ordered=True):
     """See the `n_near` docstring."""
     coords, dist, n_array = n_near(a, N=N, ordered=ordered)
@@ -167,13 +168,13 @@ def n_near(a, N=3, ordered=True):
     kv = np.argsort(d, axis=1)       # sort 'd' on last axis to get keys
     coords = a[kv]                   # pull out coordinates using the keys
     s0, s1, s2 = coords.shape
-    coords = coords.reshape((s0, s1*s2))
+    coords = coords.reshape((s0, s1 * s2))
     dist = np.sort(d)[:, 1:]         # slice sorted distances, skip 1st
     # ---- construct the structured array ----
     dt_names = n_array.dtype.names
-    s0, s1, s2 = (1, (N+1)*2 + 1, len(dt_names))
+    s0, s1, s2 = (1, (N+1) * 2 + 1, len(dt_names))
     for i in range(0, s1):           # coordinate field names
-        nm = dt_names[i+1]
+        nm = dt_names[i + 1]
         n_array[nm] = coords[:, i]
     dist_names = dt_names[s1:s2]
     for i in range(N):               # fill n_array with the results
@@ -235,23 +236,10 @@ def n_spaced(L=0, B=0, R=10, T=10, min_space=1, num=10, verbose=True):
 
 # ==== intersection
 #
-def intersects(*args):
+def _x_sect_2(*args):
     """Line intersection check.  Inputs are two lines or 4 points.
 
-    Parameters
-    ----------
-      intersects(line0, line1) or intersects(p0, p1, p2, p3)
-        p0, p1 -> line 1
-        p2, p3 -> line 2
-
-    Returns
-    -------
-    boolean, if the segments do intersect
-
-    References
-    ----------
-    `<https://stackoverflow.com/questions/563198/how-do-you-detect-where-two-
-    line-segments-intersect#565282>`_.
+    See npg.geom.intersect for details.  This is a variant for concave hulls.
     """
     if len(args) == 2:
         p0, p1, p2, p3 = *args[0], *args[1]
@@ -321,6 +309,9 @@ def intersection_pnt(p0, p1, p2, p3):
     return arr * n3
 
 
+# ---- k-nearest neighbors
+# knn0 used by concave hulls
+#
 def knn(p, pnts, k=1, return_dist=True):
     """Calculate the `k` nearest neighbours for a given point.
 
@@ -455,12 +446,13 @@ def mst(arr, calc_dist=True):
         W[pnts_seen, new_edge[1]] = np.inf
         W[new_edge[1], pnts_seen] = np.inf
         n_seen += 1
-    pairs = np.array(pairs)
+    #pairs = np.array(pairs)
+    pairs = np.vstack(pairs)
     frum = a_copy[pairs[:, 0]]
     too = a_copy[pairs[:, 1]]
     fr_to = np.concatenate((frum, too), axis=1)  # np.vstack(pairs)
-    fr_to = uts(fr_to, names=['X_orig', 'Y_orig', 'X_dest', 'Y_dest'])
-    return repack_fields(fr_to)
+#    fr_to_2 = uts(fr_to, names=['X_orig', 'Y_orig', 'X_dest', 'Y_dest'])
+    return pairs, fr_to  #, repack_fields(fr_to_2)
 
 
 def connect(a, dist_arr, edges):
@@ -485,8 +477,19 @@ def connect(a, dist_arr, edges):
     out['Orig'] = p_f
     out['Dest'] = p_t
     out['Dist'] = d
-    return out
+    return out, p_f, p_t
 
+"""
+    a = np.array([[0, 0], [0,8], [10, 8],  [10,0], [3, 4], [7,4]])
+    #
+    idx= np.lexsort((a[:,1], a[:,0]))  # sort X, then Y
+    a_srt = a[idx,:]                   # slice the sorted array
+    d = _e_dist_(a_srt)                 # determine the square form distances
+    pairs, fr_to = mst(d)                     # get the orig-dest pairs for the mst
+    plot_mst(a_srt, pairs)             # a little plot
+    o_d = connect(a_srt, d, pairs)     # produce an o-d structured array
+
+"""
 
 # ---- find
 #
@@ -508,6 +511,11 @@ def concave(points, k, pip_check=False):
     knn0, intersects, angle, point_in_polygon : functions
         Functions used by `concave`
 
+    Requires
+    --------
+    knn0 : function
+        Performs the nearest neighbors search.
+
     Notes
     -----
     This recursively calls itself to check concave hull.
@@ -520,6 +528,67 @@ def concave(points, k, pip_check=False):
     """
     PI = np.pi
 
+    def _x_sect_(*args):
+        """Line intersection check.  Two lines or 4 points that form the lines.
+    
+        Requires:
+        --------
+          intersects(line0, line1) or intersects(p0, p1, p2, p3)
+            p0, p1 -> line 1
+            p2, p3 -> line 2
+    
+        Returns:
+        --------
+            boolean, if the segments do intersect
+    
+        References:
+        -----------
+        `<https://stackoverflow.com/questions/563198/how-do-you-detect-where-two-
+        line-segments-intersect#565282>`_.
+    
+        """
+        if len(args) == 2:
+            p0, p1, p2, p3 = *args[0], *args[1]
+        elif len(args) == 4:
+            p0, p1, p2, p3 = args
+        else:
+            raise AttributeError("Pass 2, 2-pnt lines or 4 points to the function")
+        #
+        # ---- First check ----   np.cross(p1-p0, p3-p2 )
+        p0_x, p0_y, p1_x, p1_y, p2_x, p2_y, p3_x, p3_y = *p0, *p1, *p2, *p3
+        s10_x = p1_x - p0_x
+        s10_y = p1_y - p0_y
+        s32_x = p3_x - p2_x
+        s32_y = p3_y - p2_y
+        denom = s10_x * s32_y - s32_x * s10_y
+        if denom == 0.0:
+            return False
+        #
+        # ---- Second check ----  np.cross(p1-p0, p0-p2 )
+        den_gt0 = denom > 0
+        s02_x = p0_x - p2_x
+        s02_y = p0_y - p2_y
+        s_numer = s10_x * s02_y - s10_y * s02_x
+        if (s_numer < 0) == den_gt0:
+            return False
+        #
+        # ---- Third check ----  np.cross(p3-p2, p0-p2)
+        t_numer = s32_x * s02_y - s32_y * s02_x
+        if (t_numer < 0) == den_gt0:
+            return False
+        #
+        if ((s_numer > denom) == den_gt0) or ((t_numer > denom) == den_gt0):
+            return False
+        #
+        # ---- check to see if the intersection point is one of the input points
+        t = t_numer / denom
+        # substitute p0 in the equation
+        x = p0_x + (t * s10_x)
+        y = p0_y + (t * s10_y)
+        # be careful that you are comparing tuples to tuples, lists to lists
+        if sum([(x, y) == tuple(i) for i in [p0, p1, p2, p3]]) > 0:
+            return False
+        return True
     def _angle_(p0, p1, prv_ang=0):
         """Return the angle between two points and the previous angle, or."""
         ang = np.arctan2(p0[1] - p1[1], p0[0] - p1[0])
@@ -574,7 +643,7 @@ def concave(points, k, pip_check=False):
             j = 1
             its = False
             while not its and j < len(hull) - last_point:
-                its = intersects(hull[-1], cur_pnts[i], hull[-j - 1], hull[-j])
+                its = _x_sect_(hull[-1], cur_pnts[i], hull[-j - 1], hull[-j])
                 j += 1
         if its:  # All points intersect, try a higher number of neighbours
             return concave(points, k + 1)
@@ -591,6 +660,7 @@ def concave(points, k, pip_check=False):
     return hull
 
 
+# ---- demos, extras
 def _demo():
     """Demonstration."""
     # L, R, B, T = [300000, 300100, 5025000, 5025100]

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-r"""\
+r"""
 
 npg_utils
 ---------
@@ -11,7 +11,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2019-12-121
+    2020-01-11
 
 Purpose
 -------
@@ -105,22 +105,16 @@ np.ma.masked_print_option.set_display('-')  # change to a single -
 script = sys.argv[0]  # print this should you need to locate the script
 
 
-__all__ = ['time_deco',
-           'run_deco',
-           'doc_func',
-           'get_func',
-           'get_modu',
-           'dirr',
-           'find_def',
-           '_wrapper',
-           '_utils_help_'
-           ]
+__all__ = [
+    'time_deco', 'run_deco', 'doc_func', 'get_func', 'get_module_info',
+    'find_def', '_wrapper', '_utils_help_'
+]
 
 
 # ---- decorators and helpers ------------------------------------------------
 #
 def time_deco(func):  # timing originally
-    """Timing decorator function
+    """Use as a timing decorator function.
 
     Parameters
     ----------
@@ -155,7 +149,7 @@ def time_deco(func):  # timing originally
 
 
 def run_deco(func):
-    """Prints basic function information and the results of a run.
+    """Print basic function information and the results of a run.
 
     Parameters
     ----------
@@ -175,7 +169,7 @@ def run_deco(func):
 
     @wraps(func)
     def wrapper(*args, **kwargs):
-        """wrapper function"""
+        """Wrap the function."""
         frmt = "\n".join(["Function... {}", "  args.... {}",
                           "  kwargs.. {}", "  docs.... {}"])
         ar = [func.__name__, args, kwargs, func.__doc__]
@@ -189,24 +183,22 @@ def run_deco(func):
 # ----------------------------------------------------------------------------
 # ---- (1) doc_func ... code section ... ----
 def doc_func(func=None, verbose=True):
-    """(doc_func)...Documenting code using inspect
+    """(doc_func)...Documenting code using `inspect`.
 
     Parameters
     ----------
     func : function
-        Function name to document, without quotes
+        Function/method name to document, without quotes.
     verbose : Boolean
         True prints the result, False returns a string of the result.
 
     Returns
     -------
-    A listing of the source code with line numbers
+    A listing of the source code with line numbers.
 
     Notes
     -----
-    Requires the `inspect` module
-
-    Source code for::
+    Requires the `inspect` module.  Source code for::
 
         module level
         - inspect.getsourcelines(sys.modules[__name__])[0]
@@ -220,11 +212,9 @@ def doc_func(func=None, verbose=True):
 
     """
     def demo_func():
-        """dummy...
-        : Demonstrates retrieving and documenting module and function info.
-        """
+        """Demonstrate retrieving and documenting module and function info."""
         def sub():
-            """sub in dummy"""
+            """Return sub in dummy"""
             print("sub")
         return None
     #
@@ -343,51 +333,43 @@ def get_func(func, line_nums=True, verbose=True):
 
 
 # ----------------------------------------------------------------------
-# ---- (3) get_modu .... code section ----
-def get_modu(obj, code=False, verbose=True):
-    """Get module (script) information, including source code for
-    documentation purposes.
+# ---- (3) get_module info .... code section ----
+def get_module_info(obj, code=False, verbose=True):
+    """Get module (script) information, including source code if needed.
 
     Parameters
     ----------
-    >>> from textwrap import dedent, indent
-    >>> import inspect
+    obj : module (script)
+        The imported object.  It must be either a whole module or a script
+        that you imported.  Import it. It is easier if it is in the same
+        folder as the script running this function.
+    code, verbose : boolean
+        Whether to return the code as well and/or return a string output.
+
+    Requires
+    --------
+      >>> from textwrap import dedent, indent
+      >>> import inspect
 
     Returns
     -------
     A string is returned for printing.  It will be the whole module
     so use with caution.
 
-    Notes
-    -----
-    Useage::
+    Example
+    -------
+    Importing this function from the following module to inspect the module
+    itself.
 
-    >>> from arraytools.utils import get_modu
-    >>> get_modu(tools, code=False, verbose=True)
+    >>> from npgeom.npg_utils import get_module_info
+    >>> get_module_info(npg, False, True)
     >>> # No quotes around module name, code=True for module code
-
-   """
-    frmt = """
-    :-----------------------------------------------------------------
-    :Module: .... {} ....
-    :------
-    :File: ......
-    {}\n
-    :Docs: ......
-    {}\n
-    :Members: .....
-    {}
     """
-    frmt0 = """
-    :{}
-    :-----------------------------------------------------------------
-    """
-    frmt1 = """
-    :Source code: .....
-    {}
-    :
-    :-----------------------------------------------------------------
-    """
+    ln = "\n:{}:\n\n".format("-"*65)
+    frmt = "{}Module: {}\nFile:   {}\nMembers:\n{}\n\nDocs:...\n{}"
+    frmt0 = "  {}"
+    frmt1 = "{}Module: {}\nFile:   {}\nMembers:\n"
+    frmt2 = "\nSource code: .....\n{}Docs:...\n{}"
     import inspect
     # from textwrap import dedent  # required if not immported initially
 
@@ -397,126 +379,26 @@ def get_modu(obj, code=False, verbose=True):
         return None
     if code:
         lines, _ = inspect.getsourcelines(obj)
-        frmt = frmt + frmt1
-        code = "".join(["{:4d}  {}".format(idx, line)
+        frmt = frmt0 + frmt2
+        code = "".join(["{:4d}  {}".format(idx + 1, line)
                         for idx, line in enumerate(lines)])
     else:
         lines = code = ""
-        frmt = frmt + frmt0
-    memb = [i[0] for i in inspect.getmembers(obj)]
-    args = [obj.__name__, obj.__file__, obj.__doc__, memb, code]
-    mod_mem = dedent(frmt).format(*args)
+        frmt = frmt + frmt1
+    memb = [i[0] for i in inspect.getmembers(obj) if i[0][:2] != "__"]
+    memb.sort()
+    memb = ", ".join([i for i in memb])
+    w = wrap(memb)
+    w0 = "\n".join([i for i in w])
+    args0 = [ln, obj.__name__, obj.__file__]
+    args1 = [obj.__doc__, code, ln[1:]]
+    p0 = frmt1.format(*args0)
+    p1 = indent(w0, "  ")
+    p2 = frmt2.format(*args1)
     if verbose:
-        print(mod_mem)
+        print("{}\n{}\n{}".format(p0, p1, p2))
     else:
-        return mod_mem
-
-
-# ----------------------------------------------------------------------
-# ---- (4) dirr .... code section ----
-def dirr(obj, colwise=False, cols=4, sub=None, prn=True):
-    """A formatted `dir` listing of an object, module, function... anything you
-    can get a listing for.
-
-    Source, arraytools.py_tools has a pure python equivalent
-
-    Also, arraytools `__init__._info()` has an abbreviated version
-
-    Parameters
-    ----------
-    colwise : boolean
-        `True` or `1`, otherwise, `False` or `0`
-    cols : number
-      pick a size to suit
-    sub : text
-      sub array with wildcards
-
-    - `arr\\*` : begin with `arr`
-    - `\\*arr` : endswith `arr` or
-    - `\\*arr\\*`: contains `arr`
-    prn : boolean
-      `True` for print or `False` to return output as string
-
-    Returns
-    -------
-    A directory listing of a module's namespace or a part of it if the
-    `sub` option is specified.
-
-    Notes
-    -----
-    See the `inspect` module for possible additions like `isfunction`,
-    `ismethod`, `ismodule`
-
-    Examples::
-
-        dirr(art, colwise=True, cols=3, sub=None, prn=True)  # all columnwise
-        dirr(art, colwise=True, cols=3, sub='arr', prn=True) # just the `arr`s
-
-          (001)    _arr_common     arr2xyz         arr_json
-          (002)    arr_pnts        arr_polygon_fc  arr_polyline_fc
-          (003)    array2raster    array_fc
-          (004)    array_struct    arrays_cols
-    """
-    err = """
-    ...No matches found using substring .  `{0}`
-    ...check with wildcards, *, ... `\\*abc\\*`, `\\*abc`, `abc\\*`
-
-    """
-    d_arr = dir(obj)
-    a = np.array(d_arr)
-    dt = a.dtype.descr[0][1]
-    if sub not in (None, '', ' '):
-        start = [0, 1][sub[0] == "*"]
-        end = [0, -1][sub[-1] == "*"]
-        if not start and abs(end):
-            a = [i for i in d_arr
-                 if i.startswith(sub[start:end], start, len(i))]
-        elif start and abs(end):
-            a = [i for i in d_arr
-                 if sub[1:4] in i[:len(i)]]
-        elif abs(end):
-            sub = sub.replace("*", "")
-            a = [i for i in d_arr
-                 if i.endswith(sub, start, len(i))]
-        else:
-            a = []
-        if len(a) == 0:
-            print(dedent(err).format(sub))
-            return None
-        num = max([len(i) for i in a])
-    else:
-        num = int("".join([i for i in dt if i.isdigit()]))
-    frmt = ("{{!s:<{}}} ".format(num)) * cols
-    if colwise:
-        z = np.array_split(a, cols)
-        zl = [len(i) for i in z]
-        N = max(zl)
-        e = np.empty((N, cols), dtype=z[0].dtype)
-        for i in range(cols):
-            n = min(N, zl[i])
-            e[:n, i] = z[i]
-    else:
-        csze = len(a) / cols
-        rows = int(csze) + (csze % 1 > 0)
-        z = np.array_split(a, rows)
-        e = np.empty((len(z), cols), dtype=z[0].dtype)
-        N = len(z)
-        for i in range(N):
-            n = min(cols, len(z[i]))
-            e[i, :n] = z[i][:n]
-    if hasattr(obj, '__name__'):
-        args = ["-"*70, obj.__name__, obj]
-    else:
-        args = ["-"*70, type(obj), "np version"]
-    txt_out = "\n{}\n| dir({}) ...\n|    {}\n-------".format(*args)
-    cnt = 1
-    for i in e:
-        txt_out += "\n  ({:>03.0f})    {}".format(cnt, frmt.format(*i))
-        cnt += cols
-    if prn:
-        print(txt_out)
-    else:
-        return txt_out
+        return "{}\n{}\n{}".format(p0, p1, p2)
 
 
 def find_def(defs, module_name):
@@ -542,11 +424,11 @@ def find_def(defs, module_name):
 
 
 # ----------------------------------------------------------------------
-# ---- (5) wrapper .... code section ----
+# ---- (4) wrapper .... code section ----
 def _wrapper(a, wdth=70):
     """Wrap stuff using textwrap.wrap
 
-    Notes:
+    Notes
     -----
     TextWrapper class
     __init__(self, width=70, initial_indent='', subsequent_indent='',
@@ -577,7 +459,7 @@ def _utils_help_():
          documenting code using inspect
     (2)  get_func(obj, line_nums=True, verbose=True)
          pull in function code
-    (3)  get_modu(obj)
+    (3)  get_module(obj)
          pull in module code
     (4)  dirr(a)  object info
     (5)  wrapper(a)  format objects as a string
@@ -585,8 +467,38 @@ def _utils_help_():
     """
     print(dedent(_hf))
 
-# ----------------------------------------------------------------------
-# .... final code section producing the featureclass and extendtable
+
+def doc_deco(func, doc):
+    """Print basic function information and the results of a run.
+
+    Parameters
+    ----------
+    The following import.  Uncomment the import or move it inside the script.
+
+    >>> from functools import wraps
+
+    Example function::
+
+        @run_deco  # on the line above the function
+        def some_func():
+            ``do stuff``
+            return None
+
+    """
+    from functools import wraps
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        """Wrap function."""
+        frmt = "\n".join(["Function... {}", "  args.... {}",
+                          "  kwargs.. {}", "  docs.... {}",
+                          "  extra.... {}"])
+        ar = [func.__name__, args, kwargs, func.__doc__, doc]
+        print(dedent(frmt).format(*ar))
+        result = func(*args, **kwargs)
+        print("{!r:}\n".format(result))  # comment out if results not needed
+        return result                    # for optional use outside.
+    return wrapper
 
 
 # ----------------------------------------------------------------------

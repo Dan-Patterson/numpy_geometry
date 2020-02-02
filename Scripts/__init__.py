@@ -102,10 +102,12 @@ import sys
 import numpy as np
 
 from . import (
-    npGeo, npg_io, npg_geom, npg_helpers, npg_table, npg_create,
-    npg_analysis, npg_utils, smallest_circle,
+    npgDocs, npGeo, npg_io, npg_geom, npg_helpers, npg_table, npg_create,
+    npg_analysis, npg_overlay, npg_utils, smallest_circle,
 )
 
+from . npgDocs import (
+    npGeo_doc, Geo_hlp, sort_by_extent_doc, dirr_doc)
 from . npGeo import *
 from . npg_io import *
 from . npg_geom import *
@@ -113,16 +115,20 @@ from . npg_helpers import *
 from . npg_table import *
 from . npg_create import *
 from . npg_analysis import *
+from . npg_overlay import *
 from . npg_utils import *
 from . smallest_circle import *
 
+npGeo.__doc__ += npGeo_doc
+npGeo.dirr.__doc__ += dirr_doc
 
 __all__ = [
-    'npGeo', 'npg_io', 'npg_geom', 'npg_helpers', 'npg_table',
-    'npg_create', 'npg_analysis', 'npg_utils', 'npg_helpers',
-    'smallest_circle'
+    'npg_docs', 'npGeo', 'npg_io', 'npg_geom', 'npg_helpers', 'npg_overlay',
+    'npg_table', 'npg_create', 'npg_analysis', 'npg_overlay', 'npg_utils',
+    'npg_helpers', 'smallest_circle'
 ]
 
+__all__.extend(npgDocs.__all__)
 __all__.extend(npGeo.__all__)
 __all__.extend(npg_io.__all__)
 __all__.extend(npg_geom.__all__)
@@ -130,6 +136,7 @@ __all__.extend(npg_helpers.__all__)
 __all__.extend(npg_table.__all__)
 __all__.extend(npg_create.__all__)
 __all__.extend(npg_analysis.__all__)
+__all__.extend(npg_overlay.__all__)
 # __all__.extend(smallest_circle.__all__)
 __all__.sort()
 
@@ -149,6 +156,7 @@ Usage...
 
 Modules not imported by default...
 ... npg_arc
+... npg_arc_npg
 ... npg_plots
 
 ----------------------------------------------

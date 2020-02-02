@@ -50,6 +50,9 @@ References
 <https://stackoverflow.com/questions/14720331/how-to-generate-random-
 colors-in-matplotlib>`_.
 
+`Voxels in matplotlib
+<https://stackoverflow.com/questions/56752954/how-to-scale-the-voxel-
+dimensions-with-matplotlib>`_.
 """
 # ---- imports, formats, constants ----
 
@@ -65,7 +68,7 @@ from matplotlib.collections import LineCollection
 from matplotlib.markers import MarkerStyle
 
 ft = {'bool': lambda x: repr(x.astype('int32')),
-      'float': '{: 0.3f}'.format}
+      'float': '{: 0.1f}'.format}
 np.set_printoptions(edgeitems=10, linewidth=80, precision=2,
                     suppress=True, threshold=100, formatter=ft)
 np.ma.masked_print_option.set_display('-')
@@ -77,8 +80,110 @@ __all__ = ['plot_2d', 'plot_3d', 'plot_polygons', 'plot_mesh']
 
 # ---- functions ----
 #
+def subplts(plots=1, by_col=True, max_rc=4):
+    """Return subplot layout.
+
+    Parameters
+    ----------
+    plots : integer
+        Specify the num(ber) of subplots desired and return the rows and
+        columns to produce the subplots.
+    by_col : boolean
+        True for column oriented, False for row.
+    max_rc : integer
+        Maximum number of rows or columns depending on by_col.
+    """
+    row_col = (1, 1)
+    if by_col:
+        if plots <= max_rc:
+            row_col = (1, plots)
+        else:
+            row_col = (plots - max_rc, max_rc)
+    else:
+        if plots <= max_rc:
+            row_col = (plots, 1)
+        else:
+            row_col = (max_rc, plots - max_rc)
+    return row_col
+
+
+def scatter_params(plt, fig, ax, title="Title", ax_lbls=None):
+    """Assign default parameters for plots.
+
+    Notes
+    -----
+    ticklabel_format(useoffset), turns off scientific formatting
+    """
+    fig.set_figheight = 8
+    fig.set_figwidth = 8
+    fig.dpi = 200
+    if ax_lbls is None:
+        ax_lbls = ['X', 'Y']
+    x_label, y_label = ax_lbls
+    font1 = {'family': 'sans-serif', 'color': 'black',
+             'weight': 'bold', 'size': 14}  # set size to other values
+    ax.set_aspect('equal', adjustable='box')
+    ax.ticklabel_format(style='sci', axis='both', useOffset=False)
+    ax.xaxis.label_position = 'bottom'
+    ax.yaxis.label_position = 'left'
+    plt.xlabel(x_label, fontdict=font1, labelpad=12, size=14)
+    plt.ylabel(y_label, fontdict=font1, labelpad=12, size=14)
+    plt.title(title + "\n", loc='center', fontdict=font1, size=20)
+    plt.tight_layout(pad=0.2, h_pad=0.1, w_pad=0.1)
+    plt.grid(True)
+    return
+
+
+def plot_mixed(data, title="Title", invert_y=False, ax_lbls=None):
+    """Plot mixed data.
+
+    data : list of lists
+        [[values, type, color, marker, connect]]
+
+    data = [[r.shapes, 2, 'red', '.', True ], [a, 0, 'black', 'o', False]]
+    """
+    def _label_pnts(pnts, plt):
+        """Label the points. Note: to skips the last label for polygons, use
+        zip(lbl[:-1], pnts[:-1, 0], pnts[:-1, 1])
+        """
+        lbl = np.arange(len(pnts))
+        for label, xpt, ypt in zip(lbl[:], pnts[:, 0], pnts[:, 1]):
+            plt.annotate(label, xy=(xpt, ypt), xytext=(2, 2), size=14,
+                         textcoords='offset points', ha='left', va='bottom')
+
+    def _line(p, plt):  # , arrow=True):  # , color, marker, linewdth):
+        """Connect the points."""
+        X, Y = p[:, 0], p[:, 1]
+        plt.plot(X, Y, color='black', linestyle='solid', linewidth=2)
+
+    def _scatter(p, plt, color, marker):
+        """Do the actual point plotting. Change `s` to increase marker size."""
+        X, Y = p[:, 0], p[:, 1]
+        plt.scatter(X, Y, s=50, c=color, linewidths=None, marker=marker)
+
+    # ---- main plotting routine
+    fig, ax = plt.subplots(1, 1)
+    ax.set_aspect('equal', adjustable='box')
+    scatter_params(plt, fig, ax, title, ax_lbls)
+    # ----
+    for i, vals in enumerate(data):
+        pnts, kind, color, marker, connect = vals
+        if kind == 0:
+            _scatter(pnts, plt, color='black', marker='s')
+            _label_pnts(pnts, plt)
+        elif kind == 2:
+            cmap = plt.cm.get_cmap('hsv', len(pnts))
+            for j, p in enumerate(pnts):
+                # clr = cmap(j)  # clr=np.random.random(3,)  # clr = "b"
+                clr = 'None'
+                _line(p, plt)  # color, marker, linewdth=2)
+                plt.fill(*zip(*p), facecolor=clr)
+                _scatter(p, plt, color, marker)
+    plt.show()
+
+
 def plot_2d(pnts, label_pnts=False, connect=False,
-            title='Title', invert_y=False, ax_lbls=None,
+            title='Title', invert_y=False, ax_lbls=None
             ):
     """Plot points for Nx2 array representing x,y or row,col data.
 
@@ -105,7 +210,7 @@ def plot_2d(pnts, label_pnts=False, connect=False,
     Notes
     -----
     If passing a list of arrays to pnts, then make sure you specify a same
-    sized list to pnt_labels and connect
+    sized list for ``pnt_labels`` and ``connect``.
 
     markers::
 
@@ -126,36 +231,10 @@ def plot_2d(pnts, label_pnts=False, connect=False,
     ----------
     `<https://matplotlib.org/>`_.
     """
-    def scatter_params(plt, fig, ax, title="Title", ax_lbls=None):
-        """Assign default parameters for plots.
-
-        Notes
-        -----
-        ticklabel_format(useoffset), turns off scientific formatting
-        """
-        fig.set_figheight = 8
-        fig.set_figwidth = 8
-        fig.dpi = 200
-        if ax_lbls is None:
-            ax_lbls = ['X', 'Y']
-        x_label, y_label = ax_lbls
-        font1 = {'family': 'sans-serif', 'color': 'black',
-                 'weight': 'bold', 'size': 14}  # set size to other values
-        ax.set_aspect('equal', adjustable='box')
-        ax.ticklabel_format(style='sci', axis='both', useOffset=False)
-        ax.xaxis.label_position = 'bottom'
-        ax.yaxis.label_position = 'left'
-        plt.xlabel(x_label, fontdict=font1, labelpad=12, size=14)
-        plt.ylabel(y_label, fontdict=font1, labelpad=12, size=14)
-        plt.title(title + "\n", loc='center', fontdict=font1, size=20)
-        plt.tight_layout(pad=0.2, h_pad=0.1, w_pad=0.1)
-        plt.grid(True)
-        return
-
     def _scatter(p, plt, color, marker):
         """Do the actual point plotting. Change `s` to increase marker size."""
         X, Y = p[:, 0], p[:, 1]
-        plt.scatter(X, Y, s=30, c=color, linewidths=None, marker=marker)
+        plt.scatter(X, Y, s=50, c=color, linewidths=None, marker=marker)
 
     def _line(p, plt, color, marker, linewdth):
         """Connect the points with lines."""
@@ -169,7 +248,7 @@ def plot_2d(pnts, label_pnts=False, connect=False,
         """
         lbl = np.arange(len(pnts))
         for label, xpt, ypt in zip(lbl[:], pnts[:, 0], pnts[:, 1]):
-            plt.annotate(label, xy=(xpt, ypt), xytext=(2, 2), size=12,
+            plt.annotate(label, xy=(xpt, ypt), xytext=(2, 2), size=14,
                          textcoords='offset points', ha='left', va='bottom')
 
     # ---- main plotting routine
@@ -180,8 +259,8 @@ def plot_2d(pnts, label_pnts=False, connect=False,
     # ---- set basic parameters ----
     scatter_params(plt, fig, ax, title, ax_lbls)
     if hasattr(pnts, 'IFT'):  # Geo array
-        mn = pnts.mins(by_bit=True)
-        mx = pnts.maxs(by_bit=True)
+        mn = np.min(pnts.mins(by_bit=True), axis=0)
+        mx = np.max(pnts.maxs(by_bit=True), axis=0)
         pnts = pnts.bits  # convert to object array
     elif isinstance(pnts, (list, tuple)):
         mn = np.min([i.min(axis=0) for i in pnts], axis=0)
@@ -213,7 +292,6 @@ def plot_2d(pnts, label_pnts=False, connect=False,
                 _line(p, plt, color, marker, linewdth=2)
             if label_pnts:
                 _label_pnts(p, plt)
-#    plt.ion()
     plt.show()
 
 
@@ -271,7 +349,6 @@ def plot_polygons(arr, outline=True):
 
     References
     ----------
-
     See module docs for general references.
     """
     def _line(p, plt):  # , arrow=True):  # , color, marker, linewdth):
@@ -410,6 +487,22 @@ plt.show()
 #    #plt.close()
 # ----------------------------------------------------------------------------
 # ---- running script or testing code section ----
+
+
+def plot_mst(a, pairs):
+    """plot minimum spanning tree test """
+    plt.scatter(a[:, 0], a[:, 1])
+    ax = plt.axes()
+    ax.set_aspect('equal')
+    for pair in pairs:
+        i, j = pair
+        plt.plot([a[i, 0], a[j, 0]], [a[i, 1], a[j, 1]], c='r')
+    lbl = np.arange(len(a))
+    for label, xpt, ypt in zip(lbl, a[:,0], a[:,1]):
+        plt.annotate(label, xy=(xpt, ypt), xytext=(2,2), size=8,
+                     textcoords='offset points',
+                     ha='left', va='bottom') 
+    plt.show()
 
 
 def _demo():
