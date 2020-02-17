@@ -13,13 +13,12 @@ properties.
 Script : npGeo.py
     A geometry class and methods based on numpy.
 
-
 """
 # pycodestyle D205 gets rid of that one blank line thing
-# pylint: disable=C0103,C0302,C0415,D0207
-# pylint: disable=E0402,E0611,E1136,E1121,R0904,R0914,
+# pylint: disable=C0103,C0302,C0415
+# pylint: disable=E0402,E0633,E0611,E1136,E1121,R0904,R0914,
 # pylint: disable=W0201,W0212,W0221,W0612,W0621,W0105
-# pylint: disable=R0902
+# pylint: disable=R0902,R0912,R0913,R0915
 
 
 import sys
@@ -33,8 +32,8 @@ import npg_geom as geom
 import npg_io
 import smallest_circle as sc
 
-import npgDocs
-from npgDocs import *
+# import npgDocs
+from npgDocs import Geo_hlp  # dirr_doc), npGeo_doc, sort_by_extent_doc
 
 if 'npg' not in list(locals().keys()):
     import npgeom as npg
@@ -55,10 +54,9 @@ NUMS = FLOATS + INTS
 TwoPI = np.pi * 2.0
 
 __all__ = [
-    'Geo', 'is_Geo', '_is_clockwise_', '_is_ccw_', '_area_bit_',
-    'array_IFT', 'arrays_to_Geo', 'Geo_to_arrays',
+    'Geo', 'array_IFT', 'arrays_to_Geo', 'Geo_to_arrays',
     '_fill_float_array', 'dirr', 'geo_info', 'check_geometry',
-    'shape_finder', '_pnts_in_geo', '_svg'
+    'common_pnts', '_svg'
 ]   # 'Update_Geo',
 
 hlp = Geo_hlp
@@ -370,7 +368,7 @@ class Geo(np.ndarray):
 
         If a piece contains multiple parts, keeps all rings.
         """
-        return np.asarray([self[f:t] for f, t in self.FT])
+        return np.asarray([np.array(self[f:t]) for f, t in self.FT])
         # tmp = np.asarray([self.XY[f:t] for f, t in self.FT])
         # return [i for i in tmp if i.size > 0]
 
@@ -394,10 +392,9 @@ class Geo(np.ndarray):
                 ift_s[:, 1] = c[:-1]
                 ift_s[:, 2] = c[1:]
                 return Geo(a_2d, ift_s, self.K, self.XT, Info="outer rings")
-        else:
-            if asGeo:
-                return self
-            return self.bits
+        if asGeo:
+            return self
+        return self.bits
 
     def inner_rings(self, asGeo=False, to_clockwise=False):
         """Collect the holes of a polygon shape.
@@ -407,6 +404,9 @@ class Geo(np.ndarray):
         """
         info = "{} inner rings".format(str(self.Info))
         ift_s = self.IFT[self.Bit != 0]
+        if ift_s.size == 0:
+            print("\nNo inner rings\n")
+            return
         fr_to = ift_s[:, 1:3]
         if to_clockwise:
             a_2d = [self.XY[f:t][::-1] for f, t in fr_to]
@@ -533,15 +533,16 @@ class Geo(np.ndarray):
             split by (b)it, (p)art (s)hape
         """
         case = splitter[0].lower()  # use first letter for case
-        if case not in ('b', 'p', 's'):
-            print("\nSplitter not in by (b)it, (p)art (s)hape")
-            return None
         if case == "b":
-            return self.bits
+            vals = self.bits
         elif case == "p":
-            return self.parts
+            vals = self.parts
         elif case == "s":
-            return self.shapes
+            vals = self.shapes
+        else:
+            print("\nSplitter not in by (b)it, (p)art (s)hape")
+            vals = None
+        return vals
 
     def original_arrays(self):
         """Convert the Geo arrays back to the original input arrays."""
@@ -769,8 +770,8 @@ class Geo(np.ndarray):
         """Mean per feature or part, optionally keep duplicates."""
         if len(self.shp_part_cnt) == 1:
             chunks = [self]
-        else:
-            chunks = self.shapes
+        if by_bit:
+            chunks = self.bits
         if remove_dups:
             chunks = [np.unique(i, axis=0) for i in chunks]
         return np.asarray([np.mean(i, axis=0) for i in chunks])
@@ -829,13 +830,38 @@ class Geo(np.ndarray):
             return uts(arr, dtype=dt)
         return arr
 
+    def is_in(self, pnts, reverse_check=False, values=True, indices=True):
+        """Return pnts that are in the Geo array
+
+        Parameters
+        ----------
+        pnts : Nx2 array
+            The array representing the point to query.
+        reverse_check : boolean
+            True queries the pnts array for common points in the Geo array
+        values, indices : boolean
+            True, returns the values in common and their indices.  False for
+            either omits that particular return.
+        """
+        if reverse_check:
+            lead = pnts
+            check = (pnts[:, None] == self.XY).all(-1).any(-1)
+        else:
+            lead = self
+            check = (self.XY[:, None] == pnts).all(-1).any(-1)
+        if indices and values:
+            return lead[check], np.nonzero(check)[0]
+        if indices:
+            return np.nonzero(check)[0]
+        return lead[check]
+
     # ---- (2) angles
     #
     def angles_polyline(self, fromNorth=False):
         """Polyline/segment angles.  *** needs work***."""
-        ft = np.concatenate([np.concatenate((b[:-1], b[1:]), axis=1)
-                             for b in self.bits], axis=0)
-        dxy = ft[:, -2:] - ft[:, :2]
+        ft_ = np.concatenate([np.concatenate((b[:-1], b[1:]), axis=1)
+                              for b in self.bits], axis=0)
+        dxy = ft_[:, -2:] - ft_[:, :2]
         ang = np.degrees(np.arctan2(dxy[:, 1], dxy[:, 0]))
         if fromNorth:
             ang = np.mod((450.0 - ang), 360.)
@@ -1105,7 +1131,9 @@ class Geo(np.ndarray):
                 else:
                     polys.append(np.concatenate((s, s[..., :1, :]), axis=0))
         g, ift, extent = array_IFT(polys)
-        return Geo(g, ift, self.K, self.XT, "Closed polylines.")
+        if out_kind not in (1, 2):
+            out_kind = self.K
+        return Geo(g, ift, out_kind, self.XT, "Closed polylines.")
 
     def densify_by_distance(self, spacing=1):
         """Densify poly features by a specified distance.
@@ -1158,8 +1186,7 @@ class Geo(np.ndarray):
             z['X_'] = r[:, 0]
             z['Y_'] = r[:, 1]
             return z
-        else:
-            return r
+        return r
 
     # ---- segments for poly* boundaries
     #
@@ -1372,14 +1399,17 @@ class Geo(np.ndarray):
         sort_by_extent :
             For polygons or polylines.
         """
-        if x_ascending:
-            if y_ascending:
-                return self[np.lexsort((self.Y, self.X))]
+        a = x_ascending
+        b = y_ascending
+        if a and b:
+            return self[np.lexsort((self.Y, self.X))]
+        if a and not b:
             return self[np.lexsort((-self.Y, self.X))]
-        if y_ascending:
-            if x_ascending:
-                return self[np.lexsort((self.X, self.Y))]
+        if not a and b:
+            return self[np.lexsort((self.X, self.Y))]
+        if not a and not b:
             return self[np.lexsort((-self.X, self.Y))]
+        return self
 
     def radial_sort(self, asGeo=True):
         """Sort the coordinates of polygon/polyline features.
@@ -1520,9 +1550,18 @@ def check_geometry(self):
     - Inner rings (aka, holes), have points in CCW order.
     """
     # ----
-    m1 = """\
-    These shapes have a first ring in CCW order or a CW ring is actually CCW.
-    """
+    def _area_bit_(a):
+        """Mini e_area, used by areas and centroids."""
+        x0, y1 = (a.T)[:, 1:]
+        x1, y0 = (a.T)[:, :-1]
+        e0 = np.einsum('...i,...i->...i', x0, y0)
+        e1 = np.einsum('...i,...i->...i', x1, y1)
+        return np.sum((e0 - e1)*0.5)
+
+    def _is_ccw_(a):
+        """Counterclockwise."""
+        return 0 if _area_bit_(a) > 0. else 1
+    # ----
     ift = self.IFT
     c0 = self.To[-1]
     c1 = self.shape
@@ -1545,37 +1584,6 @@ def check_geometry(self):
     else:
         print("no errors found")
     return
-
-
-def is_Geo(obj, verbose=False):
-    """Check the input to see if it is a Geo array."""
-    if ('Geo' in str(type(obj))) & (issubclass(obj.__class__, np.ndarray)):
-        return True
-    if verbose:
-        msg = "`{}`, is not a Geo array`. Use `arrays_toGeo` to convert."
-        print(msg.format(obj.__class__))
-    return False
-
-
-def _is_clockwise_(a):
-    """Return whether the sequence (polygon) is clockwise oriented or not."""
-    if _area_bit_(a) > 0.:
-        return True
-    return False
-
-
-def _is_ccw_(a):
-    """Counterclockwise."""
-    return 0 if _area_bit_(a) > 0. else 1
-
-
-def _area_bit_(a):
-    """Mini e_area, used by areas and centroids."""
-    x0, y1 = (a.T)[:, 1:]
-    x1, y0 = (a.T)[:, :-1]
-    e0 = np.einsum('...i,...i->...i', x0, y0)
-    e1 = np.einsum('...i,...i->...i', x1, y1)
-    return np.sum((e0 - e1)*0.5)
 
 
 def array_IFT(in_arrays, shift_to_origin=False):
@@ -1703,6 +1711,14 @@ def arrays_to_Geo(in_arrays, kind=2, info=None):
     **npg_arc.fc_geometry** to produce `Geo` objects directly from arcgis pro
     featureclasses.
     """
+    def _area_bit_(a):
+        """Mini e_area, used by areas and centroids."""
+        x0, y1 = (a.T)[:, 1:]
+        x1, y0 = (a.T)[:, :-1]
+        e0 = np.einsum('...i,...i->...i', x0, y0)
+        e1 = np.einsum('...i,...i->...i', x1, y1)
+        return np.sum((e0 - e1)*0.5)
+    # ----
     if kind == 2:  # check for proper polygon points
         in_arrays = [np.asarray(i) for i in in_arrays
                      if len(np.unique(i, axis=0)) >= 3]
@@ -1785,7 +1801,6 @@ def dirr(obj, colwise=False, cols=3, prn=True):
 
     Source, ``arraytools.py_tools`` has a pure python equivalent.
     """
-    dirr.__doc__ += dirr_doc
     if ('Geo' in str(type(obj))) & (issubclass(obj.__class__, np.ndarray)):
         a = ['... Geo class ...']
         a.extend(sorted(list(set(dir(obj)).difference(set(dir(np.ndarray))))))
@@ -1798,7 +1813,7 @@ def dirr(obj, colwise=False, cols=3, prn=True):
     csze = int(csze) + (csze % 1 > 0)
     if colwise:
         a_0 = [a[i: i+csze] for i in range(0, len(a), csze)]
-        a_0 = list(zl(*a_0, fillvalue=""))
+        a_0 = list(zip(*a_0, fillvalue=""))
     else:
         a_0 = [a[i: i+cols] for i in range(0, len(a), cols)]
     if hasattr(obj, '__module__'):
@@ -1850,40 +1865,7 @@ def geo_info(g):
     return
 
 
-def shape_finder(arr, ids=None):
-    """Provide the structure of an array/list which may be uneven and nested.
-
-    Parameters
-    ----------
-    arr : array-like
-        An array of objects. In this case points.
-    ids : integer
-        The object ID values for each shape. If ``None``, then values will be
-        returned as a sequence from zero to the length of ``arr``.
-    """
-    main = []
-    if ids is None:
-        ids = np.arange(len(arr))
-    arr = np.asarray(arr).squeeze()
-    cnt = 0
-    for i, a in enumerate(arr):
-        info = []
-        if hasattr(a, '__len__'):
-            a0 = np.asarray(a)
-            for j, a1 in enumerate(a0):
-                if hasattr(a1, '__len__'):
-                    a1 = np.asarray(a1)
-                    if len(a1.shape) >= 2:
-                        info.append([ids[i], cnt, j, *a1.shape])
-                    else:  # a pair
-                        info.append([ids[i], cnt, j, *a0.shape])
-                        break
-        main.append(np.asarray(info))
-        cnt += 1
-    return np.vstack(main)
-
-
-def _pnts_in_geo(pnts, self, remove_common=True):
+def common_pnts(pnts, self, remove_common=True):
     """Check for coincident points between `pnts` and the Geo array.
 
     Parameters
@@ -2008,8 +1990,7 @@ def _svg(g, as_polygon=True):
     if GA:  # Geo array display
         g.SVG = s
         return SVG(g.SVG)  # plot the representation
-    else:  # np.ndarray display
-        return SVG(s)
+    return SVG(s)  # np.ndarray display
 
 
 # ---- Final main section ----------------------------------------------------

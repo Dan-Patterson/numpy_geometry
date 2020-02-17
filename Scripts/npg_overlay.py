@@ -63,13 +63,13 @@ References
 
 
 import sys
-from textwrap import dedent
+# from textwrap import dedent
 import numpy as np
 
 import npgeom as npg
 from npgeom.npg_helpers import (
-    compare_geom, line_crosses, radial_sort, crossing_num, pnts_in_poly
-)
+    compare_geom, radial_sort
+)  # , pnts_in_poly, crossing_num,  line_crosses,
 
 # ---- optional imports
 # from numpy.lib.recfunctions import structured_to_unstructured as stu
@@ -149,19 +149,20 @@ def _in_LBRT_(pnts, extent):
     return np.any(LB < pnts) & np.any(pnts <= RT)
 
 # c0 = np.logical_and(yp[i] <= y, y < yp[j])
-# c1 = np.logical_and(yp[j] <= y, y < yp[i]) 
+# c1 = np.logical_and(yp[j] <= y, y < yp[i])
 # np.logical_or(c0, c1)
 # ((yp[j] <= y) && (y < yp[i]))) &&
 #             (x < (xp[j] - xp[i]) * (y - yp[i]) / (yp[j] - yp[i]) + xp[i]))
 #           c = !c;
 
+
 # ----------------------------------------------------------------------------
-# ---- (2) clip, intersect geometry
+# ---- (3) clip, intersect geometry
 #  `p_ints_p` is the main function
 #  `batch_p_int_p` use this to batch intersect multiple polygons as input
 #  and intersectors.
 
-def dist_to_segment(x1, y1, x2, y2, x3, y3): # x3,y3 is the point
+def dist_to_segment(x1, y1, x2, y2, x3, y3):  # x3,y3 is the point
     """
     `<https://stackoverflow.com/questions/849211/shortest-distance-between
     -a-point-and-a-line-segment/2233538#2233538>`_.
@@ -169,7 +170,7 @@ def dist_to_segment(x1, y1, x2, y2, x3, y3): # x3,y3 is the point
     px = x2-x1
     py = y2-y1
     norm = px*px + py*py
-    u =  ((x3 - x1) * px + (y3 - y1) * py) / float(norm)
+    u = ((x3 - x1) * px + (y3 - y1) * py) / float(norm)
     if u > 1:
         u = 1
     elif u < 0:
@@ -188,34 +189,35 @@ def dist_to_segment(x1, y1, x2, y2, x3, y3): # x3,y3 is the point
     return dist
 
 
-def ray_tracing_numpy(x, y, poly):
-    """
-    `<https://stackoverflow.com/questions/36399381/whats-the-fastest-way
-    -of-checking-if-a-point-is-inside-a-polygon-in-python>`_.
-    """
-    n = len(poly)
-    inside = np.zeros(len(x),np.bool_)
-    p2x = 0.0
-    p2y = 0.0
-    xints = 0.0
-    p1x, p1y = poly[0]
-    for i in range(n+1):
-        p2x,p2y = poly[i % n]
-        idx = np.nonzero((y > min(p1y, p2y)) & (y <= max(p1y,p2y))
-                          & (x <= max(p1x,p2x)))[0]
-        if p1y != p2y:
-            xints = (y[idx]-p1y)*(p2x-p1x)/(p2y-p1y)+p1x
-        if p1x == p2x:
-            inside[idx] = ~inside[idx]
-        else:
-            idxx = idx[x[idx] <= xints]
-            inside[idxx] = ~inside[idxx]    
+# def ray_tracing_numpy(x, y, poly):
+#     """
+#     `<https://stackoverflow.com/questions/36399381/whats-the-fastest-way
+#     -of-checking-if-a-point-is-inside-a-polygon-in-python>`_.
+#     """
+#     n = len(poly)
+#     inside = np.zeros(len(x), np.bool_)
+#     p2x = 0.0
+#     p2y = 0.0
+#     xints = 0.0
+#     p1x, p1y = poly[0]
+#     for i in range(n+1):
+#         p2x, p2y = poly[i % n]
+#         idx = np.nonzero((y > min(p1y, p2y)) & (y <= max(p1y, p2y)) &
+#                          (x <= max(p1x, p2x)))[0]
+#         if p1y != p2y:
+#             xints = (y[idx]-p1y)*(p2x-p1x)/(p2y-p1y)+p1x
+#         if p1x == p2x:
+#             inside[idx] = ~inside[idx]
+#         else:
+#             idxx = idx[x[idx] <= xints]
+#             inside[idxx] = ~inside[idxx]
 
-        p1x,p1y = p2x,p2y
-    return inside    
+#         p1x, p1y = p2x, p2y
+#     return inside
 
-def ray_tracing_mult(x, y,poly):
-    return [ray_tracing_numpy(xi, yi, poly[:-1,:]) for xi, yi in zip(x, y)]
+
+# def ray_tracing_mult(x, y, poly):
+#     return [ray_tracing_numpy(xi, yi, poly[:-1,:]) for xi, yi in zip(x, y)]
 
 
 def points_in_polygons(pnts, geo):
@@ -263,15 +265,15 @@ def points_in_polygons(pnts, geo):
     in_outs = []
     ids = np.arange(pnts.shape[0])
     polys = geo.bits
-    bit_exts = geo.extents('bit')
-    #in_ext = []
+    # bit_exts = geo.extents('bit')
+    # in_ext = []
     for poly in polys:
-        #idx = in_extent(pnts, bit_exts[i])
-        #good = ids[idx]
-        #in_ext.append(good)
-        #p_in = pnts[idx]
+        # idx = in_extent(pnts, bit_exts[i])
+        # good = ids[idx]
+        # in_ext.append(good)
+        # p_in = pnts[idx]
         in_out = [_pip_(i[0], i[1], poly) for i in pnts]  # p_in]
-        #pnts = p_out
+        # pnts = p_out
         in_outs.append(ids[in_out])
         final.append(pnts[in_out])  # p_in[in_out])
     return in_outs, final  # in_ext,

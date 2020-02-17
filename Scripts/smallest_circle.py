@@ -1,7 +1,8 @@
-"""
-===============
+# -*- coding: utf-8 -*-
+"""Minimum area bounding circles
+
 smallest_circle
-===============
+---------------
 
 Script :
     smallest_circle.py for npgeom
@@ -12,16 +13,17 @@ Author :
 Modified :
     2019-08-30
 
-Purpose :
-    Returns the smallest circle enclosing a shape in the form of a center and
-    radius.  Original in smallestCircle.py in Bounding Containers.
+Purpose
+-------
+Returns the smallest circle enclosing a shape in the form of a center and
+radius.  Original in smallestCircle.py in Bounding Containers.
 
-Requires :
-    Must have at least two points.
+Requires
+--------
+Must have at least two points.
 
 References
 ----------
-
 de Berg et al., Computational Geometry with Applications, Springer-Verlag.
 
 Welzl, E. (1991), Smallest enclosing disks (balls and ellipsoids),
@@ -47,12 +49,10 @@ ft = {'bool': lambda x: repr(x.astype(np.int32)),
       'float_kind': '{: 8.2f}'.format}
 
 np.set_printoptions(
-        edgeitems=5,
-        threshold=500,
-        floatmode='maxprec',
-        precision=2, suppress=True, linewidth=120,
-        nanstr='nan', infstr='inf', sign='-',
-        formatter=ft)
+    edgeitems=5, threshold=500, floatmode='maxprec', precision=2,
+    suppress=True, linewidth=120, nanstr='nan', infstr='inf', sign='-',
+    formatter=ft
+)
 
 
 def circle_mini(radius=1.0, theta=10.0, xc=0.0, yc=0.0):
@@ -64,9 +64,8 @@ def circle_mini(radius=1.0, theta=10.0, xc=0.0, yc=0.0):
         Distance from centre
     theta : number
         Angle of densification of the shape around 360 degrees
-
     """
-    angles = np.deg2rad(np.arange(180.0, -180.0-theta, step=-theta))
+    angles = np.deg2rad(np.arange(180.0, -180.0 - theta, step=-theta))
     x_s = radius*np.cos(angles) + xc    # X values
     y_s = radius*np.sin(angles) + yc    # Y values
     pnts = np.array([x_s, y_s]).T
@@ -76,8 +75,10 @@ def circle_mini(radius=1.0, theta=10.0, xc=0.0, yc=0.0):
 # ---- smallest circle implementation ----------------------------------------
 # helpers : farthest, center, distance
 def farthest(a, check=False):
-    """Distance matrix calculation for 2D points using einsum, yielding the
-    two points which have the greatest distance between them.
+    """Distance matrix calculation for 2D points using einsum.
+
+    This functions yielding the two points which have the greatest distance
+    between them.
     """
     if check:
         a = np.unique(a, axis=0)
@@ -103,6 +104,7 @@ def distance(p0, p1):
 
 def small_circ(a):
     """Return the minimum area bounding circle for a points array.
+
     The ``unique`` points are used since np.unique removes reduncant calls and
     sorts the points in ascending order.
 
@@ -154,8 +156,9 @@ def sub_1(pnts, prev, ptQ):
 
 # -------------------------------------------------------------------
 def sub_2(pnts, N, ptQ, ptP):
-    """Returns the {cent, radius} for the smallest disc enclosing the points
-    in the list with PointR and PointQ on its boundary.
+    """Return the {cent, radius} for the smallest disc.
+
+    The disc encloses the points list with PointR, PointQ on its boundary.
     """
     if pnts.size == 0:
         pnts = np.array([[1.0, 1.0]])  # check

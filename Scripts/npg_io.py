@@ -48,7 +48,7 @@ References
 # pylint: disable=W0105, W0201, W0212, W0221, W0612, W0614, W0621, W0105
 
 import sys
-# from textwrap import indent, dedent
+from textwrap import indent, dedent
 import json
 import numpy as np
 
@@ -56,7 +56,7 @@ import npGeo
 
 # ---- Keep for now.
 # from numpy.lib.recfunctions import structured_to_unstructured as stu
-from numpy.lib.recfunctions import unstructured_to_structured as uts
+# from numpy.lib.recfunctions import unstructured_to_structured as uts
 # import npGeo
 # from npGeo import *
 
@@ -70,7 +70,7 @@ NUMS = FLOATS + INTS
 
 
 ft = {'bool': lambda x: repr(x.astype(np.int32)),
-      'float_kind': '{: 0.3f}'.format}
+      'float_kind': '{: 0.1f}'.format}
 np.set_printoptions(
     edgeitems=10, linewidth=160, precision=2, suppress=True,
     threshold=100, formatter=ft
@@ -78,8 +78,8 @@ np.set_printoptions(
 
 __all__ = [
     'dtype_info', 'load_geo', 'save_geo', 'load_txt', 'save_txt',
-    'load_geojson',
-    'prn_q', 'prn_tbl', 'prn_geo',
+    'load_geojson', 'geojson_Geo',
+    'prn_q', 'prn_', 'prn_tbl', 'prn_geo',
 ]
 
 
@@ -118,7 +118,7 @@ def dtype_info(a, as_string=False):
 def load_geo(f_name, suppress_extras=True):
     """Load a well formed `npy` file representing a structured array.
 
-    Unpack an npz file containing a geo array.
+    Unpack an npz file containing a Geo array.
 
     Parameters
     ----------
@@ -142,12 +142,21 @@ def load_geo(f_name, suppress_extras=True):
 
     Example
     -------
-    >>> f_name = "c:/temp/arr.npz"
+    >>> f_name = "C:/Git_Dan/npgeom/data/g_arr.npz"
     >>> geo, arrs, names = npg.load_geo(f_name)
     >>> arr_names = arrs.files  # returns the list of array names inside
     arr0 = arrs[0]
     An array or arrays. The description, field names and their size of each
     are returned.
+
+    Notes
+    -----
+    From above: arrs = np.load(f_name)
+    arrs : numpy.lib.npyio.NpzFile
+        The type of file
+    other properties : dir(arrs)
+        'allow_pickle', 'close', 'f', 'fid', 'files', 'get', 'items',
+        'iteritems', 'iterkeys', 'keys', 'pickle_kwargs', 'values', 'zip'
     """
     arrs = np.load(f_name)
     names = arrs.files  # array names
@@ -163,7 +172,8 @@ def load_geo(f_name, suppress_extras=True):
                     IFT=arrs[n1],
                     Kind=int(arrs[n2]),
                     Extent=arrs[n3],
-                    SR=arrs[n4])
+                    SR=str(arrs[n4])
+                    )
     if suppress_extras:
         return geo
     return geo, arrs, names
@@ -329,7 +339,7 @@ def geojson_Geo(pth, kind=2, info=None):
         Supplementary information.
     """
     coords = load_geojson(pth)
-    # a_2d, ift, extents = npGeo._arr_ift_(coords)
+    # a_2d, ift, extents = npGeo.array_IFT(coords)
     return npGeo.arrays_to_Geo(coords, kind=kind, info=info)
     # return npGeo.Geo(a_2d, IFT=ift, Extent=extents, Kind=kind)
 
@@ -384,6 +394,94 @@ def _col_format(pairs, deci):
 
 # ---- main print functions
 #
+def make_row_format(dim=3, cols=5, a_kind='f', deci=1,
+                    a_max=10, a_min=-10, width=100, prnt=False):
+    """Format the row based on input parameters
+
+    `dim` - int
+        Number of dimensions
+    `cols` : int
+        Columns per dimension
+
+    `a_kind`, `deci`, `a_max` and `a_min` allow you to specify a data type,
+    number of decimals and maximum and minimum values to test formatting.
+    """
+    if a_kind not in NUMS:
+        a_kind = 'f'
+    w_, m_ = [[':{}.0f', '{:0.0f}'], [':{}.{}f', '{:0.{}f}']][a_kind == 'f']
+    m_fmt = max(len(m_.format(a_max, deci)), len(m_.format(a_min, deci))) + 1
+    w_fmt = w_.format(m_fmt, deci)
+    suffix = '  '
+    while m_fmt*cols*dim > width:
+        cols -= 1
+        suffix = '.. '
+    row_sub = (('{' + w_fmt + '}')*cols + suffix)
+    row_frmt = (row_sub*dim).strip()
+    if prnt:
+        frmt = "Row format: dim cols: ({}, {})  kind: {} decimals: {}\n\n{}"
+        print(dedent(frmt).format(dim, cols, a_kind, deci, row_frmt))
+        a = np.random.randint(a_min, a_max+1, dim*cols)
+        col_hdr(width//10)  # run col_hdr to produce the column headers
+        print(row_frmt.format(*a))
+    else:
+        return row_frmt
+
+
+def prn_(a, deci=2, width=120, prefix=". . "):
+    """Alternate format to prn_nd function from `arraytools.frmts`.
+    Inputs are largely the same.
+
+    Parameters
+    ----------
+    a : ndarray
+        An np.ndarray with `ndim` 1 through 5 supported.
+    others :
+        self-evident
+    """
+    def _piece(sub, i, frmt, linewidth):
+        """Piece together 3D chunks by row."""
+        s0 = sub.shape[0]
+        block = np.hstack([sub[j] for j in range(s0)])
+        txt = ""
+        if i is not None:
+            fr = ("({}" + ", {}"*len(a.shape[1:]) + ")\n")
+            txt = fr.format(i, *sub.shape)
+        for line in block:
+            ln = frmt.format(*line)[:linewidth]
+            end = ["\n", "...\n"][len(ln) >= linewidth]
+            txt += indent(ln + end, ". . ")
+        return txt
+    # ---- main section ----
+    # out = "\n{}... ndim: {}  shape: {}\n".format(title, a.ndim, a.shape)
+    out = "\n"
+    linewidth = width
+    if a.ndim <= 1:
+        return a
+    if a.ndim == 2:
+        a = a.reshape((1,) + a.shape)
+    # ---- pull the 1st and 3rd dimension for 3D and 4D arrays
+    frmt = make_row_format(dim=a.shape[-3],
+                           cols=a.shape[-1],
+                           a_kind=a.dtype.kind,
+                           deci=deci,
+                           a_max=a.max(),
+                           a_min=a.min(),
+                           width=width,
+                           prnt=False)
+    if a.ndim == 3:
+        out += _piece(a, None, frmt, linewidth)  # ---- _piece ----
+    elif a.ndim == 4:
+        for i in range(a.shape[0]):  # s0):
+            out += "\n" + _piece(a[i], i, frmt, linewidth)  # ---- _piece
+    elif a.ndim == 5:
+        frmt = frmt *a.shape[-4]
+        for i in range(a.shape[0]):  # s0):
+            for j in range(a.shape[1]):
+                out += "\n" + _piece(a[i][j], i, frmt, linewidth)
+    with np.printoptions(precision=deci, linewidth=width):
+        print(out)
+
+
 def prn_tbl(a, rows_m=20, names=None, deci=2, width=75):
     """Format a structured array with a mixed dtype.
 

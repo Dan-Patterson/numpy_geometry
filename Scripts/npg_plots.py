@@ -140,7 +140,9 @@ def plot_mixed(data, title="Title", invert_y=False, ax_lbls=None):
     data : list of lists
         [[values, type, color, marker, connect]]
 
-    data = [[r.shapes, 2, 'red', '.', True ], [a, 0, 'black', 'o', False]]
+    data = [[p3.bits, 2, 'red', '.', True ], [psrt, 0, 'black', 'o', False]]
+    plot_mixed(data, title="Points in Polygons", invert_y=False, ax_lbls=None)
+    out, ift, ps, final = pnts_in_Geo(psrt, p3)
     """
     def _label_pnts(pnts, plt):
         """Label the points. Note: to skips the last label for polygons, use
@@ -490,7 +492,7 @@ plt.show()
 
 
 def plot_mst(a, pairs):
-    """plot minimum spanning tree test """
+    """Plot minimum spanning tree test"""
     plt.scatter(a[:, 0], a[:, 1])
     ax = plt.axes()
     ax.set_aspect('equal')
@@ -498,10 +500,10 @@ def plot_mst(a, pairs):
         i, j = pair
         plt.plot([a[i, 0], a[j, 0]], [a[i, 1], a[j, 1]], c='r')
     lbl = np.arange(len(a))
-    for label, xpt, ypt in zip(lbl, a[:,0], a[:,1]):
-        plt.annotate(label, xy=(xpt, ypt), xytext=(2,2), size=8,
+    for label, xpt, ypt in zip(lbl, a[:, 0], a[:, 1]):
+        plt.annotate(label, xy=(xpt, ypt), xytext=(2, 2), size=8,
                      textcoords='offset points',
-                     ha='left', va='bottom') 
+                     ha='left', va='bottom')
     plt.show()
 
 

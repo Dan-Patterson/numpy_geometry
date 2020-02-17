@@ -15,7 +15,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2020-01-21
+    2020-02-14
 
 Purpose
 -------
@@ -34,17 +34,17 @@ None (yet).
 # pylint: disable=R0902
 
 # pylint: disable=R1710  # inconsistent-return-statements
-# pylint: disable=W0105  # string statement has no effect
+
 
 import sys
 import copy
-from textwrap import dedent, indent
+# from textwrap import dedent, indent
 
 import numpy as np
 
 from numpy.lib.recfunctions import repack_fields
 from numpy.lib.recfunctions import structured_to_unstructured as stu
-from numpy.lib.recfunctions import unstructured_to_structured as uts
+# from numpy.lib.recfunctions import unstructured_to_structured as uts
 
 if 'npg' not in list(locals().keys()):
     import npgeom as npg
@@ -52,8 +52,8 @@ if 'npg' not in list(locals().keys()):
 # import arcpy
 
 from arcpy import (
-    Array, Exists, ListFields, Multipoint, Point, Polygon, Polyline
-)
+    Array, Exists, Multipoint, Point, Polygon, Polyline
+)  # ListFields
 
 from arcpy.da import (
     Describe, InsertCursor, SearchCursor, FeatureClassToNumPyArray,
@@ -70,14 +70,13 @@ from arcpy.management import (
 script = sys.argv[0]  # print this should you need to locate the script
 
 __all__ = [
-    'fc_to_Geo', 'id_fr_to',            # option 1, use this ***
-    'Geo_to_shapes', 'Geo_to_fc', 'view_poly',     # back to fc
-    'make_nulls', 'fc_data', 'tbl_data',     # get attributes
+    'get_SR', 'fc_to_Geo', 'id_fr_to',          # option 1, use this ***
+    'Geo_to_shapes', 'Geo_to_fc', 'view_poly',  # back to fc
+    'make_nulls', 'fc_data', 'tbl_data',        # get attributes
     'fc2na', 'array_poly', 'geometry_fc',
-    '_array_to_poly_', '_poly_to_array_2',    # geometry to array
-    '_flat', '_del_none', '_poly_arr_',      # extras
-    '__geo_interface__'
-]
+    '_array_to_poly_', '_poly_to_array_',       # geometry to array
+    '_poly_arr_', 'poly2array'                    # extras
+]   # '_del_none', '__geo_interface__', '_flat',
 
 
 # ============================================================================
@@ -98,7 +97,7 @@ def get_SR(in_fc, verbose=False):
 #
 # -- main function --
 #
-def fc_to_Geo(in_fc, geom_kind=2, info=""):
+def fc_to_Geo(in_fc, geom_kind=2, minX=0, minY=0, info=""):
     """Convert a FeatureClassToNumPyArray to a Geo array.
 
     This works with the geometry only.  Skip the attributes for later.  The
@@ -151,8 +150,14 @@ def fc_to_Geo(in_fc, geom_kind=2, info=""):
     mn = [np.min(xy['SHAPE@X']), np.min(xy['SHAPE@Y'])]
     mx = [np.max(xy['SHAPE@X']), np.max(xy['SHAPE@Y'])]
     extent = np.array([mn, mx])
-    xy['SHAPE@X'] = np.round(xy['SHAPE@X'] - mn[0], 3)
-    xy['SHAPE@Y'] = np.round(xy['SHAPE@Y'] - mn[1], 3)
+    # ---- shift if needed
+    dx, dy = mn
+    if minX != 0.:
+        dx = minX  # mn[0] - minX
+    if minY != 0.:
+        dy = minY  # mn[1] - minY
+    xy['SHAPE@X'] = np.round(xy['SHAPE@X'] - dx, 3)
+    xy['SHAPE@Y'] = np.round(xy['SHAPE@Y'] - dy, 3)
     xy.dtype.names = ['X', 'Y']
     xy = repack_fields(xy)
     #
@@ -287,9 +292,9 @@ def Geo_to_shapes(geo, as_singlepart=True):
         return (poly, oid)
     #
     SR = geo.SR
-    if "gon" in kind.lower():
+    if geo.K == 2:
         p_type = "POLYGON"
-    elif "line" in kind.lower():
+    elif geo.K == 1:
         p_type = "POLYLINE"
     if as_singlepart:
         b_ift = geo.bit_IFT
@@ -575,7 +580,7 @@ def array_poly(arr, p_type=None, sr=None, IFT=None):
         return False
     # ----
     if is_Geo_(arr):
-        ids = arr.IFT[:, 0]
+        # ids = arr.IFT[:, 0]
         from_to = arr.IFT[:, 1:3]
         arr = [arr.XY[f:t] for f, t in from_to]  # --- _poly_pieces_ chunks
         polys = []

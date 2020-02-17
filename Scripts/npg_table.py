@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
-r"""\
-
+r"""
+---------
 npg_table
 ---------
+
+Tabular data and geometry attributes.
+
+----
 
 Script :
     npg_table.py
@@ -11,10 +15,11 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2019-12-12
+    2019-12-15
 
-Purpose :
-    Tools for working with tabular data in the Geo class.
+Purpose
+-------
+Tools for working with tabular data in the Geo class.
 
 data types handled :
     i : integer
@@ -81,9 +86,9 @@ import npg_io
 ft = {"bool": lambda x: repr(x.astype(np.int32)),
       "float_kind": "{: 0.3f}".format}
 np.set_printoptions(
-        edgeitems=10, linewidth=80, precision=2, suppress=True, threshold=100,
-        formatter=ft
-        )
+    edgeitems=10, linewidth=80, precision=2, suppress=True, threshold=100,
+    formatter=ft
+)
 np.ma.masked_print_option.set_display("-")  # change to a single -
 
 script = sys.argv[0]  # print this should you need to locate the script
@@ -95,7 +100,7 @@ __all__ = [
     "calc_stats", "_get_numeric_fields", "col_stats",
     "group_stats", "find_a_in_b", "find_in",
     "split_sort_slice", "group_sort", "n_largest_vals", "n_smallest_vals"
-    ]
+]
 
 u_case = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 l_case = "abcdefghijklmnopqrstuvwxyz"
@@ -122,7 +127,7 @@ def nd2struct(a, fld_names=None):
     --------
     >>> a = np.arange(2*3).reshape(2, 3)
     array([[0, 1, 2],
-           [3, 4, 5]])  # dtype('int64')
+           [3, 4, 5]])  # dtype('int32')
     >>> b = nd2struct(a)
     array([(0, 1, 2), (3, 4, 5)],
           dtype=[('A', '<i8'), ('B', '<i8'), ('C', '<i8')])
@@ -392,7 +397,7 @@ def _prn(r, c, a, stat_name="Total"):
     f_0 = "{{!s:<{}}} ".format(r_sze)
     f_1 = ("{{!s:>{}}} "*len(c)).format(*c_sze)
     frmt = f_0 + f_1
-    hdr = "Result" + "_"*(r_sze-7)
+    hdr = "Result" + "_" * (r_sze - 7)
     txt = [frmt.format(hdr, *c)]
     txt2 = txt + [frmt.format(r[i], *a[i]) for i in range(len(r))]
     result = "\n".join(txt2)
@@ -407,7 +412,7 @@ def _as_pivot(a):
     flds = list(a.dtype.names)
     r = np.unique(a[flds[0]])
     c = np.unique(a[flds[1]])
-    z = np.zeros((len(r)+1, len(c)+1), dtype=np.float)
+    z = np.zeros((len(r) + 1, len(c) + 1), dtype=np.float)
     rc = [[(np.where(r == i[0])[0]).item(),
            (np.where(c == i[1])[0]).item()] for i in a]
     for i in range(len(a)):
@@ -728,7 +733,7 @@ def find_a_in_b(a, b, fld_names=None):
     >>> a.shape, b.shape # ((69688,), (10,))
     >>> find_a_in_b(a, b, flds, flds)
     array([69678, 69679, 69680, 69681, 69682,
-           69683, 69684, 69685, 69686, 69687], dtype=int64)
+           69683, 69684, 69685, 69686, 69687], dtype=int32)
 
     References
     ----------

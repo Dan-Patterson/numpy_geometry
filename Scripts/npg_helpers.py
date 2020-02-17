@@ -47,33 +47,104 @@ import sys
 # from textwrap import dedent
 
 import numpy as np
+import npgeom as npg
 
 script = sys.argv[0]  # print this should you need to locate the script
 
 nums = 'efdgFDGbBhHiIlLqQpP'
 
 __all__ = [
-    'pnt_right_side', 'line_crosses', 'in_out_crosses',
-    'pnts_in_poly', 'crossing_num',
-    'compare_geom', 'keep_geom', 'remove_geom', 'radial_sort'
-]
+    '_area_bit_', '_in_extent_', '_is_ccw_', '_is_clockwise_',
+    '_is_right_side', '_length_bit_', '_rotate_', '_scale_', '_translate_',
+    'compare_geom', 'crossings', 'in_out_crosses', 'interweave', 'is_Geo',
+    'keep_geom', 'line_crosses', 'pnts_in_extent_', 'poly_cross_product_',
+    'polyline_angles', 'radial_sort', 'remove_geom', 'sort_xy'
+]  # 'crossing_num', 'pnts_in_poly'
 
 
-# ---- common helpers ---- duplicates in npGeo
+# ---- common helpers ----
 #
-def _is_Geo_(obj):
-    """From : Function of npgeom.npGeo module"""
-    if 'Geo' in str(type(obj)) & issubclass(obj.__class__, np.ndarray):
+def _area_bit_(a):
+    """Mini e_area, used by areas and centroids."""
+    x0, y1 = (a.T)[:, 1:]
+    x1, y0 = (a.T)[:, :-1]
+    e0 = np.einsum('...i,...i->...i', x0, y0)
+    e1 = np.einsum('...i,...i->...i', x1, y1)
+    return np.sum((e0 - e1)*0.5)
+
+
+def _length_bit_(ar):
+    """Calculate segment lengths of poly geometry."""
+    diff = ar[:-1] - ar[:-1]
+    return np.sqrt(np.einsum('ij,ij->i', diff, diff))
+
+
+def _is_clockwise_(a):
+    """Return whether the sequence (polygon) is clockwise oriented or not."""
+    if _area_bit_(a) > 0.:
         return True
     return False
 
 
-def _cw_(a):
-    """Clockwise test."""
-    return 1 if _area_part_(a) > 0. else 0
+def _is_ccw_(a):
+    """Counterclockwise."""
+    return 0 if _area_bit_(a) > 0. else 1
 
 
-def pnts_in_extent_(pnts, ext, return_index=False):
+def _is_right_side(p, strt, end):
+    """Determine if a point (p) is `inside` a line segment (strt-->end).
+
+    Parameters
+    ----------
+    p, strt, end : array-like
+        X,Y coordinates of the subject point and the start and end of the line.
+
+    See Also
+    --------
+    line_crosses, in_out_crosses
+
+    Notes
+    -----
+    Returns whether or not a point is inside (right-side) the current
+    clip edge for a clockwise oriented polygon and its segments.
+
+    position = sign((Bx - Ax) * (Y - Ay) - (By - Ay) * (X - Ax))
+
+    negative for right of clockwise line, positive for left. So in essence,
+    the reverse of _is_left_side with the outcomes reversed ;)
+    """
+    x, y, x0, y0, x1, y1 = *p, *strt, *end
+    return (x1 - x0) * (y - y0) - (y1 - y0) * (x - x0)
+
+
+def is_Geo(obj, verbose=False):
+    """Check the input to see if it is a Geo array."""
+    if ('Geo' in str(type(obj))) & (issubclass(obj.__class__, np.ndarray)):
+        return True
+    if verbose:
+        msg = "`{}`, is not a Geo array`. Use `arrays_toGeo` to convert."
+        print(msg.format(obj.__class__))
+    return False
+
+
+def _in_extent_(pnts, ext):
+    """Return points in, or on the line of an extent. See `_in_LBRT_` also.
+
+    Parameters
+    ----------
+    pnts : array
+        An Nx2 array representing point objects.
+    extent : array-like
+        A 2x2 array, as [[x0, y0], [x1, y1] where the first pair is the
+        left-bottom and the second pair is the right-top coordinate.
+    """
+    LB, RT = ext
+    comp = np.logical_and(LB <= pnts, pnts <= RT)  # using <= and <=
+    idx = np.logical_and(comp[..., 0], comp[..., 1])
+    return pnts[idx]
+
+
+def pnts_in_extent_(pnts, ext=None, return_index=False):
     """Check, and return points within a defined extent.
 
     Parameters
@@ -90,33 +161,22 @@ def pnts_in_extent_(pnts, ext, return_index=False):
     >>> RT = np.max(a, axis=0)  # right top
     >>> ext = np.asarray([LB, RT])
     """
-    shp = ext.shape
+    msg = "\nExtent in error... 2x2 array required not:\n{}\n"
+    if ext is None:
+        print(msg.format(ext))
+        return
+    shp = np.asarray(ext).shape
     if shp == (2, 2):
         LB, RT = ext
     elif shp[0] > 2:
         LB, RT = np.min(ext, axis=0), np.max(ext, axis=0)
     else:
-        print("\nExtent in error... 2x2 array required not:\n{}\n".format(ext))
-        return None
+        print(msg.format(ext))
+        return
     idx = np.all(np.logical_and(LB < pnts, pnts <= RT), axis=1)
     if return_index:
         return idx
     return np.all(idx)
-
-
-def _area_part_(ar):
-    """Calculate area using einsum for ndarray `ar`, shape Nx2  with N > 3."""
-    x0, y1 = (ar.T)[:, 1:]
-    x1, y0 = (ar.T)[:, :-1]
-    e0 = np.einsum('...i,...i->...i', x0, y0)
-    e1 = np.einsum('...i,...i->...i', x1, y1)
-    return np.sum((e0 - e1)*0.5)
-
-
-def _length_part_(ar):
-    """Calculate segment lengths of poly geometry."""
-    diff = ar[:-1] - ar[:-1]
-    return np.sqrt(np.einsum('ij,ij->i', diff, diff))
 
 
 def _translate_(a, dx=0, dy=0):
@@ -141,7 +201,7 @@ def _translate_(a, dx=0, dy=0):
         return a + [dx, dy]
 
 
-def rotate(a, angle=0.0, clockwise=False):
+def _rotate_(a, angle=0.0, clockwise=False):
     """Rotate shapes about their center or individually."""
     if clockwise:
         angle = -angle
@@ -152,7 +212,7 @@ def rotate(a, angle=0.0, clockwise=False):
     return np.einsum('ij,jk->ik', a - cent, R) + cent
 
 
-def scale(a, factor=1):
+def _scale_(a, factor=1):
     """Scale a geometry equally."""
     a = np.array(a)
     cent = np.min(a, axis=0)
@@ -162,10 +222,10 @@ def scale(a, factor=1):
 
 
 # ---- Geo array stuff
-def polyline_angles(arr, fromNorth=False):
+def polyline_angles(geo, fromNorth=False):
     """Polyline/segment angles.  *** needs work***."""
     ft = np.concatenate([np.concatenate((b[:-1], b[1:]), axis=1)
-                         for b in self.bits], axis=0)
+                         for b in geo.bits], axis=0)
     dxy = ft[1:] - ft[:-1]
     ang = np.degrees(np.arctan2(dxy[:, 1], dxy[:, 0]))
     if fromNorth:
@@ -203,26 +263,6 @@ def poly_cross_product_(a):
 #  pnt_right_side : single point relative to the line
 #  line_crosses   : checks both segment points relative to the line
 #  in_out_crosses # a variante of the above, with a different return signature
-
-def pnt_right_side(p, strt, end):
-    """Determine if a point is `inside` a line segment.
-
-    Parameters
-    ----------
-    p, strt, end : array-like
-        X,Y coordinates of the subject point and the start and end of the line.
-
-    Returns whether or not a point is inside (right-side) the current
-    clip edge for a clockwise oriented polygon and its segments.
-
-    See : line_crosses, in_out_crosses
-    """
-    if sum([len(i) for i in pnts[:3]]) != 6:
-        print("\n Three points needed\n")
-        return
-    x, y, x0, y0, x1, y1 = *p, *strt, *end
-    return (x1 - x0) * (y - y0) <= (y1 - y0) * (x - x0)
-
 
 def line_crosses(p0, p1, p2, p3):
     """Determine if a line is `inside` another line segment.
@@ -299,7 +339,7 @@ def in_out_crosses(*args):
 
 def crossings(geo, clipper):
     """Determine if lines cross. multiline implementation of above"""
-    bounds = dissolve(geo)
+    bounds = npg.dissolve(geo)
     p0s = bounds[:-1]
     p1s = bounds[1:]
     p2s = clipper[:-1]
@@ -315,14 +355,14 @@ def crossings(geo, clipper):
         for i in range(n):
             p0, p1 = p0s[i], p1s[i]
             ar = np.asarray([p0, p1, p2, p3])
-            a, b = _lc_(p0, p1, p2, p3)
+            a, b = line_crosses(p0, p1, p2, p3)
             if a and b:
                 # return 1
                 in_.append(ar)
             elif a or b:
                 # return 0
                 crosses_.append(ar)
-                x0 = _intersect_(p0, p1, p2, p3)
+                x0 = npg._intersect_(p0, p1, p2, p3)
                 print(p0, p1, p2, p3, x0)
                 x_pnts.append(x0)
             # elif not a and not b:
@@ -330,134 +370,6 @@ def crossings(geo, clipper):
                 # return -1
                 out_.append(ar)
     return in_, out_, crosses_, x_pnts
-# ---- point in poly ---------------------------------------------------------
-#
-def _in_extent_(pnts, ext):
-    """Return the points within an extent or on the line of the extent."""
-    LB, RT = ext
-    comp = np.logical_and(LB <= pnts, pnts <= RT)  # using <= and <=
-    idx = np.logical_and(comp[..., 0], comp[..., 1])
-    return pnts[idx]
-
-
-def pnts_in_poly(pnts, poly):
-    """Points in polygon.
-
-    Implemented using crossing number largely derived from **pnpoly** in its
-    various incarnations.
-    This version does a ``within extent`` test to pre-process the points.
-    Points meeting this condition are passed on to the crossing number section.
-
-    Parameters
-    ----------
-    pnts : array
-        point array
-    poly : polygon
-        Closed-loop as an array.  The last and first point will be the same in
-        a correctly formed polygon.
-
-    Notes
-    -----
-    Helpers from arraytools.pntinply.
-    """
-    # ----
-    inside = crossing_num(pnts, poly)
-    return inside
-
-
-def cr_num(pnts, poly, line=True):
-    """Crossing Number for point(s) in polygon.  See `pnts_in_poly`.
-
-    Parameters
-    ----------
-    pnts : array of points
-        Points are an N-2 array of point objects determined to be within the
-        extent of the input polygons.
-    poly : polygon array
-        Polygon is an Nx2 array of point objects that form the clockwise
-        boundary of the polygon.
-    line : boolean
-        True to include points that fall on a line as being inside.
-    """
-    pnts = np.atleast_2d(pnts)
-    xs = poly[:, 0]
-    ys = poly[:, 1]
-    N = len(poly)
-    xy_diff = np.diff(poly, axis=0)
-    dx = xy_diff[:, 0]  # np.diff(xs)
-    dy = xy_diff[:, 1]  # np.diff(ys)
-    ext = np.array([poly.min(axis=0), poly.max(axis=0)])
-    inside = _in_extent_(pnts, ext)
-    print(inside)
-    is_in = []
-    for pnt in inside:
-        cn = 0    # the crossing number counter
-        x, y = pnt
-        for i in range(N - 1):
-            c0 = (ys[i] <= y < ys[i + 1])  # changed to <= <=
-            c1 = (ys[i] >= y > ys[i + 1])  # and >= >=
-            if (c0 or c1) or y in (ys[i], ys[i+1]):
-                vt = (y - ys[i]) / dy[i]  # compute x-coordinate
-                xcal = (xs[i] + vt * dx[i])
-                if (x == xs[i]) or (x < xcal):  # include
-                    cn += 1
-        is_in.append(cn % 2)  # either even or odd (0, 1)
-    return pnts[np.nonzero(is_in)]
-
-
-def crossing_num(pnts, poly, line=True):
-    """Crossing Number for point(s) in polygon.  See `pnts_in_poly`.
-
-    Parameters
-    ----------
-    pnts : array of points
-        Points are an N-2 array of point objects determined to be within the
-        extent of the input polygons.
-    poly : polygon array
-        Polygon is an Nx2 array of point objects that form the clockwise
-        boundary of the polygon.
-    line : boolean
-        True to include points that fall on a line as being inside.
-    """
-    def _in_ex_(pnts, ext):
-        """Return the points within an extent or on the line of the extent."""
-        LB, RT = ext
-        comp = np.logical_and(LB <= pnts, pnts <= RT)  # using <= and <=
-        idx = np.logical_and(comp[..., 0], comp[..., 1])
-        return idx, pnts[idx]
-
-    pnts = np.atleast_2d(pnts)
-    ids_ = np.arange(len(pnts))
-    in_ids = []
-    xs = poly[:, 0]
-    ys = poly[:, 1]
-    N = len(poly)
-    xy_diff = np.diff(poly, axis=0)
-    dx = xy_diff[:, 0]  # np.diff(xs)
-    dy = xy_diff[:, 1]  # np.diff(ys)
-    ext = np.array([poly.min(axis=0), poly.max(axis=0)])
-    idx, inside = _in_ex_(pnts, ext)
-    is_in = []
-    for pnt in inside:
-        cn = 0    # the crossing number counter
-        x, y = pnt
-        for i in range(N - 1):
-            if line is True:
-                c0 = (ys[i] < y <= ys[i + 1])  # changed to <= <=
-                c1 = (ys[i] > y >= ys[i + 1])  # and >= >=
-            else:
-                c0 = (ys[i] < y < ys[i + 1])
-                c1 = (ys[i] > y > ys[i + 1])
-            if (c0 or c1) or y in (ys[i], ys[i+1]):
-                vt = (y - ys[i]) / dy[i]  # compute x-coordinate
-                if line is True:
-                    if (x == xs[i]) or (x < (xs[i] + vt * dx[i])):  # include
-                        cn += 1
-                else:
-                    if x < (xs[i] + vt * dx[i]):  # exclude pnts on line
-                        cn += 1
-        is_in.append(cn % 2)  # either even or odd (0, 1)
-    return inside[np.nonzero(is_in)]
 
 
 # ---- compare, remove, keep geometry ----------------------------------------
@@ -540,7 +452,7 @@ def sort_xy(a, x_ascending=True, y_ascending=True):
     if y_ascending:
         if x_ascending:
             return a[np.lexsort((x_s, y_s))]
-        return self[np.lexsort((-x_s, y_s))]
+        return a[np.lexsort((-x_s, y_s))]
 
 
 def radial_sort(a, close_poly=True, clockwise=True):
@@ -580,6 +492,40 @@ def interweave(arr, as_3d=False):
     if as_3d:
         return fr_to.reshape(-1, 2, 2)  # for ndim=3d
     return fr_to
+
+# ---- others ---------------------------------------------------------------
+#
+def shape_finder(arr, ids=None):
+    """Provide the structure of an array/list which may be uneven and nested.
+
+    Parameters
+    ----------
+    arr : array-like
+        An array of objects. In this case points.
+    ids : integer
+        The object ID values for each shape. If ``None``, then values will be
+        returned as a sequence from zero to the length of ``arr``.
+    """
+    main = []
+    if ids is None:
+        ids = np.arange(len(arr))
+    arr = np.asarray(arr).squeeze()
+    cnt = 0
+    for i, a in enumerate(arr):
+        info = []
+        if hasattr(a, '__len__'):
+            a0 = np.asarray(a)
+            for j, a1 in enumerate(a0):
+                if hasattr(a1, '__len__'):
+                    a1 = np.asarray(a1)
+                    if len(a1.shape) >= 2:
+                        info.append([ids[i], cnt, j, *a1.shape])
+                    else:  # a pair
+                        info.append([ids[i], cnt, j, *a0.shape])
+                        break
+        main.append(np.asarray(info))
+        cnt += 1
+    return np.vstack(main)
 
 
 # ===========================================================================

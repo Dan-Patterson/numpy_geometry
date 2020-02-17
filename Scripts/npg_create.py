@@ -72,8 +72,8 @@ npg.plot_2d(out[:N], True, True)  # change N for number of sides in range 3-->
 # pylint: disable=W0105  # string statement has no effect
 
 import sys
-from textwrap import dedent
-from functools import wraps
+# from textwrap import dedent
+# from functools import wraps
 import numpy as np
 
 import npgeom as npg
@@ -89,17 +89,18 @@ script = sys.argv[0]  # print this should you need to locate the script
 
 __all__ = ['code_grid', 'rot_matrix',
            'arc_', 'arc_sector',
-           'circle', 'circle_mini', 'circle_ring',
+           'circle', 'circle_mini', 'circle_ring', 'circ_3pa', 'circ_3p',
            'ellipse',
+           'rectangle',
+           'triangle',
            'hex_flat', 'hex_pointy',
            'mesh_xy',
            'pyramid',
-           'rectangle',
-           'triangle',
            'pnt_from_dist_bearing',
            'xy_grid',
            'transect_lines',
-           'spiral_archim',
+           'spiral_archim', 'spiral_sqr', 'spiral_cw', 'spiral_ccw',
+           'base_spiral', 'to_spiral', 'from_spiral',
            'repeat', 'mini_weave'
            ]
 
@@ -189,7 +190,7 @@ def rot_matrix(angle=0, nm_3=False):
     Notes
     -----
     Rotate Geo array, ``g`` around a point...
-    
+
     >>>> g.translate(-x, -y).rotate(theta).translate(x, y).
     """
     rad = np.deg2rad(angle)
@@ -882,6 +883,96 @@ def spiral_archim(pnts, n, inward=False, clockwise=True):
     else:
         xy = np.c_[xs, ys]
     return xs, ys, xy
+
+
+def spiral_sqr(ULx=-10, n_max=100):
+    """Create a square spiral from the centre in a clockwise direction
+    : ULx = upper left x coordinate, relative to center (0, 0)
+    : n-max = maximum number of iterations should ULx not be reached
+    :- see spirangle, Ulam spiral
+    """
+    def W(x, y, c):
+        x -= c[0]
+        return x, y, c
+
+    def S(x, y, c):
+        y -= c[1]
+        return x, y, c
+
+    def E(x, y, c):
+        x += c[2]
+        return x, y, c
+
+    def N(x, y, c):
+        y += c[3]
+        return x, y, c
+
+    c = np.array([1, 1, 2, 2])
+    pos = [0, 0, c]
+    n = 0
+    v = [pos]
+    cont = True
+    while cont:
+        p0 = W(*v[-1])
+        p1 = S(*p0)
+        p2 = E(*p1)
+        p3 = N(*p2)
+        c = c + 2
+        p3 = [p3[0], p3[1], c]
+        for i in [p0, p1, p2, p3]:
+            v.append(i)
+        # --- print(p0, p0[0])  # for testing
+        if (p0[0] <= ULx):      # bail option 1
+            cont = False
+        if n > n_max:           # bail option 2
+            cont = False
+        n = n+1
+    coords = np.asarray([np.array([i[0], i[1]]) for i in v])[:-3]
+    return coords
+
+
+# -------Excellent one-------------------------------------------------------
+#  https://stackoverflow.com/questions/36834505/
+#        creating-a-spiral-array-in-python
+def spiral_cw(A):
+    """Docstring"""
+    A = np.array(A)
+    out = []
+    while(A.size):
+        out.append(A[0])        # take first row
+        A = A[1:].T[::-1]       # cut off first row and rotate counterclockwise
+    return np.concatenate(out)
+
+
+def spiral_ccw(A):
+    """Docstring"""
+    A = np.array(A)
+    out = []
+    while(A.size):
+        out.append(A[0][::-1])    # first row reversed
+        A = A[1:][::-1].T         # cut off first row and rotate clockwise
+    return np.concatenate(out)
+
+
+def base_spiral(nrow, ncol):
+    """Docstring"""
+    return spiral_ccw(np.arange(nrow*ncol).reshape(nrow, ncol))[::-1]
+
+
+def to_spiral(A):
+    """Docstring"""
+    A = np.array(A)
+    B = np.empty_like(A)
+    B.flat[base_spiral(*A.shape)] = A.flat
+    return B
+
+
+def from_spiral(A):
+    """Docstring"""
+    A = np.array(A)
+    return A.flat[base_spiral(*A.shape)].reshape(A.shape)
+
+# ---- end code section--------------------------------------
 
 
 def repeat(seed=None, corner=[0, 0], x_cols=1, y_rows=1, angle=0):

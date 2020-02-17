@@ -108,35 +108,33 @@ from scipy.spatial import Delaunay
 
 
 import npgeom as npg
-from npGeo import *  # is_Geo, _area_bit_
+from npGeo import (array_IFT)
 # from npGeo import Geo, arrays_to_Geo
-from npgeom.npg_helpers import (
-    compare_geom, crossing_num, radial_sort, line_crosses
-)
+from npgeom.npg_helpers import (_area_bit_, _in_extent_, is_Geo)
+
+#    )  # crossing_num, compare_geom, line_crosses, radial_sort,
 # import npg_io
 # from npGeo_io import fc_data
 
 ft = {'bool': lambda x: repr(x.astype(np.int32)),
-      'float_kind': '{: 0.3f}'.format}
-np.set_printoptions(edgeitems=10, linewidth=80, precision=3, suppress=True,
+      'float_kind': '{: 0.1f}'.format}
+np.set_printoptions(edgeitems=10, linewidth=80, precision=1, suppress=True,
                     threshold=100, formatter=ft)
 np.ma.masked_print_option.set_display('-')  # change to a single -
 
 script = sys.argv[0]  # print this should you need to locate the script
 
 __all__ = [
-    'extent_to_poly', 'eucl_dist',
+    'extent_to_poly',
+    'eucl_dist', '_dist_along_', '_percent_along_', '_pnts_on_line_',
     'scale_by_area', 'offset_buffer',
-    '_area_centroid_', '_angles_',
+    '_area_centroid_', '_angles_', '_rotate_',
     '_ch_scipy_', '_ch_simple_', '_ch_',
-    '_dist_along_', '_percent_along_', '_pnts_on_line_',
-    '_polys_to_unique_pnts_', '_simplify_lines_',
-    'pnts_in_Geo_extents', 'pnts_in_Geo',
+    '_polys_to_unique_pnts_', '_simplify_lines_', 'segments_to_polys',
+    'pnts_in_Geo_extents', 'pnts_in_pnts',
     '_pnt_on_poly_', '_pnt_on_segment_', 'p_o_p',
-    '_rotate_', '_tri_pnts_',
-    'segments_to_polys', 'in_hole_check',
-    'pnts_in_pnts'
-]
+    '_tri_pnts_', 'in_hole_check'
+]  # 'pnts_in_Geo',
 
 
 def extent_to_poly(extent, kind=2):
@@ -161,7 +159,7 @@ def extent_to_poly(extent, kind=2):
     L, R = min(L, R), max(L, R)
     B, T = min(B, T), max(B, T)
     ext = np.array([[L, B], [L, T], [R, T], [R, B], [L, B]])
-    return arrays_to_Geo([ext], kind=kind, info="extent to poly")
+    return npg.arrays_to_Geo([ext], kind=kind, info="extent to poly")
 
 
 # ==== ====================================================
@@ -335,7 +333,7 @@ def scale_by_area(poly, factor=1, asGeo=False):
 
     Requires
     --------
-    `isGeo`, `_area_bit_` from npGeo
+    `isGeo`, `_area_bit_` from npg_helpers
 
     Notes
     -----
@@ -442,7 +440,6 @@ def offset_buffer(poly, buff_dist=1, keep_holes=False, asGeo=False):
     def _buffer_Geo_(poly, buff_dist, keep_holes):
         """Move the Geo array buffering separately"""
         arr = poly.bits
-        ift = poly.IFT
         cw = poly.CW
         final = []
         for i, a in enumerate(arr):
@@ -747,115 +744,9 @@ def pnts_in_pnts(pnts, geo, just_common=True):
     return pnts, None
 
 
-def pnts_in_Geo(pnts, geo, uniq_pnts=True):
-    """Geo array implementation of points in polygon. `pntply`.
-
-     Crossing number is used to determine whether a point is completely inside
-     or on the boundary of a polygon.
-
-    Parameters
-    ----------
-    pnts : array (N, 2)
-       An ndarray of point objects.
-    g : Geo array
-        The Geo array of singlepart polygons.
-     (ms)  pnts
-      8.8  1e02
-      6.6  1e03
-     45.2  1e04
-    461    1e05
-    4.17s  1e06  4 shapes, 1.47 for 1 shape
-    data = [[p3.bits, 2, 'red', '.', True ], [psrt, 0, 'black', 'o', False]]
-    plot_mixed(data, title="Points in Polygons", invert_y=False, ax_lbls=None)
-    out, ift, ps, final = pnts_in_Geo(psrt, p3)
-    """
-    # ----
-    def _cr_num_(pnts, poly, line=True):
-        """Crossing Number for point(s) in polygon. See full implementation
-        in npg.npg_helpers `crossing_num`.
-        """
-        pnts = np.atleast_2d(pnts)
-        xs = poly[:, 0]
-        ys = poly[:, 1]
-        N = len(poly)
-        xy_diff = np.diff(poly, axis=0)
-        dx = xy_diff[:, 0]  # np.diff(xs)
-        dy = xy_diff[:, 1]  # np.diff(ys)
-        is_in = []
-        for pnt in pnts:
-            cn = 0    # the crossing number counter
-            x, y = pnt
-            for i in range(N - 1):
-                c0 = (ys[i] <= y < ys[i + 1])
-                c1 = (ys[i] >= y > ys[i + 1])
-                if (c0 or c1) or y in (ys[i], ys[i+1]):
-                    if dy[i] != 0:
-                        vt = (y - ys[i]) / dy[i]  # compute x-coordinate
-                        xcal = (xs[i] + vt * dx[i])
-                        if (x == xs[i]) or (x < xcal):  # include
-                            cn += 1
-            is_in.append(cn % 2)  # either even or odd (0, 1)
-        return pnts[np.nonzero(is_in)]
-
-    def _pnts_in_ext_(pnts, geo):
-        """Return the indices of points in Geo extents."""
-        extents = geo.extents(splitter="shape")
-        L = pnts[:, 0][:, None] >= extents[:, 0]
-        R = pnts[:, 0][:, None] <= extents[:, 2]
-        B = pnts[:, 1][:, None] >= extents[:, 1]
-        T = pnts[:, 1][:, None] <= extents[:, 3]
-        c_0 = np.logical_and(L, R)
-        c_1 = np.logical_and(B, T)
-        idx = np.logical_and(c_0, c_1)
-        return idx
-    #
-    # ---- Determine points in the extents of each feature in g
-    # main section
-    geo = geo.outer_rings(True)  # remove holes, keep as Geo array
-    extents = geo.extents(splitter="shape")
-    # get the `points in extent` indices
-    uni, cnts = np.unique(pnts, return_counts=True, axis=0)
-    idx = _pnts_in_ext_(uni, geo)
-    p_inside = np.asarray([uni[idx[:, i]] for i in range(idx.shape[-1])])
-    out = []
-    # cycle through the shapes
-    polys = geo.outer_rings(False)
-    for i, p in enumerate(p_inside):
-        if p.size > 0:
-            poly = polys[i]
-            cn = _cr_num_(p, poly)  # _cr_num_(p, poly)
-            if len(cn) > 0:  # cn.size > 0:
-                out.append([geo.shp_IFT[i], cn])
-    ift, ps = zip(*out)
-    ps = [i for i in ps if len(ps) > 0]
-    final = np.unique(np.vstack(ps), axis=0)
-    return out, ift, ps, final
-
-
-def _cr_np_(pnts, poly):
-    """Crossing number, using numpy"""
-    pnts = np.atleast_2d(pnts)
-    yp = pnts[:, 1]
-    xp = pnts[:, 0]
-    xs = poly[:, 0]
-    ys = poly[:, 1]
-    xy_diff = np.diff(poly, axis=0)
-    dx = xy_diff[:, 0]  # np.diff(xs)
-    dy = xy_diff[:, 1]  # np.diff(ys)
-    with np.errstate(divide='ignore', invalid='ignore'):
-        g = dy != 0
-        vt = (yp[:, None] - ys[:-1])/dy  # [:, g] / dy[g]
-        xcal = xs[:-1] + (vt * dx)
-        xcal = xcal[:, g]   # slice out the good
-        c5 = (xp[:, None] == xs[:-1])[:, g]
-        c6 = xp[:, None] <= xcal
-        c7 = np.logical_or(c5, c6)
-        cn_1 = np.sum(c7, axis=1)
-        cn_final = cn_1 % 2
-        w = np.where(cn_final == 1)[0]
-    return pnts[w]
-
-
+# ==========================================================================
+#
+# ---- Geo, pnt on polygon
 def _pnt_on_poly_(pnt, poly):
     """Find closest point location on a polygon/polyline.
 
@@ -984,7 +875,6 @@ def p_o_p(pnts, poly):
     for i, n in enumerate(names):
         z[n] = result[:, i]
     return z
-
 
 
 # ---- triangulation, Delaunay helper

@@ -17,13 +17,6 @@ Purpose
 -------
 Tools for working with numpy arrays.  From arraytools.utils
 
-References
-----------
-`<http://pro.arcgis.com/en/pro-app/arcpy/data-access/numpyarraytotable.htm>`_.
-
-`<http://pro.arcgis.com/en/pro-app/arcpy/data-access/tabletonumpyarray.htm>`_.
-
-
 Useage
 ------
 
@@ -87,6 +80,7 @@ Retrieve array information::
 # pylint: disable=W0105  # string statement has no effect
 
 import sys
+import os
 from textwrap import dedent, indent, wrap
 import warnings
 import numpy as np
@@ -334,7 +328,7 @@ def get_func(func, line_nums=True, verbose=True):
 
 # ----------------------------------------------------------------------
 # ---- (3) get_module info .... code section ----
-def get_module_info(obj, code=False, verbose=True):
+def get_module_info(obj, verbose=True):
     """Get module (script) information, including source code if needed.
 
     Parameters
@@ -343,8 +337,8 @@ def get_module_info(obj, code=False, verbose=True):
         The imported object.  It must be either a whole module or a script
         that you imported.  Import it. It is easier if it is in the same
         folder as the script running this function.
-    code, verbose : boolean
-        Whether to return the code as well and/or return a string output.
+    verbose : boolean
+        True, prints the output.  False, returns the string.
 
     Requires
     --------
@@ -365,40 +359,67 @@ def get_module_info(obj, code=False, verbose=True):
     >>> get_module_info(npg, False, True)
     >>> # No quotes around module name, code=True for module code
     """
+    def wrapit(_in, counter=None):
+        """Wrap a string."""
+        nmes = _in[1]
+        if len(nmes) > 100:
+            nmes = nmes[:100] + [".... snip ...."]
+        sub = ", ".join([j for j in nmes])
+        sub = wrap(sub, 75)
+        txt = "\n".join([j for j in sub])
+        if counter is None:
+            return "\n{}\n{}".format(i[0], indent(txt, "    "))
+        s = "\n({:2.0f}) : {}\n{}".format(counter, i[0], indent(txt, "    "))
+        return s
+    # ----
     ln = "\n:{}:\n\n".format("-"*65)
-    frmt = "{}Module: {}\nFile:   {}\nMembers:\n{}\n\nDocs:...\n{}"
-    frmt0 = "  {}"
-    frmt1 = "{}Module: {}\nFile:   {}\nMembers:\n"
-    frmt2 = "\nSource code: .....\n{}Docs:...\n{}"
+    f1 = "{}Package: {}\nFile:    {}"
     import inspect
-    # from textwrap import dedent  # required if not immported initially
-
+    from textwrap import indent, wrap
     if not inspect.ismodule(obj):
         out = "\nError... `{}` is not a module, but is of type... {}\n"
         print(out.format(obj.__name__, type(obj)))
         return None
-    if code:
-        lines, _ = inspect.getsourcelines(obj)
-        frmt = frmt0 + frmt2
-        code = "".join(["{:4d}  {}".format(idx + 1, line)
-                        for idx, line in enumerate(lines)])
-    else:
-        lines = code = ""
-        frmt = frmt + frmt1
-    memb = [i[0] for i in inspect.getmembers(obj) if i[0][:2] != "__"]
-    memb.sort()
-    memb = ", ".join([i for i in memb])
-    w = wrap(memb)
-    w0 = "\n".join([i for i in w])
+    # ----
+    path_parts = obj.__file__.split("\\")[:-1]
+    mod_path = "\\".join([i for i in path_parts])
+    out = []
+    mem = inspect.getmembers(obj, inspect.ismodule and not inspect.isbuiltin)
+    func = inspect.getmembers(obj, inspect.isroutine)  # isfunction)
+    clas_ = inspect.getmembers(obj, inspect.isclass)
+    _a0 = sorted([i[0] for i in func if i[0].startswith("_")])  # dir(m[1])
+    _a1 = sorted([i[0] for i in func if not i[0].startswith("_")])  # dir(m[1])
+    _all = _a0 + _a1
+    _c0 = sorted([i[0] for i in clas_])
+    out.append(["Functions/methods:", _all])
+    out.append(["Classes :", _c0])
+    out.append(["\nMembers:", ""])
+    for m in mem:
+        if hasattr(m[1], "__file__"):
+            if mod_path in m[1].__file__:
+                r = inspect.getmembers(m[1], inspect.isroutine)
+                _a = [i[0] for i in r]
+                _a0 = sorted([i for i in _a if i.startswith("_")])
+                _a1 = sorted([i for i in _a if not i.startswith("_")])
+                _all = _a0 + _a1
+                out.append([m[0], _all])
+            else:
+                out.append([m[0], ["package: {}".format(m[1].__package__)]])
+    # ----
+    s = ""
+    for i in out[:3]:
+        s += wrapit(i, counter=None)
+    cnt = 1
+    for i in out[3:]:
+        s += wrapit(i, counter=cnt)
+        cnt += 1
     args0 = [ln, obj.__name__, obj.__file__]
-    args1 = [obj.__doc__, code, ln[1:]]
-    p0 = frmt1.format(*args0)
-    p1 = indent(w0, "  ")
-    p2 = frmt2.format(*args1)
+    p0 = f1.format(*args0)
     if verbose:
-        print("{}\n{}\n{}".format(p0, p1, p2))
+        print("{}\n{}".format(p0, s))
+        # print(s)
     else:
-        return "{}\n{}\n{}".format(p0, p1, p2)
+        return "{}\n{}\n".format(p0, s)
 
 
 def find_def(defs, module_name):
@@ -425,7 +446,7 @@ def find_def(defs, module_name):
 
 # ----------------------------------------------------------------------
 # ---- (4) wrapper .... code section ----
-def _wrapper(a, wdth=70):
+def _wrapper(a, wdth=70, verbose=True):
     """Wrap stuff using textwrap.wrap
 
     Notes
@@ -443,7 +464,10 @@ def _wrapper(a, wdth=70):
     elif isinstance(a, (list, tuple)):
         txt = ", ".join([str(i) for i in a])
     txt = "\n".join(wrap(txt, width=wdth))
-    return txt
+    if verbose:
+        print(txt)
+    else:
+        return txt
 
 
 def _utils_help_():
@@ -499,6 +523,118 @@ def doc_deco(func, doc):
         print("{!r:}\n".format(result))  # comment out if results not needed
         return result                    # for optional use outside.
     return wrapper
+
+
+# ---- (5) general file functions ... code section ---------------------------
+#
+def get_dir(path):
+    """Get the directory list from a path, excluding geodatabase folders.
+    Used by.. folders
+
+    >>> get_dir('C:/Git_Dan/arraytools')
+    ['C:/Git_Dan/arraytools/.spyproject',
+     'C:/Git_Dan/arraytools/analysis',
+     ... snip ...
+     'C:/Git_Dan/arraytools/__pycache__']
+    >>> # ---- common path prefix
+    >>> os.path.commonprefix(get_dir('C:/Git_Dan/arraytools'))
+    'C:/Git_Dan/arraytools/'
+    """
+    if os.path.isfile(path):
+        path = os.path.dirname(path)
+    p = os.path.normpath(path)
+    full = [os.path.join(p, v) for v in os.listdir(p)]
+    dirlist = [val for val in full if os.path.isdir(val)]
+    return dirlist
+
+
+def folders(path, first=True, prefix=""):
+    r"""Print recursive listing of folders in a path.
+
+    Make sure you `raw` format the path::
+
+        ``r'c:\\Temp'``  or ``'c:/Temp' or 'c:\\Temp'``
+    Needs ``_get_dir`` also, an example of path common prefix
+    """
+    if first:  # Detect outermost call, print a heading
+        print("-"*30 + "\n|.... Folder listing for ....|\n|--{}".format(path))
+        prefix = "|-"
+        first = False
+        cprev = path
+    dirlist = get_dir(path)
+    for d in dirlist:
+        fullname = os.path.join(path, d)  # Turn name into full pathname
+        if os.path.isdir(fullname):       # If a directory, recurse.
+            cprev = path
+            pad = ' ' * len(cprev)
+            n = d.replace(cprev, pad)
+            print(prefix + "-" + n)  # fullname) # os.path.relpath(fullname))
+            p = "  "
+            folders(fullname, first=False, prefix=p)
+    # ----
+
+
+def sub_folders(path, combine=False):
+    """Print the folders in a path, excluding '.' folders
+    This is the best one.
+    """
+    import pathlib
+    print("Path...\n{}".format(path))
+    if combine:
+        r = " "*len(path)
+    else:
+        r = ""
+    f = "\n".join([(p._str).replace(path, r)
+                   for p in pathlib.Path(path).iterdir()
+                   if p.is_dir() and "." not in p._str])
+    print("{}".format(f))
+
+
+def env_list(pth, ordered=False):
+    """List folders and files in a path.  Requires ``os`` module."""
+    d = []
+    for item in os.listdir(pth):
+        check = os.path.join(pth, item)
+        check = check.replace("\\", "/")
+        if os.path.isdir(check) and ("." not in check):
+            d.append(check)
+    d = np.array(d)
+    if ordered:
+        d = d[np.argsort(d)]
+    return d
+
+
+# ---- (3) dirr ... code section ... -----------------------------------------
+#
+def dir_py(obj, colwise=False, cols=4, prn=True):
+    """Return the non-numpy version of dirr."""
+    from itertools import zip_longest as zl
+    a = dir(obj)
+    w = max([len(i) for i in a])
+    frmt = (("{{!s:<{}}} ".format(w)))*cols
+    csze = len(a) / cols  # split it
+    csze = int(csze) + (csze % 1 > 0)
+    if colwise:
+        a_0 = [a[i: i+csze] for i in range(0, len(a), csze)]
+        a_0 = list(zl(*a_0, fillvalue=""))
+    else:
+        a_0 = [a[i: i+cols] for i in range(0, len(a), cols)]
+    if hasattr(obj, '__name__'):
+        args = ["-"*70, obj.__name__, obj]
+    else:
+        args = ["-"*70, type(obj), "py version"]
+    txt_out = "\n{}\n| dir({}) ...\n|    {}\n-------".format(*args)
+    cnt = 0
+    for i in a_0:
+        cnt += 1
+        txt = "\n  ({:>03.0f})  ".format(cnt)
+        frmt = (("{{!s:<{}}} ".format(w)))*len(i)
+        txt += frmt.format(*i)
+        txt_out += txt
+    if prn:
+        print(txt_out)
+    else:
+        return txt_out
 
 
 # ----------------------------------------------------------------------
