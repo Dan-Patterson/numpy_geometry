@@ -118,6 +118,8 @@ This script will require you have a valid license for ArcGIS Pro since esri Feat
 Numpy is part of the distribution for ArcGIS Pro, so no other dependencies need to be made to their conda packages.
 If you wish to clone their distribution or modify the existing one, some guidance is provided here.
 
+[Clone .... ArcGISPro 2.5](https://community.esri.com/blogs/dan_patterson/2020/02/09/clone-arcgis-pro-25)
+
 [ArcGISPro 2.4 ... Installation, package updates and installs](https://community.esri.com/blogs/dan_patterson/2019/06/28/arcgis-pro-24-installation-package-updates-and-installs)
 
 [Clone... ArcGIS Pro ... for non administrators](https://community.esri.com/blogs/dan_patterson/2018/12/28/clone)
