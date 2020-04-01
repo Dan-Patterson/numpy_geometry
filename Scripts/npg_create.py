@@ -13,7 +13,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2019-12-15
+    2020-03-31
 
 Purpose
 -------
@@ -43,28 +43,30 @@ GB = 3/2*GA where GA is the unit circle radius
 
 `hexagonal tiling
 <https://en.wikipedia.org/wiki/Hexagonal_tiling>`_.
-hexagon
-1.5, sqrt(3)/2
-octagon
-The coordinates for the vertices of a regular octagon centered at the origin
-and with side length 2 are:
 
-(±1, ±(1+√2))
-(±(1+√2), ±1).
-s = [3, 4, 5, 6, 8, 9, 10, 12]
-c0 = [(n, np.linspace(-180, 180., n+1, True)) for n in s]
-xs = np.cos(np.radians(c0[0][1]))
-ys = np.sin(np.radians(c0[0][1]))
-xy = np.array(list(zip(xs, ys)))
+hexagon :
+    1.5, sqrt(3)/2
+octagon :
+    The coordinates for the vertices of a regular octagon centered at the
+    origin and with side length 2 are:
 
-out = []
-for i in c0:
-    xs = np.cos(np.radians(i[1]))
-    ys = np.sin(np.radians(i[1]))
-    out.append(np.array(list(zip(xs, ys))))
-npg.plot_2d(out[:N], True, True)  # change N for number of sides in range 3-->
+    - (±1, ±(1+√2))
+    - (±(1+√2), ±1)
 
-[np.mean(i[:-1], axis=0) for i in out]
+Test::
+
+    s = [3, 4, 5, 6, 8, 9, 10, 12]
+    c0 = [(n, np.linspace(-180, 180., n+1, True)) for n in s]
+    xs = np.cos(np.radians(c0[0][1]))
+    ys = np.sin(np.radians(c0[0][1]))
+    xy = np.array(list(zip(xs, ys)))
+    out = []
+    for i in c0:
+        xs = np.cos(np.radians(i[1]))
+        ys = np.sin(np.radians(i[1]))
+        out.append(np.array(list(zip(xs, ys))))
+    npg.plot_2d(out[:N], True, True)  # N, number of sides in range 3-->
+    [np.mean(i[:-1], axis=0) for i in out]
 """
 # pylint: disable=C0103  # invalid-name
 # pylint: disable=R0914  # Too many local variables

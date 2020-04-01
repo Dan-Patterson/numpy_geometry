@@ -15,7 +15,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2020-01-22
+    2020-03-29
 
 Purpose
 -------
@@ -25,7 +25,7 @@ in such things as a list comprehension.
 
 Notes
 -----
-(1) ``_npgeom_notes_.py`` contains other notes of interest.
+(1) `_npgeom_notes_.py` contains other notes of interest.
 
 (2) See references for the origin of this quote.
 
@@ -42,24 +42,24 @@ determined to be to the right of every segment', that"::
     - rings can be self-tangent,
     - rings can not overlap.
 
-(3) How to flatten a searchcursor to points and/or None::
+(3) How to flatten a searchcursor to points and/or None
 
-    in_fc = "C:/Git_Dan/npgeom/npgeom.gdb/Polygons"
-    SR = npg.getSR(in_fc)
-    with arcpy.da.SearchCursor(in_fc, ('OID@', 'SHAPE@'), None, SR) as c:
-        pnts = [[[[p for p in arr] for arr in r[1]]] for r in c]
-    c.reset()  # don't forget to reset the cursor
+>>> in_fc = "C:/Git_Dan/npgeom/npgeom.gdb/Polygons"
+>>> SR = npg.getSR(in_fc)
+>>> with arcpy.da.SearchCursor(in_fc, ('OID@', 'SHAPE@'), None, SR) as c:
+>>>     pnts = [[[[p for p in arr] for arr in r[1]]] for r in c]
+>>> c.reset()  # don't forget to reset the cursor
 
 Example
 -------
-Sample data::
+Sample data
 
-    f_name = "C:/Git_Dan/npgeom/data/g_arr.npz"
-    g, arrs, names = npg.load_geo(f_name, suppress_extras=False)
-    arr_names = arrs.files  # returns the list of array names inside
+>>> f_name = "C:/Git_Dan/npgeom/data/g_arr.npz"
+>>> g, arrs, names = npg.load_geo(f_name, suppress_extras=False)
+>>> arr_names = arrs.files  # returns the list of array names inside
 
-g - the geo array
-arrs - the sub arrays
+- g : the geo array
+- arrs : the sub arrays
 
 
 References
@@ -75,17 +75,20 @@ See comment by Serge Tolstov in:
 
 **Clipping,intersection references**
 
-`<https://rosettacode.org/wiki/Sutherland-Hodgman_polygon_clipping>`_.
+`Sutherland-Hodgman polygon clipping
+<https://rosettacode.org/wiki/Sutherland-Hodgman_polygon_clipping>`_.
 
 `<http://geomalgorithms.com/a09-_intersect-3.html>`_.
 
 `<https://codereview.stackexchange.com/questions/166702/cythonized-
 sutherland-hogman-algorithm>`_.
 
-`<https://en.wikipedia.org/wiki/Sutherland%E2%80%93Hodgman_algorithm>`_.
+`Hodgman algorithm
+<https://en.wikipedia.org/wiki/Sutherland%E2%80%93Hodgman_algorithm>`_.
 
-`<https://en.wikipedia.org/wiki/Weiler%E2%80%93Atherton_clipping_
-algorithm>`_.  polygon-polygon clipping
+`Atherton clipping
+<https://en.wikipedia.org/wiki/Weiler%E2%80%93Atherton_clipping_
+algorithm>`_.
 
 `<https://scicomp.stackexchange.com/questions/8895/vertical-and-horizontal
 -segments-intersection-line-sweep>`_.
@@ -108,9 +111,11 @@ from scipy.spatial import Delaunay
 
 
 import npgeom as npg
-from npGeo import (array_IFT)
+from npGeo import array_IFT, is_Geo
 # from npGeo import Geo, arrays_to_Geo
-from npgeom.npg_helpers import (_area_bit_, _in_extent_, is_Geo)
+from npgeom.npg_helpers import (_area_bit_, _in_extent_,
+                                _angles_, _crossproduct_bit_)
+from npgeom.npg_pip import np_wn
 
 #    )  # crossing_num, compare_geom, line_crosses, radial_sort,
 # import npg_io
@@ -125,16 +130,47 @@ np.ma.masked_print_option.set_display('-')  # change to a single -
 script = sys.argv[0]  # print this should you need to locate the script
 
 __all__ = [
-    'extent_to_poly',
+    'pnts_to_extent', 'common_extent', 'extent_to_poly',
     'eucl_dist', '_dist_along_', '_percent_along_', '_pnts_on_line_',
     'scale_by_area', 'offset_buffer',
-    '_area_centroid_', '_angles_', '_rotate_',
     '_ch_scipy_', '_ch_simple_', '_ch_',
     '_polys_to_unique_pnts_', '_simplify_lines_', 'segments_to_polys',
-    'pnts_in_Geo_extents', 'pnts_in_pnts',
+    'pnts_in_pnts',
     '_pnt_on_poly_', '_pnt_on_segment_', 'p_o_p',
     '_tri_pnts_', 'in_hole_check'
 ]  # 'pnts_in_Geo',
+
+
+def pnts_to_extent(pnts, as_pair=False):
+    """Return the extent of a geometry. (Left, Bottom, Right, Top).
+
+    Parameters
+    ----------
+    pnts : array-like
+        An Nx2 array of point objects expected.
+    as_pair : boolean
+        True, returns a point pair [LB, RT].  False, returns a ravelled array
+        [L, B, R, T]
+    """
+    pnts = np.atleast_2d(pnts)
+    ext = np.concatenate((np.min(pnts, axis=0), np.max(pnts, axis=0)))
+    if as_pair:
+        ext = ext.reshape(2, 2)
+    return ext
+
+
+def common_extent(a, b):
+    """Return the extent overlap for two polygons as L, B, R, T or None"""
+    ext0 = np.concatenate((np.min(a, axis=0), np.max(a, axis=0)))
+    ext1 = np.concatenate((np.min(b, axis=0), np.max(b, axis=0)))
+    es = np.vstack((ext0, ext1))
+    maxs = np.max(es, axis=0)
+    mins = np.min(es, axis=0)
+    L, B = maxs[:2]
+    R, T = mins[2:]
+    if (L <= R) and (B <= T):
+        return np.array([L, B, R, T])  # (x1, y1, x2, y2)
+    return None
 
 
 def extent_to_poly(extent, kind=2):
@@ -147,7 +183,8 @@ def extent_to_poly(extent, kind=2):
     ----------
     extent : array-like
         The extent is specified as four float values in the form of
-        L(eft), B(ottom), R(ight), T(op) eg. np.array([5, 5, 10, 10])
+        L(eft), B(ottom), R(ight), T(op) eg. np.array([5, 5, 10, 10]) or a
+        pair of points [LB, RT]
     kind : integer
         A value of 1 for a polyline, or 2 for a polygon.
     """
@@ -155,7 +192,7 @@ def extent_to_poly(extent, kind=2):
     if shp not in [(2, 2), (4,)]:
         print("Check the docs...\n{}".format(extent_to_poly.__doc__))
         return None
-    L, B, R, T = extent
+    L, B, R, T = extent.ravel()
     L, R = min(L, R), max(L, R)
     B, T = min(B, T), max(B, T)
     ext = np.array([[L, B], [L, T], [R, T], [R, B], [L, B]])
@@ -165,18 +202,18 @@ def extent_to_poly(extent, kind=2):
 # ==== ====================================================
 # ---- distance related
 def eucl_dist(a, b, metric='euclidean'):
-    """Distance calculation for 1D, 2D and 3D points using einsum
+    """Distance calculation for 1D, 2D and 3D points using einsum.
 
     Parameters
     ----------
     a, b : array like
-        Inputs, list, tuple, array in 1, 2 or 3D form
+        Inputs, list, tuple, array in 1, 2 or 3D form.
     metric : string
-        euclidean ('e', 'eu'...), sqeuclidean ('s', 'sq'...),
+        Euclidean ('e', 'eu'...), sqeuclidean ('s', 'sq'...),
 
     Notes
     -----
-    mini e_dist for 2d points array and a single point
+    Mini e_dist for 2d points array and a single point.
 
     >>> def e_2d(a, p):
             diff = a - p[np.newaxis, :]  # a and p are ndarrays
@@ -190,10 +227,8 @@ def eucl_dist(a, b, metric='euclidean'):
     --------
     `arraytools` has more functions and documentation.
     """
-    a = np.asarray(a)
+    a = np.atleast_2d(a)
     b = np.atleast_2d(b)
-    if a.ndim == 1:
-        a = a.reshape(1, 1, a.shape[0])
     if a.ndim >= 2:
         a = a[:, np.newaxis]  # see old version above
     if b.ndim > 2:
@@ -467,106 +502,6 @@ def offset_buffer(poly, buff_dist=1, keep_holes=False, asGeo=False):
     return final  # fr_to, z, final
 
 
-# ===== Workers with Geo and ndarrays. =======================================
-# ---- area and centroid helpers
-#
-def _area_centroid_(a):
-    """Calculate area and centroid for a singlepart polygon, `a`.
-
-    This is also used to calculate area and centroid for a Geo array's parts.
-
-    Notes
-    -----
-    For multipart shapes, just use this syntax:
-
-    >>> # rectangle with hole
-    >>> a0 = np.array([[[0., 0.], [0., 10.], [10., 10.], [10., 0.], [0., 0.]],
-                      [[2., 2.], [8., 2.], [8., 8.], [2., 8.], [2., 2.]]])
-    >>> [npg._area_centroid_(i) for i in a0]
-    >>> [(100.0, array([ 5.00,  5.00])), (-36.0, array([ 5.00,  5.00]))]
-    """
-    x0, y1 = (a.T)[:, 1:]
-    x1, y0 = (a.T)[:, :-1]
-    e0 = np.einsum('...i,...i->...i', x0, y0)
-    e1 = np.einsum('...i,...i->...i', x1, y1)
-    t = e1 - e0
-    area = np.sum((e0 - e1) * 0.5)
-    x_c = np.sum((x1 + x0) * t, axis=0) / (area * 6.0)
-    y_c = np.sum((y1 + y0) * t, axis=0) / (area * 6.0)
-    return area, np.asarray([-x_c, -y_c])
-
-
-# ---- angle related
-#
-def _angles_(a, inside=True, in_deg=True):
-    """Worker for Geo `polygon_angles` and `polyline_angles`.
-
-    Sequential points, a, b, c for the first bit in a shape, so interior holes
-    are removed in polygons and the first part of a multipart shape is used.
-    Use multipart_to_singlepart if you want to  process that type.
-
-    Parameters
-    ----------
-    inside : boolean
-        True, for interior angles.
-    in_deg : boolean
-        True for degrees, False for radians.
-    """
-    # ----
-    def _x_(a):
-        """Cross product.  see npg_helpers as well."""
-        ba = a - np.concatenate((a[-1, None], a[:-1]), axis=0)
-        bc = a - np.concatenate((a[1:], a[0, None]), axis=0)
-        return np.cross(ba, bc), ba, bc
-    # ----
-    if np.allclose(a[0], a[-1]):                 # closed loop, remove dupl.
-        a = a[:-1]
-    cr, ba, bc = _x_(a)
-    dt = np.einsum('ij,ij->i', ba, bc)
-    ang = np.arctan2(cr, dt)
-    TwoPI = np.pi * 2.
-    if inside:
-        angles = np.where(ang < 0, ang + TwoPI, ang)
-    else:
-        angles = np.where(ang > 0, TwoPI - ang, ang)
-    if in_deg:
-        angles = np.degrees(angles)
-    return angles
-
-
-def _rotate_(geo_arr, R, as_group):
-    """Rotation helper.
-
-    Parameters
-    ----------
-    geo_arr : array
-        The input geo array, which is split here.
-    as_group : boolean
-        False, rotated about the extent center.  True, rotated about each
-        shapes' center.
-    R : array
-        The rotation matrix, passed on from Geo.rotate.
-    clockwise : boolean
-    """
-    shapes = geo_arr.shapes
-    out = []
-    if as_group:
-        uniqs = []
-        for chunk in shapes:
-            _, idx = np.unique(chunk, True, axis=0)
-            uniqs.append(chunk[np.sort(idx)])
-        cents = [np.mean(i, axis=0) for i in uniqs]
-        for i, chunk in enumerate(shapes):
-            ch = np.einsum('ij,jk->ik', chunk - cents[i], R) + cents[i]
-            out.append(ch)
-        return out
-    cent = np.mean(geo_arr, axis=0)
-    for chunk in shapes:
-        ch = np.einsum('ij,jk->ik', chunk - cent, R) + cent
-        out.append(ch)
-    return out
-
-
 # ---- convex hull helpers
 #
 def _ch_scipy_(points):
@@ -659,59 +594,9 @@ def segments_to_polys(self):
 # ----------------------------------------------------------------------------
 # ---- points in, or on, geometries
 #
-def pnts_in_Geo_extents(pnts, geo):
-    """Return points in the extent of a Geo array.
-
-    `g.extents_pnts` provides the bounding geometry for the `inside` check.
-
-    Parameters
-    ----------
-    pnts : array-like
-        The points to query.
-    geo : Geo array
-        The Geo array delineating the query space.
-
-    Requires
-    --------
-    `crossing_num` from npgeom.npg_helpers.
-
-    Example
-    -------
-    Three polygons and their extent:
-
-    >>> # ---- extent Geo    and  IFT for each shape
-    >>> ext = g.extents_pnts(False, True)  # by part not bit
-    >>> Geo([[ 0.,  0.],  LB array([[0, 0, 2, 0, 1, 0],
-    ...      [10., 10.],  RT
-    ...      [10.,  0.],  LB        [1, 2, 4, 0, 1, 0],
-    ...      [25., 14.],  RT
-    ...      [10., 10.],  LB        [2, 4, 6, 0, 1, 0]], dtype=int32)
-    ...      [15., 18.]]) RT
-    >>> ext = np.array([[400, 400], [600, 600]])
-    >>> pnts = np.array([[1., 1], [2.5, 2.5], [4.5, 4.5], [5., 5],
-        ...              [6, 6], [10, 10], [12., 12], [12, 16]])
-    """
-    # extents = geo.extent_pnts(splitter="shape", asGeo=True)
-    # LB = extents[::2]
-    # RT = extents[1::2]
-    extents = geo.extents("Shape")
-    LB = extents[:, :2]
-    RT = extents[:, 2:]
-    comp = np.logical_and(LB[:, None] <= pnts, pnts <= RT[:, None])
-    idx = np.logical_and(comp[..., 0], comp[..., 1])
-    idx_t = idx.T
-    x, y = np.meshgrid(np.arange(len(LB)), np.arange(len(pnts)), sparse=True)
-    p_inside = [pnts[idx_t[:, i]] for i in range(idx_t.shape[-1])]
-    inside = []
-    for poly in geo.bits:  # outer_rings(False):
-        c_n = crossing_num(pnts, poly)
-        inside.append(c_n)
-    return idx_t, p_inside, inside  # , x0, y0, pnts_by_extent, comb
-
 
 def pnts_in_pnts(pnts, geo, just_common=True):
-    """
-    Check to see if pnts are coincident (common) with pnts in a Geo array.
+    """Check to see if pnts are coincident (common) with pnts in a Geo array.
 
     Parameters
     ----------
@@ -840,7 +725,7 @@ def _pnt_on_segment_(pnt, seg):
     pnt : array-like
         `x,y` coordinate pair as list or ndarray
     seg : array-like
-        `from-to points`, of x,y coordinates as an ndarray or equivalent
+        `from-to points`, of x,y coordinates as an ndarray or equivalent.
 
     Notes
     -----
@@ -920,6 +805,35 @@ def _tri_pnts_(pnts):
 
 # ---- Not included yet -----------------------------------------------------
 #
+def bin_pnts(pnts, x_bins=None, y_bins=None):
+    """Bin points using a 2D bin.
+
+    Parameters
+    ----------
+    pnts : array
+        An Nx2 array of point objects.
+    x_bins, y_bins : array-like
+        A sequence of incrementing bin thresholds.
+
+    Example
+    -------
+    >>> np.histogramdd(g4, bins=[(0, 10, 20, 30, 40), (0, 10, 20, 30, 40)])
+    (array([[ 1.00,  0.00,  0.00,  0.00],
+    ...     [ 4.00,  3.00,  2.00,  0.00],
+    ...     [ 3.00,  3.00,  0.00,  0.00],
+    ...     [ 1.00,  0.00,  0.00,  0.00]]),
+    [array([ 0, 10, 20, 30, 40]), array([ 0, 10, 20, 30, 40])])
+
+    Where the first array are the counts, and the next two arrays are the bin
+    edges for the X and Y values.
+    """
+    if x_bins is None:
+        x_bins = (pnts[:, 0].max() - pnts[:, 0].min())/ 10
+    if y_bins is None:
+        y_bins = (pnts[:, 0].max() - pnts[:, 0].min())/ 10
+    h = np.histogramdd(pnts, [x_bins, y_bins])
+    return h
+
 
 def in_hole_check(pnts, geo):
     """Check points are in a hole."""
@@ -927,7 +841,7 @@ def in_hole_check(pnts, geo):
     holes = geo.bits[w]
     out = []
     for h in holes:
-        inside = crossing_num(pnts, h, False)
+        inside = np_wn(pnts, h)  # crossing_num(pnts, h, False)
         if inside.size > 0:
             out.append([h, inside])
     return out
@@ -942,7 +856,7 @@ def pnt_in_list(pnt, pnts_list):
 
     sum([(x, y) == tuple(i) for i in [p0, p1, p2, p3]]) > 0
     """
-    is_in = np.any([np.isclose(pnt, i) for i in pnts_list])
+x    is_in = np.any([np.isclose(pnt, i) for i in pnts_list])
     return is_in
 
 '''

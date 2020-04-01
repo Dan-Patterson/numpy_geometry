@@ -15,27 +15,31 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2020-01-09
+    2020-03-29
 
 Purpose
 -------
-Helper functions for npgeom.
+Helper functions for Geo arrays and used by npg_geom.py
 
 Notes
 -----
-To suppress runtime warnings for errors that you know will happen
+To suppress runtime warnings for errors that you know will happen.
 
 `<https://stackoverflow.com/questions/29950557/ignore-divide-by-0-warning-
 in-numpy>`_.
 
 Generally:  np.seterr(divide='ignore', invalid='ignore')
-For a section:
+
+For a section::
+
     with np.errstate(divide='ignore', invalid='ignore'):
         # some code here
 
 References
 ----------
-None
+`compare_geometry to check for identical rows
+<https://stackoverflow.com/questions/51352527/check-for-identical-rows-in-
+different-numpy-arrays>`_.
 
 """
 # pylint: disable=C0103  # invalid-name
@@ -47,18 +51,22 @@ import sys
 # from textwrap import dedent
 
 import numpy as np
-import npgeom as npg
+#import npgeom as npg
 
 script = sys.argv[0]  # print this should you need to locate the script
 
 nums = 'efdgFDGbBhHiIlLqQpP'
 
 __all__ = [
-    '_area_bit_', '_in_extent_', '_is_ccw_', '_is_clockwise_',
-    '_is_right_side', '_length_bit_', '_rotate_', '_scale_', '_translate_',
-    'compare_geom', 'crossings', 'in_out_crosses', 'interweave', 'is_Geo',
-    'keep_geom', 'line_crosses', 'pnts_in_extent_', 'poly_cross_product_',
-    'polyline_angles', 'radial_sort', 'remove_geom', 'sort_xy'
+    '_area_bit_', '_area_centroid_', '_extent_bit_', '_length_bit_',
+    '_crossproduct_bit_',
+    '_is_clockwise_', '_is_ccw_',
+    '_is_right_side', '_in_extent_', '_pnts_in_extent_',
+    '_translate_', '_rot_', '_scale_', '_angles_', '_rotate_',
+    'polyline_angles',
+    'line_crosses', 'in_out_crosses', 'crossings',
+    'compare_geom', 'keep_geom', 'remove_geom',
+    'sort_xy', 'radial_sort', 'interweave', 'shape_finder'
 ]  # 'crossing_num', 'pnts_in_poly'
 
 
@@ -73,10 +81,51 @@ def _area_bit_(a):
     return np.sum((e0 - e1)*0.5)
 
 
+def _area_centroid_(a):
+    """Calculate area and centroid for a singlepart polygon, `a`.
+
+    This is also used to calculate area and centroid for a Geo array's parts.
+
+    Notes
+    -----
+    For multipart shapes, just use this syntax:
+
+    >>> # rectangle with hole
+    >>> a0 = np.array([[[0., 0.], [0., 10.], [10., 10.], [10., 0.], [0., 0.]],
+                      [[2., 2.], [8., 2.], [8., 8.], [2., 8.], [2., 2.]]])
+    >>> [npg._area_centroid_(i) for i in a0]
+    >>> [(100.0, array([ 5.00,  5.00])), (-36.0, array([ 5.00,  5.00]))]
+    """
+    x0, y1 = (a.T)[:, 1:]
+    x1, y0 = (a.T)[:, :-1]
+    e0 = np.einsum('...i,...i->...i', x0, y0)
+    e1 = np.einsum('...i,...i->...i', x1, y1)
+    t = e1 - e0
+    area = np.sum((e0 - e1) * 0.5)
+    x_c = np.sum((x1 + x0) * t, axis=0) / (area * 6.0)
+    y_c = np.sum((y1 + y0) * t, axis=0) / (area * 6.0)
+    return area, np.asarray([-x_c, -y_c])
+
+
+def _extent_bit_(a):
+    """Extent of a sub-array in an object array."""
+    a = np.atleast_2d(a)
+    return np.concatenate((np.min(a, axis=0), np.max(a, axis=0)))
+
+
 def _length_bit_(ar):
     """Calculate segment lengths of poly geometry."""
     diff = ar[:-1] - ar[:-1]
     return np.sqrt(np.einsum('ij,ij->i', diff, diff))
+
+
+def _crossproduct_bit_(a, extras=False):
+    """Cross product.  Concatenate version is slightly faster."""
+    ba = a - np.concatenate((a[-1][None, :], a[:-1]), axis=0)
+    bc = a - np.concatenate((a[1:], a[0][None, :]), axis=0)
+    if extras:
+        return np.cross(ba, bc), ba, bc
+    return np.cross(ba, bc)
 
 
 def _is_clockwise_(a):
@@ -117,16 +166,6 @@ def _is_right_side(p, strt, end):
     return (x1 - x0) * (y - y0) - (y1 - y0) * (x - x0)
 
 
-def is_Geo(obj, verbose=False):
-    """Check the input to see if it is a Geo array."""
-    if ('Geo' in str(type(obj))) & (issubclass(obj.__class__, np.ndarray)):
-        return True
-    if verbose:
-        msg = "`{}`, is not a Geo array`. Use `arrays_toGeo` to convert."
-        print(msg.format(obj.__class__))
-    return False
-
-
 def _in_extent_(pnts, ext):
     """Return points in, or on the line of an extent. See `_in_LBRT_` also.
 
@@ -138,13 +177,15 @@ def _in_extent_(pnts, ext):
         A 2x2 array, as [[x0, y0], [x1, y1] where the first pair is the
         left-bottom and the second pair is the right-top coordinate.
     """
+    if ext.shape[0] == 4:
+        ext = ext.reshape(2, 2)
     LB, RT = ext
     comp = np.logical_and(LB <= pnts, pnts <= RT)  # using <= and <=
     idx = np.logical_and(comp[..., 0], comp[..., 1])
     return pnts[idx]
 
 
-def pnts_in_extent_(pnts, ext=None, return_index=False):
+def _pnts_in_extent_(pnts, ext=None, return_index=False):
     """Check, and return points within a defined extent.
 
     Parameters
@@ -201,7 +242,7 @@ def _translate_(a, dx=0, dy=0):
         return a + [dx, dy]
 
 
-def _rotate_(a, angle=0.0, clockwise=False):
+def _rot_(a, angle=0.0, clockwise=False):
     """Rotate shapes about their center or individually."""
     if clockwise:
         angle = -angle
@@ -221,40 +262,86 @@ def _scale_(a, factor=1):
     return scaled + cent
 
 
-# ---- Geo array stuff
-def polyline_angles(geo, fromNorth=False):
+# ---- angle related
+#
+def _angles_(a, inside=True, in_deg=True):
+    """Worker for Geo `angles_polygon` and `polyline_angles`.
+
+    Sequential points, a, b, c for the first bit in a shape, so interior holes
+    are removed in polygons and the first part of a multipart shape is used.
+    Use multipart_to_singlepart if you want to  process that type.
+
+    Parameters
+    ----------
+    inside : boolean
+        True, for interior angles.
+    in_deg : boolean
+        True for degrees, False for radians.
+    """
+    if np.allclose(a[0], a[-1]):                 # closed loop, remove dupl.
+        a = a[:-1]
+    cr, ba, bc = _crossproduct_bit_(a, extras=True)
+    dt = np.einsum('ij,ij->i', ba, bc)
+    ang = np.arctan2(cr, dt)
+    TwoPI = np.pi * 2.
+    if inside:
+        angles = np.where(ang < 0, ang + TwoPI, ang)
+    else:
+        angles = np.where(ang > 0, TwoPI - ang, ang)
+    if in_deg:
+        angles = np.degrees(angles)
+    return angles
+
+
+def _rotate_(geo_arr, R, as_group):
+    """Rotation helper.
+
+    Parameters
+    ----------
+    geo_arr : array
+        The input geo array, which is split here.
+    as_group : boolean
+        False, rotated about the extent center.  True, rotated about each
+        shapes' center.
+    R : array
+        The rotation matrix, passed on from Geo.rotate.
+    clockwise : boolean
+    """
+    shapes = geo_arr.shapes
+    out = []
+    if as_group:
+        uniqs = []
+        for chunk in shapes:
+            _, idx = np.unique(chunk, True, axis=0)
+            uniqs.append(chunk[np.sort(idx)])
+        cents = [np.mean(i, axis=0) for i in uniqs]
+        for i, chunk in enumerate(shapes):
+            ch = np.einsum('ij,jk->ik', chunk - cents[i], R) + cents[i]
+            out.append(ch)
+        return out
+    cent = np.mean(geo_arr, axis=0)
+    for chunk in shapes:
+        ch = np.einsum('ij,jk->ik', chunk - cent, R) + cent
+        out.append(ch)
+    return out
+
+
+# ---- Geo or ndarray stuff
+def polyline_angles(obj, fromNorth=False):
     """Polyline/segment angles.  *** needs work***."""
+    if npg.is_Geo(obj, verbose=False):
+        bits = obj.bits
+    elif isinstance(obj, (list, tuple)):
+        bits = obj
+    else:
+        return
     ft = np.concatenate([np.concatenate((b[:-1], b[1:]), axis=1)
-                         for b in geo.bits], axis=0)
+                         for b in bits], axis=0)
     dxy = ft[1:] - ft[:-1]
     ang = np.degrees(np.arctan2(dxy[:, 1], dxy[:, 0]))
     if fromNorth:
         ang = np.mod((450.0 - ang), 360.)
     return ang
-
-
-def poly_cross_product_(a):
-    """Cross product for poly features.
-
-    Used by geom._angles_ with the optional ba, bc returns.  Kept for future
-    reference.
-
-    Parameters
-    ----------
-    a : ndarray
-        The first and last points are checked in case
-
-    Alternate::
-
-        ba = a - np.roll(a, 1, 0)   # just as fastish as concatenate
-        bc = a - np.roll(a, -1, 0)  # but definitely cleaner
-    """
-    dx, dy = a[0] - a[-1]
-    if np.allclose(dx, dy):     # closed loop, remove duplicate
-        a = a[:-1]
-    ba = a - np.concatenate((a[-1, None], a[:-1]), axis=0)
-    bc = a - np.concatenate((a[1:], a[0, None]), axis=0)
-    return np.cross(ba, bc)  # ---  ba, bc
 
 
 # ---- `crossing` and related methods ----------------------------------------
@@ -339,7 +426,7 @@ def in_out_crosses(*args):
 
 def crossings(geo, clipper):
     """Determine if lines cross. multiline implementation of above"""
-    bounds = npg.dissolve(geo)
+    bounds = npg.dissolve(geo)  # need to fix dissolve
     p0s = bounds[:-1]
     p1s = bounds[1:]
     p2s = clipper[:-1]
@@ -385,6 +472,12 @@ def compare_geom(arr, look_for, unique=True, invert=False, return_idx=False):
         The main array, preferably the larger of the two.
     look_for : array, 2D
         The array to compare with.
+    unique : boolean
+        True, return unique values.
+    invert : boolean
+        True, look for those not in.
+    return_idx : boolean
+        True, return both the values and the indices of the comparison.
 
     Returns
     -------
@@ -402,7 +495,13 @@ def compare_geom(arr, look_for, unique=True, invert=False, return_idx=False):
     ... array([[ 5.,  5.],
     ...        [10., 10.]])
     """
-    result = (arr[:, None] == look_for).all(-1).any(-1)
+    def _iterate_(N, n):
+        """Return combinations for array lengths"""
+        import itertools
+        combos = itertools.combinations(np.arange(N), n)
+        return combos
+
+    result = (arr[:, None] == look_for).all(-1).any(-1)  # ** see reference
     if sum(result) == 0:
         return None
     if invert:
@@ -492,6 +591,7 @@ def interweave(arr, as_3d=False):
     if as_3d:
         return fr_to.reshape(-1, 2, 2)  # for ndim=3d
     return fr_to
+
 
 # ---- others ---------------------------------------------------------------
 #

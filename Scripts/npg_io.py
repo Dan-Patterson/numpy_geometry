@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 r"""
-------------------------------------------
-  npg_io: Input/Output related functions
-------------------------------------------
+--------
+  npg_io
+--------
+
+**Input/Output related functions**
 
 Load and save Geo arrays like you can with numpy arrays.  All required
 information is saved in the standard `.npz` format for easy packing and
@@ -17,8 +19,8 @@ Script :
 Author :
     Dan_Patterson@carleton.ca
 
-Modified : 2019-12-30
-    Creation date during 2019 as part of ``arraytools``.
+Modified : 2020-03-31
+    Creation date during 2019 as part of `arraytools`.
 
 Purpose
 -------
@@ -394,6 +396,14 @@ def _col_format(pairs, deci):
 
 # ---- main print functions
 #
+def col_hdr(num=8):
+    """Print numbers from 1 to 10*num to show column positions"""
+    args = [(('{:<10}')*num).format(*'0123456789'),
+            '0123456789'*num, '-'*10*num]
+    s = "\n{}\n{}\n{}".format(args[0][1:], args[1][1:], args[2])  # *args)
+    print(s)
+
+
 def make_row_format(dim=3, cols=5, a_kind='f', deci=1,
                     a_max=10, a_min=-10, width=100, prnt=False):
     """Format the row based on input parameters
@@ -543,6 +553,7 @@ def prn_geo(a, rows_m=100, names=None, deci=2, width=75):
 
     Derived from arraytools.frmts and the prn_rec function therein.
 
+    ****** fix *****
     Parameters
     ----------
     a : array
@@ -587,16 +598,19 @@ def prn_geo(a, rows_m=100, names=None, deci=2, width=75):
     c_sum = np.cumsum(wdths)               # -- determine where to slice the
     N = len(np.where(c_sum < width)[0])    # columns that exceed ``width``
     # ---- Assemble the formats and print
+    print(dts)
+    print(dts[:N])
     row_frmt = " {:>03.0f} " + "  ".join([('{' + i + '}') for i in dts[:N]])
-    hdr = ["!s:<" + "{}".format(wdths[i]) for i in range(N)]
-    hdr2 = "  ".join(["{" + hdr[i] + "}" for i in range(N)])
-    header = " pnt " + hdr2.format(*names[:N])
-    header = "\n{}\n{}".format(header, "-" * len(header))
-    txt = [header]
-    for i in range(a.shape[0]):
-        txt.append(row_frmt.format(i, c[i], pp[i], a[i, 0], a[i, 1]))
-    msg = "\n".join(txt)
-    print(msg)
+    print(row_frmt)
+    # hdr = ["!s:<" + "{}".format(wdths[i]) for i in range(N)]
+    # hdr2 = "  ".join(["{" + hdr[i] + "}" for i in range(N)])
+    # header = " pnt " + hdr2.format(*names[:N])
+    # header = "\n{}\n{}".format(header, "-" * len(header))
+    # txt = [header]
+    # for i in range(a.shape[0]):
+    #     txt.append(row_frmt.format(i, c[i], pp[i], a[i, 0], a[i, 1]))
+    # msg = "\n".join(txt)
+    # print(msg)
     # return row_frmt, hdr2  # uncomment for testing
 
 

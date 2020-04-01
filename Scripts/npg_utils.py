@@ -15,7 +15,7 @@ Modified :
 
 Purpose
 -------
-Tools for working with numpy arrays.  From arraytools.utils
+Tools for working with numpy arrays.  From arraytools.utils.
 
 Useage
 ------
@@ -137,8 +137,8 @@ def time_deco(func):  # timing originally
         if result is None:
             result = 0
         print("  Time: {: <8.2e}s for {:,} objects".format(dt, result))
-        return result                   # return the result of the function
-        # return dt                       # return delta time
+        return result                    # return the result of the function
+        # return dt                      # return delta time
     return wrapper
 
 
@@ -328,7 +328,7 @@ def get_func(func, line_nums=True, verbose=True):
 
 # ----------------------------------------------------------------------
 # ---- (3) get_module info .... code section ----
-def get_module_info(obj, verbose=True):
+def get_module_info(obj, max_number=100, verbose=True):
     """Get module (script) information, including source code if needed.
 
     Parameters
@@ -362,8 +362,8 @@ def get_module_info(obj, verbose=True):
     def wrapit(_in, counter=None):
         """Wrap a string."""
         nmes = _in[1]
-        if len(nmes) > 100:
-            nmes = nmes[:100] + [".... snip ...."]
+        if len(nmes) > max_number:
+            nmes = nmes[:max_number] + [".... snip ...."]
         sub = ", ".join([j for j in nmes])
         sub = wrap(sub, 75)
         txt = "\n".join([j for j in sub])
@@ -525,7 +525,8 @@ def doc_deco(func, doc):
     return wrapper
 
 
-# ---- (5) general file functions ... code section ---------------------------
+# ---- (5) folder tree -------------------------------------------------------
+# `folders` requires `get_dir`
 #
 def get_dir(path):
     """Get the directory list from a path, excluding geodatabase folders.
@@ -543,34 +544,47 @@ def get_dir(path):
     if os.path.isfile(path):
         path = os.path.dirname(path)
     p = os.path.normpath(path)
-    full = [os.path.join(p, v) for v in os.listdir(p)]
+    full = []
+    try:
+        for val in os.listdir(p):
+            v = os.path.join(p, val)
+            full.append(v)
+    except OSError:
+        pass
+    # full = [os.path.join(p, v) for v in os.listdir(p)]
     dirlist = [val for val in full if os.path.isdir(val)]
     return dirlist
 
 
-def folders(path, first=True, prefix=""):
+def folders(path, first=True, initial=0, prefix=""):
     r"""Print recursive listing of folders in a path.
 
-    Make sure you `raw` format the path::
+    Parameters
+    ----------
+    path : string
+        The folder path to examine.  Make sure you `raw` format the path::
 
-        ``r'c:\\Temp'``  or ``'c:/Temp' or 'c:\\Temp'``
-    Needs ``_get_dir`` also, an example of path common prefix
+    Requires
+    --------
+    ``_get_dir`` See its docstring for an example of path common prefix.
     """
     if first:  # Detect outermost call, print a heading
         print("-"*30 + "\n|.... Folder listing for ....|\n|--{}".format(path))
+        print("\n... content and sub folders ...")
         prefix = "|-"
         first = False
+        initial = len(path)
         cprev = path
     dirlist = get_dir(path)
     for d in dirlist:
         fullname = os.path.join(path, d)  # Turn name into full pathname
         if os.path.isdir(fullname):       # If a directory, recurse.
             cprev = path
-            pad = ' ' * len(cprev)
+            pad = ' ' * (len(cprev) - initial)
             n = d.replace(cprev, pad)
             print(prefix + "-" + n)  # fullname) # os.path.relpath(fullname))
             p = "  "
-            folders(fullname, first=False, prefix=p)
+            folders(fullname, first=False, initial=initial, prefix=p)
     # ----
 
 

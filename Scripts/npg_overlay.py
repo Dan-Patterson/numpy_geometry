@@ -18,42 +18,29 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2020-01-13
+    2020-03-29
 
 Purpose
 -------
-Functions for ...
+Functions for overlay analysis.
 
 See Also
 --------
 None
 
-Notes
------
-p0s = s00[:-1]
-p1s = s00[1:]
-p2s = c[:-1]
-p3s = c[1:]
-n = np.arange(len(p0s))
-m = np.arange(len(p2s))
-z0 = [[intersects(p0s[i], p1s[i], p2s[j], p3s[j]) for i in n] for j in m]
-z1 = [[_intersect_(p0s[i], p1s[i], p2s[j], p3s[j]) for i in n] for j in m]
-z2 = poly_intersects_poly(s00, c)
-z3 = p_intr_p(s00, c)
-z4  p_ints_p(s00, c)  **
-
-Timing
-z0  150 µs ± 1.4 µs per loop (mean ± std. dev. of 7 runs, 10000 loops each)
-z1  149 µs ± 1.4 µs per loop (mean ± std. dev. of 7 runs, 10000 loops each)
-z2  173 µs ± 12.1 µs per loop (mean ± std. dev. of 7 runs, 10000 loops each)
-z3  73.4 µs ± 10.6 µs per loop (mean ± std. dev. of 7 runs, 10000 loops each)
-z4  65.3 µs ± 4.08 µs per loop (mean ± std. dev. of 7 runs, 10000 loops each)
 
 References
 ----------
 `Paul Bourke geometry
 <http://paulbourke.net/geometry/pointlineplane/>`_.
 
+**Dissolve**
+
+`<C:\arc_pro\Resources\ArcToolBox\Scripts\Weights.py>`_.
+`<C:\arc_pro\Resources\ArcToolBox\Toolboxes
+\Spatial Statistics Tools.pyt>`_.
+`<https://pro.arcgis.com/en/pro-app/tool-reference/geoanalytics-desktop
+/dissolve-boundaries.htm>`_.
 """
 # pycodestyle D205 gets rid of that one blank line thing
 # pylint: disable=C0103,C0302,C0415
@@ -67,9 +54,9 @@ import sys
 import numpy as np
 
 import npgeom as npg
-from npgeom.npg_helpers import (
-    compare_geom, radial_sort
-)  # , pnts_in_poly, crossing_num,  line_crosses,
+from npg_pip import np_wn
+from npgeom.npg_helpers import (compare_geom, radial_sort)
+# pnts_in_poly, crossing_num,  line_crosses,
 
 # ---- optional imports
 # from numpy.lib.recfunctions import structured_to_unstructured as stu
@@ -92,8 +79,7 @@ script = sys.argv[0]  # print this should you need to locate the script
 # TwoPI = np.pi * 2.0
 
 __all__ = [
-    '_in_LBRT_', 'p_ints_p', 'batch_p_int_p',
-    '_intersect_', 'intersects',
+    '_in_LBRT_', 'p_ints_p', 'batch_p_int_p', '_intersect_', 'intersects',
     'clip_', 'dissolve', 'append_', 'merge_', '_union_', 'union_'
 ]  # '_poly_intersect_poly',
 
@@ -114,25 +100,8 @@ def flat(l):
     return _flat(l, [])
 
 
-def _in_extent_(pnts, ext):
-    """Return points in, or on the line of an extent. See `_in_LBRT_` also.
-
-    Parameters
-    ----------
-    pnts : array
-        An Nx2 array representing point objects.
-    extent : array-like
-        A 2x2 array, as [[x0, y0], [x1, y1] where the first pair is the
-        left-bottom and the second pair is the right-top coordinate.
-    """
-    LB, RT = ext
-    comp = np.logical_and(LB <= pnts, pnts <= RT)  # using <= and <=
-    idx = np.logical_and(comp[..., 0], comp[..., 1])
-    return pnts[idx]
-
-
 def _in_LBRT_(pnts, extent):
-    """Return points in, or on the line of an extent. See `_in_extent_` also.
+    """Return points in, or on the line of an extent.
 
     Parameters
     ----------
@@ -141,6 +110,10 @@ def _in_LBRT_(pnts, extent):
     extent : array-like
         A 1x4, as [x0, y0, x1, y1] where the first tw is the left-bottom
         and the second two are the right-top coordinate.
+
+    See Also
+    --------
+    `np_helpers._in_extent_`
     """
     # if hasattr(pnts, 'XY'):
     if pnts.__class__.__name__ == "Geo":
@@ -154,6 +127,30 @@ def _in_LBRT_(pnts, extent):
 # ((yp[j] <= y) && (y < yp[i]))) &&
 #             (x < (xp[j] - xp[i]) * (y - yp[i]) / (yp[j] - yp[i]) + xp[i]))
 #           c = !c;
+
+
+def pnt_segments(g):
+    """Return point segmentation information.
+
+    Notes
+    -----
+    p_ids : Nx2 array
+        The first column is the point number and the second column is the
+        feature they belong to.  The point IDs are in the sequence order of
+        the poly feature construction.  This information is used to determine
+        where duplicates occur and to what features they belong.
+    """
+    uni, idx, inv, cnts = np.unique(g, True, True, True, axis=0)
+    # index = sorted(idx)
+    p_ids = g.pnt_indices()  # get the point IDs, they will not be sorted
+    out = []
+    uni_cnts = np.unique(cnts).tolist()
+    for i in uni_cnts:
+        sub0 = uni[cnts==i]
+        sub1 = idx[cnts==i]
+        sub2 = p_ids[sub1]
+        out.append([i, sub0, sub1, sub2])
+    return out
 
 
 # ----------------------------------------------------------------------------
@@ -231,11 +228,10 @@ def points_in_polygons(pnts, geo):
         """Point in polygon."""
         n = len(poly)
         inside = False
-        # cnt = 0
         p1x, p1y = poly[0]
         if [x, y] in poly:
             return True
-        cnt = 0
+        # cnt = 0
         for i in range(n+1):
             p2x, p2y = poly[i % 2]
             if y >= min(p1y, p2y):
@@ -341,10 +337,9 @@ def p_ints_p(poly0, poly1):
 
 def clip_(geo, c):
     """Do the work"""
-    out = []
     bounds = dissolve(geo)
-    in_0 = points_in_polygon(bounds, c)
-    in_1 = points_in_polygon(c, bounds)
+    in_0 = np_wn(bounds, c)  # points_in_polygon(bounds, c)
+    in_1 = np_wn(c, bounds)  # points_in_polygon(c, bounds)
     x_sect0 = p_ints_p(bounds, c)
     # x_sect1 = p_ints_p(bounds, c[::-1])
     final = [np.atleast_2d(i) for i in (in_0, in_1, x_sect0) if i.size > 0]
@@ -379,7 +374,6 @@ def batch_p_int_p(polys, overlays):
     elif polys.ndim == 3:
         polys = [i for i in polys]
     # ----
-    empty_array = np.array([])
     output = []
     for ov in overlays:
         clip_extent = np.concatenate(
@@ -420,7 +414,8 @@ def _intersect_(p0, p1, p2, p3):
     `<https://en.wikipedia.org/wiki/Intersection_(Euclidean_geometry)>`_.
     """
     null_pnt = np.array([np.nan, np.nan])
-    x0, y0, x1, y1, x2, y2, x3, y3 = (*p0, *p1, *p2, *p3)
+    x0, y0 = p0
+#    x0, y0, x1, y1, x2, y2, x3, y3 = (*p0, *p1, *p2, *p3)
     p01_x, p01_y = p1 - p0
     p02_x, p02_y = p0 - p2
     p23_x, p23_y = p3 - p2
@@ -545,40 +540,146 @@ def intersects(*args):
 # ----------------------------------------------------------------------------
 # ---- (3) dissolve shared boundaries
 #
-def dissolve(g, plot=False):
-    """Dissolves shared boundaries in geometries within a set of data.
+def adjacent(a, b):
+    """Check adjacency between 2 polygon shapes
 
     Parameters
     ----------
-    g : Geo array
-        The array to dissolve.
-    plot : boolean
-        True, to produce a plot of the segments forming the new geometry.
+    a, b : ndarrays
+        The arrays of coordinates to check for polygon adjacency.
+        The duplicate first/last point is removed so that a count will not
+        flag a point as being a meeting point between polygons.
+    """
+    s = np.concatenate((a[:-1], b[:-1]), axis=0)
+    u, idx = np.unique(s, True, False, False, axis=0)
+    if len(s) > len(u):
+        return s[idx]
+    return None
+
+
+def adjacency_matrix(g):
+    """Construct an adjacency matrix from an input Geo array.
 
     Returns
     -------
-    A new Geo array.
+    An nxn array adjacency for polygons and a id-keys to convert row-column
+    indices to their original ID values.
+    """
+    g0 = g.outer_rings(asGeo=False)
+    n = len(g0)
+    id_keys = np.array(list(zip(g.IDs, np.arange(n))))
+    srted = g.sort_by_extent('LB', 0)
+    idx = srted.pnt_indices(as_structured=False)
+    # ---- create the adjacency matrix
+    z = np.zeros((n, n), dtype=np.int32)
+    cks = [(srted.XY[:, None] == bit).all(-1).any(-1) for bit in g0]
+    kys = [np.nonzero(c)[0] for c in cks]
+    i_x = [np.unique(idx[:, 1][k]) for k in kys]
+    for i, v in enumerate(i_x):
+        z[i, v] = 1
+    return z, id_keys
+
+
+def dissolve(g, asGeo=False):
+    r"""Dissolve polygons sharing edges
+
+    Parameters
+    ----------
+    g : array
+        A Geo array.
+
+    from npgeom.npg_plots import plot_polygons
+    """
+    def _adjacent_(a, b):
+        """Check adjacency between 2 polygon shapes"""
+        s = np.concatenate((a, b), axis=0)
+        u, idx = np.unique(s, True, False, False, axis=0)
+        if len(s) > len(u):
+            return s[sorted(idx)]
+        return None
+
+    def _dis_(orig, bits):
+        """Dissolve the bits"""
+        for i, shp in enumerate(bits):
+            result = _adjacent_(orig, shp)
+            if result is None:
+                orig = shp
+            else:
+                # fwd = [orig[0], shp]
+                # orig = np.concatenate(([orig[0]], shp[2:], orig[2:]))
+                orig = npg.radial_sort(result)
+        return orig
+    sq = g
+    b0, b1 = sq.bits[:2]
+    idx0 = ~np.all(np.isin(b0, b1), axis=1)  # b0 to keep
+    idx1 = ~np.all(np.isin(b1, b0), axis=1)  # b1 to keep
+    u0 = np.unique(b0[np.all(np.isin(b0, b1), axis=1)], axis=0)
+    u1 = np.unique(b1[np.all(np.isin(b1, b0), axis=1)], axis=0)
+
+    seq0 = np.split(idx0, np.where(np.diff(idx0) != 0)[0] + 1)
+    seq1 = np.split(idx1, np.where(np.diff(idx1) != 0)[0] + 1)
+    # b01 = np.concatenate((b0, b1), axis=0)
+
+    ft0 = np.concatenate((b0[:-1], b0[1:]), axis=1)
+    ft1 = np.concatenate((b1[1:], b1[:-1]), axis=1)
+    ft2 = np.concatenate((b1[:-1], b1[1:]), axis=1)
+    #
+    z01 = ft0[~np.all(np.isin(ft0, ft1), axis=1)]
+    z02 = ft0[~np.all(np.isin(ft0, ft2), axis=1)]
+    z10 = ft1[~np.all(np.isin(ft1, ft0), axis=1)]
+    z20 = ft2[~np.all(np.isin(ft2, ft0), axis=1)]
+
+    a = np.concatenate((b0[:-1], b0[1:]), axis=1)
+    b = np.concatenate((b1[:-1], b1[1:]), axis=1)
+    ab = ft0[~np.all(np.isin(a, b), axis=1)]
+    ba = ft2[~np.all(np.isin(b, a), axis=1)]
+
+
+    return z20, z10, z01, z02
 
     """
-    if plot is True:
-        from npgeom.npg_plots import plot_polygons, plot_2d
-    if g.__class__.__name__ != "Geo":
-        print("\nGeo array required for `to_this`\n")
-        return
-    bit_segs = g.od_pairs()
-    fr_to = np.concatenate(bit_segs, axis=0)
-    to_fr = np.hstack([fr_to[:, -2:], fr_to[:, :2]])
-    out = compare_geom(fr_to, to_fr, unique=False, invert=True,
-                       return_idx=False
-                       )
-    pairs = np.array(list(zip(out[:, :2], out[:, -2:])))
-    seq = np.concatenate(pairs, axis=0)
-    uni, idx, inv = np.unique(seq, True, True, axis=0)
-    uni_ordered = uni[inv]
-    srted = radial_sort(seq, close_poly=True, clockwise=True)
-    if plot:
-        plot_polygons([srted])
-    return srted
+    https://stackoverflow.com/questions/14263284/create-non-intersecting
+    -polygon-passing-through-all-given-points/20623817#20623817
+
+    see the code there
+
+    find the left most and right-most points, sort those above the line into
+    A and B
+    sort the points above by ascending X, those below by decending X
+    use left=hand/right hand rule to order the points
+    """
+
+    # if fr_to is None:
+    #     return None
+    # h_0 = uts(fr_to)
+    # names = h_0.dtype.names
+    # h_1 = h_0[list(names[2:4] + names[:2])]  # x_to, y_to and x_fr, y_fr
+    # idx = np.isin(h_0, h_1)
+    # common = h_0[idx]
+    # common = npg._fill_float_array(common)
+
+    # srted = g  # g.sort_by_extent(0)  # return an extent sorted Geo array
+    # s_bits = srted.bits
+    # idx = srted.point_indices(as_structured=False)
+    # # ----
+    # cks = [(srted.XY[:, None] == bit).all(-1).any(-1) for bit in s_bits]
+    # kys = [np.nonzero(c)[0] for c in cks]
+    # i_x = [np.unique(idx[:, 1][k]) for k in kys]
+    # to_test = []
+    # grouped = []
+    # for cnt, ix in enumerate(i_x):
+    #     if ix.size == 1:
+    #         grouped.append(srted.get_shape(cnt, False))
+    #     else:
+    #         to_test.append(ix)
+    # t = np.unique(np.concatenate(to_test))
+    # bits = srted.pull_shapes(t, False)
+    # new_orig = _dis_(bits[0], bits[1:])
+    # grouped.append(new_orig)
+    # if asGeo:
+    #     a_stack, ift, extent = npg.array_IFT(grouped, shift_to_origin=False)
+    #     return npg.Geo(a_stack, IFT=ift, Kind=2, Extent=extent, Info=None)
+    # return grouped
 
 
 # ----------------------------------------------------------------------------
@@ -607,7 +708,6 @@ def append_(this, to_this):
     this = [a, b]
     to_this = s0
     """
-    # if not hasattr(to_this, 'IFT'):
     if to_this.__class__.__name__ != "Geo":
         print("\nGeo array required for `to_this`\n")
         return
@@ -651,7 +751,7 @@ def merge_(a, to_b):
     -----
     The `this` array can be a single array, a list of arrays or a Geo array.
     If you want to append object array(s) (dtype= 'O'), then convert to a
-        list of arrays or a list of lists first.
+    list of arrays or a list of lists first.
 
     During the merged operation, overlapping geometries are not intersected.
 
@@ -659,7 +759,7 @@ def merge_(a, to_b):
     -------
     A new Geo array.
 
-    a = np.array([[0, 8.],[5., 13.], [5., 8.], [0., 8]])
+    a = np.array([[0, 8.], [5., 13.], [5., 8.], [0., 8]])
     b = a + [5, 2]
     this = [a, b]
     to_this = s0
@@ -710,7 +810,7 @@ def _union_(poly, clipper, is_polygon=True):
     -------
     Unioned polygon
     """
-    from npgeom.npg_plots import plot_2d, plot_polygons
+    # from npgeom.npg_plots import plot_2d, plot_polygons
     # plot_2d([b0, clipper], True, True)
 
     def _radsrt_(a, dup_first=True):
@@ -734,20 +834,18 @@ def _union_(poly, clipper, is_polygon=True):
         e1 = np.einsum('...i,...i->...i', x1, y1)
         return np.sum((e0 - e1)*0.5) > 0
     # ----
-    empty_array = np.array([])
     clone = np.copy(poly)  # Don't modify original list.
     poly = np.copy(poly[1:])        # normally poly[:-1])
     clipper = np.asarray(clipper[1:])  # normally clipper[:-1]
     result = []
     strt = clipper[-1]         # Start with first vertex in clip polygon.
-    msg = "p0, p1, strt, end, c\n  {} {} {} {}\n - {} ...{}"
+    # msg = "p0, p1, strt, end, c\n  {} {} {} {}\n - {} ...{}"
     for end in clipper:
         inputList = poly
         output = []
         if len(inputList) == 0:
             break
         p0 = inputList[-1]  # Previous vertex.
-        is_first = True
         for p1 in inputList:
             a, b = intersects(p0, p1, strt, end)
             if a is True:
@@ -756,17 +854,18 @@ def _union_(poly, clipper, is_polygon=True):
         strt = np.copy(end)  # remember clip vertex for next edge.
         if len(output) > 0:  # form a closed-loop if poly is a polygon
             result.append(np.array(output))
-    inside = npg.pnts_in_poly(clone, clipper)
+    inside = np_wn(clone, clipper)  # npg.pnts_in_poly(clone, clipper)
     outside = npg.remove_geom(clone, inside)
     if outside is not None:
-        print("outside {}".format(outside))
+        # print("outside {}".format(outside))
         outside = [np.atleast_2d(i) for i in outside if np.array(i).size > 0]
         result.extend(outside)
     # clipper = np.vstack(clipper)
     result.extend(clipper)
     result.extend(clone)
     # print(result)
-    result = np.vstack(result)
+    if len(result) > 1:
+        result = np.vstack(result)
     result = _radsrt_(result, dup_first=True)  # return CW
     if not _clockwise_check_(result):
         result = result[::-1]
@@ -784,8 +883,8 @@ def union_(poly, clipper, is_polygon=True):
     ccw = ~ccw
     cw_idx = np.where(poly.CW == 1)[0]
     cw_bits = [poly.bits[i] for i in cw_idx]
-    ccw_idx = np.where(poly.CW == 0)[0]
-    ccw_bits = [poly.bits[i] for i in ccw_idx]
+    # ccw_idx = np.where(poly.CW == 0)[0]
+    # ccw_bits = [poly.bits[i] for i in ccw_idx]
     final = [_union_(p, clipper, is_polygon=True) for p in cw_bits]
     # final = np.vstack((final))
     # ccw_bits = np.vstack((ccw_bits))

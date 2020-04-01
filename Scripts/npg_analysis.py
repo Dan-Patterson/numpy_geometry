@@ -446,13 +446,13 @@ def mst(arr, calc_dist=True):
         W[pnts_seen, new_edge[1]] = np.inf
         W[new_edge[1], pnts_seen] = np.inf
         n_seen += 1
-    #pairs = np.array(pairs)
+    # pairs = np.array(pairs)
     pairs = np.vstack(pairs)
     frum = a_copy[pairs[:, 0]]
     too = a_copy[pairs[:, 1]]
     fr_to = np.concatenate((frum, too), axis=1)  # np.vstack(pairs)
 #    fr_to_2 = uts(fr_to, names=['X_orig', 'Y_orig', 'X_dest', 'Y_dest'])
-    return pairs, fr_to  #, repack_fields(fr_to_2)
+    return pairs, fr_to  # repack_fields(fr_to_2)
 
 
 def connect(a, dist_arr, edges):
@@ -479,17 +479,19 @@ def connect(a, dist_arr, edges):
     out['Dist'] = d
     return out, p_f, p_t
 
+
 """
-    a = np.array([[0, 0], [0,8], [10, 8],  [10,0], [3, 4], [7,4]])
+    a = np.array([[0, 0], [0, 8], [10, 8],  [10, 0], [3, 4], [7, 4]])
     #
     idx= np.lexsort((a[:,1], a[:,0]))  # sort X, then Y
     a_srt = a[idx,:]                   # slice the sorted array
-    d = _e_dist_(a_srt)                 # determine the square form distances
-    pairs, fr_to = mst(d)                     # get the orig-dest pairs for the mst
+    d = _e_dist_(a_srt)                # determine the square form distances
+    pairs, fr_to = mst(d)              # get the orig-dest pairs for the mst
     plot_mst(a_srt, pairs)             # a little plot
     o_d = connect(a_srt, d, pairs)     # produce an o-d structured array
 
 """
+
 
 # ---- find
 #
@@ -530,29 +532,29 @@ def concave(points, k, pip_check=False):
 
     def _x_sect_(*args):
         """Line intersection check.  Two lines or 4 points that form the lines.
-    
-        Requires:
+
+        Requires
         --------
           intersects(line0, line1) or intersects(p0, p1, p2, p3)
             p0, p1 -> line 1
             p2, p3 -> line 2
-    
-        Returns:
-        --------
+
+        Returns
+        -------
             boolean, if the segments do intersect
-    
-        References:
-        -----------
+
+        References
+        ----------
         `<https://stackoverflow.com/questions/563198/how-do-you-detect-where-two-
         line-segments-intersect#565282>`_.
-    
+
         """
         if len(args) == 2:
             p0, p1, p2, p3 = *args[0], *args[1]
         elif len(args) == 4:
             p0, p1, p2, p3 = args
         else:
-            raise AttributeError("Pass 2, 2-pnt lines or 4 points to the function")
+            raise AttributeError("Use 2, 2-pnt lines or 4 points.")
         #
         # ---- First check ----   np.cross(p1-p0, p3-p2 )
         p0_x, p0_y, p1_x, p1_y, p2_x, p2_y, p3_x, p3_y = *p0, *p1, *p2, *p3
@@ -580,7 +582,7 @@ def concave(points, k, pip_check=False):
         if ((s_numer > denom) == den_gt0) or ((t_numer > denom) == den_gt0):
             return False
         #
-        # ---- check to see if the intersection point is one of the input points
+        # ---- check if the intersection point is one of the input points
         t = t_numer / denom
         # substitute p0 in the equation
         x = p0_x + (t * s10_x)
@@ -589,6 +591,7 @@ def concave(points, k, pip_check=False):
         if sum([(x, y) == tuple(i) for i in [p0, p1, p2, p3]]) > 0:
             return False
         return True
+
     def _angle_(p0, p1, prv_ang=0):
         """Return the angle between two points and the previous angle, or."""
         ang = np.arctan2(p0[1] - p1[1], p0[0] - p1[0])

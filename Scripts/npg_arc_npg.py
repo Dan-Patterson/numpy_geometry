@@ -225,7 +225,9 @@ def id_fr_to(a, oids):
         n = len(w)
         sub = [val]
         id_val = [oids[val]]  # a list for concatenation
-        if n == 1:            # one found, use the next one
+        if n < 1:
+            continue
+        elif n == 1:            # one found, use the next one
             val = w[0] + 1
         elif n == 2:          # two found, use the last one + 1
             key = w[-1]

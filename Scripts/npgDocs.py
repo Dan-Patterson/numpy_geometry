@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 r"""
 -----------
-npg_docs.py
+npgDocs.py
 -----------
 
-Documentation for functions.
+Documentation for Geo array class methods and functions.
 
 ----
 
 Script :
-    npg_docs.py
+    npgDocs.py
 
 Author :
     Dan_Patterson@carleton.ca
@@ -17,23 +17,11 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2020-01-09
+    2020-03-29
 
 Purpose
 -------
-Documentation strings.
-
-See Also
---------
-None
-
-Notes
------
-None
-
-References
-----------
-None
+Documentation strings.  These docstrings are assigned in the __init__.py file.
 
 """
 # pycodestyle D205 gets rid of that one blank line thing
@@ -44,7 +32,7 @@ None
 
 
 import sys
-from textwrap import dedent
+# from textwrap import dedent
 import numpy as np
 
 # noqa: E501
@@ -58,7 +46,14 @@ np.set_printoptions(
 script = sys.argv[0]  # print this should you need to locate the script
 
 
-__all__ = ['npGeo_doc', 'Geo_hlp', 'dirr_doc', 'sort_by_extent_doc']
+__all__ = ['npGeo_doc', 'Geo_hlp',
+           'shapes_doc', 'parts_doc',
+           'outer_rings_doc', 'inner_rings_doc', 'get_shape_doc',
+           'pull_shapes_doc', 'radial_sort_doc',
+           'sort_by_extent_doc',
+           'polys_to_segments_doc',
+           'array_IFT_doc', 'dirr_doc'
+           ]
 
 author_date = r"""
 Author :
@@ -66,10 +61,21 @@ Author :
 - Dan_Patterson@carleton.ca
 - https://github.com/Dan-Patterson
 
-Modified : 2010-01-09
+Modified : 2020-03-28
     Initial creation period 2019-05.
 
 """
+
+
+def _update_docstring(obj, doc):
+    """Update/expand a docstring.
+    Based on _add_docstring in function_base.py
+    """
+    try:
+        obj.__doc__ = doc
+    except Exception:
+        pass
+
 
 # ----------------------------------------------------------------------------
 # ---- (1) ...npGeo
@@ -227,7 +233,7 @@ Load file::
 
 # ----------------------------------------------------------------------------
 # ---- (2) ... Geo class
-#
+# ---- ... Geo_hlp
 
 Geo_hlp = r"""
 
@@ -309,63 +315,152 @@ array([[ 1,  0,  5,  1,   1,  0],  # first shape, first part, outer ring
                      dtype=int64)
 """
 
-
-# ----------------------------------------------------------------------------
-# ---- (3) ... dirr function
-#
-dirr_doc = r"""
-Parameters
-----------
-colwise : boolean
-    `True` or `1`, otherwise, `False` or `0`
-cols : number
-    Pick a size to suit.
-sub : text
-    Sub array with wildcards.
-
-- `arr*` : begin with `arr`
-- `*arr` : endswith `arr` or
-- `*arr*`: contains `arr`
-prn : boolean
-  `True` for print or `False` to return output as string
+shapes_doc = r"""
 
 Returns
 -------
-A directory listing of an object or module's namespace or a part of it if
-the `sub` option is specified.
+Either an object array or ndarray depending on the shape of the parts.
+The overall array should be an object array.
 
 Notes
 -----
-See the `inspect` module for possible additions like `isfunction`,
-`ismethod`, `ismodule`
+Pull out and ravel the from-to point IDs.  Slice the first and last
+locations. Finally, slice the actual coordinates for each range.
 
-Example
--------
->>> npg.dirr(g)
-----------------------------------------------------------------------
-| dir(npgeom) ...
-|    <class 'npgeom.Geo'>
--------
-  (001)  ... Geo class ...       Bit                     CW
-  (002)  FT                      Fr                      H
-  (003)  IDs                     IFT                     IFT_str
-  (004)  IP                      Info                    K
-  (005)  LL                      N                       PID
-  (006)  SR                      To                      U
-  (007)  UR                      X                       XT
-  (008)  XY                      Y                       Z
-  (009)  __author__              __dict__                __hlp__
-  (010)  __module__              __name__                aoi_extent
-  (011)  aoi_rectangle           areas                   bit_IFT
-  (012)  bit_ids                 bit_pnt_cnt             bit_seq
-... snip
 """
 
+parts_doc = r"""
 
-# ----------------------------------------------------------------------------
-# ---- ( ) ... sort_by_extent
-# npg.npGeo.Geo class property
-sort_by_extent_doc = author_date + r"""
+Returns
+-------
+Either an array of ndarrays and/or object arrays.  Slice by IP, ravel
+to get the first and last from-to points, then slice the XY
+coordinates.
+"""
+
+# ---- ... outer_rings
+outer_rings_doc = r"""
+
+Returns
+-------
+A new Geo array with holes discarded.  The IFT is altered to adjust for the
+removed points. If there are not holes, `self.bits` is returned.
+"""
+
+# ---- ... inner_rings
+inner_rings_doc = r"""
+
+Returns
+-------
+Return a list of ndarrays or optionally a new Geo array.
+Use True for `to_clockwise` to convert holes to outer rings.
+"""
+
+# ---- ... get_shape
+get_shape_doc = r"""
+
+The ID must exist, otherwise `None` is returned and a warning is issued.
+
+Parameters
+----------
+ID : integer
+    A single integer value.
+asGeo : Boolean
+    True, returns an updated Geo array.  False returns an ndarray or
+    object array.
+"""
+
+# ---- ... pull_shapes
+pull_shapes_doc = r"""
+
+The original IDs are added to the `Info` property of the output array.
+The point sequence is altered to reflect the new order.
+
+Parameters
+----------
+ID_list : array-like
+    A list, tuple or ndarray of ID values identifying which features
+    to pull from the input.
+asGeo : Boolean
+    True, returns an updated Geo array.  False returns an ndarray or
+    object array.
+
+Notes
+-----
+>>> a.pull_shapes(np.arange(3:8))  # get shapes over a range of values
+>>> a.pull_shapes([1, 3, 5])  # get selected shapes
+"""
+
+# ---- ... polys_to_segments
+polys_to_segments_doc = r"""
+
+Parameters
+----------
+as_basic : boolean
+    True returns the basic od pairs as an Nx5 array in the form
+    [X_orig', Y_orig', 'X_dest', 'Y_dest'] as an ndarray.
+    If False, the content is returned as a structured array with the
+    same content and ids and length.
+to_orig : boolean
+    True, shifts the coordinates back to their original extent space.
+as_3d : boolean
+    True, the point pairs are returned as a 3D array in the form
+    [[X_orig', Y_orig'], ['X_dest', 'Y_dest']], without the distances.
+
+Notes
+-----
+Use `prn_tbl` if you want to see a well formatted output.
+"""
+
+# ---- ... radial_sort
+radial_sort_doc = r"""
+
+The features will be sorted so that their first coordinate is in the
+lower left quadrant (SW) as best as possible.  Outer rings are sorted
+clockwise and interior rings, counterclockwise.  Existing duplicates
+are removed to clean features, hence, the dup_first to provide closure
+for polygons.
+
+Returns
+-------
+Geo array, with points radially sorted (about their center).
+
+Notes
+-----
+Angles relative to the x-axis.
+>>> rad = np.arange(-6, 7.)*np.pi/6
+>>> np.degrees(rad)
+... array([-180., -150., -120., -90., -60., -30.,  0.,
+...          30., 60., 90., 120., 150., 180.])
+
+References
+----------
+`<https://stackoverflow.com/questions/35606712/numpy-way-to-sort-out-a
+-messy-array-for-plotting>`_.
+"""
+
+# ---- ... sort_by_extent
+sort_by_extent_doc = r"""
+
+Parameters
+----------
+extent_pnt : text
+    Use `LB` for left-bottom, `LT` for left-top or `C`  for center.
+key : int
+    The key is the directional order used to sort the features from their
+    extent points as described in `Notes`.
+just_indices : boolean
+    True returns the geometry ID values only.
+
+Notes
+-----
+The key/azimuth information is::
+
+              S-N SW-NE W-E NW-SE N-S NE-SW E-W SE-NW
+    azimuth [   0,  45,  90, 135, 180, 225, 270, 315]
+    key     [   0,   1,   2,   3,   4,   5,   6,   7]
+
+    where a key of ``0`` would mean sort from south to north.
 
 **Sorting... key - direction vector - azimuth**
 
@@ -389,15 +484,97 @@ sort_by_extent_doc = author_date + r"""
 |  7   | SE - NW |  315  |
 +------+---------+-------+
 
-Notes
------
+
 The key values are used to select the dominant direction vector.
 
 >>> z = sin(a) * [X] + cos(a) * [Y]  # - sort by vector
 
-`vector sort
+References
+----------
+`vector sorting
 <https://gis.stackexchange.com/questions/60134/sort-a-feature-table-by
 -geographic-location>`_.
+"""
+
+
+# ----------------------------------------------------------------------------
+# ---- (3) ... array_IFT
+array_IFT_doc = r"""
+
+Parameters
+----------
+in_arrays : list, array
+    The input data can include list of lists, list of arrays or arrays
+    including multidimensional and object arrays.
+shift_to_origin : boolean
+    True, shifts coordinates by subtracting the minimum x,y from all
+    values.  Only use `True` if working with arrays for the first time.
+
+Returns
+-------
+a_stack : ndarray
+    Nx2 array (float64) of x,y values representing the geometry.
+    There are no breaks in the sequence.
+IFT : ndarray
+    Nx6 array (int32) which contains the geometry IDs, the F(rom) and T(o)
+    point sequences used to construct the parts of the geometry.
+    Ring orientation for `polygon` geometry is also provided (CW or CCW).
+    A geometry  with many parts will contain a `bit` and `part` sequence
+    identifier.
+extent : ndarray
+    The bounding rectangle of the input geometry.
+
+Notes
+-----
+- Called by `arrays_to_Geo`.
+- Use `fc_geometry` to produce `Geo` objects directly from FeatureClasses
+"""
+
+
+# ----------------------------------------------------------------------------
+# ---- (4) ... dirr function
+dirr_doc = r"""
+
+Source, ``arraytools.py_tools`` has a pure python equivalent.
+
+Parameters
+----------
+colwise : boolean
+    `True` or `1`, otherwise, `False` or `0`
+cols : number
+    Pick a size to suit.
+prn : boolean
+  `True` for print or `False` to return output as string
+
+Returns
+-------
+A directory listing of an object or module's namespace.
+
+Notes
+-----
+See the `inspect` module for possible additions like `isfunction`,
+`ismethod`, `ismodule`
+
+Example
+-------
+>>> npg.dirr(g)
+----------------------------------------------------------------------
+| dir(npgeom) ...
+|    <class 'npgeom.Geo'>
+-------
+  (001)  ... Geo class ...       Bit                     CW
+  (002)  FT                      Fr                      H
+  (003)  IDs                     IFT                     IFT_str
+  (004)  IP                      Info                    K
+  (005)  LL                      N                       PID
+  (006)  SR                      SVG                     To
+  (007)  U                       UR                      X
+  (008)  XT                      XY                      Y
+  (009)  Z                       __author__              __dict__
+  (010)  __module__              __name__                angles_polygon
+  (011)  angles_polyline         aoi_extent              aoi_rectangle
+  (012)  areas                   bit_IFT                 bit_ids
+... snip
 """
 
 

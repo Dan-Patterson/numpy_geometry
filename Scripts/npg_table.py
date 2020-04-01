@@ -15,7 +15,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2019-12-15
+    2020-03-31
 
 Purpose
 -------
@@ -59,7 +59,8 @@ array([(-inf, -2147483648, 0, '-inf'), (-inf, -2147483648, 0, '-inf'),
 
 >>> import numpy.lib.recfunctions as rfn
 
-Useful ones :
+Useful ones::
+
     _get_fields_and_offsets, _get_fieldspec, _keep_fields,
     append_fields, drop_fields, find_duplicates, join_by, merge_arrays,
     repack_fields, stack_arrays, structured_to_unstructured,

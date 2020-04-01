@@ -17,7 +17,7 @@ Author :
 - Dan_Patterson@carleton.ca
 - https://github.com/Dan-Patterson
 
-Modified : 2019-12-24
+Modified : 2020-03-28
     Creation date during 2019 as part of ``arraytools``.
 
 Purpose
@@ -48,14 +48,18 @@ provides the base class for this package.  It is based on the numpy ndarray.
 ...  'geometry_fc', 'prn_q', '_check', 'prn_tbl', 'prn_geo']
 
 >>> npg.npGeo.__all__
-... ['Geo', 'arrays_to_Geo', '_arr_ift_', 'Geo_to_arrays', '_fill_float_array',
-...  'dirr', 'geo_info', 'check_geometry', 'shape_finder', '_pnts_in_geo',
+... ['Geo', 'is_Geo', 'arrays_to_Geo', '_arr_ift_', 'Geo_to_arrays',
+...  '_fill_float_array',
+...  'dirr', 'geo_info', 'check_geometry', '_pnts_in_geo',
 ...  '_svg']
 
 >>> npg.npg_helpers.__all__
-... ['_angles_', '_area_centroid_', '_ch_', '_ch_scipy',
-...  '_ch_simple_', '_nan_split_', '_o_ring_', '_pnts_on_line_',
-...  '_polys_to_segments_', '_polys_to_unique_pnts_', '_simplify_lines_']
+... ['_area_bit_', '_in_extent_', '_is_ccw_', '_is_clockwise_',
+...  '_is_right_side', '_length_bit_', '_pnts_in_extent_',
+...  '_rotate_', '_scale_', '_translate_',
+...  'compare_geom', 'crossings', 'in_out_crosses', 'interweave',
+...  'keep_geom', 'line_crosses',  'poly_cross_product_',
+...  'polyline_angles', 'radial_sort', 'remove_geom', 'sort_xy']
 
 **Import options for arcpy functions**
 
@@ -89,28 +93,28 @@ resides.
 >>> cd C:\arc_pro\bin\Python\Scripts
 >>> conda list  # will provide a listing of your packages
 
-Note:  Python resides in this folder
+Note:  Python resides in... (substitute `arc_pro` for your install folder).
 
 >>> C:\arc_pro\bin\Python\envs\arcgispro-py3
 
 """
-# pyflakes: disable=F0401
+# pyflakes: disable=F403
 # pylint: disable=unused-import
 # pylint: disable=W0611
 
+# ---- sys, np imports
 import sys
 import numpy as np
 
+# ---- import for npg
 from . import (
-    npgDocs, npGeo, npg_io, npg_geom, npg_helpers, npg_table, npg_create,
-    npg_analysis, npg_overlay, npg_utils, smallest_circle,
+    npgDocs, npGeo, npg_io, npg_geom, npg_pip, npg_helpers, npg_table,
+    npg_create, npg_analysis, npg_overlay, npg_utils, smallest_circle,
 )
-
-from . npgDocs import (
-    npGeo_doc, Geo_hlp, sort_by_extent_doc, dirr_doc)
 from . npGeo import *
 from . npg_io import *
 from . npg_geom import *
+from . npg_pip import *
 from . npg_helpers import *
 from . npg_table import *
 from . npg_create import *
@@ -119,11 +123,27 @@ from . npg_overlay import *
 from . npg_utils import *
 from . smallest_circle import *
 
+# ---- docstring info for Geo and some methods
+from . npgDocs import (
+    npGeo_doc, Geo_hlp, array_IFT_doc, dirr_doc,
+    outer_rings_doc, inner_rings_doc, pull_shapes_doc, polys_to_segments_doc,
+    sort_by_extent_doc, radial_sort_doc
+)
 npGeo.__doc__ += npGeo_doc
+npGeo.Geo.__doc__ += Geo_hlp
+npGeo.array_IFT.__doc__ += array_IFT_doc
 npGeo.dirr.__doc__ += dirr_doc
 
+npGeo.Geo.outer_rings.__doc__ += outer_rings_doc
+npGeo.Geo.inner_rings.__doc__ += inner_rings_doc
+npGeo.Geo.pull_shapes.__doc__ += pull_shapes_doc
+npGeo.Geo.polys_to_segments.__doc__ += polys_to_segments_doc
+npGeo.Geo.radial_sort.__doc__ += radial_sort_doc
+npGeo.Geo.sort_by_extent.__doc__ += sort_by_extent_doc
+
+# ---- define __all__
 __all__ = [
-    'npg_docs', 'npGeo', 'npg_io', 'npg_geom', 'npg_helpers', 'npg_overlay',
+    'npgDocs', 'npGeo', 'npg_io', 'npg_geom', 'npg_helpers', 'npg_overlay',
     'npg_table', 'npg_create', 'npg_analysis', 'npg_overlay', 'npg_utils',
     'npg_helpers', 'smallest_circle'
 ]
@@ -132,6 +152,7 @@ __all__.extend(npgDocs.__all__)
 __all__.extend(npGeo.__all__)
 __all__.extend(npg_io.__all__)
 __all__.extend(npg_geom.__all__)
+__all__.extend(npg_pip.__all__)
 __all__.extend(npg_helpers.__all__)
 __all__.extend(npg_table.__all__)
 __all__.extend(npg_create.__all__)
@@ -139,7 +160,6 @@ __all__.extend(npg_analysis.__all__)
 __all__.extend(npg_overlay.__all__)
 # __all__.extend(smallest_circle.__all__)
 __all__.sort()
-
 
 msg = """
 ----------------------------------------------
@@ -155,12 +175,11 @@ Usage...
 ... import npgeom as npg
 
 Modules not imported by default...
-... npg_arc
 ... npg_arc_npg
 ... npg_plots
 
 ----------------------------------------------
 """
-
-print(msg.format(__path__[0], sys.version, sys.exec_prefix, np.__version__))
+pth = __path__[0]
+print(msg.format(pth, sys.version, sys.exec_prefix, np.__version__))
 del msg
