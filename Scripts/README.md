@@ -1,5 +1,9 @@
 # Scripts
 ----
+
+**This is way out of date**
+I will update the documentation as soon as I can.
+
 The following scripts are listed in this folder and the documentation guide
 
 1. \_\_init__.py
