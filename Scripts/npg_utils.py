@@ -72,6 +72,21 @@ Retrieve array information::
          |__['C', '<i8']
          |__['D', '<i8']
          |__['E', '<i8']
+
+New random number generator protocol
+
+r = np.random.default_rng()
+
+dir(r)
+[ ..., '_poisson_lam_max', 'beta', 'binomial', 'bit_generator', 'bytes',
+ 'chisquare', 'choice', 'dirichlet', 'exponential', 'f', 'gamma', 'geometric',
+ 'gumbel', 'hypergeometric', 'integers', 'laplace', 'logistic', 'lognormal',
+ 'logseries', 'multinomial', 'multivariate_hypergeometric',
+ 'multivariate_normal', 'negative_binomial', 'noncentral_chisquare',
+ 'noncentral_f', 'normal', 'pareto', 'permutation', 'poisson', 'power',
+ 'random', 'rayleigh', 'shuffle', 'standard_cauchy', 'standard_exponential',
+ 'standard_gamma', 'standard_normal', 'standard_t', 'triangular', 'uniform',
+ 'vonmises', 'wald', 'weibull', 'zipf']
 """
 
 # pylint: disable=C0103  # invalid-name
@@ -84,6 +99,7 @@ import os
 from textwrap import dedent, indent, wrap
 import warnings
 import numpy as np
+from numpy.lib.recfunctions import unstructured_to_structured as uts
 
 warnings.simplefilter('ignore', FutureWarning)
 
@@ -651,6 +667,89 @@ def dir_py(obj, colwise=False, cols=4, prn=True):
         return txt_out
 
 
+def package_info(pth=None):
+    r"""Access package info.
+
+    os, json required
+    pth = r'C:\Users\dan_p\AppData\Local\ESRI\conda\pkgs'
+    sub_folder="info"
+    file_name = "index.json"
+    text = "python"
+
+    np.isin(out['Depend'], 'python')
+    """
+    import json
+    out = []
+    if pth is None:
+        arc_pth = r"\AppData\Local\ESRI\conda\pkgs"
+        user = os.path.expandvars("%userprofile%")
+        pth = "{}{}".format(user, arc_pth)
+        if not os.path.isdir(pth):
+            print("{} doesn't exist".format(pth))
+            return None
+    dir_lst = os.listdir(pth)
+    max_len = 0
+    for d in dir_lst:  # [:20]:
+        if d not in ("cache", ".trash"):
+            fname = pth + os.sep + d + os.sep + r"info\index.json"
+            if os.path.isfile(fname):
+                f = open(fname, 'r')
+                d = json.loads(f.read())
+                depends = "; ".join([i.split(" ")[0] for i in d["depends"]])
+                max_len = max(max_len, len(depends))
+                out.append([d["name"], d["version"], d["build"], depends])
+                f.close()
+    r_dt = "<U{}".format(max_len)
+    dt = np.dtype([('Name', '<U30'), ('Version', '<U15'), ('Build', '<U15'),
+                   ('Requires', r_dt)])
+    packages = uts(np.asarray(out), dtype=dt)
+    out = []
+    names = packages['Name']
+    depends = packages['Requires']
+    for nme in names:
+        f = np.char.find(depends, nme.split("-")[0])
+        w = np.where(f != -1)[0]
+        if np.size(w) > 0:
+            v = names[w].tolist()
+            v0 = ", ".join([i.split(" ")[0] for i in v])
+            out.append([nme, v0])
+        else:
+            out.append([nme, "None"])
+    return packages, out
+
+
+def in_file(pth, sub_folder=None, file_name="", text="", dependencies=False):
+    r"""Find string in file in folders
+
+    os, json required
+    pth = r'C:\Users\dan_p\AppData\Local\ESRI\conda\pkgs'
+    sub_folder="info"
+    file_name = "index.json"
+    text = "python"
+    """
+    import json
+    out = []
+    dir_lst = os.listdir(pth)
+    for obj in dir_lst:
+        key_fld = pth + os.sep + obj
+        if sub_folder:
+            key_fld += os.sep + sub_folder
+        if os.path.exists(key_fld):
+            fname = key_fld + os.sep + file_name
+            if os.path.isfile(fname):
+                f = open(fname, 'r')
+                f_string = f.read()
+                if text in f_string:
+                    dct = json.loads(f_string)
+                    if dependencies:
+                        depends = dct['depends']
+                        out.append([obj, depends])
+                    else:
+                        out.append(obj)
+                f.close()
+    return out
+
+
 # ----------------------------------------------------------------------
 # __main__ .... code section
 if __name__ == "__main__":
@@ -661,3 +760,4 @@ if __name__ == "__main__":
 else:
     testing = False
     # parameters here
+    

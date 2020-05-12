@@ -4,7 +4,7 @@ r"""
 npg_table
 ---------
 
-Tabular data and geometry attributes.
+**Tabular data and geometry attributes**
 
 ----
 
@@ -22,10 +22,10 @@ Purpose
 Tools for working with tabular data in the Geo class.
 
 data types handled :
-    i : integer
-    u : unsigned integer
-    f : float
-    U : Unicode text
+    - i : integer
+    - u : unsigned integer
+    - f : float
+    - U : Unicode text
 >>> np.iinfo(np.int32).min # -2147483648
 >>> np.iinfo(np.int16).min # -32768
 >>> np.iinfo(np.int8).min  # -128
@@ -67,8 +67,7 @@ Useful ones::
     unstructured_to_structured
 """
 # pylint: disable=C0103  # invalid-name
-# pylint: disable=R0914  # Too many local variables
-# pylint: disable=R1710  # inconsistent-return-statements
+# pylint: disable=R0912, R0913, R0914  # Too many, args, branches local vars
 # pylint: disable=W0105  # string statement has no effect
 # pylint: disable=unused-import
 # pylint: disable=W0611
@@ -82,7 +81,7 @@ import numpy.lib.recfunctions as rfn
 # from numpy.lib.recfunctions import _keep_fields
 
 import npg_io
-# from npg_io import prn_tbl
+import npg_arc_npg
 
 ft = {"bool": lambda x: repr(x.astype(np.int32)),
       "float_kind": "{: 0.3f}".format}
@@ -177,7 +176,7 @@ def struct2nd(a):
     -----
     The is a quick function.  The expectation is that the array contains a
     uniform dtype (e.g "f8").  For example, coordinate values in the form
-    ``dtype([("X", "<f8"), ("Y", "<f8")])`` maybe with a Z
+    ``dtype([("X", "<f8"), ("Y", "<f8")])`` maybe with a Z.
 
     See ``structured_to_unstructured`` in np.lib.recfunctions and the imports.
     """
@@ -190,7 +189,7 @@ def _field_specs(a):
     """Produce a list of name/dtype pairs for fields in a structured array.
 
     Derived from rfn._get_fieldspec.
-    The input is a structured array `a`, rather than the dtype
+    The input is a structured array `a`, rather than the dtype.
 
     Parameters
     ----------
@@ -331,7 +330,7 @@ def keep_fields_by_kind(in_arr, field_kind=("i", "f", "U")):
     dt = in_arr.dtype
     dt_names = np.asarray(dt.names)
     dt_kind = np.asarray([dt.fields[name][0].kind for name in dt_names])
-    uni, idx = np.unique(dt_kind, True)
+    uni, _ = np.unique(dt_kind, True)
     to_keep = []
     if not isinstance(field_kind, (list, tuple)):
         field_kind = [field_kind]
@@ -356,7 +355,7 @@ def merge_arrays(a, others):
     Notes
     -----
     This partially emulate np.lib.recfunctions' merge_arrays but with fewer
-    checks
+    checks.
     """
     if not isinstance(others, (list, tuple)):
         others = [others, ]
@@ -457,10 +456,10 @@ def crosstab_tbl(in_tbl, flds=None, as_pivot=True):
     depending on the field type.  This is handled by the call to fc_data which
     uses make_nulls to do the work.
     """
-    a = npg_io.fc_data(in_tbl)
+    a = npg_arc_npg.fc_data(in_tbl)
     if flds is None:
         flds = list(a.dtype.names)
-    uni, idx, cnts = np.unique(a[flds], True, False, True)
+    uni, cnts = np.unique(a[flds], return_counts=True)
     out_arr = rfn.append_fields(uni, "Counts", cnts, usemask=False)
     if as_pivot:
         return _as_pivot(out_arr)
@@ -486,7 +485,7 @@ def crosstab_rc(row, col, reclassed=False):
     dt = np.dtype([("row", row.dtype), ("col", col.dtype)])
     rc_zip = list(zip(row, col))
     rc = np.asarray(rc_zip, dtype=dt)
-    u, idx, cnts = np.unique(rc, return_index=True, return_counts=True)
+    u, cnts = np.unique(rc, return_counts=True)
     rcc_dt = u.dtype.descr
     rcc_dt.append(("Count", "<i4"))
     ctab = np.asarray(list(zip(u["row"], u["col"], cnts)), dtype=rcc_dt)
@@ -709,9 +708,7 @@ def find_a_in_b(a, b, fld_names=None):
     """Find the indices of the elements between two, 2D arrays.
 
     Normally you are looking for elements in the smaller 2d array that are
-    contained in the larger 2d array. If the arrays are stuctured with field
-    names,then these need to be specified.  It should go without saying that
-    the dtypes need to be the same.
+    contained in the larger 2d array.
 
     Parameters
     ----------
@@ -743,9 +740,6 @@ def find_a_in_b(a, b, fld_names=None):
     `<https://stackoverflow.com/questions/38674027/find-the-row-indexes-of-
     several-values-in-a-numpy-array/38674038#38674038>`_.
     """
-    def struct2nd(a):
-        """Based on the same function in arraytools."""
-        return a.view((a.dtype[0], len(a.dtype.names)))
     #
     msg0 = "The array to search requires a dtype with field names"
     msg1 = "Array columns of equal size are required."
@@ -754,17 +748,17 @@ def find_a_in_b(a, b, fld_names=None):
         return None
     a_names = a.dtype.names
     if a_names is None:
-        if (len(fld_names) != a.shape[-1]):
+        if len(fld_names) != a.shape[-1]:
             print(msg1)
             return None
     else:
-        if (len(fld_names) != len(a_names)):
+        if len(fld_names) != len(a_names):
             print(msg1)
             return None
     if a_names is not None:
         small = struct2nd(a)
     big = b[fld_names]
-    big = struct2nd(big)
+    big = struct2nd(big)  # ---- call to struct2nd or `stu`
     if a.ndim == 1:  # last slice, if  [:2] instead, it returns both indices
         indices = np.where((big == small).all(-1))[0]
     elif a.ndim == 2:
@@ -882,7 +876,7 @@ def split_sort_slice(a, split_fld=None, order_fld=None):
     if split_fld is None:
         print("No split_fld")
         return a
-    elif not isinstance(split_fld, (list, tuple, np.ndarray)):
+    if not isinstance(split_fld, (list, tuple, np.ndarray)):
         split_fld = [split_fld]
     if order_fld is None:
         order_fld = split_fld
@@ -914,15 +908,15 @@ def group_sort(a, group_fld, sort_fld=None, ascend=True, sort_name=None):
     a : structured/recarray
         Array must have field names to enable splitting on and sorting by
     group_fld : string or list/tuple
-        The field/name in the dtype used to identify groupings of features
+        The field/name in the dtype used to identify groupings of features.
     sort_fld : string
         As above, but this field contains the values that you want to sort on.
     ascend : boolean
         **True**, sorts in ascending order, so you can slice for the lowest
         `num` records. **False**, sorts in descending order if you want to
-        slice the top `num` records
+        slice the top `num` records.
     sort_name : text
-        Name to give the new sorted order field
+        Name to give the new sorted order field.
 
     Example
     -------
@@ -1127,3 +1121,4 @@ def remove_seq_dupl(a):
 if __name__ == "__main__":
     """optional location for parameters"""
     # msg = _demo_()
+    # r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\sample_10k"

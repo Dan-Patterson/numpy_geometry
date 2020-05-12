@@ -187,7 +187,7 @@ def save_geo(g, f_name, folder):
     Parameters
     ----------
     g : Geo array
-        A complete Geo array
+        A complete Geo array.
     f_name : text
         Filename without file extension or path.
     folder : text
@@ -221,7 +221,7 @@ def load_txt(name="arr.txt", data_type=None):
     names : boolean
         If `True`, the first row contains the field names.
     encoding :
-        Set to None to use system default
+        Set to None to use system default.
     see np.genfromtxt for all `args` and `kwargs`.
 
     """
@@ -293,7 +293,7 @@ def load_geojson(pth, full=False, geometry=True):
     ... {'type':                                  # next feature
     ...  ... repeat}
 
-        geometry : list
+    geometry : list
         A list of lists representing the features, their parts (for multipart
         features) and inner holes (for polygons).
 
@@ -397,7 +397,7 @@ def _col_format(pairs, deci):
 # ---- main print functions
 #
 def col_hdr(num=8):
-    """Print numbers from 1 to 10*num to show column positions"""
+    """Print numbers from 1 to 10*num to show column positions."""
     args = [(('{:<10}')*num).format(*'0123456789'),
             '0123456789'*num, '-'*10*num]
     s = "\n{}\n{}\n{}".format(args[0][1:], args[1][1:], args[2])  # *args)
@@ -406,12 +406,12 @@ def col_hdr(num=8):
 
 def make_row_format(dim=3, cols=5, a_kind='f', deci=1,
                     a_max=10, a_min=-10, width=100, prnt=False):
-    """Format the row based on input parameters
+    """Format the row based on input parameters.
 
     `dim` - int
-        Number of dimensions
+        Number of dimensions.
     `cols` : int
-        Columns per dimension
+        Columns per dimension.
 
     `a_kind`, `deci`, `a_max` and `a_min` allow you to specify a data type,
     number of decimals and maximum and minimum values to test formatting.
@@ -510,7 +510,7 @@ def prn_tbl(a, rows_m=20, names=None, deci=2, width=75):
     deci : int
         The number of decimal places to print for all floating point columns.
     width : int
-        Print width in characters
+        Print width in characters.
     """
     # ----
     dtype_names = a.dtype.names

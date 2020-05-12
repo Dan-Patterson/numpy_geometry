@@ -91,6 +91,19 @@ def get_SR(in_fc, verbose=False):
     return SR
 
 
+# geometry shape class to Geo shape class
+def get_shape_K(in_fc):
+    """Return shape type for a featureclass.  Returns (kind, k)"""
+    desc = Describe(in_fc)
+    kind = desc['shapeType']
+    if kind in ('Polygon', 'PolygonM', 'PolygonZ'):
+        return (kind, 2)
+    if kind in ('Polyline', 'PolylineM', 'PolylineZ'):
+        return (kind, 1)
+    if kind in ('Point', 'Multipoint'):
+        return (kind, 0)
+
+
 # ============================================================================
 # ---- (1) fc_to_Geo section
 # -- fc -> nparray -> Geo  uses FeatureClassToNumpyArray
@@ -327,9 +340,9 @@ def Geo_to_fc(geo, gdb=None, name=None, kind=None, SR=None):
         print("\n ``kind`` must be one of Polygon, Polyline or Point.")
         return None
     #
-    dx, dy = geo.LL
-    geo = geo.shift(dx, dy)
-    polys = Geo_to_shapes(geo, SR, kind)
+    # dx, dy = geo.LL
+    # geo = geo.shift(dx, dy)
+    polys = Geo_to_shapes(geo, as_singlepart=True)
     out_name = gdb.replace("\\", "/") + "/" + name
     wkspace = env.workspace = 'memory'  # legacy is in_memory
     tmp_name = "{}\\{}".format(wkspace, "tmp")
@@ -447,8 +460,8 @@ def fc_data(in_fc):
     `OID_`, `X_cent`, `Y_cent`, where the latter two are the centroid values.
     """
     null_dict, fld_names = make_nulls(in_fc, include_oid=True, int_null=-999)
-    flds = ["OID@", "SHAPE@", "SHAPE@X", "SHAPE@Y", "SHAPE@XY"]
-    new_names = [[i, i.replace("@", "_@")][i in flds] for i in fld_names]
+    flds = ["Shape", "OID@", "SHAPE@", "SHAPE@X", "SHAPE@Y", "SHAPE@XY"]
+    new_names = [[i, i.replace("@", "__")][i in flds] for i in fld_names]
     a = FeatureClassToNumPyArray(
         in_fc, fld_names, skip_nulls=False, null_value=null_dict
     )

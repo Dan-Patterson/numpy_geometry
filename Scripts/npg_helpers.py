@@ -4,7 +4,7 @@ r"""
 npg_helpers
 -----------
 
-General helper functions.
+**General helper functions**
 
 ----
 
@@ -37,7 +37,7 @@ For a section::
 
 References
 ----------
-`compare_geometry to check for identical rows
+`Compare_geometry to check for identical rows
 <https://stackoverflow.com/questions/51352527/check-for-identical-rows-in-
 different-numpy-arrays>`_.
 
@@ -51,7 +51,7 @@ import sys
 # from textwrap import dedent
 
 import numpy as np
-#import npgeom as npg
+# import npgeom as npg
 
 script = sys.argv[0]  # print this should you need to locate the script
 

@@ -848,12 +848,12 @@ class Geo(np.ndarray):
             if np.all(c[0] != c[-1]):
                 ch_out[i] = np.vstack((c, c[0]))
         if shift_back:
-            out = [i + self.LL for i in ch_out]
-        out = arrays_to_Geo(out, kind=2, info="convex hulls")
+            ch_out = [i + self.LL for i in ch_out]
+        out = arrays_to_Geo(ch_out, kind=2, info="convex hulls")
         return out
 
     def min_area_rect(self, shift_back=False, as_structured=False):
-        """Determine the minimum area rectangle for a shape.
+        """Determine the minimum area rectangle for shapea.
 
         The shape is represented by a list of points.
         If the shape is a polygon, then only the outer ring is used.
@@ -880,7 +880,9 @@ class Geo(np.ndarray):
         cent_ = np.c_[np.mean(xt[:, 0::2], axis=1),
                       np.mean(xt[:, 1::2], axis=1)]
         rects = []
+        ch_out = []
         for i, p in enumerate(chs):
+            ch_small = None
             # ---- np.radians(np.unique(np.round(ang_[i], 2))) # --- round
             uni_ = np.radians(np.unique(ang_[i]))
             area_old, LBRT = _extent_area_(p)
@@ -893,9 +895,11 @@ class Geo(np.ndarray):
                 vals = [area_, Xmin, Ymin, Xmax, Ymax]
                 if area_ < area_old:
                     area_old = area_
+                    ch_small = ch
                     Xmin, Ymin, Xmax, Ymax = LBRT
-                    vals = [area_, Xmin, Ymin, Xmax, Ymax]   # min_area,
+                    vals = [area_, Xmin, Ymin, Xmax, Ymax]   # min_area
             rects.append(vals)
+            ch_out.append(ch_small)
         rects = np.asarray(rects)
         if shift_back:
             rects[:, 1:] = rects[:, 1:] + self.XT.ravel()
@@ -903,7 +907,8 @@ class Geo(np.ndarray):
             dt = np.dtype([('Rect_area', '<f8'), ('Xmin', '<f8'),
                            ('Ymin', '<f8'), ('Xmax', '<f8'), ('Ymax', '<f8')])
             return uts(rects, dtype=dt)
-        return rects
+        rects = arrays_to_Geo(rects, kind=2, info="mabr")
+        return ch_out, rects
 
     def triangulate(self, by_bit=False, as_polygon=True):
         """Delaunay triangulation for point groupings."""
@@ -1854,7 +1859,7 @@ def _svg(g, as_polygon=True):
 # ---- Final main section ----------------------------------------------------
 if __name__ == "__main__":
     """optional location for parameters"""
-#    in_fc = r"C:\Git_Dan\npgeom\npgeom.gdb\Polygons"
-    in_fc = r"C:\Git_Dan\npgeom\npgeom.gdb\Polygons2"
-#    in_fc = r"C:\Git_Dan\npgeom\npgeom.gdb\Polylines2"
+    in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\Polygons"
+#    in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\Polygons2"
+#    in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\Polylines2"
 #    in_fc = r"C:\Git_Dan\npgeom\npgeom.gdb\Polygon2pnts"

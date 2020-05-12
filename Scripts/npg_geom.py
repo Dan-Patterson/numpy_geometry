@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 r"""
---------------------------------------
-  npg_geom: Geometry focused methods
---------------------------------------
+----------------------------------
+npg_geom: Geometry focused methods
+----------------------------------
 
-Geometry focused methods that work with Geo arrays or np.ndarrays.
+**Geometry focused methods that work with Geo arrays or np.ndarrays.**
 
 ----
 
@@ -15,7 +15,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2020-03-29
+    2020-04-05
 
 Purpose
 -------
@@ -109,17 +109,11 @@ import numpy as np
 from scipy.spatial import ConvexHull as CH
 from scipy.spatial import Delaunay
 
-
 import npgeom as npg
-from npGeo import array_IFT, is_Geo
-# from npGeo import Geo, arrays_to_Geo
-from npgeom.npg_helpers import (_area_bit_, _in_extent_,
-                                _angles_, _crossproduct_bit_)
+
+from npgeom.npg_helpers import (_area_bit_, _in_extent_, _angles_)
 from npgeom.npg_pip import np_wn
 
-#    )  # crossing_num, compare_geom, line_crosses, radial_sort,
-# import npg_io
-# from npGeo_io import fc_data
 
 ft = {'bool': lambda x: repr(x.astype(np.int32)),
       'float_kind': '{: 0.1f}'.format}
@@ -389,12 +383,12 @@ def scale_by_area(poly, factor=1, asGeo=False):
         scaled = shifted * [alpha, alpha]
         return scaled + cent
     # ----
-    if is_Geo(poly):
+    if npg.is_Geo(poly):
         final = [_area_scaler_(a, factor) for a in poly.bits]
     else:
         final = _area_scaler_(poly, factor)
     if asGeo:
-        a_stack, ift, extent = array_IFT(final, shift_to_origin=False)
+        a_stack, ift, extent = npg.array_IFT(final, shift_to_origin=False)
         return npg.Geo(a_stack, IFT=ift, Kind=2, Extent=extent, Info=None)
     return final
 
@@ -492,12 +486,12 @@ def offset_buffer(poly, buff_dist=1, keep_holes=False, asGeo=False):
         return final
     # ----
     # Buffer Geo arrays or ndarray
-    if is_Geo(poly):
+    if npg.is_Geo(poly):
         final = _buffer_Geo_(poly, buff_dist, keep_holes)
     else:
         final = _buffer_array_(poly, buff_dist)
     if asGeo:
-        a_stack, ift, extent = array_IFT(final, shift_to_origin=False)
+        a_stack, ift, extent = npg.array_IFT(final, shift_to_origin=False)
         return npg.Geo(a_stack, IFT=ift, Kind=2, Extent=extent, Info=None)
     return final  # fr_to, z, final
 
@@ -578,7 +572,7 @@ def _polys_to_unique_pnts_(a, as_structured=True):
 
 
 def _simplify_lines_(a, deviation=10):
-    """Simplify array."""
+    """Simplify array. Requires, `_angles_` from npg_helpers."""
     ang = _angles_(a, inside=True, in_deg=True)
     idx = (np.abs(ang - 180.) >= deviation)
     sub = a[1: -1]

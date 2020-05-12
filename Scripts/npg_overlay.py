@@ -4,7 +4,7 @@ r"""
 npg_overlay
 -----------
 
-Overlay tool. Working with two sets of geometries.  The functions are largely
+Overlay tools. Working with two sets of geometries.  The functions are largely
 confined to polygon and polyline objects.
 
 ----

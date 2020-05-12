@@ -527,7 +527,7 @@ extent : ndarray
 Notes
 -----
 - Called by `arrays_to_Geo`.
-- Use `fc_geometry` to produce `Geo` objects directly from FeatureClasses
+- Use `fc_geometry` to produce `Geo` objects directly from FeatureClasses.
 """
 
 
@@ -540,11 +540,11 @@ Source, ``arraytools.py_tools`` has a pure python equivalent.
 Parameters
 ----------
 colwise : boolean
-    `True` or `1`, otherwise, `False` or `0`
+    `True` or `1`, otherwise, `False` or `0`.
 cols : number
     Pick a size to suit.
 prn : boolean
-  `True` for print or `False` to return output as string
+  `True` for print or `False` to return output as string.
 
 Returns
 -------
@@ -553,7 +553,7 @@ A directory listing of an object or module's namespace.
 Notes
 -----
 See the `inspect` module for possible additions like `isfunction`,
-`ismethod`, `ismodule`
+`ismethod`, `ismodule`.
 
 Example
 -------
