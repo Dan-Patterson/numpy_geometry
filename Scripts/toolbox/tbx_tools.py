@@ -1,30 +1,37 @@
 # -*- coding: utf-8 -*-
-"""
-=========
-tbx_tools
-=========
+r"""Toolbox tools for Free tools.
 
-Script :
+tbx_tools
+---------
+
+Script : C:\Git_Dan\npgeom\Project_npg\tbx_tools.py
     tbx_tools.py for npgeom
 
 Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2019-10-27
+    2020-05-05
 
-Purpose :
-    Tools for working with ``free`` ArcGIS Pro functionality
+Purpose
+-------
+Tools to provide ``free`` advanced license functionality for ArcGIS Pro.
 
-Notes :
+Notes
+-----
+None
 
 References
 ----------
-
 **Advanced license tools**
 
 Some of the functions that you can replicate using this data class would
 include:
+
+**Attribute Tools**
+AttributeSort
+
+Crosstabulate
 
 **Containers**
 
@@ -78,6 +85,10 @@ split-line-at-vertices.htm>`_.
 `Frequency
 <https://pro.arcgis.com/en/pro-app/tool-reference/analysis/frequency.htm>`_.
 
+`Feature Envelope to Polygon
+<https://pro.arcgis.com/en/pro-app/tool-reference/data-management/feature
+-envelope-to-polygon.htm>`_.
+
 **To do**
 
 `Find Identical
@@ -97,32 +108,38 @@ unsplit-line.htm>`_.
 
 import sys
 from textwrap import dedent
-# import importlib
+from importlib import reload  # for testing
 import numpy as np
 # from numpy.lib.recfunctions import structured_to_unstructured as stu
-from numpy.lib.recfunctions import unstructured_to_structured as uts
+# from numpy.lib.recfunctions import unstructured_to_structured as uts
 from numpy.lib.recfunctions import append_fields
 
 import arcgisscripting as ags
 from arcgisscripting import da
+
 from arcpy import (
-        env, gp, AddMessage, Exists, ImportToolbox, Delete_management,
-        MultipartToSinglepart_management, XYToLine_management
-        )
+    env, AddMessage, Exists, Delete_management,
+    MultipartToSinglepart_management, XYToLine_management)  # gp, ImportToolbox
 
-from npg_io import (getSR, shape_K, fc_data, fc_geometry, geometry_fc)
+import npGeo
+import npg_arc_npg
 
-from npGeo import Geo, Update_Geo
+reload(npGeo)
+reload(npg_arc_npg)
 
-from npg_geom import _polys_to_unique_pnts_
+from npg_arc_npg import (
+    get_SR, get_shape_K, fc_to_Geo, Geo_to_fc)  # fc_data, geometry_fc
+from npGeo import Geo
+# from npg_geom import _polys_to_unique_pnts_
 
 
 env.overwriteOutput = True
 
 ft = {'bool': lambda x: repr(x.astype(np.int32)),
       'float_kind': '{: 0.3f}'.format}
-np.set_printoptions(edgeitems=10, linewidth=80, precision=2, suppress=True,
-                    threshold=100, formatter=ft)
+np.set_printoptions(
+    edgeitems=10, linewidth=80, precision=2, suppress=True, threshold=100,
+    formatter=ft)
 np.ma.masked_print_option.set_display('-')  # change to a single -
 
 script = sys.argv[0]
@@ -130,13 +147,14 @@ pth = "/".join(script.split("/")[:-1])
 
 
 tool_list = [
-        'Bounding Circles', 'Convex Hulls', 'Extent Polys',
-        'Features to Points', 'Polygons to Polylines', 'Vertices to Points',
-        'Split at Vertices',
-        'Shift Features', 'Rotate Features', 'Fill Holes',
-        'Geometry Sort', 'Area Sort', 'Length Sort', 'Extent Sort',
-        'Crosstab', 'Attribute sort'
-        ]
+    'Attribute sort', 'Frequency and Stats',
+    'Bounding Circles', 'Extent Polys', 'Convex Hulls',
+    'Minimum area bounding rectangle',
+    'Features to Points', 'Polygons to Polylines', 'Split at Vertices',
+    'Vertices to Points',
+    'Extent Sort', 'Geometry Sort',
+    'Area Sort', 'Length Sort',
+    'Fill Holes', 'Rotate Features', 'Shift Features']
 
 
 # ===========================================================================
@@ -163,15 +181,15 @@ msg_mp_sp = """\
 
 
 def tweet(msg):
-    """Print a message for both arcpy and python.
-    """
+    """Print a message for both arcpy and python."""
     m = "\n{}\n".format(msg)
     AddMessage(m)
     print(m)
 
 
 def check_path(fc):
-    """
+    r"""Check file name and file path for compliance.
+
     ---- check_path ----
 
     Checks for a file geodatabase and a filename. Files and/or paths containing
@@ -194,8 +212,7 @@ def check_path(fc):
     -file-paths-in-python>`_.
     """
     msg = dedent(check_path.__doc__)
-    _punc_ = '!"#$%&\'()*+,-;<=>?@[]^`~}{ '
-    flotsam = " ".join([i for i in _punc_])  # " ... plus the `space`"
+    flotsam = '!"#$%&\'()*+,-;<=>?@[]^`~}{ '  # " ... plus the `space`"
     fail = False
     if (".gdb" not in fc) or np.any([i in fc for i in flotsam]):
         fail = True
@@ -210,275 +227,43 @@ def check_path(fc):
     return gdb, name
 
 
-# ---- Container tools -------------------------------------------------------
-# ---- (1) bounding circles
+# ---- io tools -------------------------------------------------------
 #
-def circles(in_fc, gdb, name, kind):
-    """Minimum area bounding circles.  Change `angle=2` to a smaller value for
-    denser points on circle perimeter.
-    `getSR`, `shape_k`  and `fc_geometry` are from npg_io.
+def _in_(in_fc, info):
+    """Produce the Geo array."""
+    SR = get_SR(in_fc)
+    shp_kind, k = get_shape_K(in_fc)
+    g = fc_to_Geo(in_fc, geom_kind=k, info=info)
+    m = g.LL  # the lower left of the Geo array, which has been shifted
+    oids = g.shp_ids
+    return g, oids, shp_kind, k, m, SR
+
+
+def _out_(shps, gdb, name, out_kind, SR):
+    """Output the FeatureClass from the Geo array.
+
+    outkind : string
+        Polygon, Polyline
+        srt, oids, out_kind, gdb, name, SR
     """
-    SR = getSR(in_fc)
-    kind, k = shape_K(in_fc)
-    tmp, IFT = fc_geometry(in_fc, SR=SR, IFT_rec=False)
-    m = np.nanmin(tmp, axis=0)                   # shift to LB of whole extent
-    info = "bounding circles"
-    a = tmp - m
-    g = Geo(a, IFT, k, info)                     # create the geo array
-    out = g.bounding_circles(angle=2, return_xyr=False)
-    circs = [arr + m for arr in out]
-    k = 1
-    if kind == 'Polygons':
-        k = 2
-    circs = Update_Geo(circs, K=k, id_too=None, Info=info)
-    # produce the geometry
-    p = kind.upper()
-    geometry_fc(circs, circs.IFT, p_type=p, gdb=gdb, fname=name, sr=SR)
-    return "{} completed".format("Circles")
+    Geo_to_fc(shps, gdb=gdb, name=name, kind=out_kind, SR=SR)
 
 
-# ---- (2) convex hulls
-#
-def convex_hull_polys(in_fc, gdb, name, kind):
-    """Determine the convex hulls on a shape basis"""
-    SR = getSR(in_fc)
-    kind, k = shape_K(in_fc)
-    tmp, IFT = fc_geometry(in_fc, SR=SR, IFT_rec=False)
-    info = "convex hulls to polygons"
-    g = Geo(tmp, IFT, k, info)                   # create the geo array
-    ch_out = g.convex_hulls(by_part=False, threshold=50)
-    ch_out = Update_Geo(ch_out, K=k, id_too=None, Info=info)
-    # ---- produce the geometry
-    p = kind.upper()
-    geometry_fc(ch_out, ch_out.IFT, p_type=p, gdb=gdb, fname=name, sr=SR)
-    return "{} completed".format("Convex Hulls")
-
-
-# ---- (3) extent_poly section
-#
-def extent_poly(in_fc, gdb, name, kind):
-    """Feature envelope to polygon demo.
-
-    Parameters
-    ----------
-    in_fc : string
-        Full geodatabase path and featureclass filename.
-    kind : integer
-        2 for polygons, 1 for polylines
-
-    References
-    ----------
-    `Feature Envelope to Polygon
-    <https://pro.arcgis.com/en/pro-app/tool-reference/data-management/feature
-    -envelope-to-polygon.htm>`_.
-
-    >>> data = fc_data(in_fc)
-    """
-    SR = getSR(in_fc)
-    kind, k = shape_K(in_fc)
-    tmp, IFT = fc_geometry(in_fc, SR=SR, IFT_rec=False)
-    m = np.nanmin(tmp, axis=0)                   # shift to LB of extent
-    info = "extent to polygons"
-    a = tmp - m
-    g = Geo(a, IFT, k, Info=info)   # create the geo array
-    ext = g.extent_rectangles()   # create the extent array
-    ext = ext + m                 # shift back, construct the output features
-    ext = Update_Geo(ext, K=k, id_too=None, Info=info)
-    # ---- produce the geometry
-    p = kind.upper()
-    geometry_fc(ext, ext.IFT, p_type=p, gdb=gdb, fname=name, sr=SR)
-    return "{} completed".format("Extents")
-
-
-# ---- Conversion Tools ------------------------------------------------------
-# ---- (1) features to point
-#
-def f2pnts(in_fc):
-    """Features to points.
-    `getSR`, `shape_K` and `fc_geometry` from `npGeo_io`
-    """
-    SR = getSR(in_fc)
-    kind, k = shape_K(in_fc)
-    tmp, ift = fc_geometry(in_fc, SR=SR, IFT_rec=False)
-    m = np.nanmin(tmp, axis=0)                   # shift to LB of whole extent
-    info = "feature to points"
-    a = tmp - m
-    g = Geo(a, IFT=ift, Kind=k, Info=info)    # create the geo array
-    cent = g.centroids + m                       # create the centroids
-    dt = np.dtype([('Xs', '<f8'), ('Ys', '<f8')])
-    cent = uts(cent, dtype=dt)
-    return cent, SR
-
-
-# ---- (2) polygon to polyline
-#
-def pgon_to_pline(in_fc, gdb, name):
-    """Polygon to polyline conversion.  Multipart shapes are converted to
-    singlepart.  The singlepart geometry is used to produce the polylines."""
-#    gdb, name = check_path(out_fc)
-#    if gdb is None:
-#        return None
-    SR = getSR(in_fc)
-    tmp = MultipartToSinglepart_management(in_fc, r"memory\in_fc_temp")
-    a, IFT = fc_geometry(tmp, SR=SR, IFT_rec=False)
-    info = "pgon to pline"
-    # create the geo array, convert it, then create the output featureclass
-    a = Geo(a, IFT=IFT, Kind=1, Info=info)       # create the geo array
-    geometry_fc(a, IFT, p_type="POLYLINE", gdb=gdb, fname=name, sr=SR)
-    out = "{}/{}".format(gdb, name)
-    if Exists(out):
-        d = fc_data(tmp)
-        import time
-        time.sleep(1.0)
-        da.ExtendTable(out, 'OBJECTID', d, 'OID_')
-    tweet(dedent(msg_mp_sp))
-    return
-
-
-# ---- (3) vertices to points
-#
-def p_uni_pnts(in_fc):
-    """Implements `_polys_to_unique_pnts_` in ``npg_helpers``.
-    """
-    SR = getSR(in_fc)
-    tmp, IFT = fc_geometry(in_fc, SR=SR, IFT_rec=False)
-    info = "unique points"
-    a = Geo(tmp, IFT=IFT, Kind=0, Info=info)     # create the geo array
-    out = _polys_to_unique_pnts_(a, as_structured=True)
-    return out, SR
-
-
-# ---- Alter Geometry --------------------------------------------------------
-# ---- (1) rotate features
-def rotater(in_fc, gdb, name, as_group, angle, clockwise):
-    """Rotate features separately or as a group.
-    """
-    SR = getSR(in_fc)
-    kind, k = shape_K(in_fc)                        # geometry type, 0, 1, 2
-    a, IFT = fc_geometry(in_fc, SR=SR, IFT_rec=False)
-    tmp = MultipartToSinglepart_management(in_fc, r"memory\in_fc_temp")
-    info = "rotate features"
-    a = Geo(a, IFT=IFT, Kind=k, Info=info)       # create the geo array
-    s = a.rotate(as_group=as_group, angle=angle, clockwise=clockwise)
-    p = kind.upper()
-    geometry_fc(s, s.IFT, p_type=p, gdb=gdb, fname=name, sr=SR)
-    out = "{}/{}".format(gdb, name)
-    if Exists(out):
-        import time
-        time.sleep(1.0)
-        d = fc_data(tmp)
-        da.ExtendTable(out, 'OBJECTID', d, 'OID_')
-    return
-
-
-def fill_holes(in_fc, gdb, name):
-    """Fill holes in a featureclass.  See the Eliminate part tool.
-    """
-    SR = getSR(in_fc)
-    kind, k = shape_K(in_fc)                        # geometry type, 0, 1, 2
-    tmp = MultipartToSinglepart_management(in_fc, r"memory\in_fc_temp")
-    a, IFT = fc_geometry(tmp, SR=SR, IFT_rec=False)
-    info = "fill holes"
-    a = Geo(a, IFT=IFT, Kind=k, Info=info)       # create the geo array
-    oring = a.outer_rings(True)
-    p = kind.upper()
-    geometry_fc(oring, oring.IFT, p_type=p, gdb=gdb, fname=name, sr=SR)
-    out = "{}/{}".format(gdb, name)
-    if Exists(out):
-        import time
-        time.sleep(1.0)
-        d = fc_data(tmp)
-        da.ExtendTable(out, 'OBJECTID', d, 'OID_')
-    return
-
-
-# ---- (2) sorty by area, length
-#
-def sort_geom(in_fc, gdb, name, sort_kind):
-    """Sort features by area, length
-    """
-    SR = getSR(in_fc)
-    kind, k = shape_K(in_fc)                        # geometry type, 0, 1, 2
-    a, IFT = fc_geometry(in_fc, SR=SR, IFT_rec=False)
-    info = "sort features"
-    a = Geo(a, IFT=IFT, Kind=k, Info=info)
-    if sort_kind == 'area':
-        srt = a.sort_by_area(ascending=True, just_indices=False)
-    elif sort_kind == 'length':
-        srt = a.sort_by_length(ascending=True, just_indices=False)
-    p = kind.upper()
-    geometry_fc(srt, srt.IFT, p_type=p, gdb=gdb, fname=name, sr=SR)
-    return
-
-
-# ---- (3) sorty by extent
-#
-def sort_extent(in_fc, gdb, name, key):
-    """Sort features by extent, area, length
-    """
-    SR = getSR(in_fc)
-    kind, k = shape_K(in_fc)                        # geometry type, 0, 1, 2
-    a, IFT = fc_geometry(in_fc, SR=SR, IFT_rec=False)
-    info = "sort features"
-    a = Geo(a, IFT=IFT, Kind=k, Info=info)
-    srt = a.sort_by_extent(key, just_indices=False)
-    p = kind.upper()
-    geometry_fc(srt, srt.IFT, p_type=p, gdb=gdb, fname=name, sr=SR)
-    return
-
-
-# ---- (4) move/shift/translate features
-#
-def shifter(in_fc, gdb, name, dX, dY):
-    """Shift features to a new location by delta X and Y values.  Multipart
-    shapes are converted to singlepart shapes.
-    """
-    SR = getSR(in_fc)
-    desc = da.Describe(in_fc)
-    kind = desc['shapeType']
-    kind, k = shape_K(in_fc)                        # geometry type, 0, 1, 2
-    a, IFT = fc_geometry(in_fc, SR=SR, IFT_rec=False)
-    tmp = MultipartToSinglepart_management(in_fc, r"memory\in_fc_temp")
-    info = "shift features"
-    # create the geo array, shift it, then create the output featureclass
-    a = Geo(a, IFT=IFT, Kind=k, Info=info)
-    s = a.shift(dX, dY)
-    p = kind.upper()
-    geometry_fc(s, s.IFT, p_type=p, gdb=gdb, fname=name, sr=SR)
-    out = "{}/{}".format(gdb, name)
-    if Exists(out):
-        import time
-        time.sleep(1.0)
-        d = fc_data(tmp)
-        da.ExtendTable(out, 'OBJECTID', d, 'OID_')
-    return
-
-
-# ---- (5) split line at vertices
-#
-def split_at_vertices(in_fc, out_fc):
-    """Unique segments retained when poly geometry is split at vertices.
-    """
-    gdb, _ = check_path(out_fc)
-    if gdb is None:
-        return None
-    SR = getSR(in_fc)
-    tmp, IFT = fc_geometry(in_fc, SR=SR, IFT_rec=False)
-    ag = Geo(tmp, IFT)
-    od = ag.polys_to_segments(as_basic=False, as_3d=False)
-    tmp = "memory/tmp"
-    if Exists(tmp):
-        Delete_management(tmp)
-    ags.da.NumPyArrayToTable(od, tmp)
-    xyxy = list(od.dtype.names[:4])
-    args = [tmp, out_fc] + xyxy + ["GEODESIC", "Orig_id", SR]
-    XYToLine_management(*args)
-    return
-
-
+# ============================================================================
 # ---- Attribute tools -------------------------------------------------------
-# ---- (1) frequency and statistics
-#
+# attribute sort
+def attr_sort(a, oid_fld=None, sort_flds=None, out_fld=None):
+    """Return old and new id values for the sorted array."""
+    idx = np.argsort(a, order=sort_flds)
+    srted = a[idx]
+    dt = [(oid_fld, '<i4'), (out_fld, '<i4')]
+    out = np.zeros_like(srted, dtype=np.dtype(dt))  # create the new array
+    out[oid_fld] = srted[oid_fld]
+    out[out_fld] = np.arange(0, out.shape[0])
+    return out
+
+
+# frequency and statistics
 def freq(a, cls_flds, stat_fld):
     """Frequency and crosstabulation.
 
@@ -486,8 +271,10 @@ def freq(a, cls_flds, stat_fld):
     ----------
     a : array
         A structured array.
-    flds : field
-        Fields to use in the analysis.
+    cls_flds : field name
+        Fields to use in the analysis, their combination representing the case.
+    stat_fld : field name
+        The field to provide summary statistics for.
 
     Notes
     -----
@@ -525,22 +312,235 @@ def freq(a, cls_flds, stat_fld):
     return out
 
 
-# ---- () attribute sort
-def attr_sort(a, oid_fld=None, sort_flds=None, out_fld=None):
-    """Return old and new id values for the sorted array.
+# ============================================================================
+# ---- Geometry tools --------------------------------------------------------
+# Containers
+#
+# bounding circles
+def circles(in_fc, gdb, name, out_kind):
+    """Minimum area bounding circles.
+
+    Change `angle=2` to a smaller value for
+    denser points on circle perimeter.
+    `getSR`, `get_shape_K`  and `fc_geometry` are from npg_io.
     """
-    idx = np.argsort(a, order=sort_flds)
-    srted = a[idx]
-    dt = [(oid_fld, '<i4'), (out_fld, '<i4')]
-    out = np.zeros_like(srted, dtype=np.dtype(dt))  # create the new array
-    out[oid_fld] = srted[oid_fld]
-    out[out_fld] = np.arange(0, out.shape[0])
-    return out
+    info = "bounding circles"
+    g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
+    # ---- run the function
+    shps = g.bounding_circles(angle=2, shift_back=True, return_xyr=False)
+    # ---- create the fc
+    Geo_to_fc(shps, gdb, name, kind=out_kind, SR=SR)
+    return "{} completed".format("Circles")
+
+
+# convex hulls
+def convex_hull_polys(in_fc, gdb, name, out_kind):
+    """Determine the convex hulls on a shape basis"""
+    info = "convex hulls to polygons"
+    g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
+    # ---- run the function
+    shps = g.convex_hulls(by_bit=False, shift_back=True, threshold=50)
+    # ---- create the fc
+    Geo_to_fc(shps, gdb, name, kind=out_kind, SR=SR)
+    return "{} completed".format("Convex Hulls")
+
+
+# extent_poly section
+def extent_poly(in_fc, gdb, name, out_kind):
+    """Feature envelope to polygon demo."""
+    info = "extent to polygons"
+    g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
+    # ---- run the function
+    shps = g.extent_rectangles(shift_back=True, asGeo=True)
+    # ---- create the fc
+    Geo_to_fc(shps, gdb, name, kind=out_kind, SR=SR)
+    return "{} completed".format("Extents")
+
+
+def mabr(in_fc, gdb, name, out_kind):
+    """Return Minumum Area Bounding Rectangle."""
+    info = "minimum area bounding rectangle"
+    g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
+    # ---- run the function
+    shps = g.min_area_rect(shift_back=True, as_structured=False)
+    Geo_to_fc(shps, gdb, name, kind=out_kind, SR=SR)
+    return "{} completed".format("Minimum area bounding rectangle")
+
+
+# ============================================================================
+# ---- Conversion Tools ------------------------------------------------------
+#
+# features to point
+def f2pnts(in_fc):
+    """Features to points.
+
+    `getSR`, `get_shape_K` and `fc_geometry` from `npGeo_io`
+    """
+    info = "feature to points"
+    g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
+    # ---- run the function
+    cent = g.centroids() + m
+    dt = np.dtype([('OID_', '<i4'), ('Xs', '<f8'), ('Ys', '<f8')])
+    out = np.empty((len(cent), ), dtype=dt)
+    out['OID_'] = oids
+    out['Xs'] = cent[:, 0]
+    out['Ys'] = cent[:, 1]
+    return out, SR  # featureclass creation handled elsewhere
+
+
+# polygon to polyline
+def pgon_to_pline(in_fc, gdb, name):
+    """Polygon to polyline conversion.
+
+    Multipart shapes are converted to singlepart.
+    The singlepart geometry is used to produce the polylines.
+    """
+    info = "pgon to pline"
+    g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
+    g0 = g.polygons_to_polylines()
+    x, y = g0.LL
+    g0 = g0.translate(dx=x, dy=y)
+    Geo_to_fc(g0, gdb, name, kind="POLYLINE", SR=SR)
+    # out = "{}/{}".format(gdb, name)
+    # if Exists(out):
+    #     d = fc_data(in_fc)
+    #     import time
+    #     time.sleep(1.0)
+    #     da.ExtendTable(out, 'OBJECTID', d, 'OID_', append_only=False)
+    tweet(dedent(msg_mp_sp))
+    return
+
+
+# split line at vertices
+def split_at_vertices(in_fc, out_fc):
+    """Split at vertices.  Unique segments retained."""
+    info = "split at vertices"
+    g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
+    od = g.polys_to_segments(as_basic=False, to_orig=True, as_3d=False)
+    tmp = "memory/tmp"
+    if Exists(tmp):
+        Delete_management(tmp)
+    ags.da.NumPyArrayToTable(od, tmp)
+    xyxy = list(od.dtype.names[:4])
+    args = [tmp, out_fc] + xyxy + ["GEODESIC", "Orig_id", SR]
+    XYToLine_management(*args)
+    return
+
+
+# vertices to points
+def p_uni_pnts(in_fc):
+    """Implement `_polys_to_unique_pnts_` in ``npg_helpers``."""
+    info = "unique points"
+    g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
+    out = g.polys_to_points(keep_order=True, as_structured=True)
+    return out, SR
+
+
+# ============================================================================
+# ---- Sort Geometry --------------------------------------------------------
+#
+# sort by area, length
+def sort_geom(in_fc, gdb, name, sort_kind):
+    """Sort features by area, length"""
+    SR = get_SR(in_fc)
+#    kind, k = get_shape_K(in_fc)                    # geometry type, 0, 1, 2
+#    a, IFT = fc_geometry(in_fc, SR=SR, IFT_rec=False)
+    tmp = MultipartToSinglepart_management(in_fc, r"memory\in_fc_temp")
+    info = "sort features"
+    g, oids, shp_kind, k, m, SR = _in_(tmp, info)
+#    a = Geo(a, IFT=IFT, Kind=k, Info=info)
+    if sort_kind == 'area':
+        srt = g.sort_by_area(ascending=True, just_indices=False)
+    elif sort_kind == 'length':
+        srt = g.sort_by_length(ascending=True, just_indices=False)
+#    p = kind.upper()
+    out_kind = shp_kind
+    # shps, gdb, name, out_kind, SR
+    _out_(srt, gdb, name, out_kind, SR)
+#    geometry_fc(srt, srt.IFT, p_type=p, gdb=gdb, fname=name, sr=SR)
+    return
+
+
+# sort by extent
+def sort_extent(in_fc, gdb, name, key):
+    """Sort features by extent, area, length."""
+    g, oids, shp_kind, k, m, SR = _in_(in_fc, info="sort features")
+#    a, IFT = fc_geometry(in_fc, SR=SR, IFT_rec=False)
+
+#    a = Geo(g, IFT=IFT, Kind=k, Info=info)
+    srt = g.sort_by_extent(key, just_indices=False)
+    out_kind = shp_kind.upper()
+    # geometry_fc(srt, srt.IFT, p_type=p, gdb=gdb, fname=name, sr=SR)
+    _out_(srt, gdb, name, out_kind, SR)
+    return
+
+
+# ============================================================================
+# ---- Alter Geometry --------------------------------------------------------
+#
+
+def fill_holes(in_fc, gdb, name):
+    """Fill holes in a featureclass.  See the Eliminate part tool."""
+    SR = get_SR(in_fc)
+    tmp = MultipartToSinglepart_management(in_fc, r"memory\in_fc_temp")
+    g, oids, shp_kind, k, m, SR = _in_(tmp, info="fill holes")
+    oring = g.outer_rings(True)
+    out_kind = shp_kind
+    x, y = g.LL
+    oring = oring.translate(dx=x, dy=y)
+    _out_(oring, gdb, name, out_kind, SR)
+    # out = "{}/{}".format(gdb, name)
+    # if Exists(out):
+    #     import time
+    #     time.sleep(1.0)
+    #     d = fc_data(tmp)
+    #     da.ExtendTable(out, 'OBJECTID', d, 'OID@')
+    return
+
+
+def rotater(in_fc, gdb, name, as_group, angle, clockwise):
+    """Rotate features separately or as a group."""
+    SR = get_SR(in_fc)
+    tmp = MultipartToSinglepart_management(in_fc, r"memory\in_fc_temp")
+    g, oids, shp_kind, k, m, SR = _in_(tmp, info="rotate features")
+    g0 = g.rotate(as_group=as_group, angle=angle, clockwise=clockwise)
+    out_kind = shp_kind
+    x, y = g.LL
+    g0 = g0.translate(dx=x, dy=y)
+    _out_(g0, gdb, name, out_kind, SR)
+    # out = "{}/{}".format(gdb, name)
+    # if Exists(out):
+    #     import time
+    #     time.sleep(1.0)
+    #     d = fc_data(tmp)
+    #     da.ExtendTable(out, 'OBJECTID', d, 'OID_')
+    return
+
+
+def shifter(in_fc, gdb, name, dX, dY):
+    """Shift features to a new location by delta X and Y values.
+
+    Multipart shapes are converted to singlepart shapes.
+    """
+    SR = get_SR(in_fc)
+    tmp = MultipartToSinglepart_management(in_fc, r"memory\in_fc_temp")
+    g, oids, shp_kind, k, m, SR = _in_(tmp, info="shift features")
+    out_kind = shp_kind
+    x, y = g.LL
+    g0 = g.translate(dx=x+dX, dy=y+dY)
+    _out_(g0, gdb, name, out_kind, SR)
+    # out = "{}/{}".format(gdb, name)
+    # if Exists(out):
+    #     import time
+    #     time.sleep(1.0)
+    #     d = fc_data(tmp)
+    #     da.ExtendTable(out, 'OBJECTID', d, 'OID_', append_only=False)
+    return
 
 
 # ===========================================================================
-# ---- main section: testing or tool run ------------------------------------
-#
+# ---- main section ---------------------------------------------------------
+# : testing or tool run
 
 # tbx = pth + "/FreeTools.tbx"
 # tbx = pth + "/npGeo_1.tbx"
@@ -566,20 +566,46 @@ f1 = """\
 
 
 def pick_tool(tool, in_fc, out_fc, gdb, name):
-    """Pick the tool and run the option.
-    """
+    """Pick the tool and run the option."""
     # ---- Geometry tools ----------------------------------------------------
     #
     tweet(dedent(f0).format(script, tool, in_fc, out_fc))
+    #
+    # ---- Attribute tools --------------------------------------------------
+    if tool == 'Attribute sort':
+        sort_flds = str(sys.argv[4])  # just tool and in_fc, extend to existing
+        out_fld = str(sys.argv[5])
+        sort_flds = sort_flds.split(";")
+        tweet(dedent(f1).format(in_fc, sort_flds, out_fld))
+        oid_fld = da.Describe(in_fc)['OIDFieldName']
+        flds = [oid_fld] + sort_flds
+        a = ags.da.TableToNumPyArray(in_fc, flds)
+        out = attr_sort(a, oid_fld, sort_flds, out_fld)  # run... attr_sort
+        da.ExtendTable(in_fc, oid_fld, out, oid_fld, append_only=False)
+    elif tool == 'Frequency and Stats':           # ---- (1) freq and stats
+        cls_flds = sys.argv[4]
+        stat_fld = sys.argv[5]
+        cls_flds = cls_flds.split(";")  # multiple to list, singleton a list
+        if stat_fld in (None, 'NoneType', ""):
+            stat_fld = None
+        a = ags.da.TableToNumPyArray(in_fc, "*")  # use the whole array
+        out = freq(a, cls_flds, stat_fld)         # do freq analysis
+        if Exists(out_fc) and env.overwriteOutput:
+            Delete_management(out_fc)
+        ags.da.NumPyArrayToTable(out, out_fc)
+    #
     # ---- Containers
-    if tool in ['Bounding Circles', 'Convex Hulls', 'Extent Polys']:
-        kind = sys.argv[4].upper()
+    elif tool in ['Bounding Circles', 'Convex Hulls', 'Extent Polys',
+                  'Minimum area bounding rectangle']:
+        out_kind = sys.argv[4].upper()
         if tool == 'Bounding Circles':           # ---- (1) bounding circles
-            circles(in_fc, gdb, name, kind)
+            circles(in_fc, gdb, name, out_kind)
         elif tool == 'Convex Hulls':             # ---- (2) convex hulls
-            convex_hull_polys(in_fc, gdb, name, kind)
+            convex_hull_polys(in_fc, gdb, name, out_kind)
         elif tool == 'Extent Polys':             # ---- (3) extent_poly
-            extent_poly(in_fc, gdb, name, kind)
+            extent_poly(in_fc, gdb, name, out_kind)
+        elif tool == 'Minimum area bounding rectangle':
+            mabr(in_fc, gdb, name, out_kind)
     #
     # ---- Conversion
     elif tool in ['Features to Points', 'Vertices to Points']:
@@ -623,28 +649,6 @@ def pick_tool(tool, in_fc, out_fc, gdb, name):
         tweet("...\n{} as {}".format(tool, 'input'))
         sort_extent(in_fc, gdb, name, srt_type)
     #
-    # ---- Attribute tools --------------------------------------------------
-    elif tool == 'Crosstab':                # ---- (1) freq and stats
-        cls_flds = sys.argv[4]
-        stat_fld = sys.argv[5]
-        cls_flds = cls_flds.split(";")  # multiple to list, singleton a list
-        if stat_fld in (None, 'NoneType', ""):
-            stat_fld = None
-        a = ags.da.TableToNumPyArray(in_fc, "*")  # use the whole array
-        out = freq(a, cls_flds, stat_fld)         # do freq analysis
-        if Exists(out_fc) and env.overwriteOutput:
-            Delete_management(out_fc)
-        ags.da.NumPyArrayToTable(out, out_fc)
-    elif tool == 'Attribute sort':
-        sort_flds = str(sys.argv[4])  # just tool and in_fc, extend to existing
-        out_fld = str(sys.argv[5])
-        sort_flds = sort_flds.split(";")
-        tweet(dedent(f1).format(in_fc, sort_flds, out_fld))
-        oid_fld = da.Describe(in_fc)['OIDFieldName']
-        flds = [oid_fld] + sort_flds
-        a = ags.da.TableToNumPyArray(in_fc, flds)
-        out = attr_sort(a, oid_fld, sort_flds, out_fld)  # run... attr_sort
-        da.ExtendTable(in_fc, oid_fld, out, oid_fld, append_only=False)
     else:
         tweet("Tool {} not found".format(tool))
         return None
@@ -654,8 +658,7 @@ def pick_tool(tool, in_fc, out_fc, gdb, name):
 # ==== testing or tool run ===================================================
 #
 def _testing_():
-    """Run in spyder
-    """
+    """Run in spyder."""
     in_fc = "C:/Git_Dan/npgeom/npgeom.gdb/Polygons"
     out_fc = "C:/Git_Dan/npgeom/npgeom.gdb/x"
 #    tbx = pth + "/npGeom.tbx"
@@ -670,9 +673,10 @@ def _testing_():
 
 
 def _tool_(tools=tool_list):
-    """Run from a tool in arctoolbox in ArcGIS Pro.  The tool checks to ensure
-    that the path to the output complies and that the desired tool actually
-    exists, so it can be parsed based on type.
+    """Run from a tool in arctoolbox in ArcGIS Pro.
+
+    The tool checks to ensure that the path to the output complies and that
+    the desired tool actually exists, so it can be parsed based on type.
     """
     tool = sys.argv[1]
     in_fc = sys.argv[2]
