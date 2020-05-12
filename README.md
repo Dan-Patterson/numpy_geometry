@@ -1,7 +1,12 @@
 # NumPy and Geometry
 
 **NOTE**
-This is the main working repository for *Free_tools*.  I update that when major work is complete here.
+
+1 This is the main working repository for *Free_tools*.  I update that when major work is complete here.
+
+2 See the **Docs** folder for other documentation
+
+3 The **Scripts** folder contains the scripts associated with the **Geo** array, a subclass of a *numpy* ndarray.  The script, *tbx_tools.py* is the controlling script associated with the *npGeom.tbx* toolbox.
 
 ----
 A numpy geometry class and functions that work with arcpy and ESRI featureclasses is provided here to facilitate working with vector geometry using the ndarray as its base.
