@@ -272,28 +272,37 @@ def doc_func(func=None, verbose=True):
 
 # ----------------------------------------------------------------------
 # ---- (2) get_func .... code section ----
-def get_func(func, line_nums=True, verbose=True):
+def get_func(func, line_nums=True, output=False):
     """Get function information (ie. for a def)
 
     Parameters
     ----------
+    func : function/def
+        The object to document.
+    line_nums : boolean
+        True, provides line numbers.
+    output : boolean
+        True, returns the formatted report.  False, prints it.
+
+    Required
+    --------
     >>> from textwrap import dedent, indent, wrap
     >>> import inspect
 
     Returns
     -------
     The function information includes arguments and source code.
-    A string is returned for printing.
+    A string is optionally returned for deferred printing.
 
     Notes
     -----
     Import the module containing the function and put the object name in
     without quotes...
 
-    >>> from arraytools.utils import get_func
-    >>> get_func(get_func)  # returns this source code etc.
+    >>> import npgeom as npg
+    >>> npg.get_func(get_func)  # returns this source code etc.
     """
-    frmt = """\
+    frmt = r"""
     -----------------------------------------------------------------
     File path: ... {}
     Function: .... {} ....
@@ -302,13 +311,14 @@ def get_func(func, line_nums=True, verbose=True):
     Defaults:  ... {}
     kwdefaults: .. {}
     Variable names:
-    {}\n
+    {}
+
     Source code:
     {}
     -----------------------------------------------------------------
     """
     import inspect  # required if not imported at the top
-    import dis
+    # import dis
     # from textwrap import dedent, wrap
 
     if not inspect.isfunction(func):
@@ -336,10 +346,9 @@ def get_func(func, line_nums=True, verbose=True):
             func.__defaults__,
             func.__kwdefaults__, indent(vars_, "    "), code]
     code_mem = dedent(frmt).format(*args)
-    if verbose:
-        print(code_mem)
-    else:
+    if output:
         return code_mem
+    print(code_mem)
 
 
 # ----------------------------------------------------------------------
@@ -597,6 +606,7 @@ def folders(path, first=True, initial=0, prefix=""):
         if os.path.isdir(fullname):       # If a directory, recurse.
             cprev = path
             pad = ' ' * (len(cprev) - initial)
+            # pad = ' ' * 4
             n = d.replace(cprev, pad)
             print(prefix + "-" + n)  # fullname) # os.path.relpath(fullname))
             p = "  "
@@ -605,9 +615,7 @@ def folders(path, first=True, initial=0, prefix=""):
 
 
 def sub_folders(path, combine=False):
-    """Print the folders in a path, excluding '.' folders
-    This is the best one.
-    """
+    """Print the folders in a path, excluding '.' folders."""
     import pathlib
     print("Path...\n{}".format(path))
     if combine:
@@ -621,7 +629,7 @@ def sub_folders(path, combine=False):
 
 
 def env_list(pth, ordered=False):
-    """List folders and files in a path.  Requires ``os`` module."""
+    """List folders, files in a path, as an array.  Requires ``os`` module."""
     d = []
     for item in os.listdir(pth):
         check = os.path.join(pth, item)
@@ -695,7 +703,8 @@ def package_info(pth=None):
             if os.path.isfile(fname):
                 f = open(fname, 'r')
                 d = json.loads(f.read())
-                depends = "; ".join([i.split(" ")[0] for i in d["depends"]])
+                depends = " ".join([i.split(" ")[0] for i in d["depends"]])
+                depends = "".join([i for i in depends if i != 'python'])
                 max_len = max(max_len, len(depends))
                 out.append([d["name"], d["version"], d["build"], depends])
                 f.close()
@@ -718,7 +727,8 @@ def package_info(pth=None):
     return packages, out
 
 
-def in_file(pth, sub_folder=None, file_name="", text="", dependencies=False):
+def in_file(pth, sub_folder="info", file_name="index.json",
+            text="", dependencies=True, output=False):
     r"""Find string in file in folders
 
     os, json required
@@ -730,6 +740,7 @@ def in_file(pth, sub_folder=None, file_name="", text="", dependencies=False):
     import json
     out = []
     dir_lst = os.listdir(pth)
+    print("module, dependencies....")
     for obj in dir_lst:
         key_fld = pth + os.sep + obj
         if sub_folder:
@@ -747,7 +758,12 @@ def in_file(pth, sub_folder=None, file_name="", text="", dependencies=False):
                     else:
                         out.append(obj)
                 f.close()
-    return out
+    if output:
+        return out
+    for ln in out:
+        lines = "\n".join([f"   {i}" for i in ln[1]])
+        print("{}\n{}".format(ln[0], lines))
+    
 
 
 # ----------------------------------------------------------------------

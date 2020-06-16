@@ -15,7 +15,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2020-04-05
+    2020-05-22
 
 Purpose
 -------
@@ -109,10 +109,10 @@ import numpy as np
 from scipy.spatial import ConvexHull as CH
 from scipy.spatial import Delaunay
 
-import npgeom as npg
+#import npgeom as npg
 
-from npgeom.npg_helpers import (_area_bit_, _in_extent_, _angles_)
-from npgeom.npg_pip import np_wn
+from npg_helpers import (_area_bit_, _in_extent_, _angles_)
+from npg_pip import np_wn
 
 
 ft = {'bool': lambda x: repr(x.astype(np.int32)),
@@ -132,7 +132,7 @@ __all__ = [
     'pnts_in_pnts',
     '_pnt_on_poly_', '_pnt_on_segment_', 'p_o_p',
     '_tri_pnts_', 'in_hole_check'
-]  # 'pnts_in_Geo',
+]  # 'pnts_in_Geo'
 
 
 def pnts_to_extent(pnts, as_pair=False):
@@ -557,8 +557,10 @@ def _polys_to_unique_pnts_(a, as_structured=True):
     """Based on `polys_to_points`.
 
     Allows for recreation of original point order and unique points.
+    Structured arrays is used for sorting.
     """
-    uni, idx, cnts = np.unique(a, True, return_counts=True, axis=0)
+    uni, idx, cnts = np.unique(uts(a), return_index=True,
+                               return_counts=True, axis=0)
     if as_structured:
         N = uni.shape[0]
         dt = [('New_ID', '<i4'), ('Xs', '<f8'), ('Ys', '<f8'), ('Num', '<i4')]
@@ -567,8 +569,8 @@ def _polys_to_unique_pnts_(a, as_structured=True):
         z['Xs'] = uni[:, 0]
         z['Ys'] = uni[:, 1]
         z['Num'] = cnts
-        return z[np.argsort(z, order='New_ID')]
-    return np.asarray(uni)
+        return z[np.argsort(z, order='New_ID')]   
+    return a[np.sort(idx)]
 
 
 def _simplify_lines_(a, deviation=10):
@@ -790,8 +792,8 @@ def _tri_pnts_(pnts):
     z[:, 3] = simps[:, 0]
     z = z[:, ::-1]                               # reorder clockwise
     new_pnts = p[z] + avg
-    new_pnts = new_pnts.reshape(-1, 2)
-    return new_pnts
+    # new_pnts = new_pnts.reshape(-1, 2)
+    return new_pnts.tolist()
 
 
 # ----------------------------------------------------------------------------

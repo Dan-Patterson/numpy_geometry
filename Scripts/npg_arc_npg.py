@@ -46,8 +46,11 @@ from numpy.lib.recfunctions import repack_fields
 from numpy.lib.recfunctions import structured_to_unstructured as stu
 # from numpy.lib.recfunctions import unstructured_to_structured as uts
 
-if 'npg' not in list(locals().keys()):
-    import npgeom as npg
+#if 'npg' not in list(locals().keys()):
+#    import npgeom as npg
+
+from npGeo import Geo
+from npGeo import *
 
 # import arcpy
 
@@ -209,7 +212,7 @@ def fc_to_Geo(in_fc, geom_kind=2, minX=0, minY=0, info=""):
     IFT[:, 5] = pnt_nums
     #
     # ---- (6) Create the output array... as easy as ``a`` to ``z``
-    z = npg.Geo(xy_arr, IFT, kind, Extent=extent, Info="test", SR=sp_ref.name)
+    z = Geo(xy_arr, IFT, kind, Extent=extent, Info="test", SR=sp_ref.name)
     out = copy.deepcopy(z)
     return out
 

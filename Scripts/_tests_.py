@@ -17,12 +17,14 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2019-12-31
+    2020-01-09
 
 Purpose
 -------
 Tests for the Geo class.
 
+
+ast.literal_eval(  *** find examples
 """
 # pylint: disable=C0103  # invalid-name
 # pylint: disable=R0914  # Too many local variables
@@ -40,7 +42,8 @@ from numpy.lib.recfunctions import repack_fields
 
 if 'npg' not in list(locals().keys()):
     import npgeom as npg
-from npg_arc import get_shapes, fc_nparray_Geo
+    from npgeom.npGeo import *
+from npg_arc_npg import get_SR, get_shapes, fc_to_Geo, poly2array, fc_data
 
 # import npGeo
 # from npGeo import fc2na_geo, id_fr_to, _fill_float_array
@@ -60,111 +63,196 @@ script = sys.argv[0]  # print this should you need to locate the script
 
 # ===========================================================================
 # ---- current problem
-def _radsrt_(a, dup_first=False):
-    """Worker for radial sort.
 
-    Notes
-    -----
-    See ``radial_sort`` for parameter details.
+from npgeom.npg_plots import plot_polygons
+from npgeom.npg_overlay import (
+    _intersect_, intersects
+)
+from npgeom.npg_helpers import line_crosses, _in_extent_, polyline_angles
+from npgeom.npg_geom import _angles_
+r"""
+directional buffer
+point_move_x = vertex_coords_x -
+    (distance) * math.cos(math.radians(direction))
+point_move_y = vertex_coords_y -
+    (distance) * math.cos(math.radians(90 - direction))
 
-    Angles relative to the x-axis.
-    >>> rad = np.arange(-6, 7.)*np.pi/6
-    >>> np.degrees(rad)
-    ... array([-180., -150., -120., -90., -60., -30.,  0.,
-    ...          30., 60., 90., 120., 150., 180.])
+# Make list of points
+new_line = ([[vertex_coords_x, vertex_coords_y], [point_move_x, point_move_y]])
+lines_list.append(new_line)
+"""
+
+"""
+diff = s00[:-1] - s00[1:]  #  coordinate difference around perimeter
+sq_dist = np.einsum('ij,ij->i', diff, diff)
+dist = np.sqrt(np.einsum('ij,ij->i', diff, diff))
+array([ 8.6,  10.0,  10.0,  8.6])
+
+same as
+
+np.hypot(diff[:, 0], diff[:, 1])
+array([ 8.6,  10.0,  10.0,  8.6])
+
+segments = []
+for i in range(len(coords) - 1):
+    x1, y1, x2, y2 = coords[i][0], coords[i][1], coords[i+1][0], coords[i+1][1]
+    r = offset / math.hypot(x2 - x1, y2 - y1)
+    vx, vy = (x2 - x1) * r, (y2 - y1) * r
+    segments.append(((x1 - vy, y1 + vx), (x2 - vy, y2 + vx)))
+
+# Set the resultant offset line to the input feature.
+feature.setGeometry(fmeobjects.FMELine([segments[0][0]]
+    + [intersection(s, t) for s, t in zip(segments[:-1], segments[1:])]
+    + [segments[-1][1]]))
+
+fr_to = np.concatenate((s00[:-1], s00[1:]), axis=1)  # produce from-to pairs
+ft_pairs = fr_to.reshape(-1, 2, 2)
+
+
+
+fr_to = np.concatenate((pnts0, pnts1), axis=1)
+sze = (fr_to[:-1].size * 2)
+e = np.zeros((sze), dtype=fr_to.dtype).reshape(-1, 4)
+e[:-1][0::2] = fr_to[:-1]
+e[1:][0::2] = fr_to[1] # for ndim=2
+e.reshape(-1, 2, 2)  # for ndim=3
+
+
+"""
+
+
+"""  MST ....
+connect shape points to follow the outline of a polygon
+Thinking about using mst to do this... see npg_analysis, mst there
+
+
+https://community.esri.com/blogs/dan_patterson/2017/01/31/spanning-trees
+
+
+"""
+
+
+# ---- common helpers
+#
+def polarToCartesian(centerX, centerY, radius, angleInDegrees):
+    """Polar coordinate conversion"""
+    angleInRadians = (angleInDegrees-90) * math.pi / 180.0
+    x = centerX + (radius * math.cos(angleInRadians))
+    y = centerY + (radius * math.sin(angleInRadians))
+    return (x, y)
+
+
+# ======
+def angle_calculator(p0, cent, p1):
+    """Angles given 3 points.
+
+    A variety of things are returned.
+    Angles are relative to the x-axis.  upper quadrants cover 180 to.
+    Consider the points as listed in the order above.
+
+    c_p0 : angle from cent to p0
+    c_p1 : angle from cent to p1
+    btwn_cp0_cp1 : angle formed between c_p0 and c_p1
+    p0_c_p01_seq : sequential angle from p0==>cent==>p1
+        outside/left inside/right
     """
-    uniq = np.unique(a, axis=0)
-    cent = np.mean(uniq, axis=0)
-    dxdy = uniq - cent
-    angles = np.arctan2(dxdy[:, 1], dxdy[:, 0])
-    idx = angles.argsort()
-    srted = uniq[idx]
-    if dup_first:
-        return np.concatenate((srted, [srted[0]]), axis=0)[::-1]
-    return srted
+    x_c, y_c = cent
+    x_0, y_0 = p0
+    x_1, y_1 = p1
+    c_p0 = np.degrees(np.arctan2(y_0 - y_c, x_0 - x_c))
+    c_p1 = np.degrees(np.arctan2(y_1 - y_c, x_1 - x_c))
+    btwn_cp0_cp1 = (c_p0 - c_p1 + 180) % 360 -180  # signed angle
+    return c_p0, c_p1, btwn_cp0_cp1
 
 
-def radial_sort(a, as_Geo=True, dup_first=False):
-    """Sort the coordinates of polygon/polyline features.
+def buffer_circ(poly, buff_dist=1):
+    """Buffer a polygon with circular ends.
 
-    The features will be sorted so that their first coordinate is in the lower
-    left quadrant (SW) as best as possible.  Outer rings are sorted clockwise
-    and interior rings, counterclockwise.  Existing duplicates are removed to
-    clean features, hence, the dup_first to provide closure for polygons.
+    Stack the corner angles in clockwise order
+    np.hstack((pnts0[1:], p0[1:], pnts1[:-1]))
 
-    Parameters
-    ----------
-    a : Geo array
-        The Geo array to sort.
-    dup_first : boolean
-        If True, the first point is duplicated.  This is needed for polygons
-        and should be set to False otherwise.
+    d = np.arange(0, 360, 10.)
+    xys = [c[0] + (p[0]-c[0])* np.cos(1), c[1] + (c[1]-p[1])*np.sin(1)]
 
-    Returns
-    -------
-    Geo array, with points radially sorted (about their center).
-
-    Notes
-    -----
-    See ``radial_sort`` for parameter details.
-
-    Angles relative to the x-axis.
-    >>> rad = np.arange(-6, 7.)*np.pi/6
-    >>> np.degrees(rad)
-    ... array([-180., -150., -120., -90., -60., -30.,  0.,
-    ...          30., 60., 90., 120., 150., 180.])
-
-    References
-    ----------
-    `<https://stackoverflow.com/questions/35606712/numpy-way-to-sort-out-a
-    -messy-array-for-plotting>`_.
+    ycal = c[1] + (p[1]-c[1])* np.cos(1) + (p[0]-c[0])*np.sin(1)
     """
-    def _radsrt_(a, dup_first=False):
-        """Worker for radial sort."""
-        uniq = np.unique(a, axis=0)
-        cent = np.mean(uniq, axis=0)
-        dxdy = uniq - cent
-        angles = np.arctan2(dxdy[:, 1], dxdy[:, 0])
-        idx = angles.argsort()
-        srted = uniq[idx]
-        if dup_first:
-            return np.concatenate((srted, [srted[0]]), axis=0)[::-1]
-        return srted
-    # ----
-    arrs = a.bits
-    ift = a.IFT
-    cw = a.CW
-    kind = a.K
-    if kind == 2 or dup_first is True:
-        dup_first = True
-    tmp = []
-    for i, a in enumerate(arrs):
-        arr = _radsrt_(a, dup_first)
-        if cw[i] == 0:
-            arr = arr[::-1]
-        tmp.append(arr)
-    out = npg.Geo(np.vstack(tmp), IFT=ift)
-    return out
+    def intersection(p0, p1, p2, p3):
+        """Line intersections."""
+        x1, y1, x2, y2, x3, y3, x4, y4 = *p0, *p1, *p2, *p3
+        dx1, dy1, dx2, dy2 = x2 - x1, y2 - y1, x4 - x3, y4 - y3
+        a = x1 * y2 - x2 * y1
+        b = x3 * y4 - x4 * y3
+        c = dy1 * dx2 - dy2 * dx1
+        if 1e-12 < abs(c):
+            n1 = (a * dx2 - b * dx1) / c
+            n2 = (a * dy2 - b * dy1) / c
+            return (n1, n2)
+        return (x2, y2)
+    # -- ******* not done
+    p0 = poly[:-1]
+    p1 = poly[1:]
+    diff = p1 - p0  # poly[1:] - poly[:-1]
+    r = buff_dist/np.sqrt(np.einsum('ij,ij->i', diff, diff))
+    vy_vx = (diff * r[:, None] * [1, -1])[:, ::-1]  # so adding for [1, -1]
+    pnts0 = p0 + vy_vx
+    pnts1 = p1 + vy_vx
+    # fr_to = np.hstack((pnts0, pnts1)).reshape(-1, 2, 2)
+    fr_to = np.concatenate((pnts0, pnts1), axis=1).reshape(-1, 2, 2)
+    z = list(zip(fr_to[:-1], fr_to[1:]))
+    z.append([z[-1][-1], z[0][0]])
+    z = np.array(z)
+    segs = [intersection(i[0], i[1], j[0], j[1]) for i, j in z]
+    frst = np.atleast_2d(segs[-1])
+    final = np.concatenate((frst, np.array(segs)), axis=0)
+    return fr_to, z, final
 
-    # arrays_to_Geo(in_arrays, kind=2, info=None)
-    # Split at opening in line
-    # dx = np.diff(np.append(x, x[-1]))
-    # dy = np.diff(np.append(y, y[-1]))
-    # max_gap = np.abs(np.hypot(dx, dy)).argmax() + 1
 
-    # x = np.append(x[max_gap:], x[:max_gap])
-    # y = np.append(y[max_gap:], y[:max_gap])
-    # return x, y
+def buff_(poly, buff_dist=1):
+    """Offset line"""
+    def intersection(p0, p1, p2, p3):
+        """Line intersections."""
+        x1, y1, x2, y2, x3, y3, x4, y4 = *p0, *p1, *p2, *p3
+        dx1, dy1, dx2, dy2 = x2 - x1, y2 - y1, x4 - x3, y4 - y3
+        a = x1 * y2 - x2 * y1
+        b = x3 * y4 - x4 * y3
+        c = dy1 * dx2 - dy2 * dx1
+        if 1e-12 < abs(c):
+            n1 = (a * dx2 - b * dx1) / c
+            n2 = (a * dy2 - b * dy1) / c
+            return (n1, n2)
+        return (x2, y2)
+    ft = []
+    segs = []
+    poly = np.array(poly)
+    for i in range(poly.shape[0] - 1):
+        x1, y1, x2, y2 = *poly[i], *poly[i+1]
+        r = buff_dist / np.hypot(x2 - x1, y2 - y1)
+        vx, vy = (x2 - x1) * r, (y2 - y1) * r
+        pnt0 = (x1 - vy, y1 + vx)
+        pnt1 = (x2 - vy, y2 + vx)
+        ft.append([pnt0, pnt1])
+    f_t = np.array(ft)
+    z = list(zip(f_t[:-1], f_t[1:]))
+    z.append([z[-1][-1], z[0][0]])
+    z = np.array(z)
+    for i, j in z:
+        x_tion = intersection(i[0], i[1], j[0], j[1])
+        segs.append(x_tion)  # np.array([i[0], middle]))
+    frst = np.atleast_2d(segs[-1])
+    final = np.concatenate((frst, np.array(segs)), axis=0)
+    return f_t, z, final
 
 
 # ===========================================================================
-
+"""
 # ----
 # https://stackoverflow.com/questions/2158395/flatten-an-irregular-
 # list-of-lists/2158532#2158532  # alfasin
+"""
+
 
 def flat1(l):
-    """Just does the basic flattening but doesn't yield where things are."""
+    """Just does the basic flattening but doesnt yield where things are."""
     def _flat(l, r):
         """Flatten sequence."""
         if not isinstance(l[0], (list, np.ndarray, tuple)):  # added [0]
@@ -204,56 +292,7 @@ def flat(container, cnt=0, flat_list=None, sze_lst=None):
 
 
 # ===========================================================================
-# ---- demo
-
-def _test_(in_fc=None, full=False):
-    """Demo files listed in __main__ section.
-
-    Usage
-    -----
-    in_fc, g = npg._tests_._test_()
-    """
-    if in_fc is None:
-        in_fc = r"C:/Git_Dan/npgeom/npgeom.gdb/Polygons2"
-    kind = 2
-    info = None
-    SR = npg.get_SR(in_fc)
-    shapes = npg.fc_shapes(in_fc)
-    # ---- Do the work ----
-    poly_arr = npg.poly2array(shapes)
-    tmp, IFT = npg.fc_geometry(in_fc)
-    m = np.nanmin(tmp, axis=0)
-#    m = [300000., 5000000.]
-    arr = tmp - m
-    poly_arr = [(i - m) for p in poly_arr for i in p]
-    arr = arr.round(3)
-    g = npg.Geo(arr, IFT, kind, info)
-    d = npg.fc_data(in_fc)
-    a = FeatureClassToNumPyArray(
-        in_fc, ['OID@', 'SHAPE@X', 'SHAPE@Y'], explode_to_points=True)
-    a_id = a['OID@']
-    g0xy = a[['SHAPE@X', 'SHAPE@Y']]
-    g0xy['SHAPE@X'] = np.round(a['SHAPE@X'] - m[0], 3)
-    g0xy['SHAPE@Y'] = np.round(a['SHAPE@Y'] - m[1], 3)
-    a = repack_fields(g0xy)
-#    g0xy = stu(g0xy)
-#    g0xy = g0xy - m
-    # g0xy = g0xy.round(3)
-    frmt = """
-    Type :  {}
-    IFT  :
-    {}
-    """
-    k_dict = {0: 'Points', 1: 'Polylines/lines', 2: 'Polygons'}
-    print(dedent(frmt).format(k_dict[kind], IFT))
-#    arr_poly_fc(a, p_type='POLYGON', gdb=gdb, fname='a_test', sr=SR, ids=ids)
-#    a = np.array([[0.,  0.], [0., 10.], [10., 10.], [10.,  0.], [0.,  0.]])
-#    a = npg.arrays_to_Geo(a, Kind=2, Info=None)
-    if full:
-        print("variables : SR, shapes, poly_arr, arr, IFT, g, g0xy, g0id")
-        return SR, shapes, poly_arr, arr, IFT, g, d, a, a_id
-    return in_fc, g, d
-
+# ---- demos
 
 # *** note   np.clip(np.clip(g, 0, 5), None, 10)
 
@@ -301,7 +340,7 @@ def this_in_seq(this, seq):
     idx = np.searchsorted(seq, this, sorter=idx_srt)
     idx[idx == len(seq)] = 0
     idx2 = idx_srt[idx]
-    return (np.diff(idx2) == 1).all() & (seq[idx2] == this).all()
+    return idx2, (np.diff(idx2) == 1).all() & (seq[idx2] == this).all()
 
 
 def this_in_seq2(this, seq):
@@ -314,53 +353,6 @@ def this_in_seq2(this, seq):
     if w.size > 0:
         out = seq[w[0]:w[0] + n]
     return np.any(w), out
-
-
-"""
-clockwise polygons
-p = np.array([[ 50, 150], [100, 200], [100, 250], [150, 350], [200, 250],
-                 [250, 300], [350, 300], [350, 150], [200,  50], [ 50, 150]])
-
-c = np.array([[100, 100], [100, 300], [300, 300],
-                    [300, 100], [100, 100]])
-
-out = slip_poly(p, c)
-array([[125.  , 100.  ],
-       [100.  , 116.67],
-       [100.  , 200.  ],
-       [100.  , 200.  ],
-       [100.  , 250.  ],
-       [125.  , 300.  ],
-       [175.  , 300.  ],
-       [200.  , 250.  ],
-       [250.  , 300.  ],
-       [300.  , 300.  ],
-       [300.  , 116.67],
-       [275.  , 100.  ],
-       [125.  , 100.  ]])
-"""
-
-
-# ----
-'''
-def _p_(sub):
-   """print the sub results"""
-
-s1 = sub[1]
-for i, s in enumerate(s1):
-    args = [s[0], s[0][1], s[i][0], s[i][1],
-            s[i][2], s[i][3], [s[i][4: len(s[i])]]]
-        prt_cnt = len(s)
-        p_in_prt = s[i][0]
-        b_in_prt = s[i][1]
-        num_splits = s[i][2]
-        splits = s[i][3]
-        pnt_per_bit = [s[i][4:]]
-        args = [i, prt_cnt, p_in_prt, b_in_prt, num_splits,
-                splits, pnt_per_bit]
-    print(frmt.format(*args))
-return
-'''
 
 
 def iterate_nested_array(array, index=()):
@@ -380,8 +372,6 @@ def get_dimensions(arr, level=0):
             yield from get_dimensions(row, level + 1)
     except TypeError:  # not an iterable
         pass
-
-# ---- callers
 
 
 def pad_fill_array(array, fill_value):
@@ -463,9 +453,22 @@ def nested_shape(arr_like):
     return tuple([len(arr_like)]) + max([nested_shape(i) for i in arr_like])
 
 
-# =========================================================================
-# ---- (5) fc searchcursor to Geo
+# ----------------------------------------------------------------------------
+# ----
+#
+def tile_(a):
+    """Produce a line sweep"""
+    uniq_x = np.unique(a[:, 0])
+    uniq_y = np.unique(a[:, 1])
+    xs = uniq[:, 0]
+    ys = uniq[:, 1]
+    LB = np.min(uniq, axis=0)
+    RT = np.max(uniq, axis=0)
+    LR = np.array([LB[0], RT[0]])
 
+
+# =========================================================================
+# ---- (1) test functions
 
 frmt = """
 Shape {} len {}
@@ -475,13 +478,54 @@ Shape {} len {}
 """
 
 
-def test(in_fc):
-    """Test data"""
-    a = fc_nparray_Geo(in_fc, geom_kind=2, info="")
-    polys = get_shapes(in_fc)
-    # a = npg_arc.fc_nparray_Geo(in_fc, geom_kind=2, info="")
-    # polys = npg_arc.get_shapes(in_fc)
-    return a, polys
+def _test_(in_fc=None, full=False):
+    """Demo files listed in __main__ section.
+
+    Usage
+    -----
+    in_fc, g = npg._tests_._test_()
+    """
+    if in_fc is None:
+        in_fc = r"C:/Git_Dan/npgeom/Project_npg/npgeom.gdb/Polygons2"
+    kind = 2
+    info = None
+    SR = get_SR(in_fc)
+    shapes = get_shapes(in_fc)
+    # ---- Do the work ----
+    poly_arr = poly2array(shapes)
+    tmp = fc_to_Geo(in_fc)
+    IFT = tmp.IFT
+    m = np.nanmin(tmp, axis=0)
+#    m = [300000., 5000000.]
+    arr = tmp - m
+    # poly_arr = [(i - m) for p in poly_arr for i in p]
+    # arr = arr.round(3)
+    g = npg.Geo(arr, IFT, kind, info)
+    d = fc_data(in_fc)
+    a = FeatureClassToNumPyArray(
+        in_fc, ['OID@', 'SHAPE@X', 'SHAPE@Y'], explode_to_points=True)
+    a_id = a['OID@']
+    g0xy = a[['SHAPE@X', 'SHAPE@Y']]
+    g0xy['SHAPE@X'] = np.round(a['SHAPE@X'] - m[0], 3)
+    g0xy['SHAPE@Y'] = np.round(a['SHAPE@Y'] - m[1], 3)
+    a = repack_fields(g0xy)
+#    g0xy = stu(g0xy)
+#    g0xy = g0xy - m
+    # g0xy = g0xy.round(3)
+    frmt = """
+    Type :  {}
+    IFT  :
+    {}
+    """
+    k_dict = {0: 'Points', 1: 'Polylines/lines', 2: 'Polygons'}
+    print(dedent(frmt).format(k_dict[kind], IFT))
+#    arr_poly_fc(a, p_type='POLYGON', gdb=gdb, fname='a_test', sr=SR, ids=ids)
+#    a = np.array([[0.,  0.], [0., 10.], [10., 10.], [10.,  0.], [0.,  0.]])
+#    a = npg.arrays_to_Geo(a, Kind=2, Info=None)
+    if full:
+        print("variables : SR, shapes, poly_arr, arr, IFT, g, g0xy, g0id")
+        return SR, shapes, poly_arr, arr, IFT, g, d, a, a_id
+    return in_fc, g, d
 
 
 def test2(g, kind=2):
@@ -554,7 +598,7 @@ def test2(g, kind=2):
         ['g.first_bit(True).IFT', g.first_bit(True).IFT],
         ['g.first_part(True)', g.first_part(True)],
         ['g.first_part(True).IFT', g.first_part(True).IFT],
-        ['g.get_shape(ID=3, asGeo=True)', g.get_shape(ID=3, asGeo=True)],
+        ['g.get_shape(ID=1, asGeo=True)', g.get_shape(ID=1, asGeo=True)],
         ['g.get_shape(ID=3, asGeo=True).IFT',
          g.get_shape(ID=3, asGeo=True).IFT],
         ['g.outer_rings(asGeo=True)', g.outer_rings(asGeo=True)],
@@ -563,8 +607,6 @@ def test2(g, kind=2):
         ['g.areas(False)', g.areas(False)],
         ['g.lengths(True)', g.lengths(True)],
         ['g.lengths(False)', g.lengths(False)],
-        ['g.cent_shapes()', g.cent_shapes()],
-        ['g.cent_parts()', g.cent_parts()],
         ['g.centroids()', g.centroids()],
         ['g.aoi_extent()', g.aoi_extent()],
         ['g.aoi_rectangle()', g.aoi_rectangle()],
@@ -585,8 +627,8 @@ def test2(g, kind=2):
         ['g.is_convex()', g.is_convex()],
         ['g.is_multipart(as_structured=False)',
          g.is_multipart(as_structured=False)],
-        ['g.polygon_angles(inside=True, in_deg=True)',
-         g.polygon_angles(inside=True, in_deg=True)],
+        ['g.angles_polygon(inside=True, in_deg=True)',
+         g.angles_polygon(inside=True, in_deg=True)],
         ['g.bounding_circles(angle=5, return_xyr=False)',
          g.bounding_circles(angle=5, return_xyr=False)],
         ['g.min_area_rect(as_structured=False)',
@@ -619,115 +661,9 @@ def test2(g, kind=2):
             pass
 
 
-"""
-a = np.array([[10., 5.], [10., 0.], [0., 0.],
- [0., 10.], [10., 10.], [10., 5.]])
-a2 = np.array([[10., 10], [10,0], [0,0], [0,10], [10,10]])
-b = np.array([[[10, 5], [15, 10], [20, 5], [15, 0], [10, 5]], [[10, 5],
-               [7.5, 7.5], [5, 5], [7.5, 2.5], [10, 5]]])
-jb = [a], [a2], [b], [a, b ], [a2, b]
-
-"""
-
-r"""
-extents = g.extents(by_bit=True)
-pnts = np.array([[1., 1], [2.5, 2.5], [4.5, 4.5], [5., 5],
-                  [6, 6], [10, 10], [12., 12], [12, 16]])
-comp = np.logical_and(extents[:, 0:2] <= pnts[:, None],
-                      pnts[:, None] <= extents[:, 2:4])
-idx = np.logical_and(comp[..., 0], comp[..., 1])
-idx.astype('int')
-p_inside = [pnts[idx[:, i]] for i in range(idx.shape[-1])]
-w0 = np.asarray(np.where(idx.astype('int'))).T    # col 0: pnt,   col 1: extent
-w1 = np.asarray(np.where(idx.T.astype('int'))).T  # col 0: extent col 1: pnt
-
-See Point_in_polygon.txt in my c:\Book_materials\Blogs folder
-
-"""
-
 # ===========================================================================
 # ---- main section
 if __name__ == "__main__":
     """optional location for parameters"""
     in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\Polygons"
     in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\Polygons2"
-#    in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb/fishnet"
-#    in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\Ontario_LCConic"
-#    in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\Polylines"
-#    in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\Dissolved"  #
-
-#    in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\Wards_mtm9"
-    # pth = r"C:/Git_Dan/npgeom/data/Polygons.geojson"
-    # pth = r"C:/Git_Dan/npgeom/data/Oddities.geojson"
-    # pth = r"C:/Git_Dan/npgeom/data/Ontario_LCConic.geojson"
-    # in_fc = r"C:/Git_Dan/npgeom/npgeom.gdb/sample_10k"
-    # in_fc = r"C:/Git_Dan/npgeom/npgeom.gdb/Oddities"
-    pnts = np.array([[1., 1], [2.5, 2.5], [4.5, 4.5], [5., 5],
-                     [6, 6], [10, 10], [12., 12], [12, 16]])
-    g, polys = test(in_fc)
-    p0, p1, p2 = polys
-    g0 = g.get_shape(1)
-
-"""
-    ccw = np.array([[10., 5.], [7.5, 7.5], [5., 5.], [7.5, 2.5], [10., 5.]])
-    a0 = np.array([[10., 5.], [10., 0.], [0., 0.],
-                   [0., 10.], [10., 10.], [10., 5.]])
-    a1 = np.array([[10., 5.], [15., 10.], [20., 5.], [15., 0.], [10., 5.]])
-    a2 = np.asarray([a0, ccw])
-    a3 = np.asarray([a1, ccw])
-    ccw2 = ccw + [6, 0]
-    a4 = np.asarray([a1, ccw2])
-    a5 = np.asarray([ccw2, a1])
-    arrs = [a0, a1, a2, a3, a4, a5, ccw, ccw2]
-    z = npg.arrays_to_Geo(arrs, 2, "arr = [a1, a2, b1, b2, ccw]")
-    # b = np.array([[[10., 5.], [15., 10.], [20., 5.], [15., 0.], [10., 5.]],
-    #              [[10., 5.], [7.5, 7.5], [5., 5.], [7.5, 2.5], [10., 5.]]])
-    # np.array([[10., 10.], [10., 0.], [0., 0.], [0., 10.], [10., 10.]])
-    # arr = [a1, a2, b1, b2, ccw]  # [a, b], [a1, b]]
-"""
-
-"""
-NOTE
-
-To reorder array elements
-
-z = [0, 2, 1, 3, 5, 4]
-np.choose(z[:3], g0.bits)
-
-To take chunks out of arrays
-
-z = [1, 3]
-np.compress(z, g.bits)
-"""
-"""
-heatmap = np.array([
-    [1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
-    [1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
-    [1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0],
-    [1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0],
-    [1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0],
-    [1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0],
-    [1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0],
-    [0, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0],
-    [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-])
-bboxes = np.array([
-    [0, 0, 4, 7],
-    [3, 4, 3, 4],
-    [7, 2, 3, 7]
-])
-
-bbr = np.array([
-    [0, 0, 7, 4],
-    [4, 3, 4, 3],
-    [2, 7, 7, 3]
-])
-s = heatmap[:7, :4]
-fr = bbr[:, :2]
-too = bbr[:, 2:]
-https://stackoverflow.com/questions/59086169/is-there-a-way-to-slice-out-
-multiple-2d-numpy-arrays-from-one-2d-numpy-array-in
-"""
-ifts = g0.IFT
-

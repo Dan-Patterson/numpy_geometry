@@ -78,8 +78,8 @@ import sys
 # from functools import wraps
 import numpy as np
 
-import npgeom as npg
-from npgeom.npg_plots import plot_mixed, plot_2d, plot_polygons
+#import npgeom as npg
+from npg_plots import plot_mixed, plot_2d, plot_polygons
 
 ft = {'bool': lambda x: repr(x.astype(np.int32)),
       'float_kind': '{: 0.1f}'.format}

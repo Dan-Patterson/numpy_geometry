@@ -28,21 +28,22 @@ import numpy as np
 from numpy.lib.recfunctions import unstructured_to_structured as uts
 from numpy.lib.recfunctions import repack_fields
 
-import npg_helpers
-from npg_helpers import (
-    _area_bit_, _length_bit_, _area_centroid_, _extent_bit_,
-    _crossproduct_bit_, _is_ccw_, _angles_, _rotate_)
-import npg_geom as geom
-import npg_io
-import smallest_circle as sc
+# import npg_helpers
+if '_area_bit_' not in list(locals().keys()):
+    from npg_helpers import (
+        _area_bit_, _length_bit_, _area_centroid_, _extent_bit_,
+        _crossproduct_bit_, _is_ccw_, _angles_, _rotate_)
+    import npg_geom as geom
+    import npg_io
+    import smallest_circle as sc
 
 
 from npgDocs import Geo_hlp
 #     Geo_hlp, array_IFT_doc, dirr_doc, sort_by_extent_doc
 # )  # npGeo_doc,
 
-if 'npg' not in list(locals().keys()):
-    import npgeom as npg
+# if 'npg' not in list(locals().keys()):
+#     import npgeom as npg
 
 # noqa: E501
 ft = {"bool": lambda x: repr(x.astype(np.int32)),
@@ -274,6 +275,14 @@ class Geo(np.ndarray):
         Useful for slicing the points of poly features.  See, shp_ids warning.
         """
         return np.repeat(self.IDs, self.To - self.Fr)
+
+    @property
+    def shp_pnt_ids(self):
+        """Return the sequential ids and feature id that each point belongs to.
+        """
+        z1 = np.repeat(self.IDs, self.To - self.Fr)
+        z0 = np.arange(len(z1) + 1)
+        return np.array(list(zip(z0, z1)))
 
     @property
     def xy_id(self):
@@ -892,28 +901,29 @@ class Geo(np.ndarray):
                 ch = np.einsum('ij,jk->ik', p - cent_[i], R) + cent_[i]
                 area_, LBRT = _extent_area_(ch)
                 Xmin, Ymin, Xmax, Ymax = LBRT
-                vals = [area_, Xmin, Ymin, Xmax, Ymax]
+                vals = [area_, np.degrees(angle), Xmin, Ymin, Xmax, Ymax]
                 if area_ < area_old:
                     area_old = area_
                     ch_small = ch
                     Xmin, Ymin, Xmax, Ymax = LBRT
-                    vals = [area_, Xmin, Ymin, Xmax, Ymax]   # min_area
+                    vals = [area_, np.degrees(angle), Xmin, Ymin, Xmax, Ymax]
             rects.append(vals)
             ch_out.append(ch_small)
         rects = np.asarray(rects)
         if shift_back:
-            rects[:, 1:] = rects[:, 1:] + self.XT.ravel()
+            rects[:, 2:] = rects[:, 2:] + self.XT.ravel()
         if as_structured:
-            dt = np.dtype([('Rect_area', '<f8'), ('Xmin', '<f8'),
-                           ('Ymin', '<f8'), ('Xmax', '<f8'), ('Ymax', '<f8')])
+            dt = np.dtype([('Rect_area', '<f8'), ('Angle_', '<f8'),
+                           ('Xmin', '<f8'), ('Ymin', '<f8'),
+                           ('Xmax', '<f8'), ('Ymax', '<f8')])
             return uts(rects, dtype=dt)
         rects = arrays_to_Geo(rects, kind=2, info="mabr")
         return ch_out, rects
 
-    def triangulate(self, by_bit=False, as_polygon=True):
+    def triangulate(self, as_one=False, as_polygon=True):
         """Delaunay triangulation for point groupings."""
-        if by_bit:
-            shps = self.bits
+        if as_one:
+            shps = [self.XY]
         else:
             shps = self.shapes
         out = [geom._tri_pnts_(s) for s in shps]
@@ -1461,6 +1471,7 @@ def check_geometry(self):
     `_is_ccw_` and `_area_bit_` for the calculations.
 
     Performs clockwise/counterclockwise (CW/CCW) checks.
+
     - Outer rings must consist of CW ordered points.
     - First ring must be CW.
     - Inner rings (aka, holes), have points in CCW order.
@@ -1682,7 +1693,7 @@ def dirr(obj, colwise=False, cols=3, prn=True):
     if hasattr(obj, '__module__'):
         args = ["-"*70, obj.__module__, obj.__class__]
     else:
-        args = ["-"*70, type(obj), "py version"]
+        args = ["-"*70, type(obj), "npg.dirr..."]
     txt_out = "\n{}\n| dir({}) ...\n|    {}\n-------".format(*args)
     cnt = 0
     for i in a_0:

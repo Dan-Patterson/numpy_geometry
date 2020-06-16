@@ -19,7 +19,7 @@ Modified :
 
 Purpose
 -------
-Helper functions for Geo arrays and used by npg_geom.py
+Helper functions for Geo arrays and used by npg_geom.py.
 
 Notes
 -----
@@ -51,6 +51,9 @@ import sys
 # from textwrap import dedent
 
 import numpy as np
+
+# if 'npg' not in list(locals().keys()):
+#     import npgeom as npg
 # import npgeom as npg
 
 script = sys.argv[0]  # print this should you need to locate the script
@@ -329,7 +332,7 @@ def _rotate_(geo_arr, R, as_group):
 # ---- Geo or ndarray stuff
 def polyline_angles(obj, fromNorth=False):
     """Polyline/segment angles.  *** needs work***."""
-    if npg.is_Geo(obj, verbose=False):
+    if is_Geo(obj, verbose=False):
         bits = obj.bits
     elif isinstance(obj, (list, tuple)):
         bits = obj
