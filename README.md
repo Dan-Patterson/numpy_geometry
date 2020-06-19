@@ -28,7 +28,8 @@ What I set out to do was create a uniform 2D array of coordinates with np.nan va
 
 I will document and build on these tools set with examples.  I am only working with featureclasses stored in a file geodatabase.
 
-# Some links
+----
+**Some links**
 
 *2020*
 
