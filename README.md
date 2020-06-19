@@ -4,9 +4,9 @@
 
 [Backgrounder document](/Docs/Backgrounder.md)
 
-[npGeom toolbox description](https://github.com/Dan-Patterson/numpy_geometry/blob/master/Docs/npGeomTools.md)
+[npGeom toolbox description](/Docs/npGeomTools.md)
 
-[Multipart shapes](https://github.com/Dan-Patterson/numpy_geometry/blob/master/Docs/Multipart_shapes.md)
+[Multipart shapes](/Docs/Multipart_shapes.md)
 
 
 **NOTE**
