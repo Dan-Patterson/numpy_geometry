@@ -1,5 +1,7 @@
 # NumPy and Geometry
 
+[Backgrounder document](https://github.com/Dan-Patterson/numpy_geometry/edit/master/Docs/Backgrounder.md)
+
 **NOTE**
 
 1 This is the main working repository for *Free_tools*.  I update that when major work is complete here.
