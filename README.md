@@ -2,7 +2,7 @@
 
 **Documentation Links**
 
-[Backgrounder document](https://github.com/Dan-Patterson/numpy_geometry/edit/master/Docs/Backgrounder.md)
+[Backgrounder document](/Docs/Backgrounder.md)
 
 [npGeom toolbox description](https://github.com/Dan-Patterson/numpy_geometry/blob/master/Docs/npGeomTools.md)
 
