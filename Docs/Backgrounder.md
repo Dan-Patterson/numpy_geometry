@@ -9,6 +9,64 @@ To reduce numeric problems, the value of the lower left corner is subtracted fro
 ```
 test2(g, kind=2)  # a polygon featureclass with 3 shapes
 ```
+
+---------
+**Listing of Geo array properties and functions**
+
+npg.dirr(g)
+
+```
+----------------------------------------------------------------------
+| dir(npgeom) ...
+|    <class 'npgeom.Geo'>
+-------
+  (001)  ... Geo class ...       Bit                     CW                      
+  (002)  FT                      Fr                      H                       
+  (003)  IDs                     IFT                     IFT_str                 
+  (004)  IP                      Info                    K                       
+  (005)  LL                      N                       PID                     
+  (006)  SR                      SVG                     To                      
+  (007)  U                       UR                      X                       
+  (008)  XT                      XY                      Y                       
+  (009)  Z                       __author__              __dict__                
+  (010)  __module__              __name__                angles_polygon          
+  (011)  angles_polyline         aoi_extent              aoi_rectangle           
+  (012)  areas                   bit_IFT                 bit_ids                 
+  (013)  bit_pnt_cnt             bit_seq                 bits                    
+  (014)  boundary                bounding_circles        centers                 
+  (015)  centroids               change_indices          close_polylines         
+  (016)  common_segments         convex_hulls            densify_by_distance     
+  (017)  densify_by_percent      dupl_pnts               extent_centers          
+  (018)  extent_corner           extent_pnts             extent_rectangles       
+  (019)  extents                 fill_holes              first_bit               
+  (020)  first_part              geom_check              get_shape               
+  (021)  hlp                     holes_to_shape          info                    
+  (022)  inner_rings             is_clockwise            is_convex               
+  (023)  is_in                   is_multipart            lengths                 
+  (024)  maxs                    means                   min_area_rect           
+  (025)  mins                    moveto                  multipart_to_singlepart 
+  (026)  od_pairs                original_arrays         outer_rings             
+  (027)  part_IFT                part_ids                parts                   
+  (028)  pnt_counts              pnt_ids                 pnt_indices             
+  (029)  pnt_on_poly             polygons_to_polylines   polylines_to_polygons   
+  (030)  polys_to_points         polys_to_segments       pull_shapes             
+  (031)  radial_sort             rotate                  segment_pnt_ids         
+  (032)  shapes                  shift                   shp_IFT                 
+  (033)  shp_ids                 shp_part_cnt            shp_pnt_cnt             
+  (034)  shp_pnt_ids             sort_by_area            sort_by_extent          
+  (035)  sort_by_length          sort_coords             split_by                
+  (036)  structure               translate               triangulate             
+  (037)  uniq_pnts               unique_segments         xy_id                   
+  (038)  ... Geo helpers ...     ... Geo helpers ...     ... Geo helpers ...     
+  (039)  _ch_                    _ch_scipy_              _ch_simple_             
+  (040)  _dist_along_            _percent_along_         _pnt_on_poly_           
+  (041)  _pnt_on_segment_        _pnts_on_line_          _polys_to_unique_pnts_  
+  (042)  _simplify_lines_        _tri_pnts_              common_extent           
+  (043)  eucl_dist               extent_to_poly          in_hole_check           
+  (044)  offset_buffer           p_o_p                   pnts_in_pnts            
+  (045)  pnts_to_extent          scale_by_area           segments_to_polys  
+```
+
 ---------
 **Geo array creation**
 __new__(cls, g=None, IFT=None, Kind=2, Info="Geo array")
