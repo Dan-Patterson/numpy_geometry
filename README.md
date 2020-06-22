@@ -24,7 +24,7 @@ This is a work in progress, so bear with me.  The intent of the Geo class is to 
 
 When trying to work with numpy and the geometries, this creates problems since geometry is rarely a collection of simple shapes (eg. rectangles, circles, triangles).  Object arrays containing the coordinates are the norm.  An object array is created when the number of points per feature and/or feature part are not uniform.  For example, a square with a triangular hole in it, will have an outer ring, oriented clockwise consisting of a list of 5 points with the first and last point being the same.  The triangular hole will be represented by 4 points oriented counterclockwise.  Now that arrangement of points can be used to represent a polygon, a closed-loop polyline or a multipoint.  The same points can be used to represent 3 distinctly different geometric objects.
 
-What I set out to do was create a uniform 2D array of coordinates with np.nan values separating the parts of a particular shape and a companion array which denotes the feature ID and the from-to point pairs.  This is similar to the FeatureClassToNumPy array approach, but that particular function and its inverse, are only useful for simple singlepart geometries.
+What I set out to do was create a uniform 2D array of coordinates and a companion array which denotes the feature ID and the from-to point pairs.  This is similar to the FeatureClassToNumPy array approach, but that particular function and its inverse, are only useful for simple singlepart geometries.
 
 I will document and build on these tools set with examples.  I am only working with featureclasses stored in a file geodatabase.
 
