@@ -1,7 +1,7 @@
 ----
 # Multipart shapes
 
-<a href="url"><img src="images/Shape2.png" align="right" height="300" width="auto" ></a>
+<a href="url"><img src="../images/Shape2.png" align="right" height="300" width="auto" ></a>
 
 Consider the following multipart shapes.  The first shape has is second part slightly offset and it also contains a hole.  The second shape is a flip/mirror/translate of its first part.
 
@@ -272,7 +272,7 @@ cur.fields   # ==> ('OID@', 'SHAPE@X', 'SHAPE@Y')
 ```
 
 
-<a href="url"><img src="images/bad_shape.png" align="right" height="300" width="auto" ></a>
+<a href="url"><img src="../images/bad_shape.png" align="right" height="300" width="auto" ></a>
 
 The parts and the geometry are not identified within the sequences.  Constructing points from the above is no big deal, but polylines and polygons would fail miserably... as shown in this example.
 
