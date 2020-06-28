@@ -4,6 +4,8 @@
 
 [Backgrounder document](/Docs/Backgrounder.md)
 
+[Script descriptions](/Scripts/README.md)
+
 [npGeom toolbox description](/Docs/npGeomTools.md)
 
 [Multipart shapes](/Docs/Multipart_shapes.md)
