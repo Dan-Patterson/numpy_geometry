@@ -20,10 +20,94 @@ Links to other documentation will be provided as appropriate
 
 Some useful functions to access and document featureclass information
 
+**dtype_info(a, as_string=False)**
+
+Return dtype information as lists or a string.
+```
+a = np.array([(0,  1,  2), (3,  4,  5), (6,  7,  8), (9, 10, 11)],
+              dtype=[('f0', '<i4'), ('f1', '<i4'), ('f2', '<i4')])
+
+npg.dtype_info(a, False)
+(['f0', 'f1', 'f2'], ['<i4', '<i4', '<i4'])
+
+npg.dtype_info(a, True)
+Out[4]: ('f0, f1, f2', '<i4, <i4, <i4')
+```
+
+**load_geo(f_name, suppress_extras=True)**
+
+Load saved arrays and supplemental information.
+
+```
+ geo = npg.load_geo(f_name, True)
+
+Loading...C:/Git_Dan/npgeom/data/g_arr.npz
+Arrays include...['g', 'ift', 'kind', 'extents', 'spatial_ref']
+(0) name : g
+  shape : (62, 2)
+  descr. : [('', '<f8')]
+(1) name : ift
+  shape : (12, 6)
+  descr. : [('', '<i4')]
+(2) name : kind
+  shape : ()
+  descr. : [('', '<i4')]
+(3) name : extents
+  shape : (2, 2)
+  descr. : [('', '<f8')]
+(4) name : spatial_ref
+  shape : ()
+  descr. : [('', '<U19')]
+
+geo, arrs, names = npg.load_geo(f_name, False)
+
+Loading...C:/Git_Dan/npgeom/data/g_arr.npz
+Arrays include...['g', 'ift', 'kind', 'extents', 'spatial_ref']
+(0) name : g
+  shape : (62, 2)
+  descr. : [('', '<f8')]
+(1) name : ift
+  shape : (12, 6)
+  descr. : [('', '<i4')]
+(2) name : kind
+  shape : ()
+  descr. : [('', '<i4')]
+(3) name : extents
+  shape : (2, 2)
+  descr. : [('', '<f8')]
+(4) name : spatial_ref
+  shape : ()
+  descr. : [('', '<U19')]
+```
+
+**save_geo(g, f_name, folder)**
+
+Save an array as an npz file.
+
+**save_txt(a, name="arr.txt", sep=", ", dt_hdr=True)**
+
+Save a NumPy structured/recarray to text.
+
+**load_txt(name="arr.txt", data_type=None)**
+
+Read a structured/recarray created by save_txt.  Many options are specified in save_txt.  If you wish to modify this, modify save_txt as well.
+
+**Others**
+
+The remainder of the functions deal with formatting attribute data and printing.
+
+```
+npg.npg_io
+'_ckw_', '_col_format', 'col_hdr', 'dtype_info', 'geojson_Geo', 'gms', 'load_geo', 'load_geojson',
+ 'load_txt', 'make_row_format', 'prn_', 'prn_geo', 'prn_q', 'prn_tbl', 'save_geo', 'save_txt
+```
+----
+## npg_arc_npg
+
 ```
 in_fc = 'C:/Arc_projects/CoordGeom/CoordGeom.gdb/Shape2'
 ```
-**getSR(in_fc, verbose=False)**
+**get_SR(in_fc, verbose=False)**
 
 ```
 getSR(in_fc, verbose=False)
@@ -32,6 +116,63 @@ getSR(in_fc, verbose=False)
 getSR(in_fc, verbose=True)
 SR name: NAD_1983_CSRS_MTM_9  factory code: 2951
 ```
+
+**get_shape_K(in_fc)**
+
+Returns the shape type for a featureclass as (kind, k), where kind is polygon, polyline, multipoint, point and variants.  k is 2, 1 or 0.
+
+----
+## npGeo.py
+
+This is where the Geo class is housed along with methods an properties applicable to it.  The Geo class inherits from the numpy ndarray and methods applied to Geo arrays generally returns arrays of that class.
+
+Geo arrays can be constructed from other ndarrays using **arrays_Geo**.  Three sample arrays are shown below.  They have been arranged in column format to save space.  
+
+```
+array(                  array([[[12., 18.], array([[14., 20.],
+    [array([[10., 20.],         [12., 12.],        [10., 20.],
+            [10., 10.],         [20., 12.],        [15., 28.],
+            [ 0., 10.],         [20., 10.],        [14., 20.]])
+            [ 0., 20.],         [10., 10.],
+            [10., 20.],         [10., 20.],
+            [ 3., 19.],         [20., 20.],
+            [ 3., 13.],         [20., 18.],
+            [ 9., 13.],         [12., 18.]],
+            [ 9., 19.],        [[25., 24.],
+            [ 3., 19.]]),       [25., 14.], 
+     array([[ 8., 18.],         [15., 14.],
+            [ 8., 14.],         [15., 16.],
+            [ 4., 14.],         [23., 16.],
+            [ 4., 18.],         [23., 22.],
+            [ 8., 18.],         [15., 22.],
+            [ 6., 17.],         [15., 24.],
+            [ 5., 15.],         [25., 24.]]])
+            [ 7., 15.],
+            [ 6., 17.]])],
+            dtype=object),
+```
+
+Both the array of arrays and the geo array are saved in the Scripts folder.
+To load the Geo array, save the files to disk.  You can save and load arrays using the follow syntax.  This was used to create the files saved here.
+```
+# ---- For single arrays
+np.save("c:/path_to_file/three_arrays.npy", z, allow_pickle=True, fix_imports=False)   # ---- save to disk
+
+arr = np.load(c:/path_to_file/three_arrays.npy", allow_pickle=True, fix_imports=False) # ---- load above arrays
+
+# ---- For multiple arrays
+np.savez("c:/temp/geo_array.npz", s2=s2, IFT=s2.IFT)  # ---- save arrays, s2 and s2.IFT with names (s2, IFT)
+
+npzfiles = np.load("c:/temp/geo_array.npz")  # ---- the Geo array and the array of I(ds)F(rom)T(o) values
+npzfiles.files                               # ---- will show ==> ['s2', 'IFT']
+s2 = npzfiles['s2']                          # ---- slice the arrays by name from the npz file to get each array
+IFT = npzfiles['IFT']
+```
+
+----
+OLD
+----
+
 **fc_info(in_fc, prn=True)**
 
 ```fc_info(in_fc, prn=True)
@@ -129,52 +270,3 @@ If you wish to clone their distribution or modify the existing one, some guidanc
 [Clone... ArcGIS Pro ... for non administrators](https://community.esri.com/blogs/dan_patterson/2018/12/28/clone)
 
 <a href="url"><img src="https://github.com/Dan-Patterson/npGeo/blob/master/images/clones2.png" align="center" height="200" width="auto" ></a>
-
-
-----
-## npGeo.py
-
-This is where the Geo class is housed along with methods an properties applicable to it.  The Geo class inherits from the numpy ndarray and methods applied to Geo arrays generally returns arrays of that class.
-
-Geo arrays can be constructed from other ndarrays using **arrays_Geo**.  Three sample arrays are shown below.  They have been arranged in column format to save space.  
-
-```
-array(                  array([[[12., 18.], array([[14., 20.],
-    [array([[10., 20.],         [12., 12.],        [10., 20.],
-            [10., 10.],         [20., 12.],        [15., 28.],
-            [ 0., 10.],         [20., 10.],        [14., 20.]])
-            [ 0., 20.],         [10., 10.],
-            [10., 20.],         [10., 20.],
-            [ 3., 19.],         [20., 20.],
-            [ 3., 13.],         [20., 18.],
-            [ 9., 13.],         [12., 18.]],
-            [ 9., 19.],        [[25., 24.],
-            [ 3., 19.]]),       [25., 14.], 
-     array([[ 8., 18.],         [15., 14.],
-            [ 8., 14.],         [15., 16.],
-            [ 4., 14.],         [23., 16.],
-            [ 4., 18.],         [23., 22.],
-            [ 8., 18.],         [15., 22.],
-            [ 6., 17.],         [15., 24.],
-            [ 5., 15.],         [25., 24.]]])
-            [ 7., 15.],
-            [ 6., 17.]])],
-            dtype=object),
-```
-
-Both the array of arrays and the geo array are saved in the Scripts folder.
-To load the Geo array, save the files to disk.  You can save and load arrays using the follow syntax.  This was used to create the files saved here.
-```
-# ---- For single arrays
-np.save("c:/path_to_file/three_arrays.npy", z, allow_pickle=True, fix_imports=False)   # ---- save to disk
-
-arr = np.load(c:/path_to_file/three_arrays.npy", allow_pickle=True, fix_imports=False) # ---- load above arrays
-
-# ---- For multiple arrays
-np.savez("c:/temp/geo_array.npz", s2=s2, IFT=s2.IFT)  # ---- save arrays, s2 and s2.IFT with names (s2, IFT)
-
-npzfiles = np.load("c:/temp/geo_array.npz")  # ---- the Geo array and the array of I(ds)F(rom)T(o) values
-npzfiles.files                               # ---- will show ==> ['s2', 'IFT']
-s2 = npzfiles['s2']                          # ---- slice the arrays by name from the npz file to get each array
-IFT = npzfiles['IFT']
-```
