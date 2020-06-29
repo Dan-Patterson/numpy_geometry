@@ -142,8 +142,86 @@ g.FT   IFT[:, 1:3] from-to point pairs
 
 g.K ... 2 ...  shape kind 1, 2, 3 for points, polylines, polygons
 g.Info ... test ... extra information string
-```
 
+g.H ... Help on Geo arrays
+
+**Geo class**
+-------------
+
+Construction from an ndarray, IFT, Kind and optional Info.
+
+Parameters
+----------
+**Required**
+
+arr : array-like
+    A 2D array sequence of points with shape (N, 2).
+IFT : array-like
+    Defines, the I(d)F(rom)T(o) and other structural elements that are
+    present in polyline or polygon geometry that `arr` represents .
+    Shape (N, 6) required.
+Kind : integer
+    Points (0), polylines/lines (1) and polygons (2).
+Info : string (optional)
+    Optional information if needed.
+
+**Derived**
+
+IDs : IFT[:, 0]
+    Shape ids, the id number will be repeated for each part and hole in
+    the shape
+Fr : IFT[:, 1]
+    The ``from`` point in the point sequence.
+To : IFT[:, 2]
+    The ``to`` point in the point sequence.
+CW : IFT[:, 3]
+    A value of ``1`` for exterior rings, ``0`` for interior/holes.
+PID : IFT[:, 4]
+    Part ids sequence by shape.  A singlepart shape will have one (1) part.
+    Subsequent parts are numbered incrementally.
+Bit : IFT[:, 5]
+    The bit sequence in a singlepart feature with holes and/or multipart
+    features with or without holes
+FT : IFT[:, 1:3]
+    The from-to ids together (Fr, To).
+IP : IFT[:, [0, 4]]
+    Shape and part ids together (IDs, PID)
+N : integer
+    The number of unique shapes.
+U : integer(s)
+    A sequence of integers indicating the feature ID value.  There is no
+    requirement for these to be sequential.
+SR : text
+    Spatial reference name.
+X, Y, XY, Z: Derived from columns in the point array.
+    X = arr[:, 0], Y = arr[:, 0], XY = arr[:, :2],
+    Z = arr[:, 2] if defined
+XT : array
+    An array/list of points identifying the lower-left and upper-right,
+    of full extent of all the geometry objects.
+LL, UR : array
+    The extent points as defined in XT.
+hlp : this
+    self.H or self.docs where self is a Geo array will recall this information.
+
+A featureclass with 3 shapes. The first two are multipart with holes.
+
+arr.IFT  # ---- annotated ----
+#      IDs, Fr, To, CW, PID, Bit
+array([[ 1,  0,  5,  1,   1,  0],  # first shape, first part, outer ring
+       [ 1,  5, 10,  0,   1,  1],  # hole 1
+       [ 1, 10, 14,  0,   1,  2],  # hole 2
+       [ 1, 14, 18,  0,   1,  3],  # hole 3
+       [ 1, 18, 23,  1,   2,  0],  # first shape, second part, outer ring
+       [ 1, 23, 27,  0,   2,  1],  # hole 1
+       [ 2, 27, 36,  1,   1,  0],  # second shape, first part, outer ring
+       [ 2, 36, 46,  1,   2,  0],  # second shape, second part, outer ring
+       [ 2, 46, 50,  0,   2,  1],  # hole 1
+       [ 2, 50, 54,  0,   2,  2],  # hole 2
+       [ 2, 54, 58,  0,   2,  3],  # hole 3
+       [ 3, 58, 62,  1,   1,  0]], # third shape, first part, outer ring
+                     dtype=int64)
+```
 **Derived Properties**
 ----
 shape, part, and bit        : N, part_cnt, bit_cnt
@@ -543,5 +621,28 @@ g.bits
  [ 14.00  10.00]]
 
 ```
+**Others of interest**
 
+A simplified informational table of a Geo array's IFT array with annotations.  Useful for documentation purposes.
+```
+sq2.structure()
+
+Geo array structure
+-------------------
+OID_    : self.Id   shape id
+Fr_pnt  : self.Fr   from point id
+To_pnt  : self.To   to point id for a shape
+CW_CCW  : self.CW   outer (1) inner/hole (0)
+Part_ID : self.PID  part id for each shape
+Bit_ID  : self.Bit  sequence order of each part in a shape
+----
+
+...    OID_    Fr_pnt    To_pnt    CW_CCW    Part_ID    Bit_ID  
+--------------------------------------------------------------
+ 000      1         0         7         1          1         0
+ 001      1         7        11         0          1         1
+ 002      2        11        19         1          1         0
+ 003      3        19        25         1          1         0
+ 004      4        25        30         1          1         0
+ ```
 
