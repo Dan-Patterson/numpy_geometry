@@ -1,5 +1,7 @@
 # NumPy and Geometry
 
+<a href="url"><img src="../images/Voronoi2.png" align="right" height="auto" width="300" ></a>
+
 **Documentation Links**
 
 * [Backgrounder document](/Docs/Backgrounder.md)
