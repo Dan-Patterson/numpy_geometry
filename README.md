@@ -1,6 +1,6 @@
 # NumPy and Geometry
 
-<a href="url"><img src="/images/Voronoi2.png" align="center" height="auto" width="300" ></a>
+<a href="url"><img src="https://github.com/Dan-Patterson/numpy_geometry/blob/master/images/Voronoi2.png" align="center" height="auto" width="300" ></a>
 
 
 
