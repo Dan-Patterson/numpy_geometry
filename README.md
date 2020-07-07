@@ -2,13 +2,13 @@
 
 **Documentation Links**
 
-[Backgrounder document](/Docs/Backgrounder.md)
+* [Backgrounder document](/Docs/Backgrounder.md)
 
-[Script descriptions](/Scripts/README.md)
+* [Script descriptions](/Scripts/README.md)
 
-[npGeom toolbox description](/Docs/npGeomTools.md)
+* [npGeom toolbox description](/Docs/npGeomTools.md)
 
-[Multipart shapes](/Docs/Multipart_shapes.md)
+* [Multipart shapes](/Docs/Multipart_shapes.md)
 
 
 **NOTE**
