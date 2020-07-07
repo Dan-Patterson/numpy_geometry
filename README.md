@@ -1,6 +1,8 @@
 # NumPy and Geometry
 
-<a href="url"><img src="../images/Voronoi2.png" align="right" height="auto" width="300" ></a>
+<a href="url"><img src="/images/Voronoi2.png" align="center" height="auto" width="300" ></a>
+
+
 
 **Documentation Links**
 
