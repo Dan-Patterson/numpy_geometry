@@ -8,9 +8,10 @@ The following scripts are listed in this folder and the documentation guide
 
 1. \_\_init__.py
 2. npg_io.py
-3. npGeo.py
-4. npg_helpers.py
-5. smallest_circle.py
+3. npg_arc_npg.py
+4. npGeo.py
+5. npg_helpers.py
+6. smallest_circle.py
 
 Links to other documentation will be provided as appropriate
 
@@ -121,6 +122,25 @@ SR name: NAD_1983_CSRS_MTM_9  factory code: 2951
 
 Returns the shape type for a featureclass as (kind, k), where kind is polygon, polyline, multipoint, point and variants.  k is 2, 1 or 0.
 
+**fc_to_Geo(in_fc, geom_kind=2, minX=0, minY=0, info="")**
+
+Convert FeatureClassToNumPyArray to a Geo array.  `in_fc` is the path to the featureclass.  `geom_kind` is either 1 or 2 representing polylines or polygons.
+
+**id_fr_to(a, oids)**
+
+Produce the `id`, `from` and `to points` used to delineate poly* bit geometry.
+
+**Geo_to_shapes(geo, as_singlepart=True)**
+
+Convert a geo array back to esri geometry objects.
+
+**Geo_to_fc(geo, gdb=None, name=None, kind=None, SR=None)**
+
+Produce a geodatabase featureclass from a geo array.
+
+**Other functions**
+
+There are a variety of other functions that deal with converting between geometries.
 ----
 ## npGeo.py
 
