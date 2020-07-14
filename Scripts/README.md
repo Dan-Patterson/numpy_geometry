@@ -105,6 +105,7 @@ npg.npg_io
 ----
 ## npg_arc_npg
 
+[npg_arc_npg functions](/images/npg_arc_npg.png)
 ```
 in_fc = 'C:/Arc_projects/CoordGeom/CoordGeom.gdb/Shape2'
 ```
