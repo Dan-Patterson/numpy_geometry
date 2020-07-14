@@ -19,6 +19,8 @@ Links to other documentation will be provided as appropriate
 ----
 ## npg_io.py
 
+<a href="url"><img src="https://github.com/Dan-Patterson/numpy_geometry/blob/master/images/npg_io.png" align="right" height="auto" width="150" ></a>
+
 Some useful functions to access and document featureclass information
 
 **dtype_info(a, as_string=False)**
