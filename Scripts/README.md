@@ -105,7 +105,8 @@ npg.npg_io
 ----
 ## npg_arc_npg
 
-[npg_arc_npg functions](/images/npg_arc_npg.png)
+<a href="url"><img src="https://github.com/Dan-Patterson/numpy_geometry/blob/master/images/npg_arc_npg.png" align="right" height="auto" width="150" ></a>
+
 ```
 in_fc = 'C:/Arc_projects/CoordGeom/CoordGeom.gdb/Shape2'
 ```
