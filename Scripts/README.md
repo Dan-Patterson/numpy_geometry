@@ -99,6 +99,7 @@ Read a structured/recarray created by save_txt.  Many options are specified in s
 
 The remainder of the functions deal with formatting attribute data and printing.
 
+
 ```
 npg.npg_io
 '_ckw_', '_col_format', 'col_hdr', 'dtype_info', 'geojson_Geo', 'gms', 'load_geo', 'load_geojson',
@@ -145,8 +146,12 @@ Produce a geodatabase featureclass from a geo array.
 **Other functions**
 
 There are a variety of other functions that deal with converting between geometries.
+
+
 ----
 ## npGeo.py
+
+<a href="url"><img src="https://github.com/Dan-Patterson/numpy_geometry/blob/master/images/npGeo.png" align="right" height="auto" width="300" ></a>
 
 This is where the Geo class is housed along with methods an properties applicable to it.  The Geo class inherits from the numpy ndarray and methods applied to Geo arrays generally returns arrays of that class.
 
