@@ -5,7 +5,8 @@
 
 <!--- <a href="url"><img src="https://github.com/Dan-Patterson/numpy_geometry/blob/master/images/Voronoi2.png" align="center" height="auto" width="300" ></a> -->
 <!--- ![](/images/Voronoi2.png) -->
-<img src="/images/Voronoi2.png" align="center" width="300"/>
+<!--- <img src="/images/Voronoi2.png" align="center" width="300"/> -->
+![](https://dan-patterson.github.io/numpy_geometry/images/Voronoi2.png)
 
 **Documentation Links**
 
