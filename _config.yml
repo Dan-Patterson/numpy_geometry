@@ -1,2 +1,5 @@
 theme: jekyll-theme-cayman
-url: https://dan-patterson.github.io/numpy_geometry/
+name: NumPy Geometry
+description: Working with geometry with numpy.
+url: "https://dan-patterson.github.io/numpy_geometry"
+markdown: GFM
