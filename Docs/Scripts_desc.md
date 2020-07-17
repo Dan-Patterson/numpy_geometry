@@ -151,7 +151,7 @@ There are a variety of other functions that deal with converting between geometr
 ----
 ## npGeo.py
 
-<a href="url"><img src=/images/npGeo.png" align="right" height="auto" width="300" ></a>
+<a href="url"><img src=../images/npGeo.png" align="right" height="auto" width="300" ></a>
 
 This is where the Geo class is housed along with methods an properties applicable to it.  The Geo class inherits from the numpy ndarray and methods applied to Geo arrays generally returns arrays of that class.
 
@@ -298,4 +298,4 @@ If you wish to clone their distribution or modify the existing one, some guidanc
 
 [Clone... ArcGIS Pro ... for non administrators](https://community.esri.com/blogs/dan_patterson/2018/12/28/clone)
 
-<a href="url"><img src="https://github.com/Dan-Patterson/npGeo/blob/master/images/clones2.png" align="center" height="200" width="auto" ></a>
+<a href="url"><img src="../images/clones2.png" align="center" height="200" width="auto" ></a>
