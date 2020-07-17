@@ -152,11 +152,14 @@ There are a variety of other functions that deal with converting between geometr
 ## npGeo.py
 
 
-!<--- <a href="url"><img src=../images/npGeo.png" align="left" height="auto" width="300" ></a> -->
 
-This is where the Geo class is housed along with methods an properties applicable to it.  The Geo class inherits from the numpy ndarray and methods applied to Geo arrays generally returns arrays of that class.
+<a href="url"><img src="../images/npGeo.png" align="right" height="auto" width="450" ></a>
 
-Geo arrays can be constructed from other ndarrays using **arrays_Geo**.  Three sample arrays are shown below.  They have been arranged in column format to save space.  
+This is where the Geo class is housed along with methods and properties applicable to it.  The Geo class inherits from the numpy ndarray and methods applied to Geo arrays generally returns arrays of that class.
+
+Geo arrays can be constructed from other ndarrays using **arrays_Geo**.
+Three sample arrays are shown below.
+They have been arranged in column format to save space.  
 
 ```
 array(                  array([[[12., 18.], array([[14., 20.],
