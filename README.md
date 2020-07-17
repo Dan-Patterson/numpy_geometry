@@ -13,7 +13,7 @@
 
 * [Backgrounder document](/Docs/Backgrounder.md)
 
-* [Script descriptions](/Scripts/README.md)
+* [Script descriptions](/Docs/Scripts_desc.md)
 
 * [npGeom toolbox description](/Docs/npGeomTools.md)
 
