@@ -151,7 +151,8 @@ There are a variety of other functions that deal with converting between geometr
 ----
 ## npGeo.py
 
-<a href="url"><img src=../images/npGeo.png" align="right" height="auto" width="300" ></a>
+
+<a href="url"><img src=../images/npGeo.png" align="left" height="auto" width="300" ></a>
 
 This is where the Geo class is housed along with methods an properties applicable to it.  The Geo class inherits from the numpy ndarray and methods applied to Geo arrays generally returns arrays of that class.
 
