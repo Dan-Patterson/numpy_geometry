@@ -19,7 +19,7 @@ Links to other documentation will be provided as appropriate
 ----
 ## npg_io.py
 
-<a href="url"><img src="/images/npg_io.png" align="right" height="auto" width="150" ></a>
+<a href="url"><img src="../images/npg_io.png" align="right" height="auto" width="150" ></a>
 
 Some useful functions to access and document featureclass information
 
@@ -108,7 +108,7 @@ npg.npg_io
 ----
 ## npg_arc_npg
 
-<a href="url"><img src="/images/npg_arc_npg.png" align="right" height="auto" width="150" ></a>
+<a href="url"><img src="../images/npg_arc_npg.png" align="right" height="auto" width="150" ></a>
 
 ```
 in_fc = 'C:/Arc_projects/CoordGeom/CoordGeom.gdb/Shape2'
