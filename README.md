@@ -7,6 +7,7 @@
 <!--- ![](/images/Voronoi2.png) -->
 <img src="images/Voronoi2.png" align="center" width="300"/>
 
+
 **Documentation Links**
 
 * [Backgrounder document](/Docs/Backgrounder.md)
