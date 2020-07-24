@@ -1,5 +1,7 @@
 # NumPy and Geometry
 
+----
+
 <!--- This is a comment -->
 <!--- https://dan-patterson.github.io/numpy_geometry/ -->
 
