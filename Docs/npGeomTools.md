@@ -18,21 +18,21 @@ The tools here are the most recent version of those provided in *FreeTools*
 
 
 
-(1) Attribute tools
+(1) **Attribute tools**
 
 The tools are self-evident and don't include multiple options.
 
-(2) Containers
+(2) **Containers**
 
 The containers toolset offers the options shown in the image.
 
-`Bounding circles` is probalby the most uncommon for GIS tools.
+`Bounding circles` is probably the most uncommon for GIS tools.
 
 The `extent polygon` is the axis aligned extent of the feature geometry.
 
 `Convex hull` is included for convenience.  It uses scipy's Qhull implementation.
 
-(3) Conversion
+(3) **Conversion**
 
 The options for `conversion` are as follows:
 
@@ -55,6 +55,20 @@ The options for `conversion` are as follows:
 
 
 
+
+(4) **Sort Geometry**
+
+`Extent sort` provides options for sorting geometries using keys like S - N, E - W etcetera.
+
+`Geometry sort` can be used to sort by area or perimeter/length.
 *Source image*
+
+(5) **Alter Geometry**
+
+The tool listing provides densification options, filling holes in polygons, and shifting and rotating geometries either as a group or individually.
+
+(6) **Triangulation Tools**
+
+Voronoi diagram (aka Thiessen polygons) and Delaunay triangulations, round out the tools so far.
 
 ../numpy_geometry/images/npGeomTools.png
