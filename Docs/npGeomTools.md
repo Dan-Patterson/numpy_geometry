@@ -49,12 +49,7 @@ The options for `conversion` are as follows:
 <a href="url"><img src="../images/npGeo_conversion_tools.png" align="center" height="auto" width="200" ></a>
 
 
-
-
-
-
-
-
+----
 
 (4) **Sort Geometry**
 
