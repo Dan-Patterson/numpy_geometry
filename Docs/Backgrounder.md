@@ -67,13 +67,27 @@ npg.dirr(g)
   (045)  pnts_to_extent          scale_by_area           segments_to_polys  
 ```
 
----------
+----
+
 **Geo array creation**
+
 __new__(cls, g=None, IFT=None, Kind=2, Info="Geo array")
-required: g, IFT, Kind
+
+g : array_like
+    A 2D array sequence of points with shape (N, 2).
+IFT : array_like
+    Defines, the I(d)F(rom)T(o) and other structural elements that are
+    present in polyline or polygon geometry that `arr` represents.
+    Shape (N, 6) required.
+Kind : integer
+    Points (0), polylines/lines (1) and polygons (2).
+Info : text (optional)
+    Optional information if needed.
+
+----
 
 **Properties**
-----
+
 ```
 g      the ndarray of xy coordinates
 g.T  # ---- g.T shown
@@ -222,8 +236,12 @@ array([[ 1,  0,  5,  1,   1,  0],  # first shape, first part, outer ring
        [ 3, 58, 62,  1,   1,  0]], # third shape, first part, outer ring
                      dtype=int64)
 ```
-**Derived Properties**
 ----
+
+**Derived Properties**
+
+----
+
 shape, part, and bit        : N, part_cnt, bit_cnt
 
 shape, part and bit ids     : shp_ids, part_ids, bit_ids
@@ -331,9 +349,12 @@ g.bits
  [ 15.00  18.00]
  [ 14.00  10.00]]
 ```
+----
 
 **Methods.....**
+
 ----
+
 ```
 (1) g.first_bit(True) ...
 [[ 10.00  10.00]
@@ -621,7 +642,11 @@ g.bits
  [ 14.00  10.00]]
 
 ```
+----
+
 **Others of interest**
+
+----
 
 A simplified informational table of a Geo array's IFT array with annotations.  Useful for documentation purposes.
 ```
