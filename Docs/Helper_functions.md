@@ -1,8 +1,12 @@
-**Geo array helpers**
+## Geo array helpers ##
 
-npg.geo_info(sq2)
+The differences in properties and methods between Geo arrays and ndarrays.
 
+All common properties can be determined using `npg.dirr` while the output from `npg.geo_info` is subdivided into the properties and methods specific to a geo array, their base and special properties.
 
+**npg.geo_info(g)**  # ---- g is a geo array
+
+```
 geo_info(geo_array)
 Geo methods and properties.
     Bit, CW, FT, Fr, H, IDs, IFT, IFT_str, IP, Info, K, LL, N, PID, SR,
@@ -30,4 +34,4 @@ Geo base properties.
 
 Geo special.
     __array_finalize__, __array_wrap__, __doc__, __new__
-    
+```
