@@ -1,4 +1,4 @@
-## Geo array helpers ##
+# Geo array helpers
 
 The differences in properties and methods between Geo arrays and ndarrays.
 
