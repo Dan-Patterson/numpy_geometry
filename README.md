@@ -13,7 +13,9 @@
 
 **Documentation Links**
 
-* [Backgrounder document](/Docs/Backgrounder.md)
+* [Geo array Backgrounder](/Docs/Backgrounder.md)
+
+* [Geo array Helper functions](/Docs/Helper_functions.md)
 
 * [Script descriptions](/Docs/Scripts_desc.md)
 
