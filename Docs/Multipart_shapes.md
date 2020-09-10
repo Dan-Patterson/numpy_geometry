@@ -4,6 +4,11 @@
 
 <a href="url"><img src="../images/Shape2.png" align="right" height="300" width="auto" ></a>
 
+.. Contents::
+
+Some basics
+-----------
+
 Consider the following multipart shapes.  The first shape has is second part slightly offset and it also contains a hole.  The second shape is a flip/mirror/translate of its first part.
 
 The centroids of each part are shown on the image.  These locations have been confirmed using arcpy and npGeo methods.
@@ -127,10 +132,14 @@ This will obviously not be possible in all situations, but every bit helps.
 
 
 ----
-# ndarray values from esri geometry
+
+ndarray values from esri geometry
+---------------------------------
 
 
-**(1) The arcpy geometry**
+(1) The arcpy geometry
+----------------------
+
 
 This is what the geometry looks like for the first shape (multipart with holes).
 
