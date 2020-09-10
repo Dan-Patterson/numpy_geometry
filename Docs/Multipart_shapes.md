@@ -1,14 +1,19 @@
+<a href="url"><img src="../images/Shape2.png" align="center" height="200" width="auto" ></a>
+
+
+
+
+
+
+
+
+
+
 # Multipart shapes
 
-----
-
-<a href="url"><img src="../images/Shape2.png" align="right" height="300" width="auto" ></a>
-
-.. Contents::
 
 Some basics
 -----------
-
 Consider the following multipart shapes.  The first shape has is second part slightly offset and it also contains a hole.  The second shape is a flip/mirror/translate of its first part.
 
 The centroids of each part are shown on the image.  These locations have been confirmed using arcpy and npGeo methods.
@@ -135,10 +140,8 @@ This will obviously not be possible in all situations, but every bit helps.
 
 ndarray values from esri geometry
 ---------------------------------
-
-
-(1) The arcpy geometry
-----------------------
+The arcpy geometry
+------------------
 
 
 This is what the geometry looks like for the first shape (multipart with holes).
@@ -166,8 +169,8 @@ The polygon consists of two parts, represented as the arcpy.Array.  This in turn
 ```
 
 
-**(2)  FeatureClassToNumPyArray**
-
+FeatureClassToNumPyArray
+------------------------
 The standby, great for singlepart simple shapes.  You have to read the X, and Y coordinates separately or as a ``SHAPE@XY`` since reading the ``SHAPE@`` to retrieve the object directly is not permitted.
 
 In the examples below, extra effort would have to be made to subtract the extent minimum from each point to obtain their values relative to it.
@@ -188,8 +191,8 @@ array([(300010., 5000020.), (300010., 5000010.), (300000., 5000010.), (300000., 
 ```
 
 
-**(3)  SearchCursors and the ``__geo_interface__`` method**
-
+SearchCursors and the ``__geo_interface__`` method
+--------------------------------------------------
 Works, and useful if you intend to work with the arcgis module.  There are variants on this as well depending on whether you want arrays or arrays or just an array of objects.
 
 ```
@@ -253,8 +256,8 @@ array([[list([[(300010.0, 5000020.0), (300010.0, 5000010.0), (300000.0, 5000010.
       dtype=object)
 ```
 
-**(4) Searchcursors and _as_narray**
-
+Searchcursors and `_as_narray`
+----------------------------
 A related ditty, however, you have to specify the fields directly and you essentially get the equivalent of FeatureClassToNumPyArray.
 
 ```
