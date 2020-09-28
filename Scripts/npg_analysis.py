@@ -119,7 +119,7 @@ def n_check(a):  # N=3, order=True):
         return False
 
 
-def n_near(a, N=3, ordered=True):
+def n_near(a, N=3, ordered=True, return_all=False):
     """Nearest N point analysis.
 
     Return the coordinates and distances to the nearest ``N`` points in a
@@ -132,12 +132,18 @@ def n_near(a, N=3, ordered=True):
         representing the x,y coordinates before proceeding.
     `N` : number
          Number of closest points to return.
+    `ordered` : boolean
+        True, return results sorted by distance.
+    `return_all` : boolean
+        True, returns coordinates, distance and combined array.  False, return
+        a structured array containing the from-to coordinates and their
+        distances.
 
     Returns
     -------
     A structured array is returned containing an ID number.  The ID number
-    is the ID of the points as they were read.  The array will contain
-    (C)losest fields and distance fields
+    is the ID of the points as they were read.  The ID values are zero-based.
+    The array will contain (C)losest fields and distance fields
     (C0_X, C0_Y, C1_X, C1_Y, Dist0, Dist1 etc) representing coordinates
     and distance to the required 'closest' points.
     """
@@ -180,15 +186,17 @@ def n_near(a, N=3, ordered=True):
     for i in range(N):               # fill n_array with the results
         nm = dist_names[i]
         n_array[nm] = dist[:, i]
-    return coords, dist, n_array
+    if return_all:
+        return coords, dist, n_array
+    return n_array
 
 
 def n_spaced(L=0, B=0, R=10, T=10, min_space=1, num=10, verbose=True):
-    """Produce num points within the bounds specified by the extent (L,B,R,T).
+    """Produce `num` points within specified (L,B,R,T).
 
     Parameters
     ----------
-    L(eft), B, R, T(op) : numbers
+    L(eft), B, R, T(op) : int, float
         Extent coordinates.
     min_space : number
         Minimum spacing between points.
@@ -234,13 +242,25 @@ def n_spaced(L=0, B=0, R=10, T=10, min_space=1, num=10, verbose=True):
     return a0
 
 
-# ==== intersection
+# ---- intersection
 #
-def _x_sect_2(*args):
-    """Line intersection check.  Inputs are two lines or 4 points.
+def _x_sect_2(args):
+    """Line intersection with extrapolation if needed.
+    Inputs are two lines or 4 points.
+
+    Example
+    -------
+    >>> s0 = np.array([[ 0.0, 0.0], [ 5.0, 5.0], [ 2.0,  0.0], [ 2.0, -2.0]])
+    >>> s1 = np.array([[ 0.0, 0.0], [ 5.0, 5.0], [ 0.0,  2.5], [ 2.5, 0.0]])
+    >>> a0, a1, a2, a3 = s0
+    >>> b0, b1, b2, b3 = s1
+    >>> npg._x_sect_2(s0)  # (False, None)
+    >>> npg._x_sect_2(s1)  # (True, [1.25, 1.25])
 
     See npg.geom.intersect for details.  This is a variant for concave hulls.
     """
+    if isinstance(args, np.ndarray):
+        args = args.tolist()
     if len(args) == 2:
         p0, p1, p2, p3 = *args[0], *args[1]
     elif len(args) == 4:
@@ -263,13 +283,13 @@ def _x_sect_2(*args):
     s02_y = p0[1] - p2[1]
     #
     # ---- Second check ----   np.cross(p1-p0, p3-p2)
-    denom = (s10_x * s32_y - s32_x * s10_y).item()
+    denom = (s10_x * s32_y - s32_x * s10_y)  # .item()
     if denom == 0.0:  # collinear
         return False, None
     #
     # ---- Third check ----  np.cross(p1-p0, p0-p2)
     positive_denom = denom > 0.0  # denominator greater than zero
-    s_numer = (s10_x * s02_y - s10_y * s02_x).item()
+    s_numer = (s10_x * s02_y - s10_y * s02_x)  # .item()
 #    if (s_numer < 0) == positive_denom:
 #        return False
     #
@@ -300,8 +320,8 @@ def intersection_pnt(p0, p1, p2, p3):
     `<https://en.wikipedia.org/wiki/Line–line_intersection>`_.
     """
     x0, y0, x1, y1, x2, y2, x3, y3 = (*p0, *p1, *p2, *p3)
-    dc_x, dc_y = p2 - p3
-    dp_x, dp_y = p0 - p1
+    dc_x, dc_y = np.subtract(p2, p3)
+    dp_x, dp_y = np.subtract(p0, p1)
     n1 = x2 * y3 - y2 * x3
     n2 = x0 * y1 - y0 * x1
     n3 = 1.0 / (dc_x * dp_y - dc_y * dp_x)
@@ -376,7 +396,6 @@ def knn0(pnts, p, k):
 #
 def _dist_arr_(a, verbose=False):
     """Minimum spanning tree preparation."""
-    a = a[~np.isnan(a[:, 0])]
     idx = np.lexsort((a[:, 1], a[:, 0]))  # sort X, then Y
     # idx= np.lexsort((a[:, 0], a[:, 1]))  # sort Y, then X
     a_srt = a[idx, :]
@@ -403,24 +422,33 @@ def _e_dist_(a):
 
 
 def mst(arr, calc_dist=True):
-    """Determine the minimum spanning tree for a set of points.
+    """Determine the minimum spanning tree for a set of points or weights.
 
     The spanning tree uses the inter-point distances as their `W`eights
 
     Parameters
     ----------
-    W : array, normally an interpoint distance array
+    arr : array, normally an interpoint distance array
         Edge weights for example, distance, time, for a set of points.
-        W needs to be a square array or a np.triu perhaps
+        `arr` needs to be a square array or a np.triu perhaps.
 
     calc_dist : boolean
-        True, if W is a points array, calculate W as the interpoint distance.
-        False means that W is not a points array, but some other `weight`
-        representing the interpoint relationship
+        True, if `arr` is a points array, the `arr` will be converted to the
+        interpoint distance.
+        False means that `arr` is not a points array, but some other `weight`
+        representing the interpoint relationship.
 
     Returns
     -------
-    pairs - the pair of nodes that form the edges
+    pairs - the pair of nodes that form the edges.
+
+    Example
+    -------
+    >>> a = np.array(
+            [[0.4, 0.5], [1.2, 9.1], [1.2, 3.6], [1.9, 4.6], [2.9, 5.9],
+             [4.2, 5.5], [4.3, 3.0], [5.1, 8.2] [5.3, 9.5], [5.5, 5.7],
+             [6.1, 4.0], [6.5, 6.8], [7.1, 7.6], [7.3, 2.0], [7.4, 1.0],
+             [7.7, 9.6], [8.5, 6.5], [9.0, 4.7], [9.6, 1.6], [9.7, 9.6]])
     """
     arr = np.unique(arr, True, False, False, axis=0)[0]
     W = arr[~np.isnan(arr[:, 0])]

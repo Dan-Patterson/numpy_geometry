@@ -98,11 +98,13 @@ __all__ = [
 # ---- single use helpers
 #
 def _is_right_side(p, strt, end):
-    """Determine if a point (p) is `inside` a line segment (strt-->end).
+    """Determine if point (p) is `inside` a line segment (strt-->end).
     See : line_crosses, in_out_crosses in npg_helpers.
     position = sign((Bx - Ax) * (Y - Ay) - (By - Ay) * (X - Ax))
 
-    negative for right of clockwise line, positive for left. So in essence,
+    Returns
+    -------
+    Negative for right of clockwise line, positive for left. So in essence,
     the reverse of _is_left_side with the outcomes reversed ;)
     """
     x, y, x0, y0, x1, y1 = *p, *strt, *end
@@ -241,7 +243,7 @@ def _partition_(pnts, geo, return_remainder=False):
         c2 = np.logical_and(c0, c1)
         in_.append(pnts[c2])
         out_pnts = pnts[np.logical_not(c2)]
-    in_pnts= np.asarray(in_)[sorted(srt_idx)]
+    in_pnts = np.asarray(in_)[sorted(srt_idx)]
     if return_remainder:
         return in_pnts, out_pnts
     return in_pnts

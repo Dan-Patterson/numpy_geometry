@@ -11,7 +11,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2020-05-22
+    2020-06-23
 
 Purpose
 -------
@@ -108,27 +108,30 @@ unsplit-line.htm>`_.
 
 import sys
 from textwrap import dedent
-from importlib import reload  # for testing
+# from importlib import reload  # for testing
 import numpy as np
 # from numpy.lib.recfunctions import structured_to_unstructured as stu
 # from numpy.lib.recfunctions import unstructured_to_structured as uts
 from numpy.lib.recfunctions import append_fields
 
-from npGeo import Geo
-from npGeo import *
-from npg_arc_npg import (
-    get_SR, get_shape_K, fc_to_Geo, Geo_to_fc, Geo_to_shapes
-    )
+# from importlib import reload
+
+from npGeo import arrays_to_Geo  # Geo
+
+from npg_arc_npg import (get_SR, get_shape_K, fc_to_Geo, Geo_to_fc,
+                         Geo_to_shapes)
 from npg_create import circle
 
-from scipy.spatial import Delaunay, Voronoi
+from scipy.spatial import Voronoi  # Delaunay
 
 import arcgisscripting as ags
 from arcpy import (env, AddMessage, Exists)  # gp, ImportToolbox
 from arcpy.management import (
     AddField, CopyFeatures, CreateFeatureclass, Delete, MakeFeatureLayer,
-    MultipartToSinglepart, XYToLine
-    )
+    MultipartToSinglepart, SelectLayerByLocation, XYToLine
+)
+from arcpy.analysis import Clip
+
 # import npgeom as npg
 # import npg_arc_npg
 # reload(npg)
@@ -150,7 +153,7 @@ pth = "/".join(script.split("/")[:-1])
 
 tool_list = [
     'Attribute sort', 'Frequency and Stats',
-    'Bounding Circles', 'Extent Polys', 'Convex Hulls',
+    'Bounding Circles', 'Convex Hulls', 'Extent Polys',
     'Minimum area bounding rectangle',
     'Features to Points', 'Polygons to Polylines', 'Split at Vertices',
     'Vertices to Points',
@@ -166,7 +169,7 @@ msg0 = """\
     ----
     Either you failed to specify the geodatabase location and filename properly
     or you had flotsam, including spaces, in the path, like...\n
-      {}\n
+    ...  {}\n
     Create a safe path and try again...\n
     `Filenames and paths in Python`
     <https://community.esri.com/blogs/dan_patterson/2016/08/14/filenames-and
@@ -230,7 +233,8 @@ def check_path(fc):
     return gdb, name
 
 
-# ---- io tools -------------------------------------------------------
+# ============================================================================
+# ---- io tools --------------------------------------------------------------
 #
 def _in_(in_fc, info):
     """Produce the Geo array."""
@@ -262,7 +266,7 @@ def temp_fc(geo, name, kind, SR):
     polys = Geo_to_shapes(geo, as_singlepart=True)
     wkspace = env.workspace = 'memory'  # legacy is in_memory
     tmp_name = "{}\\{}".format(wkspace, name)
-    #tmp = MultipartToSinglepart(in_fc, r"memory\in_fc_temp")
+    # tmp = MultipartToSinglepart(in_fc, r"memory\in_fc_temp")
     if Exists(tmp_name):
         Delete(tmp_name)
     CreateFeatureclass(wkspace, name, kind, spatial_reference=SR)
@@ -379,8 +383,8 @@ def mabr(in_fc, gdb, name, out_kind):
     """Return Minumum Area Bounding Rectangle."""
     info = "minimum area bounding rectangle"
     g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
-    _, shps = g.min_area_rect(shift_back=True, as_structured=False)
-    LBRT = shps[:, 1:]
+    shps = g.min_area_rect(shift_back=True, as_structured=False)
+    # LBRT = shps[:, 1:]
     Geo_to_fc(shps, gdb, name, kind=out_kind, SR=SR)
     return "{} completed".format("Minimum area bounding rectangle")
 
@@ -454,7 +458,7 @@ def p_uni_pnts(in_fc):
 
 
 # ============================================================================
-# ---- Sort Geometry --------------------------------------------------------
+# ---- Sort Geometry ---------------------------------------------------------
 #
 # sort by area, length
 def sort_geom(in_fc, gdb, name, sort_kind):
@@ -576,8 +580,8 @@ def shifter(in_fc, gdb, name, dX, dY):
     return
 
 
-# ===========================================================================
-# ---- Triangulation tools --------------------------------------------------
+# ============================================================================
+# ---- Triangulation tools ---------------------------------------------------
 #
 def tri_poly(in_fc, gdb, name, out_kind, constrained=True):
     """Return the Delaunay triangulation of the poly* features."""
@@ -589,13 +593,14 @@ def tri_poly(in_fc, gdb, name, out_kind, constrained=True):
     if constrained:
         tmp_name = temp_fc(g0, shp_kind, SR)  # create a temporary featureclass
         tmp_lyr = MakeFeatureLayer(tmp_name)
-        arcpy.management.SelectLayerByLocation(tmp_lyr, "WITHIN", tmp, None,
-                                               "NEW_SELECTION", "NOT_INVERT")
+        SelectLayerByLocation(
+            tmp_lyr, "WITHIN", tmp, None, "NEW_SELECTION", "NOT_INVERT")
         out_name = gdb.replace("\\", "/") + "/" + name
         CopyFeatures(tmp_lyr, out_name)
     else:
         _out_(g0, gdb, name, shp_kind, SR)
     return
+
 
 def vor_poly(in_fc, gdb, name, out_kind):
     """Return the Voronoi/Theissen poly* features."""
@@ -611,10 +616,10 @@ def vor_poly(in_fc, gdb, name, out_kind):
         if len(ps) > 2:
             ps = np.unique(ps, axis=0)
         avg = np.mean(ps, axis=0)
-        p =  ps - avg
+        p = ps - avg
         tri = Voronoi(p)
         for region in tri.regions:
-            if not -1 in region:
+            if -1 not in region:
                 polygon = np.array([tri.vertices[i] + avg for i in region])
                 if len(polygon) >= 3:
                     out.append(polygon)
@@ -628,14 +633,15 @@ def vor_poly(in_fc, gdb, name, out_kind):
     ext_poly = ext_poly.translate(dx=x, dy=y)
     tmp1 = temp_fc(ext_poly, "tmp1", shp_kind, SR)
     final = gdb.replace("\\", "/") + "/" + name
-    arcpy.Clip_analysis(tmp, tmp1, final)
+    Clip(tmp, tmp1, final)  # arcpy.analysis.Clip
     return
-# ===========================================================================
-# ---- pick tool section ----------------------------------------------------
+# ============================================================================
+# ---- pick tool section -----------------------------------------------------
 # : testing or tool run
 
 # tbx = pth + "/npGeom.tbx"
 # tbx = ImportToolbox(tbx)
+
 
 f0 = """\
     -------------------
@@ -668,11 +674,11 @@ def pick_tool(tool, in_fc, out_fc, gdb, name):
         out_fld = str(sys.argv[5])
         sort_flds = sort_flds.split(";")
         tweet(dedent(f1).format(in_fc, sort_flds, out_fld))
-        oid_fld = da.Describe(in_fc)['OIDFieldName']
+        oid_fld = ags.da.Describe(in_fc)['OIDFieldName']
         flds = [oid_fld] + sort_flds
         a = ags.da.TableToNumPyArray(in_fc, flds)
         out = attr_sort(a, oid_fld, sort_flds, out_fld)  # run... attr_sort
-        da.ExtendTable(in_fc, oid_fld, out, oid_fld, append_only=False)
+        ags.da.ExtendTable(in_fc, oid_fld, out, oid_fld, append_only=False)
     elif tool == 'Frequency and Stats':           # ---- (1) freq and stats
         cls_flds = sys.argv[4]
         stat_fld = sys.argv[5]

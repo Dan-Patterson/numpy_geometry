@@ -19,8 +19,7 @@ Script :
 Author :
     Dan_Patterson@carleton.ca
 
-Modified : 2020-03-31
-    Creation date during 2019 as part of `arraytools`.
+Modified : 2020-09-17
 
 Purpose
 -------
@@ -80,8 +79,7 @@ np.set_printoptions(
 
 __all__ = [
     'dtype_info', 'load_geo', 'save_geo', 'load_txt', 'save_txt',
-    'load_geojson', 'geojson_Geo',
-    'prn_q', 'prn_', 'prn_tbl', 'prn_geo',
+    'load_geojson', 'geojson_Geo', 'prn_q', 'prn_', 'prn_tbl', 'prn_geo',
 ]
 
 
@@ -182,7 +180,7 @@ def load_geo(f_name, suppress_extras=True):
 
 
 def save_geo(g, f_name, folder):
-    """Save an array as an npy file.
+    """Save an array as an npz file.
 
     Parameters
     ----------
@@ -240,10 +238,10 @@ def save_txt(a, name="arr.txt", sep=", ", dt_hdr=True):
     ----------
     a : array
         Input array.
-    fname : filename
+    name : filename
         Output filename and path otherwise save to script folder.
     sep : separator
-        Column separater, include a space if needed.
+        Column separator, include a space if needed.
     dt_hdr : boolean
         If True, add dtype names to the header of the file.
 
@@ -350,13 +348,17 @@ def geojson_Geo(pth, kind=2, info=None):
 # ---- (3) Print etc ---------------------------------------------------------
 # printing based on arraytools.frmts.py using prn_rec and dependencies
 
-def prn_q(a, edges=3, max_lines=25, width=120, decimals=2):
-    """Format a structured array by setting the width so it wraps."""
+def prn_q(a, edges=5, max_lines=25, width=120, decimals=2):
+    """Format an array so that it wraps.
+
+    An ndarray is changed to a structured array.
+    """
     width = min(len(str(a[0])), width)
     with np.printoptions(edgeitems=edges, threshold=max_lines, linewidth=width,
                          precision=decimals, suppress=True, nanstr='-n-'):
         print("\nArray fields/values...:")
-        print("  ".join(a.dtype.names))
+        if a.dtype.kind == 'V':
+            print("  ".join(a.dtype.names))
         print(a)
 
 
@@ -484,7 +486,7 @@ def prn_(a, deci=2, width=120, prefix=". . "):
         for i in range(a.shape[0]):  # s0):
             out += "\n" + _piece(a[i], i, frmt, linewidth)  # ---- _piece
     elif a.ndim == 5:
-        frmt = frmt *a.shape[-4]
+        frmt = frmt * a.shape[-4]
         for i in range(a.shape[0]):  # s0):
             for j in range(a.shape[1]):
                 out += "\n" + _piece(a[i][j], i, frmt, linewidth)
@@ -494,8 +496,6 @@ def prn_(a, deci=2, width=120, prefix=". . "):
 
 def prn_tbl(a, rows_m=20, names=None, deci=2, width=75):
     """Format a structured array with a mixed dtype.
-
-    Derived from arraytools.frmts and the prn_rec function therein.
 
     Parameters
     ----------
@@ -511,8 +511,15 @@ def prn_tbl(a, rows_m=20, names=None, deci=2, width=75):
         The number of decimal places to print for all floating point columns.
     width : int
         Print width in characters.
+
+    See Also
+    --------
+    Alternate formats and information in `g.info` and `g.structure()` where
+    `g` in a geo array.
     """
     # ----
+    if hasattr(a, "IFT"):  # geo array
+        a = a.IFT_str
     dtype_names = a.dtype.names
     if dtype_names is None:
         print("Structured/recarray required")
@@ -534,7 +541,7 @@ def prn_tbl(a, rows_m=20, names=None, deci=2, width=75):
     row_frmt = "  ".join([('{' + i + '}') for i in dts[:N]])
     hdr = ["!s:<" + "{}".format(wdths[i]) for i in range(N)]
     hdr2 = "  ".join(["{" + hdr[i] + "}" for i in range(N)])
-    header = " ... " + hdr2.format(*names[:N]) + tail
+    header = " ...   " + hdr2.format(*names[:N]) + tail
     header = "{}\n{}".format(header, "-" * len(header))
     txt = [header]
     for idx, i in enumerate(range(a.shape[0])):
@@ -553,7 +560,6 @@ def prn_geo(a, rows_m=100, names=None, deci=2, width=75):
 
     Derived from arraytools.frmts and the prn_rec function therein.
 
-    ****** fix *****
     Parameters
     ----------
     a : array
@@ -598,19 +604,17 @@ def prn_geo(a, rows_m=100, names=None, deci=2, width=75):
     c_sum = np.cumsum(wdths)               # -- determine where to slice the
     N = len(np.where(c_sum < width)[0])    # columns that exceed ``width``
     # ---- Assemble the formats and print
-    print(dts)
-    print(dts[:N])
-    row_frmt = " {:>03.0f} " + "  ".join([('{' + i + '}') for i in dts[:N]])
-    print(row_frmt)
-    # hdr = ["!s:<" + "{}".format(wdths[i]) for i in range(N)]
-    # hdr2 = "  ".join(["{" + hdr[i] + "}" for i in range(N)])
-    # header = " pnt " + hdr2.format(*names[:N])
-    # header = "\n{}\n{}".format(header, "-" * len(header))
-    # txt = [header]
-    # for i in range(a.shape[0]):
-    #     txt.append(row_frmt.format(i, c[i], pp[i], a[i, 0], a[i, 1]))
-    # msg = "\n".join(txt)
-    # print(msg)
+    # row_frmt = " {:>03.0f} " + "  ".join([('{' + i + '}') for i in dts[:N]])
+    row_frmt = " {:>03.0f} {:>5.0f}  {!s:<4}  {:>6.2f}  {:>6.2f}"
+    hdr = ["!s:<" + "{}".format(wdths[i]) for i in range(N)]
+    hdr2 = "  ".join(["{" + hdr[i] + "}" for i in range(N)])
+    header = " pnt " + hdr2.format(*names[:N])
+    header = "\n{}\n{}".format(header, "-" * len(header))
+    txt = [header]
+    for i in range(a.shape[0]):
+        txt.append(row_frmt.format(i, c[i], pp[i], a[i, 0], a[i, 1]))
+    msg = "\n".join(txt)
+    print(msg)
     # return row_frmt, hdr2  # uncomment for testing
 
 

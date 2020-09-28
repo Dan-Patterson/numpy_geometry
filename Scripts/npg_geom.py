@@ -15,7 +15,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2020-05-22
+    2020-09-22
 
 Purpose
 -------
@@ -102,16 +102,16 @@ algorithm>`_.
 import sys
 import numpy as np
 
-# from numpy.lib.recfunctions import unstructured_to_structured as uts
+from numpy.lib.recfunctions import unstructured_to_structured as uts
 # from numpy.lib.recfunctions import structured_to_unstructured as stu
-# from numpy.lib.recfunctions import repack_fields
+from numpy.lib.recfunctions import repack_fields
 
 from scipy.spatial import ConvexHull as CH
 from scipy.spatial import Delaunay
 
-#import npgeom as npg
+import npGeo as npg
 
-from npg_helpers import (_area_bit_, _in_extent_, _angles_)
+from npg_helpers import (_bit_area_, _in_extent_, _angles_3pnt_)
 from npg_pip import np_wn
 
 
@@ -124,11 +124,12 @@ np.ma.masked_print_option.set_display('-')  # change to a single -
 script = sys.argv[0]  # print this should you need to locate the script
 
 __all__ = [
-    'pnts_to_extent', 'common_extent', 'extent_to_poly',
+    'pnts_to_extent', 'common_extent', 'extent_to_poly', 'find_closest',
     'eucl_dist', '_dist_along_', '_percent_along_', '_pnts_on_line_',
     'scale_by_area', 'offset_buffer',
-    '_ch_scipy_', '_ch_simple_', '_ch_',
-    '_polys_to_unique_pnts_', '_simplify_lines_', 'segments_to_polys',
+    'mabr', '_ch_scipy_', '_ch_simple_', '_ch_',
+    'polys_to_unique_pnts', 'polys_to_segments',
+    'segments_to_polys', 'simplify_lines',
     'pnts_in_pnts',
     '_pnt_on_poly_', '_pnt_on_segment_', 'p_o_p',
     '_tri_pnts_', 'in_hole_check'
@@ -195,6 +196,13 @@ def extent_to_poly(extent, kind=2):
 
 # ==== ====================================================
 # ---- distance related
+def find_closest(self, pnt):
+    """Find the closest point within a Geo array, its index and distance."""
+    dist = eucl_dist(self, pnt)
+    idx = np.argmin(dist)
+    return np.asarray(self[idx]), idx, dist[idx]
+
+
 def eucl_dist(a, b, metric='euclidean'):
     """Distance calculation for 1D, 2D and 3D points using einsum.
 
@@ -338,13 +346,13 @@ def _pnts_on_line_(a, spacing=1, is_percent=False):  # densify by distance
         spacing = min(spacing / 100, 1.)
         steps = (sum(leng) * spacing) / leng          # step distance
     else:
-        steps = leng / spacing                          # step distance
-    deltas = dxdy / (steps.reshape(-1, 1))              # coordinate steps
+        steps = leng / spacing                        # step distance
+    deltas = dxdy / (steps.reshape(-1, 1))            # coordinate steps
     pnts = np.empty((N,), dtype='O')                  # construct an `O` array
     for i in range(N):              # cycle through the segments and make
         num = np.arange(steps[i])   # the new points
         pnts[i] = np.array((num, num)).T * deltas[i] + a[i]
-    a0 = a[-1].reshape(1, -1)        # add the final point and concatenate
+    a0 = a[-1].reshape(1, -1)       # add the final point and concatenate
     return np.concatenate((*pnts, a0), axis=0)
 
 
@@ -362,7 +370,7 @@ def scale_by_area(poly, factor=1, asGeo=False):
 
     Requires
     --------
-    `isGeo`, `_area_bit_` from npg_helpers
+    `is_Geo`, `_bit_area_` from npg_helpers
 
     Notes
     -----
@@ -372,13 +380,13 @@ def scale_by_area(poly, factor=1, asGeo=False):
     - Shift back to the original center.
     """
     def _area_scaler_(a, factor):
-        """Do the work"""
+        """Do the work."""
         if factor <= 0.0:
             return None
         a = np.array(a)
         cent = np.mean(np.unique(a, axis=0), axis=0)
         shifted = a - cent
-        area_ = _area_bit_(shifted)
+        area_ = _bit_area_(shifted)
         alpha = np.sqrt(factor * area_ / area_)
         scaled = shifted * [alpha, alpha]
         return scaled + cent
@@ -496,6 +504,67 @@ def offset_buffer(poly, buff_dist=1, keep_holes=False, asGeo=False):
     return final  # fr_to, z, final
 
 
+# ---- minimum area bounding rectangle (mabr)
+#
+def mabr(polys, p_centers, p_angles):
+    """Determine the minimum area bounding rectangle for polygons.
+
+    Parameters
+    ----------
+    polys : array
+        These shapes should be the convex hull of the shape points.
+    p_centers : array
+        Extent centers of the convex hulls (polys).
+    p_angles : array
+        The perimeter/segment angles making up the shape.
+
+    Returns
+    -------
+    This is the MABR... minimum area bounding rectangle.
+    """
+
+    def _LBRT_(a):
+        """Extent of a sub-array in an object array."""
+        return np.concatenate((np.min(a, axis=0), np.max(a, axis=0)))
+
+    def _extent_area_(a):
+        """Area of an extent polygon."""
+        LBRT = _LBRT_(a)
+        dx, dy = np.diff(LBRT.reshape(2, 2), axis=0).squeeze()
+        return dx * dy, LBRT
+
+    def _rot_(a, cent, angle, clockwise):
+        """Rotate shapes about their center. Specify `angle` in degrees."""
+        angle = np.radians(angle)
+        if clockwise:
+            angle = -angle
+        c, s = np.cos(angle), np.sin(angle)
+        R = np.array(((c, -s), (s, c)))
+        return np.einsum('ij,jk->ik', a - cent, R) + cent
+    # ----
+    # Determine their convex hulls for the outer rings.
+    # Obtain the angles, extents and centers for each hull.
+    rects = []
+    for i, ch in enumerate(polys):  # chs_):   # first quadrant
+        uni_ = np.unique(p_angles[i] % 180.)
+        # uni_ = uni_[inv]  # [i for i in uni_ if i not in [90.]]
+        _, LBRT = _extent_area_(ch)
+        area_old = np.inf
+        Xmin, Ymin, Xmax, Ymax = LBRT
+        vals = [area_old, p_centers[i], np.inf, Xmin, Ymin, Xmax, Ymax]
+        for angle in uni_:
+            ch2 = _rot_(ch, p_centers[i], angle, False)  # translate, rotate
+            area_, LBRT = _extent_area_(ch2)  # ---- determine area
+            Xmin, Ymin, Xmax, Ymax = LBRT
+            if area_ <= area_old:
+                area_old = area_
+                Xmin, Ymin, Xmax, Ymax = LBRT
+                vals = [area_, p_centers[i], angle, Xmin, Ymin, Xmax, Ymax]
+        rects.append(vals)
+    rects = np.asarray(rects, dtype='O')
+    return rects
+
+
 # ---- convex hull helpers
 #
 def _ch_scipy_(points):
@@ -553,7 +622,7 @@ def _ch_(points, threshold=50):
 
 # ---- poly conversion helpers
 #
-def _polys_to_unique_pnts_(a, as_structured=True):
+def polys_to_unique_pnts(a, as_structured=True):
     """Based on `polys_to_points`.
 
     Allows for recreation of original point order and unique points.
@@ -569,22 +638,77 @@ def _polys_to_unique_pnts_(a, as_structured=True):
         z['Xs'] = uni[:, 0]
         z['Ys'] = uni[:, 1]
         z['Num'] = cnts
-        return z[np.argsort(z, order='New_ID')]   
+        return z[np.argsort(z, order='New_ID')]
     return a[np.sort(idx)]
 
 
-def _simplify_lines_(a, deviation=10):
-    """Simplify array. Requires, `_angles_` from npg_helpers."""
-    ang = _angles_(a, inside=True, in_deg=True)
-    idx = (np.abs(ang - 180.) >= deviation)
-    sub = a[1: -1]
-    p = sub[idx]
-    return a, p, ang
+def polys_to_segments(self, as_basic=True, to_orig=False, as_3d=False):
+    """Segment poly* structures into o-d pairs from start to finish.
+
+    as_basic : boolean
+        True, returns an Nx4 array (x0, y0, x1, y1) of from-to coordinates.
+        False, returns a structured array
+        If `as_3d` is True, then `as_basic` is set to False.
+    to_origin : boolean
+        True, moves the coordinates back to their original position
+        defined by the `LL` property of the Geo array.
+    as_3d : boolean
+        True, the point pairs are returned as a 3D array in the form
+        [[X_orig', Y_orig'], ['X_dest', 'Y_dest']], without the distances.
+
+    Notes
+    -----
+    Use `prn_tbl` if you want to see a well formatted output.
+    """
+    if self.K not in (1, 2):
+        print("Poly* features required.")
+        return None
+    # ---- basic return as ndarray used by common_segments
+    if as_3d:  # The array cannot be basic if it is 3d
+        as_basic = False
+    if to_orig:
+        b_vals = [b + self.LL for b in self.bits]  # shift to orig extent
+    else:
+        b_vals = [b for b in self.bits]
+    # ---- Do the concatenation
+    fr_to = np.concatenate([np.concatenate((b[:-1], b[1:]), axis=1)
+                            for b in b_vals], axis=0)
+    # ---- return if simple and not 3d representation
+    if as_basic:
+        return fr_to
+    # ---- return 3d from-to representation
+    if as_3d:
+        fr_to = fr_to[:, :4]
+        s0, s1 = fr_to.shape
+        return fr_to.reshape(s0, s1//2, s1//2)
+    # ----structured array section
+    # add bit ids and lengths to the output array
+    b_ids = self.IFT
+    segs = np.asarray([[[b_ids[i][0], *(b_ids[i][-2:])], len(b) - 1]
+                       for i, b in enumerate(b_vals)], dtype='O')
+    s_ids = np.concatenate([np.tile(i[0], i[1]).reshape(-1, 3)
+                            for i in segs], axis=0)
+    dist = (np.sqrt(np.sum((fr_to[:, :2] - fr_to[:, 2:4])**2, axis=1)))
+    fr_to = np.hstack((fr_to, s_ids, dist.reshape(-1, 1)))
+    dt = np.dtype([('X_fr', 'f8'), ('Y_fr', 'f8'), ('X_to', 'f8'),
+                   ('Y_to', 'f8'), ('Orig_id', 'i4'), ('Part', 'i4'),
+                   ('Seq_ID', 'i4'), ('Length', 'f8')])
+    fr_to = uts(fr_to, dtype=dt)
+    return repack_fields(fr_to)
 
 
 def segments_to_polys(self):
     """Return segments from one of the above to their original form."""
     return np.vstack([i.reshape(2, 2) for i in self])
+
+
+def simplify_lines(a, deviation=10):
+    """Simplify array. Requires, `_angles_3pnt_` from npg_helpers."""
+    ang = _angles_3pnt_(a, inside=True, in_deg=True)
+    idx = (np.abs(ang - 180.) >= deviation)
+    sub = a[1: -1]
+    p = sub[idx]
+    return a, p, ang
 
 
 # ----------------------------------------------------------------------------
@@ -609,7 +733,7 @@ def pnts_in_pnts(pnts, geo, just_common=True):
 
     See Also
     --------
-    `npGeo._pnts_in_geo` for Geo arrays explicitly.
+    `npGeo.pnts_in_Geo` for Geo arrays explicitly.
     """
     w = np.where((pnts == geo[:, None]).all(-1))[1]
     if len(w) > 0:
@@ -692,7 +816,7 @@ def _pnt_on_poly_(pnt, poly):
     elif (key + 1) >= len(poly):  # np.vstack((poly[-2:], poly[:1]))
         seg = np.concatenate((poly[-2:], poly[:1]), axis=0)
     else:
-        seg = poly[key - 1: key + 2]       # grab the before and after closest
+        seg = poly[key - 1: key + 2]  # grab the before and after closest
     n1 = _pnt_on_seg_(seg[:-1], pnt)  # abbreviated pnt_on_seg
     d1 = np.linalg.norm(n1 - pnt)
     n2 = _pnt_on_seg_(seg[1:], pnt)   # abbreviated pnt_on_seg
@@ -824,15 +948,15 @@ def bin_pnts(pnts, x_bins=None, y_bins=None):
     edges for the X and Y values.
     """
     if x_bins is None:
-        x_bins = (pnts[:, 0].max() - pnts[:, 0].min())/ 10
+        x_bins = (pnts[:, 0].max() - pnts[:, 0].min()) / 10
     if y_bins is None:
-        y_bins = (pnts[:, 0].max() - pnts[:, 0].min())/ 10
+        y_bins = (pnts[:, 0].max() - pnts[:, 0].min()) / 10
     h = np.histogramdd(pnts, [x_bins, y_bins])
     return h
 
 
 def in_hole_check(pnts, geo):
-    """Check points are in a hole."""
+    """Check if points are in a hole."""
     w = np.where(geo.CW == 0)[0]
     holes = geo.bits[w]
     out = []

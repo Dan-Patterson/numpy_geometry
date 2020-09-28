@@ -17,12 +17,12 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2019-12-31
+    2020-06-29
 
 Purpose
 -------
 Sample scatterplot and line plotting, in 2D and 3D.
-alterior motive is to also represent the line and polygon geometries as
+Alterior motive is to also represent the line and polygon geometries as
 ... ``graphs``.
 
 Notes
@@ -65,7 +65,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 # import matplotlib.lines as lines
-from matplotlib.markers import MarkerStyle
+# from matplotlib.markers import MarkerStyle
 
 ft = {'bool': lambda x: repr(x.astype('int32')),
       'float': '{: 0.1f}'.format}
@@ -129,7 +129,7 @@ def scatter_params(plt, fig, ax, title="Title", ax_lbls=None):
     plt.xlabel(x_label, fontdict=font1, labelpad=12, size=14)
     plt.ylabel(y_label, fontdict=font1, labelpad=12, size=14)
     plt.title(title + "\n", loc='center', fontdict=font1, size=20)
-    plt.tight_layout(pad=0.2, h_pad=0.1, w_pad=0.1)
+    # plt.tight_layout(pad=0.2, h_pad=0.1, w_pad=0.1)
     plt.grid(True)
     return
 
@@ -140,10 +140,12 @@ def plot_mixed(data, title="Title", invert_y=False, ax_lbls=None):
     data : list of lists
         [[values, type, color, marker, connect]]
 
-    data = [[p3.bits, 2, 'red', '.', True ], [psrt, 0, 'black', 'o', False]]
-    plot_mixed(data, title="Points in Polygons", invert_y=False, ax_lbls=None)
-    out, ift, ps, final = pnts_in_Geo(psrt, p3)
+    >>> data = [[p3.bits, 2, 'red', '.', True ], [ps, 0, 'black', 'o', False]]
+    >>> plot_mixed(data, title="Points in Polygons",
+    ...            invert_y=False, ax_lbls=None)
+    >>> out, ift, ps, final = pnts_in_Geo(psrt, p3)
     """
+
     def _label_pnts(pnts, plt):
         """Label the points. Note: to skips the last label for polygons, use
         zip(lbl[:-1], pnts[:-1, 0], pnts[:-1, 1])
@@ -174,7 +176,7 @@ def plot_mixed(data, title="Title", invert_y=False, ax_lbls=None):
             _scatter(pnts, plt, color='black', marker='s')
             _label_pnts(pnts, plt)
         elif kind == 2:
-            cmap = plt.cm.get_cmap('hsv', len(pnts))
+            # cmap = plt.cm.get_cmap('hsv', len(pnts))
             for j, p in enumerate(pnts):
                 # clr = cmap(j)  # clr=np.random.random(3,)  # clr = "b"
                 clr = 'None'
@@ -352,6 +354,13 @@ def plot_polygons(arr, outline=True):
     References
     ----------
     See module docs for general references.
+
+    Example
+    -------
+    use hexs to demonstrate::
+
+        h = npg.npg_create.hex_flat(dx=1, dy=1, x_cols=5, y_rows=3,
+                                    orig_x=0, orig_y=0, kind=2, asGeo=True)
     """
     def _line(p, plt):  # , arrow=True):  # , color, marker, linewdth):
         """Connect the points."""
@@ -362,6 +371,7 @@ def plot_polygons(arr, outline=True):
         cw = arr.CW
         shapes = arr.bits
     else:
+        cw = np.repeat(1, arr.shape[0])
         shapes = np.copy(arr)
     fig, ax = plt.subplots(1, 1)
     fig.set_figheight = 8
@@ -370,7 +380,7 @@ def plot_polygons(arr, outline=True):
     plt.tight_layout(pad=0.2, h_pad=0.1, w_pad=0.1)
     ax.set_aspect('equal', adjustable='box')
     # cmap = plt.cm.get_cmap(plt.cm.viridis, 143)  # default colormap
-    cmap = plt.cm.get_cmap('hsv', len(shapes))
+    cmap = plt.cm.get_cmap('jet', len(shapes))  # 'hsv'
     for i, shape in enumerate(shapes):
         if outline:   # _line(shape, plt)  # alternate, see line for options
             plt.fill(*zip(*shape), facecolor='none', edgecolor='black',
@@ -386,22 +396,7 @@ def plot_polygons(arr, outline=True):
     return plt
 
 
-# def preamble(fo):
-#     """The SVG preamble and styles.
-
-#     https://scipython.com/blog/depicting-a-torus-as-an-svg-image/
-#     """
-#     print('<?xml version="1.0" encoding="utf-8"?>\n'
-#           '<svg xmlns="http://www.w3.org/2000/svg"\n' + ' '*5 +
-#           'xmlns:xlink="http://www.w3.org/1999/xlink" width="{}" height="{}" >'.format(width, height), file=fo)
-
-#     print("""
-#         <defs>
-#         <style type="text/css"><![CDATA[""", file=fo)
-#     print('path {stroke-width: 1.5px; stroke: #000;}', file=fo)
-#     print("""]]></style>
-#     </defs>""", file=fo)
-def plot_mesh(x=None, y=None, ax=None):
+def plot_mesh(x=None, y=None):
     """Plot a meshgrid/fishnet given x and y ranges.
 
     Parameters
@@ -420,17 +415,15 @@ def plot_mesh(x=None, y=None, ax=None):
         x, y = np.meshgrid(np.linspace(0, 1, 11), np.linspace(0, 0.6, 7))
     segs1 = np.stack((x[:, [0, -1]], y[:, [0, -1]]), axis=2)
     segs2 = np.stack((x[[0, -1], :].T, y[[0, -1], :].T), axis=2)
-    # fig, ax = plt.subplots(1, 1)
-    ax = ax or plt.gca()
-    # ax.scatter(x, y)
+    fig, ax = plt.subplots(1, 1)
+    # ---- use scatter_params to set defaults
+    scatter_params(plt, fig, ax, title="Mesh", ax_lbls=['X', 'Y'])
     ax.add_collection(LineCollection(np.concatenate((segs1, segs2))))
     ax.autoscale(enable=True, axis='both', tight=None)
-    # ax.set_aspect('equal', adjustable='box')
+    ax.set_aspect('equal', adjustable='box')
     plt.show()
 
 
-# use hexs to demonstrate
-# hexs = npg_create.hex_flat(dx=1, dy=1, cols=4, rows=3)
 # def demo():
 #     x1 = [-1,-1,10,10,-1]; y1 = [-1,10,10,-1,-1]
 #     x2 = [21,21,29,29,21]; y2 = [21,29,29,21,21]
@@ -453,54 +446,20 @@ for shape in hexs[:2]:
 plt.show()
 """
 
-# def read_flds(in_fc, x_fld, y_fld):
-#    """
-#    """
-#    flds = [x_fld, y_fld]
-#    a = arcpy.da.TableToNumPyArray(in_fc, flds)
-#    x_name, y_name = a.dtype.names
-#    a = a.view(np.float64).reshape(a.shape[0], 2)
-#    return a, x_name, y_name
-#
-#
-#
-# def subplts(plots=1, by_col=True, max_rc=4):
-#    """specify the num(ber) of subplots desired and return the rows
-#    :  and columns to produce the subplots.
-#    :  by_col - True for column oriented, False for row
-#    :  max_rc - maximum number of rows or columns depending on by_col
-#    """
-#    row_col = (1, 1)
-#    if by_col:
-#        if plots <= max_rc:
-#            row_col = (1, plots)
-#        else:
-#            row_col = (plots - max_rc, max_rc)
-#    else:
-#        if plots <= max_rc:
-#            row_col = (plots, 1)
-#        else:
-#            row_col = (max_rc, plots - max_rc)
-#    return row_col
-#
-#
-# def generate():
-#    plt.show()
-#    #plt.close()
+
 # ----------------------------------------------------------------------------
 # ---- running script or testing code section ----
 
-
 def plot_mst(a, pairs):
-    """Plot minimum spanning tree test"""
+    """Plot minimum spanning tree test."""
+    fig, ax = plt.subplots(1, 1)
+    scatter_params(plt, fig, ax, title="Title", ax_lbls=None)
     plt.scatter(a[:, 0], a[:, 1])
-    ax = plt.axes()
-    ax.set_aspect('equal')
     for pair in pairs:
         i, j = pair
         plt.plot([a[i, 0], a[j, 0]], [a[i, 1], a[j, 1]], c='r')
     lbl = np.arange(len(a))
-    for label, xpt, ypt in zip(lbl, a[:, 0], a[:, 1]):
+    for label, xpt, ypt in zip(lbl[:], a[:, 0], a[:, 1]):
         plt.annotate(label, xy=(xpt, ypt), xytext=(2, 2), size=8,
                      textcoords='offset points',
                      ha='left', va='bottom')
@@ -514,177 +473,12 @@ def _demo():
                   [5.3, 9.5], [5.5, 5.7], [6.1, 4.0], [6.5, 6.8],
                   [7.1, 7.6], [7.3, 2.0], [7.4, 1.0], [7.7, 9.6],
                   [8.5, 6.5], [9.0, 4.7], [9.6, 1.6], [9.7, 9.6]])
-    plot_2d(a, title='Points no closer than... test',
-            ax_lbls=None, pnt_labels=True)
+    plot_2d([a], label_pnts=False, connect=False,
+            title='Points no closer than... test',
+            invert_y=False, ax_lbls=None
+            )
     return a
 
-
-# ----------------------------------------------------------------------
-def svg(self, scale_factor=1, fill_color=None):
-    if self.is_empty:
-        return '<g />'
-    if fill_color is None:
-        fill_color = "#66cc99" if self.is_valid else "#ff3333"
-    rings = []
-    s = ""
-    for ring in self['rings']:
-        rings = ring
-        exterior_coords = [
-            ["{},{}".format(*c) for c in rings]]
-        path = " ".join([
-            "M {} L {} z".format(coords[0], " L ".join(coords[1:]))
-            for coords in exterior_coords])
-        s += (
-            '<path fill-rule="evenodd" fill="{2}" stroke="#555555" '
-            'stroke-width="{0}" opacity="0.6" d="{1}" />'
-        ).format(2. * scale_factor, path, fill_color)
-    return s
-
-
-'''
-_repr_svg_
-
-# r"C:/arc_pro/bin/Python/envs/arcgispro-py3/Lib/site-packages/arcgis/
-geometry/_types.py"
-
-line 391
-
-
-def _repr_svg_(self):
-    """SVG representation for iPython notebook"""
-    svg_top = '<svg xmlns="http://www.w3.org/2000/svg" ' \
-        'xmlns:xlink="http://www.w3.org/1999/xlink" '
-    if self.is_empty:
-        return svg_top + '/>'
-    else:
-        # Establish SVG canvas that will fit all the data + small space
-        xmin, ymin, xmax, ymax = self.extent
-        if xmin == xmax and ymin == ymax:
-            # This is a point; buffer using an arbitrary size
-            xmin, ymin, xmax, ymax = self.buffer(1).extent
-        else:
-            # Expand bounds by a fraction of the data ranges
-            expand = 0.04  # or 4%, same as R plots
-            widest_part = max([xmax - xmin, ymax - ymin])
-            expand_amount = widest_part * expand
-            xmin -= expand_amount
-            ymin -= expand_amount
-            xmax += expand_amount
-            ymax += expand_amount
-        dx = xmax - xmin
-        dy = ymax - ymin
-        width = min([max([100., dx]), 300])
-        height = min([max([100., dy]), 300])
-        try:
-            scale_factor = max([dx, dy]) / max([width, height])
-        except ZeroDivisionError:
-            scale_factor = 1.
-        view_box = "{0} {1} {2} {3}".format(xmin, ymin, dx, dy)
-        transform = "matrix(1,0,0,-1,0,{0})".format(ymax + ymin)
-        return svg_top + (
-            'width="{1}" height="{2}" viewBox="{0}" '
-            'preserveAspectRatio="xMinYMin meet">'
-            '<g transform="{3}">{4}</g></svg>').format(view_box, width,
-                                                       height, transform,
-                                                       self.svg(scale_factor)
-                                                       )
-
-
-
-multipoint svg
-
-#----------------------------------------------------------------------
-def svg(self, scale_factor=1., fill_color=None):
-    """Returns a group of SVG circle elements for the MultiPoint geometry.
-
-    Parameters
-    ==========
-    scale_factor : float
-        Multiplication factor for the SVG circle diameters.  Default is 1.
-    fill_color : str, optional
-        Hex string for fill color. Default is to use "#66cc99" if
-        geometry is valid, and "#ff3333" if invalid.
-    """
-    if self.is_empty:
-        return '<g />'
-    if fill_color is None:
-        fill_color = "#66cc99" if self.is_valid else "#ff3333"
-    return '<g>' + \
-           ''.join(('<circle cx="{0.x}" cy="{0.y}" r="{1}" '
-                    'stroke="#555555" stroke-width="{2}" fill="{3}" opacity="0.6" />'
-                    ).format(Point({'x': p[0], 'y': p[1]}), 3 * scale_factor, 1 * scale_factor, fill_color) \
-                   for p in self['points']) + \
-           '</g>'
-               
-point svg
-    def svg(self, scale_factor=1, fill_color=None):
-        """Returns SVG circle element for the Point geometry.
-
-        Parameters
-        ==========
-        scale_factor : float
-            Multiplication factor for the SVG circle diameter.  Default is 1.
-        fill_color : str, optional
-            Hex string for fill color. Default is to use "#66cc99" if
-            geometry is valid, and "#ff3333" if invalid.
-        """
-        if self.is_empty:
-            return '<g />'
-        if fill_color is None:
-            fill_color = "#66cc99" if self.is_valid else "#ff3333"
-        return (
-            '<circle cx="{0.x}" cy="{0.y}" r="{1}" '
-            'stroke="#555555" stroke-width="{2}" fill="{3}" opacity="0.6" />'
-            ).format(self, 3 * scale_factor, 1 * scale_factor, fill_color)
-
-polygon svg
-    #----------------------------------------------------------------------
-    def svg(self, scale_factor=1,fill_color=None):
-        if self.is_empty:
-            return '<g />'
-        if fill_color is None:
-            fill_color = "#66cc99" if self.is_valid else "#ff3333"
-        rings = []
-        s = ""
-        for ring in self['rings']:
-            rings = ring
-            exterior_coords = [
-                ["{},{}".format(*c) for c in rings]]
-            path = " ".join([
-                "M {} L {} z".format(coords[0], " L ".join(coords[1:]))
-                for coords in exterior_coords])
-            s += (
-            '<path fill-rule="evenodd" fill="{2}" stroke="#555555" '
-            'stroke-width="{0}" opacity="0.6" d="{1}" />'
-            ).format(2. * scale_factor, path, fill_color)
-        return s
-
-
-polyline svg
-    def svg(self, scale_factor=1, stroke_color=None):
-        """Returns SVG polyline element for the LineString geometry.
-
-        Parameters
-        ==========
-        scale_factor : float
-            Multiplication factor for the SVG stroke-width.  Default is 1.
-        stroke_color : str, optional
-            Hex string for stroke color. Default is to use "#66cc99" if
-            geometry is valid, and "#ff3333" if invalid.
-        """
-        if self.is_empty:
-            return '<g />'
-        if stroke_color is None:
-            stroke_color = "#66cc99" if self.is_valid else "#ff3333"
-        paths = []
-        for path in self['paths']:
-            pnt_format = " ".join(["{0},{1}".format(*c) for c in path])
-            s = ('<polyline fill="none" stroke="{2}" stroke-width="{1}" '
-                 'points="{0}" opacity="0.8" />').format(pnt_format, 2. * scale_factor, stroke_color)
-            paths.append(s)
-        return "<g>" + "".join(paths) + "</g>"
-
-'''
 
 # ---------------------------------------------------------------------
 if __name__ == "__main__":

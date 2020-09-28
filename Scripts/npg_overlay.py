@@ -87,17 +87,17 @@ __all__ = [
 # ----------------------------------------------------------------------------
 # ---- (1) helpers/mini functions
 #
-def flat(l):
+def flat(lst):
     """Flatten input. Basic flattening but doesn't yield where things are"""
-    def _flat(l, r):
+    def _flat(lst, r):
         """Recursive flattener."""
-        if not isinstance(l[0], (list, np.ndarray, tuple)):  # added [0]
-            r.append(l)
+        if not isinstance(lst[0], (list, np.ndarray, tuple)):  # added [0]
+            r.append(lst)
         else:
-            for i in l:
+            for i in lst:
                 r = r + flat(i)
         return r
-    return _flat(l, [])
+    return _flat(lst, [])
 
 
 def _in_LBRT_(pnts, extent):
@@ -116,7 +116,7 @@ def _in_LBRT_(pnts, extent):
     `np_helpers._in_extent_`
     """
     # if hasattr(pnts, 'XY'):
-    if pnts.__class__.__name__ == "Geo":
+    if hasattr(pnts, "IFT"):
         pnts = pnts.XY
     LB, RT = extent[:2], extent[2:]
     return np.any(LB < pnts) & np.any(pnts <= RT)
@@ -146,8 +146,8 @@ def pnt_segments(g):
     out = []
     uni_cnts = np.unique(cnts).tolist()
     for i in uni_cnts:
-        sub0 = uni[cnts==i]
-        sub1 = idx[cnts==i]
+        sub0 = uni[cnts == i]
+        sub1 = idx[cnts == i]
         sub2 = p_ids[sub1]
         out.append([i, sub0, sub1, sub2])
     return out
@@ -415,10 +415,9 @@ def _intersect_(p0, p1, p2, p3):
     """
     null_pnt = np.array([np.nan, np.nan])
     x0, y0 = p0
-#    x0, y0, x1, y1, x2, y2, x3, y3 = (*p0, *p1, *p2, *p3)
-    p01_x, p01_y = p1 - p0
-    p02_x, p02_y = p0 - p2
-    p23_x, p23_y = p3 - p2
+    p01_x, p01_y = np.subtract(p1, p0)
+    p02_x, p02_y = np.subtract(p0, p2)
+    p23_x, p23_y = np.subtract(p3, p2)
     # ---- denom = (y3 - y2) * (x1 - x0) - (x3 - x2) * (y1 - y0)
     denom = (p23_y * p01_x - p23_x * p01_y)  # np.cross(p0-p1, p2-p3)
     if denom == 0.0:
@@ -443,7 +442,7 @@ def _intersect_(p0, p1, p2, p3):
     return np.array([x, y])  # , np.array([x2, y2])
 
 
-def intersects(*args):
+def intersects(args):
     """Line segment intersection check. **Largely kept for documentation**.
 
     Two lines or 4 points that form the lines.  This does not extrapolate to
@@ -489,22 +488,31 @@ def intersects(*args):
     line-segments-intersect#565282>`_.
 
     """
-    if len(args) == 2:    # two lines
+    if isinstance(args, np.ndarray):
+        args = args.tolist()
+    if len(args) == 2:
         p0, p1, p2, p3 = *args[0], *args[1]
-    elif len(args) == 4:  # four points
+    elif len(args) == 4:
         p0, p1, p2, p3 = args
     else:
         raise AttributeError("Pass 2, 2-pnt lines or 4 points to the function")
     #
+    # ---- First check
+    # Given 4 points, if there are < 4 unique, then the segments intersect
+    u, cnts = np.unique((p0, p1, p2, p3), return_counts=True, axis=0)
+    if len(u) < 4:
+        intersection_pnt = u[cnts > 1]
+        return True, intersection_pnt
+    #
     x0, y0, x1, y1, x2, y2, x3, y3 = *p0, *p1, *p2, *p3  # points to xs and ys
     #
-    # ---- First check ----   np.cross(p1-p0, p3-p2)
+    # ---- Second check ----   np.cross(p1-p0, p3-p2)
     denom = (x1 - x0) * (y3 - y2) - (y1 - y0) * (x3 - x2)
     t1 = denom == 0.0
     if t1:  # collinear
         return (False, "collinear/parallel")
     #
-    # ---- Second check ----  np.cross(p1-p0, p0-p2)
+    # ---- Third check ----  np.cross(p1-p0, p0-p2)
     denom_gt0 = denom > 0  # denominator greater than zero
     s_numer = (x1 - x0) * (y0 - y2) - (y1 - y0) * (x0 - x2)
     t2 = (s_numer < 0) == denom_gt0
@@ -512,14 +520,14 @@ def intersects(*args):
         msg = "s_num {} den {} cross(p1-p0, p0-p2) = 0".format(s_numer, denom)
         return (False, msg)
     #
-    # ---- Third check ----  np.cross(p3-p2, p0-p2)
+    # ---- Fourth check ----  np.cross(p3-p2, p0-p2)
     t_numer = (x3 - x2) * (y0 - y2) - (y3 - y2) * (x0 - x2)
     t3 = (t_numer < 0) == denom_gt0
     if t3:
         msg = "t_num {} den {} cross(p3-p2, p0-p2) = 0".format(t_numer, denom)
         return (False, msg)
     #
-    # ---- Fourth check ----
+    # ---- Fifth check ----
     t4 = np.logical_or((s_numer > denom) == denom_gt0,
                        (t_numer > denom) == denom_gt0
                        )
@@ -567,8 +575,8 @@ def adjacency_matrix(g):
     """
     g0 = g.outer_rings(asGeo=False)
     n = len(g0)
-    id_keys = np.array(list(zip(g.IDs, np.arange(n))))
-    srted = g.sort_by_extent('LB', 0)
+    id_keys = np.array(list(zip(g0.IDs, np.arange(n))))
+    srted = g0.sort_by_extent('LB', 0)
     idx = srted.pnt_indices(as_structured=False)
     # ---- create the adjacency matrix
     z = np.zeros((n, n), dtype=np.int32)
@@ -581,7 +589,7 @@ def adjacency_matrix(g):
 
 
 def dissolve(g, asGeo=False):
-    r"""Dissolve polygons sharing edges
+    r"""Dissolve polygons sharing edges.
 
     Parameters
     ----------
@@ -633,7 +641,6 @@ def dissolve(g, asGeo=False):
     b = np.concatenate((b1[:-1], b1[1:]), axis=1)
     ab = ft0[~np.all(np.isin(a, b), axis=1)]
     ba = ft2[~np.all(np.isin(b, a), axis=1)]
-
 
     return z20, z10, z01, z02
 
@@ -822,7 +829,7 @@ def _union_(poly, clipper, is_polygon=True):
         idx = angles.argsort()
         srted = uniq[idx]
         if dup_first:
-            srted =np.concatenate((srted, [srted[0]]), axis=0)[::-1]
+            srted = np.concatenate((srted, [srted[0]]), axis=0)[::-1]
         return srted
 
     # ----

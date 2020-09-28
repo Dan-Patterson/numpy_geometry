@@ -15,7 +15,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2020-03-29
+    2020-09-22
 
 Purpose
 -------
@@ -51,41 +51,86 @@ import sys
 # from textwrap import dedent
 
 import numpy as np
+# from numpy.lib.recfunctions import unstructured_to_structured as uts
+# from numpy.lib.recfunctions import repack_fields
 
 # if 'npg' not in list(locals().keys()):
 #     import npgeom as npg
-# import npgeom as npg
+import npGeo as npg
 
 script = sys.argv[0]  # print this should you need to locate the script
 
 nums = 'efdgFDGbBhHiIlLqQpP'
 
 __all__ = [
-    '_area_bit_', '_area_centroid_', '_extent_bit_', '_length_bit_',
-    '_crossproduct_bit_',
-    '_is_clockwise_', '_is_ccw_',
-    '_is_right_side', '_in_extent_', '_pnts_in_extent_',
-    '_translate_', '_rot_', '_scale_', '_angles_', '_rotate_',
-    'polyline_angles',
+    '_bit_check_', '_from_to_pnts_',
+    '_angles_3pnt_', '_area_centroid_', '_bit_area_', '_bit_crossproduct_',
+    '_bit_extent_', '_bit_length_', '_bit_segment_angles_',
+    '_is_clockwise_', '_is_ccw_', '_is_right_side', '_in_extent_',
+    '_pnts_in_extent_', '_translate_', '_rot_', '_scale_', '_rotate_',
+    'polyline_angles', 'segment_angles',
     'line_crosses', 'in_out_crosses', 'crossings',
-    'compare_geom', 'keep_geom', 'remove_geom',
+    'common_pnts', 'compare_geom', 'keep_geom', 'remove_geom',
     'sort_xy', 'radial_sort', 'interweave', 'shape_finder'
-]  # 'crossing_num', 'pnts_in_poly'
+]  # 'crossing_num', 'pnts_in_poly', '_bit_area_',  '_bit_length_',
 
 
-# ---- common helpers ----
+# ---- core bit functions
+def _bit_check_(a):
+    """Check for bits and convert if necessary."""
+    if isinstance(a, (list, tuple)):
+        a = np.asarray(a, dtype='O')
+    elif hasattr(a, "IFT"):
+        a = a.bits
+    if len(a) == 1:
+        a = [a]
+    return a
+
+
+def _from_to_pnts_(a):
+    """Convert polygon/polyline shapes to from-to points.
+
+    Parameters
+    ----------
+    a : array-like
+        A Geo array bit or ndarray representing a singlepart shape.
+    """
+    return np.concatenate((a[:-1], a[1:]), axis=1)
+
+
+# ---- bit helpers ----
 #
-def _area_bit_(a):
-    """Mini e_area, used by areas and centroids."""
-    x0, y1 = (a.T)[:, 1:]
-    x1, y0 = (a.T)[:, :-1]
-    e0 = np.einsum('...i,...i->...i', x0, y0)
-    e1 = np.einsum('...i,...i->...i', x1, y1)
-    return np.sum((e0 - e1)*0.5)
+def _angles_3pnt_(a, inside=True, in_deg=True):
+    """Worker for Geo `angles_polygon` and `min_area_rect`.
+
+    Sequential points, a, b, c for the first bit in a shape, so interior holes
+    are removed in polygons and the first part of a multipart shape is used.
+    Use multipart_to_singlepart if you want to  process that type.
+
+    Parameters
+    ----------
+    inside : boolean
+        True, for interior angles.
+    in_deg : boolean
+        True for degrees, False for radians.
+    """
+    if np.allclose(a[0], a[-1]):                 # closed loop, remove dupl.
+        a = a[:-1]
+    cr, ba, bc = _bit_crossproduct_(a, extras=True)
+    dt = np.einsum('ij,ij->i', ba, bc)
+    ang = np.arctan2(cr, dt)
+    TwoPI = np.pi * 2.
+    if inside:
+        angles = np.where(ang < 0, ang + TwoPI, ang)
+    else:
+        angles = np.where(ang > 0, TwoPI - ang, ang)
+    if in_deg:
+        angles = np.degrees(angles)
+    return angles
 
 
 def _area_centroid_(a):
-    """Calculate area and centroid for a singlepart polygon, `a`.
+    r"""Calculate area and centroid for a singlepart polygon, `a`.
 
     This is also used to calculate area and centroid for a Geo array's parts.
 
@@ -96,7 +141,7 @@ def _area_centroid_(a):
     >>> # rectangle with hole
     >>> a0 = np.array([[[0., 0.], [0., 10.], [10., 10.], [10., 0.], [0., 0.]],
                       [[2., 2.], [8., 2.], [8., 8.], [2., 8.], [2., 2.]]])
-    >>> [npg._area_centroid_(i) for i in a0]
+    >>> [_area_centroid_(i) for i in a0]
     >>> [(100.0, array([ 5.00,  5.00])), (-36.0, array([ 5.00,  5.00]))]
     """
     x0, y1 = (a.T)[:, 1:]
@@ -110,20 +155,17 @@ def _area_centroid_(a):
     return area, np.asarray([-x_c, -y_c])
 
 
-def _extent_bit_(a):
-    """Extent of a sub-array in an object array."""
-    a = np.atleast_2d(a)
-    return np.concatenate((np.min(a, axis=0), np.max(a, axis=0)))
+def _bit_area_(a):
+    """Mini e_area, used by `areas` and `centroids`."""
+    x0, y1 = (a.T)[:, 1:]
+    x1, y0 = (a.T)[:, :-1]
+    e0 = np.einsum('...i,...i->...i', x0, y0)
+    e1 = np.einsum('...i,...i->...i', x1, y1)
+    return np.sum((e0 - e1)*0.5)
 
 
-def _length_bit_(ar):
-    """Calculate segment lengths of poly geometry."""
-    diff = ar[:-1] - ar[:-1]
-    return np.sqrt(np.einsum('ij,ij->i', diff, diff))
-
-
-def _crossproduct_bit_(a, extras=False):
-    """Cross product.  Concatenate version is slightly faster."""
+def _bit_crossproduct_(a, extras=False):
+    """Cross product.  Used by `is_convex` and `_angles_3pnt_`."""
     ba = a - np.concatenate((a[-1][None, :], a[:-1]), axis=0)
     bc = a - np.concatenate((a[1:], a[0][None, :]), axis=0)
     if extras:
@@ -131,16 +173,39 @@ def _crossproduct_bit_(a, extras=False):
     return np.cross(ba, bc)
 
 
+def _bit_extent_(a):
+    """Extent of a sub-array in an object array."""
+    a = np.atleast_2d(a)
+    return np.concatenate((np.min(a, axis=0), np.max(a, axis=0)))
+
+
+def _bit_length_(a):
+    """Calculate segment lengths of poly geometry."""
+    diff = a[1:] - a[:-1]
+    return np.sqrt(np.einsum('ij,ij->i', diff, diff))
+
+
+def _bit_segment_angles_(a, fromNorth=False):
+    """Geo array, object or ndarray segment angles for polygons or polylines.
+    Used by `segment_angles` and `min_area_rect`.
+    """
+    dxy = a[1:] - a[:-1]
+    ang = np.degrees(np.arctan2(dxy[:, 1], dxy[:, 0]))
+    if fromNorth:
+        ang = np.mod((450.0 - ang), 360.)
+    return ang
+
+
+# ---- Condition checking
+#
 def _is_clockwise_(a):
     """Return whether the sequence (polygon) is clockwise oriented or not."""
-    if _area_bit_(a) > 0.:
-        return True
-    return False
+    return 1 if _bit_area_(a) > 0. else 0
 
 
 def _is_ccw_(a):
     """Counterclockwise."""
-    return 0 if _area_bit_(a) > 0. else 1
+    return 0 if _bit_area_(a) > 0. else 1
 
 
 def _is_right_side(p, strt, end):
@@ -157,13 +222,12 @@ def _is_right_side(p, strt, end):
 
     Notes
     -----
-    Returns whether or not a point is inside (right-side) the current
-    clip edge for a clockwise oriented polygon and its segments.
+    A point is on the inside (right-side) if `position` is negative.  This
+    assumes polygons are oriented clockwise.
 
     position = sign((Bx - Ax) * (Y - Ay) - (By - Ay) * (X - Ax))
 
-    negative for right of clockwise line, positive for left. So in essence,
-    the reverse of _is_left_side with the outcomes reversed ;)
+    So in essence, the reverse of _is_left_side with the outcomes reversed ;).
     """
     x, y, x0, y0, x1, y1 = *p, *strt, *end
     return (x1 - x0) * (y - y0) - (y1 - y0) * (x - x0)
@@ -212,14 +276,15 @@ def _pnts_in_extent_(pnts, ext=None, return_index=False):
     shp = np.asarray(ext).shape
     if shp == (2, 2):
         LB, RT = ext
-    elif shp[0] > 2:
+    elif shp[0] == 4:
+        ext = ext.reshape(2, 2)
         LB, RT = np.min(ext, axis=0), np.max(ext, axis=0)
     else:
         print(msg.format(ext))
         return
     idx = np.all(np.logical_and(LB < pnts, pnts <= RT), axis=1)
     if return_index:
-        return idx
+        return idx.base
     return np.all(idx)
 
 
@@ -265,37 +330,8 @@ def _scale_(a, factor=1):
     return scaled + cent
 
 
-# ---- angle related
+# ---- Geo or ndarray stuff
 #
-def _angles_(a, inside=True, in_deg=True):
-    """Worker for Geo `angles_polygon` and `polyline_angles`.
-
-    Sequential points, a, b, c for the first bit in a shape, so interior holes
-    are removed in polygons and the first part of a multipart shape is used.
-    Use multipart_to_singlepart if you want to  process that type.
-
-    Parameters
-    ----------
-    inside : boolean
-        True, for interior angles.
-    in_deg : boolean
-        True for degrees, False for radians.
-    """
-    if np.allclose(a[0], a[-1]):                 # closed loop, remove dupl.
-        a = a[:-1]
-    cr, ba, bc = _crossproduct_bit_(a, extras=True)
-    dt = np.einsum('ij,ij->i', ba, bc)
-    ang = np.arctan2(cr, dt)
-    TwoPI = np.pi * 2.
-    if inside:
-        angles = np.where(ang < 0, ang + TwoPI, ang)
-    else:
-        angles = np.where(ang > 0, TwoPI - ang, ang)
-    if in_deg:
-        angles = np.degrees(angles)
-    return angles
-
-
 def _rotate_(geo_arr, R, as_group):
     """Rotation helper.
 
@@ -304,46 +340,68 @@ def _rotate_(geo_arr, R, as_group):
     geo_arr : array
         The input geo array, which is split here.
     as_group : boolean
-        False, rotated about the extent center.  True, rotated about each
-        shapes' center.
+        True, all shapes are rotated about the extent center.  False, each
+        shape is rotated about its center.
     R : array
         The rotation matrix, passed on from Geo.rotate.
     clockwise : boolean
     """
-    shapes = geo_arr.shapes
+    shapes = _bit_check_(geo_arr)
     out = []
-    if as_group:
-        uniqs = []
-        for chunk in shapes:
-            _, idx = np.unique(chunk, True, axis=0)
-            uniqs.append(chunk[np.sort(idx)])
-        cents = [np.mean(i, axis=0) for i in uniqs]
-        for i, chunk in enumerate(shapes):
-            ch = np.einsum('ij,jk->ik', chunk - cents[i], R) + cents[i]
-            out.append(ch)
-        return out
-    cent = np.mean(geo_arr, axis=0)
-    for chunk in shapes:
-        ch = np.einsum('ij,jk->ik', chunk - cent, R) + cent
+    if as_group:  # ---- rotate as a whole
+        cent = np.mean(geo_arr, axis=0)
+        return np.einsum('ij,jk->ik', geo_arr - cent, R) + cent
+    # ----
+    uniqs = []
+    for chunk in shapes:  # ---- rotate individually
+        _, idx = np.unique(chunk, True, axis=0)
+        uniqs.append(chunk[np.sort(idx)])
+    cents = [np.mean(i, axis=0) for i in uniqs]
+    for i, chunk in enumerate(shapes):
+        ch = np.einsum('ij,jk->ik', chunk - cents[i], R) + cents[i]
         out.append(ch)
     return out
 
 
-# ---- Geo or ndarray stuff
-def polyline_angles(obj, fromNorth=False):
-    """Polyline/segment angles.  *** needs work***."""
-    if is_Geo(obj, verbose=False):
-        bits = obj.bits
-    elif isinstance(obj, (list, tuple)):
-        bits = obj
+def polyline_angles(a, fromNorth=False):
+    """Polyline/segment angles.
+
+    Parameters
+    ----------
+    a : array-like
+        A Geo array or a list of arrays representing the polyline shapes
+    """
+    bits = _bit_check_(a)
+    out = []
+    for b in bits:
+        dxy = b[1:] - b[:-1]
+        ang = np.degrees(np.arctan2(dxy[:, 1], dxy[:, 0]))
+        if fromNorth:
+            ang = np.mod((450.0 - ang), 360.)
+        out.append(ang)
+    return out
+
+
+def segment_angles(a, fromNorth=False):
+    """Return segment angles for Geo, object or ndarrays which represent
+    polygons or polylines.
+
+    See Also
+    --------
+    `angles_segment` in Geo class which is quicker for them.
+
+    splitter = geo.To - np.arange(1, geo.N + 1)
+    """
+    if hasattr(a, "IFT"):
+        a = a.outer_rings(asGeo=False)
+    elif a.dtype.name == "object":
+        if len(a) == 1:
+            a = [a]
+    elif len(a.shape) == 2:
+        a = [a]
     else:
-        return
-    ft = np.concatenate([np.concatenate((b[:-1], b[1:]), axis=1)
-                         for b in bits], axis=0)
-    dxy = ft[1:] - ft[:-1]
-    ang = np.degrees(np.arctan2(dxy[:, 1], dxy[:, 0]))
-    if fromNorth:
-        ang = np.mod((450.0 - ang), 360.)
+        return None
+    ang = [_bit_segment_angles_(i, fromNorth) for i in a]
     return ang
 
 
@@ -429,7 +487,7 @@ def in_out_crosses(*args):
 
 def crossings(geo, clipper):
     """Determine if lines cross. multiline implementation of above"""
-    bounds = npg.dissolve(geo)  # need to fix dissolve
+    bounds = npg.dissolve(geo)  # **** need to fix dissolve
     p0s = bounds[:-1]
     p1s = bounds[1:]
     p2s = clipper[:-1]
@@ -464,6 +522,33 @@ def crossings(geo, clipper):
 
 # ---- compare, remove, keep geometry ----------------------------------------
 #
+def common_pnts(pnts, self, remove_common=True):
+    """Check for coincident points between `pnts` and the Geo array.
+
+    Parameters
+    ----------
+    pnts : 2D ndarray
+        The points (N, 2) that you are looking for in the Geo array.
+    remove_common : boolean
+        True, returns an ndarray with the common points removed.
+        False, returns the indices of the unique entries in `pnts`, aka,
+        the indices of the common points between the two are not returned.
+
+    See Also
+    --------
+    `np_geom.pnts_in_pnts` for a variant with slightly different returns.
+    """
+    w = np.where(np.equal(pnts, self).all(-1))[0]
+    if len(w) > 0:
+        uni = np.unique(pnts[w], axis=0)
+        w1 = np.where((pnts == uni[:, None]).all(-1))[1]
+        idx = [i for i in np.arange(len(pnts)) if i not in w1]
+        if remove_common:  # equals... return np.delete(pnts, w1, axis=0)
+            return pnts[idx]
+        return idx
+    print("{} not found".format(pnts))
+    return pnts
+
 def compare_geom(arr, look_for, unique=True, invert=False, return_idx=False):
     """Look for duplicates in two 2D arrays.  This can be points or segments.
 
@@ -541,7 +626,7 @@ def sort_xy(a, x_ascending=True, y_ascending=True):
     x_ascending, y_ascending : boolean
         If False, sort is done in decending order by axis.
     """
-    if hasattr(a, 'X') and hasattr(a, 'Y'):
+    if hasattr(a, "IFT"):
         x_s = a.X
         y_s = a.Y
     else:
@@ -612,19 +697,24 @@ def shape_finder(arr, ids=None):
     main = []
     if ids is None:
         ids = np.arange(len(arr))
-    arr = np.asarray(arr).squeeze()
+    if isinstance(arr, (list, tuple)):
+        arr = np.asarray(arr, dtype='O')  # .squeeze()
+    elif isinstance(arr, np.ndarray):
+        shp = arr.shape
+        if len(shp) > 1:
+            arr = [arr]
     cnt = 0
     for i, a in enumerate(arr):
         info = []
         if hasattr(a, '__len__'):
-            a0 = np.asarray(a)
+            a0 = np.asarray(a, dtype='O')
             for j, a1 in enumerate(a0):
                 if hasattr(a1, '__len__'):
-                    a1 = np.asarray(a1)
+                    a1 = np.asarray(a1, dtype='float')
                     if len(a1.shape) >= 2:
-                        info.append([ids[i], cnt, j, *a1.shape])
+                        info.append([ids[i], j, *a1.shape])
                     else:  # a pair
-                        info.append([ids[i], cnt, j, *a0.shape])
+                        info.append([ids[i], j, *a0.shape])
                         break
         main.append(np.asarray(info))
         cnt += 1

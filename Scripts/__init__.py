@@ -17,7 +17,7 @@ Author :
 - Dan_Patterson@carleton.ca
 - https://github.com/Dan-Patterson
 
-Modified : 2020-03-28
+Modified : 2020-09-09
     Creation date during 2019 as part of ``arraytools``.
 
 Purpose
@@ -31,7 +31,7 @@ Many links and references in ``_npgeom_notes_.py``.
 
 .. note::
 
-   This double dot, note thing produces a nice blue colored box with the
+   This double dot, .. note:: thing produces a nice blue colored box with the
    note inside.
 
 Notes
@@ -41,25 +41,6 @@ provides the base class for this package.  It is based on the numpy ndarray.
 
 >>> import npgeom as npg
 
->>> npg.npg_io.__all__
-... ['poly2array', 'load_geojson', 'arrays_to_Geo', 'Geo_to_arrays',
-...  'array_ift', 'make_nulls', 'get_SR', 'fc_composition', 'fc_data',
-...  'fc_geometry', 'get_shapes', 'get_SR', 'shape_to_K', 'array_poly',
-...  'geometry_fc', 'prn_q', '_check', 'prn_tbl', 'prn_geo']
-
->>> npg.npGeo.__all__
-... ['Geo', 'is_Geo', 'arrays_to_Geo', '_arr_ift_', 'Geo_to_arrays',
-...  '_fill_float_array',
-...  'dirr', 'geo_info', 'check_geometry', '_pnts_in_geo',
-...  '_svg']
-
->>> npg.npg_helpers.__all__
-... ['_area_bit_', '_in_extent_', '_is_ccw_', '_is_clockwise_',
-...  '_is_right_side', '_length_bit_', '_pnts_in_extent_',
-...  '_rotate_', '_scale_', '_translate_',
-...  'compare_geom', 'crossings', 'in_out_crosses', 'interweave',
-...  'keep_geom', 'line_crosses',  'poly_cross_product_',
-...  'polyline_angles', 'radial_sort', 'remove_geom', 'sort_xy']
 
 **Import options for arcpy functions**
 
@@ -73,15 +54,15 @@ provides the base class for this package.  It is based on the numpy ndarray.
 
 >>> ags.da.FeatureClassToNumPyArray(...)  # useage
 
-Arcpy methods and properties needed::
+>>> from arcpy import (env, AddMessage, Exists)
 
-    arcpy.Point, arcpy.Polyline, arcpy.Polygon, arcpy.Array
-    arcpy.ListFields
-    arcpy.management.CopyFeatures
-    arcpy.da.Describe
-    arcpy.da.InsertCursor
-    arcpy.da.SearchCursor
-    arcpy.da.FeatureClassToNumPyArray
+>>> from arcpy.management import (
+...     AddField, CopyFeatures, CreateFeatureclass, Delete, MakeFeatureLayer,
+...     MultipartToSinglepart, SelectLayerByLocation, XYToLine
+... )
+
+>>> from arcpy.analysis import Clip
+
 
 Spyder and conda
 ----------------
@@ -98,54 +79,55 @@ Note:  Python resides in... (substitute `arc_pro` for your install folder).
 >>> C:\arc_pro\bin\Python\envs\arcgispro-py3
 
 """
-# pyflakes: disable=F403
+# pyflakes: disable=E0401,F403,F401
 # pylint: disable=unused-import
 # pylint: disable=W0611
-
+# pylint: disable=E0401
 # ---- sys, np imports
 import sys
 import numpy as np
 
 # ---- import for npg
-from . import (
-    npgDocs, npGeo, npg_io, npg_geom, npg_pip, npg_helpers, npg_table,
-    npg_create, npg_analysis, npg_overlay, npg_utils, smallest_circle,
-)
-from . npGeo import *
-from . npg_io import *
-from . npg_geom import *
-from . npg_pip import *
-from . npg_helpers import *
-from . npg_table import *
-from . npg_create import *
-from . npg_analysis import *
-from . npg_overlay import *
-from . npg_utils import *
-from . smallest_circle import *
+import npgDocs, npGeo, npg_io, npg_geom, npg_pip, npg_helpers, npg_table
+import npg_create, npg_analysis, npg_overlay, npg_utils, npg_min_circ
+
+from . npGeo import *  # noqa: F401, 403
+from . npg_io import *  # noqa: F401
+from . npg_geom import *  # noqa: F401
+from . npg_pip import *  # noqa: F401
+from . npg_helpers import *  # noqa: F401
+from . npg_table import *  # noqa: F401
+from . npg_create import *  # noqa: F401
+from . npg_analysis import *  # noqa: F401
+from . npg_overlay import *  # noqa: F401
+from . npg_utils import *  # noqa: F401
+from . npg_min_circ import *  # noqa: F401
 
 # ---- docstring info for Geo and some methods
 from . npgDocs import (
-    npGeo_doc, Geo_hlp, array_IFT_doc, dirr_doc,
-    outer_rings_doc, inner_rings_doc, pull_shapes_doc, polys_to_segments_doc,
-    sort_by_extent_doc, radial_sort_doc
+    npGeo_doc, Geo_hlp, array_IFT_doc, dirr_doc, shapes_doc, parts_doc,
+    outer_rings_doc, inner_rings_doc, get_shapes_doc, sort_by_extent_doc,
+    radial_sort_doc
 )
 npGeo.__doc__ += npGeo_doc
 npGeo.Geo.__doc__ += Geo_hlp
 npGeo.array_IFT.__doc__ += array_IFT_doc
 npGeo.dirr.__doc__ += dirr_doc
 
+npGeo.Geo.shapes.__doc__ += shapes_doc
+npGeo.Geo.parts.__doc__ += parts_doc
 npGeo.Geo.outer_rings.__doc__ += outer_rings_doc
 npGeo.Geo.inner_rings.__doc__ += inner_rings_doc
-npGeo.Geo.pull_shapes.__doc__ += pull_shapes_doc
-npGeo.Geo.polys_to_segments.__doc__ += polys_to_segments_doc
+npGeo.Geo.get_shapes.__doc__ += get_shapes_doc
 npGeo.Geo.radial_sort.__doc__ += radial_sort_doc
 npGeo.Geo.sort_by_extent.__doc__ += sort_by_extent_doc
+# npGeo.Geo.IFT.__doc__ = array_IFT_doc
 
 # ---- define __all__
 __all__ = [
     'npgDocs', 'npGeo', 'npg_io', 'npg_geom', 'npg_helpers', 'npg_overlay',
-    'npg_table', 'npg_create', 'npg_analysis', 'npg_overlay', 'npg_utils',
-    'npg_helpers', 'smallest_circle'
+    'npg_table', 'npg_create', 'npg_analysis', 'npg_utils',
+    'npg_helpers', 'npg_min_circ'
 ]
 
 __all__.extend(npgDocs.__all__)
@@ -158,7 +140,7 @@ __all__.extend(npg_table.__all__)
 __all__.extend(npg_create.__all__)
 __all__.extend(npg_analysis.__all__)
 __all__.extend(npg_overlay.__all__)
-# __all__.extend(smallest_circle.__all__)
+# __all__.extend(npg_min_circ.__all__)
 __all__.sort()
 
 msg = """

@@ -13,7 +13,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2020-03-31
+    2020-09-17
 
 Purpose
 -------
@@ -78,7 +78,7 @@ import sys
 # from functools import wraps
 import numpy as np
 
-#import npgeom as npg
+import npGeo as npg
 from npg_plots import plot_mixed, plot_2d, plot_polygons
 
 ft = {'bool': lambda x: repr(x.astype(np.int32)),
@@ -499,8 +499,6 @@ def triangle(dx=1, dy=1,
     See `rectangles` for shared parameter explanation..
 
     """
-    grid_type = 'triangle'
-    # a, dx, b = dx/2.0, dx, dx*1.5
     a, dx, b = dx/2.0, dx, dx*1.5
     Xu = [0.0, a, dx, 0.0]   # X, Y values for a unit triangle, point up
     Yu = [0.0, dy, 0.0, 0.0]
@@ -852,19 +850,19 @@ def transect_lines(N=5, orig=None, dist=1, x_offset=0, y_offset=0,
     return out, data
 
 
-def spiral_archim(pnts, n, inward=False, clockwise=True):
+def spiral_archim(N, n, inward=False, clockwise=True):
     """Create an Archimedes spiral in the range 0 to N points with 'n' steps.
 
     Parameters
     ----------
     N : integer
-        The range of the spiral.
+        The range of the spiral as `N` points
     n : integer
         The number of points between steps.
-    scale : number
-        The size between points.
-    outward : boolean
-        Radiate the spiral from the center.
+    inward : boolean
+        Whether the points radiate inward toward, or outward from, the center.
+    clockwise : boolean
+        Direction of rotation
 
     Notes
     -----
@@ -874,7 +872,7 @@ def spiral_archim(pnts, n, inward=False, clockwise=True):
     With N = 360, n = 20 yields 360 points with 2n points (40) to complete each
     360 degree loop of the spiral.
     """
-    rnge = np.arange(0.0, pnts)
+    rnge = np.arange(0.0, N)
     if inward:
         rnge = rnge[::-1]
     phi = rnge/n * np.pi

@@ -15,7 +15,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2020-02-14
+    2020-09-22
 
 Purpose
 -------
@@ -46,39 +46,36 @@ from numpy.lib.recfunctions import repack_fields
 from numpy.lib.recfunctions import structured_to_unstructured as stu
 # from numpy.lib.recfunctions import unstructured_to_structured as uts
 
-#if 'npg' not in list(locals().keys()):
+# if 'npg' not in list(locals().keys()):
 #    import npgeom as npg
 
-from npGeo import Geo
+# from npGeo import Geo
 from npGeo import *
 
 # import arcpy
 
-from arcpy import (
-    Array, Exists, Multipoint, Point, Polygon, Polyline
-)  # ListFields
+from arcpy import (Array, Exists, Multipoint, Point, Polygon, Polyline)
 
 from arcpy.da import (
     Describe, InsertCursor, SearchCursor, FeatureClassToNumPyArray,
-    TableToNumPyArray
-)  # ExtendTable, NumPyArrayToTable,  UpdateCursor
+    TableToNumPyArray)  # ExtendTable, NumPyArrayToTable,  UpdateCursor
 
 # from arcpy.geoprocessing import gp
 from arcpy.geoprocessing import env
 from arcpy.management import (
-    AddField, CopyFeatures, CreateFeatureclass, Delete
-)  # DeleteFeatures
+    AddField, CopyFeatures, CreateFeatureclass, Delete)  # DeleteFeatures
 
 
 script = sys.argv[0]  # print this should you need to locate the script
 
 __all__ = [
-    'get_SR', 'fc_to_Geo', 'id_fr_to',          # option 1, use this ***
+    'get_SR', 'get_shape_K', 'fc_to_Geo', 'id_fr_to',  # option 1, use this ***
     'Geo_to_shapes', 'Geo_to_fc', 'view_poly',  # back to fc
     'make_nulls', 'fc_data', 'tbl_data',        # get attributes
-    'fc2na', 'array_poly', 'geometry_fc',
+    'fc2na', 'get_fc_shapes', 'array_poly', 'geometry_fc',
     '_array_to_poly_', '_poly_to_array_',       # geometry to array
-    '_poly_arr_', 'poly2array'                    # extras
+    '_poly_arr_', 'poly2array',                 # extras
+    'arc_union'  # arcpy functions
 ]   # '_del_none', '__geo_interface__', '_flat',
 
 
@@ -125,6 +122,10 @@ def fc_to_Geo(in_fc, geom_kind=2, minX=0, minY=0, info=""):
         Featureclass in a file geodatabase.
     geom_kind : integer
         Points (0), Polylines (1) and Polygons (2)
+
+    minX, minY : numbers
+        If these values are 0, then the minimum values will be determined and
+        used to shift the data towards the origin.
 
     Notes
     -----
@@ -243,7 +244,7 @@ def id_fr_to(a, oids):
         id_val = [oids[val]]  # a list for concatenation
         if n < 1:
             continue
-        elif n == 1:            # one found, use the next one
+        elif n == 1:          # one found, use the next one
             val = w[0] + 1
         elif n == 2:          # two found, use the last one + 1
             key = w[-1]
@@ -386,7 +387,7 @@ def view_poly(geo, id_num=1, view_as=2):
         msg = "Id ... {} ... not found.\n Use geo.IDs to see their values"
         print(msg.format(id_num))
         return
-    shp = geo.get_shape(id_num)
+    shp = geo.get_shapes(id_num)
     z = [Array([Point(*i) for i in b]) for b in shp.bits]
     if view_as == 2:
         return Polygon(Array(z))
@@ -412,6 +413,10 @@ def make_nulls(in_fc, include_oid=True, int_null=-999):
     ----------
     in_fc : featureclass or featureclass table
         Uses arcpy.ListFields to get a list of featureclass/table fields.
+    include_oid : boolean
+        Include the `object id` field to denote unique records and geometry
+        in featureclasses or geodatabase tables.  This is recommended, if you
+        wish to join attributes back to geometry.
     int_null : integer
         A default to use for integer nulls since there is no ``nan`` equivalent
         Other options include
@@ -422,6 +427,11 @@ def make_nulls(in_fc, include_oid=True, int_null=-999):
 
     >>> [i for i in cur.__iter__()]
     >>> [[j if j else -999 for j in i] for i in cur.__iter__() ]
+
+    Notes
+    -----
+    The output objectid and geometry fields are renamed to
+    `OID_`, `X_cent`, `Y_cent`, where the latter two are the centroid values.
     """
     nulls = {'Double': np.nan, 'Single': np.nan, 'Float': np.nan,
              'Short': int_null, 'SmallInteger': int_null, 'Long': int_null,
@@ -447,8 +457,8 @@ def make_nulls(in_fc, include_oid=True, int_null=-999):
 
 
 # Featureclass attribute data
-def fc_data(in_fc):
-    """Pull all editable attributes from a featureclass tables.
+def fc_data(in_fc, include_oid=True, int_null=-999):
+    """Return geometry, text and numeric attributes from a featureclass table.
 
     During the process, <null> values are changed to an appropriate type.
 
@@ -456,14 +466,13 @@ def fc_data(in_fc):
     ----------
     in_fc : text
         Path to the input featureclass.
-
-    Notes
-    -----
-    The output objectid and geometry fields are renamed to
-    `OID_`, `X_cent`, `Y_cent`, where the latter two are the centroid values.
+    include_oid, int_null : boolean
+        See `make_nulls` for description
     """
-    null_dict, fld_names = make_nulls(in_fc, include_oid=True, int_null=-999)
-    flds = ["Shape", "OID@", "SHAPE@", "SHAPE@X", "SHAPE@Y", "SHAPE@XY"]
+    null_dict, fld_names = make_nulls(in_fc, include_oid, int_null)
+    flds = ["OID@", "Shape", "SHAPE@", "SHAPE@X", "SHAPE@Y", "SHAPE@Z",
+            "SHAPE@Z", "SHAPE@XY", "SHAPE@TRUECENTROID", "SHAPE@JSON",
+            "SHAPE@AREA", "SHAPE@LENGTH"]
     new_names = [[i, i.replace("@", "__")][i in flds] for i in fld_names]
     a = FeatureClassToNumPyArray(
         in_fc, fld_names, skip_nulls=False, null_value=null_dict
@@ -519,6 +528,11 @@ def fc2na(in_fc):
         sorting and/or finding duplicates.
     xy : ndarray
         The coordinates in ``a`` as an ndarray.
+
+    Notes
+    -----
+    Projected/planar coordinates are assumed and they are rounded to the
+    nearest millimeter, change if you like.
     """
     arr = FeatureClassToNumPyArray(
         in_fc, ['OID@', 'SHAPE@X', 'SHAPE@Y'], explode_to_points=True
@@ -526,7 +540,7 @@ def fc2na(in_fc):
     oids, x, y = [arr[name] for name in ['OID@', 'SHAPE@X', 'SHAPE@Y']]
     m = [np.min(x), np.min(y)]
     a = np.empty((len(x), ), dtype=np.dtype([('X', 'f8'), ('Y', 'f8')]))
-    a['X'] = np.round(x - m[0], 3)
+    a['X'] = np.round(x - m[0], 3)  # round `X` and `Y` values
     a['Y'] = np.round(y - m[1], 3)
     xy = stu(a)
     return oids, a, xy
@@ -534,7 +548,7 @@ def fc2na(in_fc):
 
 # ---- Array to poly features
 # Featureclass to shapes, using a searchcursor
-def get_shapes(in_fc, SR=None):
+def get_fc_shapes(in_fc, SR=None):
     """Return arcpy shapes from a featureclass.
 
     Returns polygon, polyline, multipoint, or points.
@@ -543,6 +557,7 @@ def get_shapes(in_fc, SR=None):
         SR = get_SR(in_fc)
     with SearchCursor(in_fc, "SHAPE@", spatial_reference=SR) as cur:
         out = [row[0] for row in cur]
+        del cur
     return out
 
 
@@ -597,11 +612,11 @@ def array_poly(arr, p_type=None, sr=None, IFT=None):
             return True
         return False
     # ----
+    polys = []
     if is_Geo_(arr):
         # ids = arr.IFT[:, 0]
         from_to = arr.IFT[:, 1:3]
         arr = [arr.XY[f:t] for f, t in from_to]  # --- _poly_pieces_ chunks
-        polys = []
     for a in arr:
         # p = _array_to_poly_(a, sr, p_type)  # makes parts of chunks
         p = _arr_poly_(a, sr, p_type)
@@ -676,7 +691,7 @@ def _array_to_poly_(arr, SR=None, as_type="Polygon"):
     counterclockwise.
     No check are made to the integrety of the geometry in this function.
     """
-    subs = np.asarray(arr)
+    subs = np.asarray(arr, dtype='O')
     aa = []
     for sub in subs:
         aa.append([Point(*pairs) for pairs in sub])
@@ -702,7 +717,7 @@ def _poly_to_array_(polys):
         pt = Point()  # arcpy.Point()
         for arr in poly:
             pnts = [[pt.X, pt.Y] for pt in arr if pt]
-            sub.append(np.asarray(pnts))
+            sub.append(np.asarray(pnts, dtype='O'))
         return sub
     # ----
     if not isinstance(polys, (list, tuple)):
@@ -723,7 +738,7 @@ def _poly_arr_(poly):
     def _split_(part):
         yield [(p.X, p.Y) for p in part if p]
     # ----
-    arrs =[]
+    arrs = []
     for part in poly:
         out = []
         w = np.where(np.isin(part, None, invert=False))[0]
@@ -732,9 +747,9 @@ def _poly_arr_(poly):
             sub = _split_(i)
             out.append(np.array(*sub).squeeze())
             # out.append(*sub)
-        arrs.append(np.asarray(out).squeeze())
+        arrs.append(np.asarray(out, dtype='O').squeeze())
         # arrs.append(out)
-    return np.asarray(arrs)
+    return np.asarray(arrs, dtype='O')
 
 
 # ============================================================================
@@ -754,7 +769,7 @@ def poly2array(polys):
         sub = []
         for arr in poly:
             pnts = [[pt.X, pt.Y] if pt else null_pnt for pt in arr]
-            sub.append(np.asarray(pnts))
+            sub.append(np.asarray(pnts, dtype='O'))
         return sub
     # ----
     if len(polys) == 1:  # not isinstance(polys, (list, tuple)):
@@ -763,6 +778,36 @@ def poly2array(polys):
     for poly in polys:
         out.append(_p2p_(poly))
     return out
+
+
+# ============================================================================
+# ---- arcpy functions
+def arc_union(in_fc, poly_type="polygon"):
+    r"""Union features in a featureclass
+
+    Parameters
+    ----------
+    in_fc : featureclass
+    poly_type : text
+        Either `polygon` or `polyline`
+    fc = r"C:\Git_Dan\npgeom\Project_npg\tests.gdb\sq"
+    """
+    arr = []
+    SR = get_SR(in_fc, verbose=False)
+    with SearchCursor(in_fc, ['SHAPE@']) as cursor:
+        for row in cursor:
+            poly = row[0]
+            for cnt in range(poly.partCount):
+                part = poly.getPart(cnt)
+                arr.append(part)
+    a = Array(arr)
+    if poly_type == "polygon":
+        return Polygon(a, SR)
+    elif poly_type == "polyline":
+        return Polyline(a, SR)
+    else:
+        print("Not polygon or polyline")
+        return None
 
 
 # ===========================================================================

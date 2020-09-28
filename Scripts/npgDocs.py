@@ -12,12 +12,12 @@ Script :
     npgDocs.py
 
 Author :
-    Dan_Patterson@carleton.ca
+    Dan_Patterson
 
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2020-03-29
+    2020-09-06
 
 Purpose
 -------
@@ -48,10 +48,9 @@ script = sys.argv[0]  # print this should you need to locate the script
 
 __all__ = ['npGeo_doc', 'Geo_hlp',
            'shapes_doc', 'parts_doc',
-           'outer_rings_doc', 'inner_rings_doc', 'get_shape_doc',
-           'pull_shapes_doc', 'radial_sort_doc',
+           'outer_rings_doc', 'inner_rings_doc',
+           'get_shapes_doc', 'radial_sort_doc',
            'sort_by_extent_doc',
-           'polys_to_segments_doc',
            'array_IFT_doc', 'dirr_doc'
            ]
 
@@ -60,9 +59,7 @@ Author :
     Dan Patterson
 - Dan_Patterson@carleton.ca
 - https://github.com/Dan-Patterson
-
-Modified : 2020-03-28
-    Initial creation period 2019-05.
+- Initial creation period 2019-05 onward.
 
 """
 
@@ -136,7 +133,7 @@ geometry properties :
 **Comments**
 
 You can use `arrays_to_Geo` to produce the required 2D array from lists
-of array-like objects of the same dimension, or a single array.
+of array_like objects of the same dimension, or a single array.
 The IFT will be derived from breaks in the sequence resulting from nesting of
 lists and/or arrays.
 
@@ -244,17 +241,18 @@ Construction from an ndarray, IFT, Kind and optional Info.
 
 Parameters
 ----------
-**Required**
 
-arr : array-like
+Required
+
+arr : array_like
     A 2D array sequence of points with shape (N, 2).
-IFT : array-like
+IFT : array_like
     Defines, the I(d)F(rom)T(o) and other structural elements that are
-    present in polyline or polygon geometry that `arr` represents .
+    present in polyline or polygon geometry that `arr` represents.
     Shape (N, 6) required.
 Kind : integer
     Points (0), polylines/lines (1) and polygons (2).
-Info : string (optional)
+Info : text (optional)
     Optional information if needed.
 
 **Derived**
@@ -281,7 +279,7 @@ IP : IFT[:, [0, 4]]
 N : integer
     The number of unique shapes.
 U : integer(s)
-    A sequence of integers indicating the feature ID value.  There is no
+    A sequence of integers denoting the unique feature ID values.  There is no
     requirement for these to be sequential.
 SR : text
     Spatial reference name.
@@ -293,10 +291,15 @@ XT : array
     of full extent of all the geometry objects.
 LL, UR : array
     The extent points as defined in XT.
-hlp : this
-    self.H or self.docs where self is a Geo array will recall this information.
+hlp : text
+    self.H or self.__doc__ help information for the a Geo array `self`.
 
-A featureclass with 3 shapes. The first two are multipart with holes.
+Example
+-------
+A featureclass with 3 shapes. The first two are multipart shapes with holes.
+
+>>> arr.dtype, arr.shape
+(dtype('float64'), (62, 2))
 
 >>> arr.IFT  # ---- annotated ----
 #      IDs, Fr, To, CW, PID, Bit
@@ -356,29 +359,15 @@ Return a list of ndarrays or optionally a new Geo array.
 Use True for `to_clockwise` to convert holes to outer rings.
 """
 
-# ---- ... get_shape
-get_shape_doc = r"""
-
-The ID must exist, otherwise `None` is returned and a warning is issued.
-
-Parameters
-----------
-ID : integer
-    A single integer value.
-asGeo : Boolean
-    True, returns an updated Geo array.  False returns an ndarray or
-    object array.
-"""
-
 # ---- ... pull_shapes
-pull_shapes_doc = r"""
+get_shapes_doc = r"""
 
 The original IDs are added to the `Info` property of the output array.
 The point sequence is altered to reflect the new order.
 
 Parameters
 ----------
-ID_list : array-like
+ID_list : array_like
     A list, tuple or ndarray of ID values identifying which features
     to pull from the input.
 asGeo : Boolean
@@ -389,27 +378,6 @@ Notes
 -----
 >>> a.pull_shapes(np.arange(3:8))  # get shapes over a range of values
 >>> a.pull_shapes([1, 3, 5])  # get selected shapes
-"""
-
-# ---- ... polys_to_segments
-polys_to_segments_doc = r"""
-
-Parameters
-----------
-as_basic : boolean
-    True returns the basic od pairs as an Nx5 array in the form
-    [X_orig', Y_orig', 'X_dest', 'Y_dest'] as an ndarray.
-    If False, the content is returned as a structured array with the
-    same content and ids and length.
-to_orig : boolean
-    True, shifts the coordinates back to their original extent space.
-as_3d : boolean
-    True, the point pairs are returned as a 3D array in the form
-    [[X_orig', Y_orig'], ['X_dest', 'Y_dest']], without the distances.
-
-Notes
------
-Use `prn_tbl` if you want to see a well formatted output.
 """
 
 # ---- ... radial_sort

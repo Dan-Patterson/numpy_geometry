@@ -11,7 +11,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2020-01-11
+    2020-06-27
 
 Purpose
 -------
@@ -97,11 +97,11 @@ dir(r)
 import sys
 import os
 from textwrap import dedent, indent, wrap
-import warnings
+# import warnings
 import numpy as np
 from numpy.lib.recfunctions import unstructured_to_structured as uts
 
-warnings.simplefilter('ignore', FutureWarning)
+# warnings.simplefilter('ignore', FutureWarning)
 
 # from arcpytools import fc_info, tweet  #, frmt_rec, _col_format
 # import arcpy
@@ -109,7 +109,7 @@ warnings.simplefilter('ignore', FutureWarning)
 ft = {'bool': lambda x: repr(x.astype(np.int32)),
       'float_kind': '{: 0.3f}'.format}
 np.set_printoptions(edgeitems=10, linewidth=80, precision=2, suppress=True,
-                    threshold=100, formatter=ft)
+                    threshold=300, formatter=ft)
 np.ma.masked_print_option.set_display('-')  # change to a single -
 
 script = sys.argv[0]  # print this should you need to locate the script
@@ -319,7 +319,7 @@ def get_func(func, line_nums=True, output=False):
     """
     import inspect  # required if not imported at the top
     # import dis
-    # from textwrap import dedent, wrap
+    from textwrap import dedent, wrap
 
     if not inspect.isfunction(func):
         out = "\nError... `{}` is not a function, but is of type... {}\n"
@@ -465,7 +465,7 @@ def find_def(defs, module_name):
     if not isinstance(defs, (list, tuple)):
         defs = [defs]
     for i in defs:
-        print("\n{}\n".format("="*20, i))
+        print("\n{}\n{}".format("="*20, i))
         np.lookfor(i, module_name)
 
 
@@ -553,7 +553,7 @@ def doc_deco(func, doc):
 # ---- (5) folder tree -------------------------------------------------------
 # `folders` requires `get_dir`
 #
-def get_dir(path):
+def get_dir(path, ignore=['__init__', '__pycache__']):
     """Get the directory list from a path, excluding geodatabase folders.
     Used by.. folders
 
@@ -572,8 +572,9 @@ def get_dir(path):
     full = []
     try:
         for val in os.listdir(p):
-            v = os.path.join(p, val)
-            full.append(v)
+            if val not in ignore:
+                v = os.path.join(p, val)
+                full.append(v)
     except OSError:
         pass
     # full = [os.path.join(p, v) for v in os.listdir(p)]
@@ -581,7 +582,10 @@ def get_dir(path):
     return dirlist
 
 
-def folders(path, first=True, initial=0, prefix=""):
+def folders(path, first=True, initial=0, prefix="",
+            ignore=['__init__', '__pycache__'],
+            max_num=20
+            ):
     r"""Print recursive listing of folders in a path.
 
     Parameters
@@ -600,7 +604,7 @@ def folders(path, first=True, initial=0, prefix=""):
         first = False
         initial = len(path)
         cprev = path
-    dirlist = get_dir(path)
+    dirlist = get_dir(path, ignore)
     for d in dirlist:
         fullname = os.path.join(path, d)  # Turn name into full pathname
         if os.path.isdir(fullname):       # If a directory, recurse.
@@ -610,7 +614,9 @@ def folders(path, first=True, initial=0, prefix=""):
             n = d.replace(cprev, pad)
             print(prefix + "-" + n)  # fullname) # os.path.relpath(fullname))
             p = "  "
-            folders(fullname, first=False, initial=initial, prefix=p)
+            folders(fullname, first=False,
+                    initial=initial, prefix=p,
+                    ignore=ignore, max_num=max_num)
     # ----
 
 
@@ -642,9 +648,9 @@ def env_list(pth, ordered=False):
     return d
 
 
-# ---- (3) dirr ... code section ... -----------------------------------------
+# ---- (6) dirr ... code section ... -----------------------------------------
 #
-def dir_py(obj, colwise=False, cols=4, prn=True):
+def dir_py(obj, colwise=False, cols=3, prn=True):
     """Return the non-numpy version of dirr."""
     from itertools import zip_longest as zl
     a = dir(obj)
@@ -658,10 +664,10 @@ def dir_py(obj, colwise=False, cols=4, prn=True):
     else:
         a_0 = [a[i: i+cols] for i in range(0, len(a), cols)]
     if hasattr(obj, '__name__'):
-        args = ["-"*70, obj.__name__, obj]
+        args = ["-"*70, obj.__name__]
     else:
-        args = ["-"*70, type(obj), "py version"]
-    txt_out = "\n{}\n| dir({}) ...\n|    {}\n-------".format(*args)
+        args = ["-"*70, type(obj)]
+    txt_out = "\n{}\n| dir_py({}) ...\n|\n-------".format(*args)
     cnt = 0
     for i in a_0:
         cnt += 1
@@ -675,95 +681,7 @@ def dir_py(obj, colwise=False, cols=4, prn=True):
         return txt_out
 
 
-def package_info(pth=None):
-    r"""Access package info.
 
-    os, json required
-    pth = r'C:\Users\dan_p\AppData\Local\ESRI\conda\pkgs'
-    sub_folder="info"
-    file_name = "index.json"
-    text = "python"
-
-    np.isin(out['Depend'], 'python')
-    """
-    import json
-    out = []
-    if pth is None:
-        arc_pth = r"\AppData\Local\ESRI\conda\pkgs"
-        user = os.path.expandvars("%userprofile%")
-        pth = "{}{}".format(user, arc_pth)
-        if not os.path.isdir(pth):
-            print("{} doesn't exist".format(pth))
-            return None
-    dir_lst = os.listdir(pth)
-    max_len = 0
-    for d in dir_lst:  # [:20]:
-        if d not in ("cache", ".trash"):
-            fname = pth + os.sep + d + os.sep + r"info\index.json"
-            if os.path.isfile(fname):
-                f = open(fname, 'r')
-                d = json.loads(f.read())
-                depends = " ".join([i.split(" ")[0] for i in d["depends"]])
-                depends = "".join([i for i in depends if i != 'python'])
-                max_len = max(max_len, len(depends))
-                out.append([d["name"], d["version"], d["build"], depends])
-                f.close()
-    r_dt = "<U{}".format(max_len)
-    dt = np.dtype([('Name', '<U30'), ('Version', '<U15'), ('Build', '<U15'),
-                   ('Requires', r_dt)])
-    packages = uts(np.asarray(out), dtype=dt)
-    out = []
-    names = packages['Name']
-    depends = packages['Requires']
-    for nme in names:
-        f = np.char.find(depends, nme.split("-")[0])
-        w = np.where(f != -1)[0]
-        if np.size(w) > 0:
-            v = names[w].tolist()
-            v0 = ", ".join([i.split(" ")[0] for i in v])
-            out.append([nme, v0])
-        else:
-            out.append([nme, "None"])
-    return packages, out
-
-
-def in_file(pth, sub_folder="info", file_name="index.json",
-            text="", dependencies=True, output=False):
-    r"""Find string in file in folders
-
-    os, json required
-    pth = r'C:\Users\dan_p\AppData\Local\ESRI\conda\pkgs'
-    sub_folder="info"
-    file_name = "index.json"
-    text = "python"
-    """
-    import json
-    out = []
-    dir_lst = os.listdir(pth)
-    print("module, dependencies....")
-    for obj in dir_lst:
-        key_fld = pth + os.sep + obj
-        if sub_folder:
-            key_fld += os.sep + sub_folder
-        if os.path.exists(key_fld):
-            fname = key_fld + os.sep + file_name
-            if os.path.isfile(fname):
-                f = open(fname, 'r')
-                f_string = f.read()
-                if text in f_string:
-                    dct = json.loads(f_string)
-                    if dependencies:
-                        depends = dct['depends']
-                        out.append([obj, depends])
-                    else:
-                        out.append(obj)
-                f.close()
-    if output:
-        return out
-    for ln in out:
-        lines = "\n".join([f"   {i}" for i in ln[1]])
-        print("{}\n{}".format(ln[0], lines))
-    
 
 
 # ----------------------------------------------------------------------
@@ -776,4 +694,3 @@ if __name__ == "__main__":
 else:
     testing = False
     # parameters here
-    
