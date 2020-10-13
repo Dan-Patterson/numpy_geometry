@@ -11,7 +11,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2020-06-23
+    2020-10-07
 
 Purpose
 -------
@@ -119,7 +119,7 @@ from numpy.lib.recfunctions import append_fields
 from npGeo import arrays_to_Geo  # Geo
 
 from npg_arc_npg import (get_SR, get_shape_K, fc_to_Geo, Geo_to_fc,
-                         Geo_to_shapes)
+                         Geo_to_arc_shapes)
 from npg_create import circle
 
 from scipy.spatial import Voronoi  # Delaunay
@@ -263,7 +263,7 @@ def _out_(shps, gdb, name, out_kind, SR):
 
 def temp_fc(geo, name, kind, SR):
     """Similar to _out_ but creates a `memory` featureclass."""
-    polys = Geo_to_shapes(geo, as_singlepart=True)
+    polys = Geo_to_arc_shapes(geo, as_singlepart=True)
     wkspace = env.workspace = 'memory'  # legacy is in_memory
     tmp_name = "{}\\{}".format(wkspace, name)
     # tmp = MultipartToSinglepart(in_fc, r"memory\in_fc_temp")

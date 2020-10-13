@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2020-03-29
+    2020-10-08
 
 Purpose
 -------
@@ -37,8 +37,8 @@ References
 **Dissolve**
 
 `<C:\arc_pro\Resources\ArcToolBox\Scripts\Weights.py>`_.
-`<C:\arc_pro\Resources\ArcToolBox\Toolboxes
-\Spatial Statistics Tools.pyt>`_.
+`<C:\arc_pro\Resources\ArcToolBox\Toolboxes\GeoAnalytics Desktop Tools.tbx\
+    DissolveBoundaries.tool>`_.
 `<https://pro.arcgis.com/en/pro-app/tool-reference/geoanalytics-desktop
 /dissolve-boundaries.htm>`_.
 """
@@ -55,7 +55,9 @@ import numpy as np
 
 import npgeom as npg
 from npg_pip import np_wn
-from npgeom.npg_helpers import (compare_geom, radial_sort)
+from npgeom.npg_helpers import (
+    _isin_2d_, _bit_check_, compare_geom, radial_sort
+    )
 # pnts_in_poly, crossing_num,  line_crosses,
 
 # ---- optional imports
@@ -79,8 +81,13 @@ script = sys.argv[0]  # print this should you need to locate the script
 # TwoPI = np.pi * 2.0
 
 __all__ = [
-    '_in_LBRT_', 'p_ints_p', 'batch_p_int_p', '_intersect_', 'intersects',
-    'clip_', 'dissolve', 'append_', 'merge_', '_union_', 'union_'
+    '_in_LBRT_', 'pnt_segments',
+    'dist_to_segment', 'points_in_polygons', 'p_ints_p', 'clip_',
+    'batch_p_int_p', '_intersect_', 'intersects',
+    'adjacent', 'adjacency_matrix', 'dissolve',
+    'append_',
+    'merge_',
+    '_union_', 'union_'
 ]  # '_poly_intersect_poly',
 
 
@@ -387,12 +394,9 @@ def batch_p_int_p(polys, overlays):
     return output
 
 
-# ---- clip is above
-#
 def _intersect_(p0, p1, p2, p3):
-    """Return the intersection of two segments (p0-->p1) and (p0-->p2).
-
-    All calculations are made whether the segments intersect or not.
+    """Return the intersection of two segments (p0-->p1) and (p0-->p2) or
+    the extrapolation point if they don't cross.
 
     Notes
     -----
@@ -407,6 +411,7 @@ def _intersect_(p0, p1, p2, p3):
     >>> denom   = (y3 - y2) * (x1 - x0) - (x3 - x2) * (y1 - y0)
     >>> s_numer = (x1 - x0) * (y0 - y2) - (y1 - y0) * (x0 - x2)
     >>> t_numer = (x3 - x2) * (y0 - y2) - (y3 - y2) * (x0 - x2)
+    >>> t = t_numer / denom
     >>> x = x0 + t * (x1 - x0)
     >>> y = y0 + t * (y1 - y0)
 
@@ -424,10 +429,10 @@ def _intersect_(p0, p1, p2, p3):
         return null_pnt
     d_gt0 = denom > 0.
     s_numer = p01_x * p02_y - p01_y * p02_x
-    if (s_numer < 0) == d_gt0:
+    if (s_numer < 0.0) == d_gt0:
         return null_pnt
     t_numer = p23_x * p02_y - p23_y * p02_x
-    if (t_numer < 0) == d_gt0:
+    if (t_numer < 0.0) == d_gt0:
         return null_pnt
     # ---- are s_numer and t_numer between 0 and 1 test
 #    if ((s_numer > denom) == d_gt0) and ((t_numer > denom) == d_gt0):
@@ -549,7 +554,7 @@ def intersects(args):
 # ---- (3) dissolve shared boundaries
 #
 def adjacent(a, b):
-    """Check adjacency between 2 polygon shapes
+    """Check adjacency between 2 polygon shapes.
 
     Parameters
     ----------
@@ -557,92 +562,129 @@ def adjacent(a, b):
         The arrays of coordinates to check for polygon adjacency.
         The duplicate first/last point is removed so that a count will not
         flag a point as being a meeting point between polygons.
+
+    Note
+    ----
+    Adjacency is defined as meeting at least 1 point.  Further checks will be
+    needed to assess whether two shapes meet at 1 point or 2 non-consequtive
+    points.
     """
-    s = np.concatenate((a[:-1], b[:-1]), axis=0)
-    u, idx = np.unique(s, True, False, False, axis=0)
-    if len(s) > len(u):
-        return s[idx]
-    return None
+    s = np.sum((a[:, None] == b).all(-1).any(-1))
+    return True if s > 0 else False
 
 
-def adjacency_matrix(g):
-    """Construct an adjacency matrix from an input Geo array.
+def adjacency_matrix(a):
+    """Construct an adjacency matrix from an input geometry.
+
+    Parameters
+    ----------
+    a : array_like
+        A Geo array, list of lists/arrays or an object array representing
+        polygon geometry.
 
     Returns
     -------
     An nxn array adjacency for polygons and a id-keys to convert row-column
     indices to their original ID values.
+
+    The diagonal of the output is assigned the shape ID. Adjacent to a cell
+    is denoted by assigning the shape ID.  Non-adjacent shapes are assigned -1
+
+    Example::
+
+        ad =adjacency_matrix(a)             # ---- 5 polygons shapes
+        array([[ 0, -1, -1,  3,  4],
+               [-1,  1, -1, -1, -1],
+               [-1, -1,  2, -1, -1],
+               [ 0, -1, -1,  3,  4],
+               [ 0, -1, -1,  3,  4]])
+        ad >= 0                             # ---- where there are links
+        array([[1, 0, 0, 1, 1],
+               [0, 1, 0, 0, 0],
+               [0, 0, 1, 0, 0],
+               [1, 0, 0, 1, 1],
+               [1, 0, 0, 1, 1]])
+        row_sums = np.sum(ad >= 0, axis=1)  # sum the rows
+        w = np.where(row_sums > 1)[0]       # find out where sum is > 1
+        np.unique(ad[w], axis=0)            # get the unique combinations
+        array([[ 0, -1, -1,  3,  4]])       # of the adjacency test if needed
+
+    Polygons 0, 3 and 4 are connected. Polygons 1 and 2 are not connected to
+    other geometry objects.
     """
-    g0 = g.outer_rings(asGeo=False)
-    n = len(g0)
-    id_keys = np.array(list(zip(g0.IDs, np.arange(n))))
-    srted = g0.sort_by_extent('LB', 0)
-    idx = srted.pnt_indices(as_structured=False)
-    # ---- create the adjacency matrix
-    z = np.zeros((n, n), dtype=np.int32)
-    cks = [(srted.XY[:, None] == bit).all(-1).any(-1) for bit in g0]
-    kys = [np.nonzero(c)[0] for c in cks]
-    i_x = [np.unique(idx[:, 1][k]) for k in kys]
-    for i, v in enumerate(i_x):
-        z[i, v] = 1
-    return z, id_keys
+    rings = _bit_check_(a, just_outer=True)
+    n = len(rings)
+    z = np.full((n, n), -1)
+    np.fill_diagonal(z, np.arange(n))
+    for i in range(n):
+        for j in range(n):
+            if i != j:
+                ij = adjacent(rings[i], rings[j])
+                if ij:
+                    z[i, j] = j
+    return z  # id_keys
 
 
-def dissolve(g, asGeo=False):
+def dissolve(a, asGeo=True):
     r"""Dissolve polygons sharing edges.
 
     Parameters
     ----------
-    g : array
-        A Geo array.
+    a : array_like
+        A Geo array is preferred, but a list of lists/arrays or an object array
+        representing geometry can be used.
+    asGeo : boolean
+        True, returns a Geo array. False returns a list of arrays.
 
-    from npgeom.npg_plots import plot_polygons
+    >>> from npgeom.npg_plots import plot_polygons  # to plot the geometry
+
+    `_isin_2d_`, `find`, `adjacent` equivalent::
+
+        (b0[:, None] == b1).all(-1).any(-1)
     """
-    def _adjacent_(a, b):
-        """Check adjacency between 2 polygon shapes"""
-        s = np.concatenate((a, b), axis=0)
-        u, idx = np.unique(s, True, False, False, axis=0)
-        if len(s) > len(u):
-            return s[sorted(idx)]
+    def _find_(a, b):
+        """Find.  Abbreviated form of `adjacent`, to use for slicing."""
+        return (a[:, None] == b).all(-1).any(-1)
+
+    def cycle(b0, b1):
+        """Cycle through the bits."""
+        idx01 = _find_(b0, b1)
+        if idx01.sum() == 0:
+            return None
+        dump = b0[idx01]
+        sp0 = np.nonzero(idx01)[0]
+        sp1 = np.any(np.isin(b1, dump, invert=True), axis=1)
+        z0 = np.array_split(b0, sp0[1:])
+        z1 = b1[sp1]
+        out = np.concatenate((z0[0], z1, z0[-1]), axis=0)
+        return out
+    # ----
+    if hasattr(a, "IFT"):
+        is_multi = np.any(a.shp_part_cnt[:, 1] > 1)
+#        holes = a.inner_rings(False, False)
+        if is_multi:
+            a = a.multipart_to_singlepart()
+            # a = a.outer_rings(asGeo=True)
+            a = npg.roll_coords(a)
+    rings = _bit_check_(a, just_outer=True)  # get the outer rings for 1 and 2
+    if len(rings) < 2:
         return None
-
-    def _dis_(orig, bits):
-        """Dissolve the bits"""
-        for i, shp in enumerate(bits):
-            result = _adjacent_(orig, shp)
-            if result is None:
-                orig = shp
-            else:
-                # fwd = [orig[0], shp]
-                # orig = np.concatenate(([orig[0]], shp[2:], orig[2:]))
-                orig = npg.radial_sort(result)
-        return orig
-    sq = g
-    b0, b1 = sq.bits[:2]
-    idx0 = ~np.all(np.isin(b0, b1), axis=1)  # b0 to keep
-    idx1 = ~np.all(np.isin(b1, b0), axis=1)  # b1 to keep
-    u0 = np.unique(b0[np.all(np.isin(b0, b1), axis=1)], axis=0)
-    u1 = np.unique(b1[np.all(np.isin(b1, b0), axis=1)], axis=0)
-
-    seq0 = np.split(idx0, np.where(np.diff(idx0) != 0)[0] + 1)
-    seq1 = np.split(idx1, np.where(np.diff(idx1) != 0)[0] + 1)
-    # b01 = np.concatenate((b0, b1), axis=0)
-
-    ft0 = np.concatenate((b0[:-1], b0[1:]), axis=1)
-    ft1 = np.concatenate((b1[1:], b1[:-1]), axis=1)
-    ft2 = np.concatenate((b1[:-1], b1[1:]), axis=1)
-    #
-    z01 = ft0[~np.all(np.isin(ft0, ft1), axis=1)]
-    z02 = ft0[~np.all(np.isin(ft0, ft2), axis=1)]
-    z10 = ft1[~np.all(np.isin(ft1, ft0), axis=1)]
-    z20 = ft2[~np.all(np.isin(ft2, ft0), axis=1)]
-
-    a = np.concatenate((b0[:-1], b0[1:]), axis=1)
-    b = np.concatenate((b1[:-1], b1[1:]), axis=1)
-    ab = ft0[~np.all(np.isin(a, b), axis=1)]
-    ba = ft2[~np.all(np.isin(b, a), axis=1)]
-
-    return z20, z10, z01, z02
+    out = rings[0]
+    missed = []
+    for b1 in rings[1:]:
+        out2 = cycle(out, b1[:-1])
+        if out2 is None:
+            missed.append(b1)
+        else:
+            out = out2[:]
+    if len(missed) > 0:
+        out = [out] + missed
+#    if holes is not None:
+#        out = out + holes.tolist()
+    if asGeo:
+        out = npg.arrays_to_Geo(
+            out, kind=a.K, info="dissolved", to_origin=False)
+    return out  # z0, z1, out
 
     """
     https://stackoverflow.com/questions/14263284/create-non-intersecting
@@ -745,13 +787,13 @@ def append_(this, to_this):
 #
 def merge_(a, to_b):
     """
-    Merge `this` geometry `to_this` geometry
+    Merge `a` geometry and `b` geometry
 
     Parameters
     ----------
-    this : array(s) or a Geo array
-        The geometry to merge to the existing geometry (`to_this`).
-    to_this : Geo array
+    a : array(s) or a Geo array
+        The geometry to merge to the existing geometry (`to_b`).
+    b : Geo array
         The Geo array to receive the new geometry
 
     Notes
@@ -771,31 +813,30 @@ def merge_(a, to_b):
     this = [a, b]
     to_this = s0
     """
-    if ('Geo' in str(type(to_b))) & (issubclass(to_b.__class__, np.ndarray)):
-        a_stack = to_b.XY
-        IFT = to_b.IFT
-    else:
-        to_b = npg.arrays_to_Geo([to_b])
-    if ('Geo' in str(type(a))) & (issubclass(a.__class__, np.ndarray)):
+    if not hasattr(to_b, 'IFT'):
+        to_b = npg.arrays_to_Geo(to_b)
+    b_XY = to_b.XY
+    b_IFT = to_b.IFT
+    if hasattr(a, 'IFT'):
         if a.K != to_b.K:
-            print("\nGeo array `kind` is not the same,\n")
+            print("\nGeo array `kind` is not the same.\n")
             return
+        a_XY = a.XY
+        a_IFT = a.IFT
     else:
         a = np.asarray(a)
         if a.ndim == 2:
             a = [a]
-        # mins = np.min(np.vstack(([np.min(i, axis=0) for i in this])), axis=0)
-        a_stack, IFT, extent = npg.array_IFT(a)
-        a_stack = a_stack + extent[0]
-
+        a_XY, a_IFT, extent = npg.array_IFT(a)
+        a_XY = a_XY + extent[0]
     last = to_b.IFT[-1, :]
     add_ = []
-    for i, row in enumerate(IFT, 1):
+    for i, row in enumerate(b_IFT, 1):
         add_.append([last[0] + i, last[2] + row[1],
                      last[2] + row[2]] + list(row[3:]))
     add_ = np.atleast_2d(add_)
-    new_ift = np.vstack((to_b.IFT, add_))
-    xys = np.vstack((to_b.XY, a_stack))
+    new_ift = np.vstack((b_IFT, add_))
+    xys = np.vstack((b_XY, a_XY))
     kind = to_b.K
     sr = to_b.SR
     out = npg.Geo(xys, IFT=new_ift, Kind=kind, Extent=None, Info="", SR=sr)
@@ -881,7 +922,7 @@ def _union_(poly, clipper, is_polygon=True):
 
 def union_(poly, clipper, is_polygon=True):
     """Return. Test main program"""
-    if poly.__class__.__name__ != "Geo":
+    if not hasattr(poly, "IFT"):
         print("\nGeo array required for `to_this`\n")
         return
     cw = poly.CW

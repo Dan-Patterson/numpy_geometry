@@ -169,8 +169,8 @@ def winding_num(pnts, poly):
 
     Parameters
     ----------
-    p : array
-        This is simply an (x, y) point pair of the point in question.
+    pnts : array
+        The (x, y) point pairs to be tested for inclusion.
     poly : array
         A clockwise oriented Nx2 array of points, with the first and last
         points being equal.

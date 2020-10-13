@@ -84,7 +84,7 @@ import npg_io
 import npg_arc_npg
 
 ft = {"bool": lambda x: repr(x.astype(np.int32)),
-      "float_kind": "{: 0.3f}".format}
+      "float_kind": "{: 7.2f}".format}
 np.set_printoptions(
     edgeitems=10, linewidth=80, precision=2, suppress=True, threshold=100,
     formatter=ft

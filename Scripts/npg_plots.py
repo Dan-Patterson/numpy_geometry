@@ -371,7 +371,8 @@ def plot_polygons(arr, outline=True):
         cw = arr.CW
         shapes = arr.bits
     else:
-        cw = np.repeat(1, arr.shape[0])
+    #     cw = np.repeat(1, arr.shape[0])
+    #    shapes = np.copy(arr)
         shapes = np.copy(arr)
     fig, ax = plt.subplots(1, 1)
     fig.set_figheight = 8

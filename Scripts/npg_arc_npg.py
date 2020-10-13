@@ -70,11 +70,11 @@ script = sys.argv[0]  # print this should you need to locate the script
 
 __all__ = [
     'get_SR', 'get_shape_K', 'fc_to_Geo', 'id_fr_to',  # option 1, use this ***
-    'Geo_to_shapes', 'Geo_to_fc', 'view_poly',  # back to fc
-    'make_nulls', 'fc_data', 'tbl_data',        # get attributes
+    'Geo_to_arc_shapes', 'Geo_to_fc', 'view_poly',  # back to fc
+    'make_nulls', 'fc_data', 'tbl_data',            # get attributes
     'fc2na', 'get_fc_shapes', 'array_poly', 'geometry_fc',
-    '_array_to_poly_', '_poly_to_array_',       # geometry to array
-    '_poly_arr_', 'poly2array',                 # extras
+    '_array_to_poly_', '_poly_to_array_',           # geometry to array
+    '_poly_arr_', 'poly2array',                     # extras
     'arc_union'  # arcpy functions
 ]   # '_del_none', '__geo_interface__', '_flat',
 
@@ -183,7 +183,7 @@ def fc_to_Geo(in_fc, geom_kind=2, minX=0, minY=0, info=""):
     id_vals = oids[indx]
     indx = np.concatenate((indx, [a.shape[0]]))
     #
-    # ---- (3) Construct the IFT data using ``id_fr_to`` to carry the load.
+    # ---- (3) Construct the IFT data using `id_fr_to` to carry the load.
     IFT_ = np.asarray(id_fr_to(xy, oids))
     cols = IFT_.shape[0]
     IFT = np.full((cols, 6), -1, dtype=np.int32)
@@ -220,9 +220,10 @@ def fc_to_Geo(in_fc, geom_kind=2, minX=0, minY=0, info=""):
 
 # helper function
 def id_fr_to(a, oids):
-    """Produce the ``id, from, to`` point indices used by fc_to_Geo.
+    """Produce the `id, from, to` point indices used by fc_to_Geo.
 
-    NOTE : no error checking.
+    .. note::
+       No error checking.  This function is used by `fc_to_Geo` .
 
     Parameters
     ----------
@@ -231,7 +232,7 @@ def id_fr_to(a, oids):
     oids : array
         An array of object ids derived from the feature class.  There is no
         guarantee that they will be as simple as a sequential list, so do not
-        substitute with an np.arange(...) option
+        substitute with an np.arange(...) option.
     """
     sze = a.shape[0]
     val = 0
@@ -262,7 +263,7 @@ def id_fr_to(a, oids):
 # ============================================================================
 # ---- (2) Geo to arcpy shapes ----------------------------------------
 #
-def Geo_to_shapes(geo, as_singlepart=True):
+def Geo_to_arc_shapes(geo, as_singlepart=True):
     """Create poly features from a Geo array.
 
     Parameters
@@ -346,7 +347,7 @@ def Geo_to_fc(geo, gdb=None, name=None, kind=None, SR=None):
     #
     # dx, dy = geo.LL
     # geo = geo.shift(dx, dy)
-    polys = Geo_to_shapes(geo, as_singlepart=True)
+    polys = Geo_to_arc_shapes(geo, as_singlepart=True)
     out_name = gdb.replace("\\", "/") + "/" + name
     wkspace = env.workspace = 'memory'  # legacy is in_memory
     tmp_name = "{}\\{}".format(wkspace, "tmp")
@@ -362,7 +363,7 @@ def Geo_to_fc(geo, gdb=None, name=None, kind=None, SR=None):
 
 
 def view_poly(geo, id_num=1, view_as=2):
-    """View a poly feature as an SVG in the console.
+    """View a since poly feature as an SVG in the console.
 
     Parameters
     ----------
@@ -608,17 +609,15 @@ def array_poly(arr, p_type=None, sr=None, IFT=None):
 
     def is_Geo_(obj):
         """From : Function of npgeom.npGeo module"""
-        if ('Geo' in str(type(obj))) & (issubclass(obj.__class__, np.ndarray)):
+        if hasattr(obj, "IFT"):
             return True
         return False
     # ----
     polys = []
     if is_Geo_(arr):
-        # ids = arr.IFT[:, 0]
         from_to = arr.IFT[:, 1:3]
         arr = [arr.XY[f:t] for f, t in from_to]  # --- _poly_pieces_ chunks
     for a in arr:
-        # p = _array_to_poly_(a, sr, p_type)  # makes parts of chunks
         p = _arr_poly_(a, sr, p_type)
         polys.append(p)
     out = list(zip(polys))  # , ids))

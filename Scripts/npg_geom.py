@@ -15,7 +15,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2020-09-22
+    2020-10-07
 
 Purpose
 -------
@@ -116,7 +116,7 @@ from npg_pip import np_wn
 
 
 ft = {'bool': lambda x: repr(x.astype(np.int32)),
-      'float_kind': '{: 0.1f}'.format}
+      'float_kind': '{: 7.2f}'.format}
 np.set_printoptions(edgeitems=10, linewidth=80, precision=1, suppress=True,
                     threshold=100, formatter=ft)
 np.ma.masked_print_option.set_display('-')  # change to a single -
@@ -196,11 +196,11 @@ def extent_to_poly(extent, kind=2):
 
 # ==== ====================================================
 # ---- distance related
-def find_closest(self, pnt):
+def find_closest(a, pnt):
     """Find the closest point within a Geo array, its index and distance."""
-    dist = eucl_dist(self, pnt)
+    dist = eucl_dist(a, pnt)
     idx = np.argmin(dist)
-    return np.asarray(self[idx]), idx, dist[idx]
+    return np.asarray(a[idx]), idx, dist[idx]
 
 
 def eucl_dist(a, b, metric='euclidean'):
@@ -370,7 +370,7 @@ def scale_by_area(poly, factor=1, asGeo=False):
 
     Requires
     --------
-    `is_Geo`, `_bit_area_` from npg_helpers
+    `is_Geo` from npGeo and `_bit_area_` from npg_helpers.
 
     Notes
     -----
@@ -475,7 +475,7 @@ def offset_buffer(poly, buff_dist=1, keep_holes=False, asGeo=False):
         return np.concatenate((frst, np.array(segs)), axis=0)
 
     def _buffer_Geo_(poly, buff_dist, keep_holes):
-        """Move the Geo array buffering separately"""
+        """Move the Geo array buffering separately."""
         arr = poly.bits
         cw = poly.CW
         final = []
@@ -508,6 +508,8 @@ def offset_buffer(poly, buff_dist=1, keep_holes=False, asGeo=False):
 #
 def mabr(polys, p_centers, p_angles):
     """Determine the minimum area bounding rectangle for polygons.
+
+    Called by the class method `min_area_rect` in npGeo.
 
     Parameters
     ----------
@@ -667,7 +669,8 @@ def polys_to_segments(self, as_basic=True, to_orig=False, as_3d=False):
     if as_3d:  # The array cannot be basic if it is 3d
         as_basic = False
     if to_orig:
-        b_vals = [b + self.LL for b in self.bits]  # shift to orig extent
+        tmp = self.XY + self.LL
+        b_vals = [tmp[ft[0]:ft[1]] for ft in self.FT]   # shift to orig extent
     else:
         b_vals = [b for b in self.bits]
     # ---- Do the concatenation
@@ -946,6 +949,12 @@ def bin_pnts(pnts, x_bins=None, y_bins=None):
 
     Where the first array are the counts, and the next two arrays are the bin
     edges for the X and Y values.
+
+    References
+    ----------
+    `Aggregate points
+    <https://pro.arcgis.com/en/pro-app/tool-reference/geoanalytics-desktop/
+    aggregate-points.htm>`_.
     """
     if x_bins is None:
         x_bins = (pnts[:, 0].max() - pnts[:, 0].min()) / 10

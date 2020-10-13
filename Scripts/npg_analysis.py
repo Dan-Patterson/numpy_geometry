@@ -313,7 +313,7 @@ def intersection_pnt(p0, p1, p2, p3):
     """Return an intersection point.
 
     The intersection point is for a polygon segment (p0->p1) and a
-    clipping polygon segment (s->e).
+    clipping polygon segment (p2->p3).
 
     References
     ----------

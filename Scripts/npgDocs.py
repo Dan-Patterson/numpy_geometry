@@ -17,7 +17,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2020-09-06
+    2020-10-07
 
 Purpose
 -------
@@ -432,25 +432,17 @@ The key/azimuth information is::
 
 **Sorting... key - direction vector - azimuth**
 
-+------+---------+-------+
-| key  + vector  +azimuth|
-+======+=========+=======+
-|  0   | S to N  |    0  |
-+------+---------+-------+
-|  1   | SW - NE |   45  |
-+------+---------+-------+
-|  2   | W to E  |   90  |
-+------+---------+-------+
-|  3   | NW - SE |  135  |
-+------+---------+-------+
-|  4   | N to S  |  180  |
-+------+---------+-------+
-|  5   | NE - SW |  225  |
-+------+---------+-------+
-|  6   | E to W  |  270  |
-+------+---------+-------+
-|  7   | SE - NW |  315  |
-+------+---------+-------+
+::
+
+      key     vector  azimuth
+    |  0   | S to N  |    0  |
+    |  1   | SW - NE |   45  |
+    |  2   | W to E  |   90  |
+    |  3   | NW - SE |  135  |
+    |  4   | N to S  |  180  |
+    |  5   | NE - SW |  225  |
+    |  6   | E to W  |  270  |
+    |  7   | SE - NW |  315  |
 
 
 The key values are used to select the dominant direction vector.

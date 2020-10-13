@@ -15,7 +15,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2020-09-22
+    2020-10-07
 
 Purpose
 -------
@@ -66,7 +66,7 @@ __all__ = [
     '_bit_check_', '_from_to_pnts_',
     '_angles_3pnt_', '_area_centroid_', '_bit_area_', '_bit_crossproduct_',
     '_bit_extent_', '_bit_length_', '_bit_segment_angles_',
-    '_is_clockwise_', '_is_ccw_', '_is_right_side', '_in_extent_',
+    '_is_clockwise_', '_is_ccw_', '_isin_2d_', '_is_right_side', '_in_extent_',
     '_pnts_in_extent_', '_translate_', '_rot_', '_scale_', '_rotate_',
     'polyline_angles', 'segment_angles',
     'line_crosses', 'in_out_crosses', 'crossings',
@@ -76,12 +76,22 @@ __all__ = [
 
 
 # ---- core bit functions
-def _bit_check_(a):
-    """Check for bits and convert if necessary."""
-    if isinstance(a, (list, tuple)):
+def _bit_check_(a, just_outer=False):
+    """Check for bits and convert if necessary.
+
+    a : array_like
+        Either a Geo array or a list of lists.  Conversion to bits or outer
+        rings as desired.
+    just_outer : boolean
+        True, removes holds from the geometry.
+    """
+    if hasattr(a, "IFT"):
+        if just_outer:
+            a = a.outer_rings(asGeo=False)
+        else:
+            a = a.bits
+    elif isinstance(a, (list, tuple)):
         a = np.asarray(a, dtype='O')
-    elif hasattr(a, "IFT"):
-        a = a.bits
     if len(a) == 1:
         a = [a]
     return a
@@ -101,7 +111,7 @@ def _from_to_pnts_(a):
 # ---- bit helpers ----
 #
 def _angles_3pnt_(a, inside=True, in_deg=True):
-    """Worker for Geo `angles_polygon` and `min_area_rect`.
+    """Worker for Geo `polygon_angles`, `polyline_angles` and `min_area_rect`.
 
     Sequential points, a, b, c for the first bit in a shape, so interior holes
     are removed in polygons and the first part of a multipart shape is used.
@@ -110,7 +120,8 @@ def _angles_3pnt_(a, inside=True, in_deg=True):
     Parameters
     ----------
     inside : boolean
-        True, for interior angles.
+        True, for interior angles for polygons ordered clockwise.  Equivalent
+        to `right-side` for polylines.
     in_deg : boolean
         True for degrees, False for radians.
     """
@@ -206,6 +217,41 @@ def _is_clockwise_(a):
 def _is_ccw_(a):
     """Counterclockwise."""
     return 0 if _bit_area_(a) > 0. else 1
+
+
+def _isin_2d_(a, b, as_integer=False):
+    """Perform a 2d `isin` check for 2 arrays.
+
+    Parameters
+    ----------
+    a, b : arrays
+        The arrays to compare.
+    as_integer : boolean
+        False, returns a boolean array.  True, returns integer array which may
+        useful for some operations.
+
+    Example
+    -------
+    >>> a = np.array([[ 5.00,  10.00], [ 5.00,  12.00], [ 6.00,  12.00],
+                      [ 8.00,  12.00], [ 8.00,  11.00], [ 5.00,  10.00]])
+    >>> b = np.array([[ 5.00,  12.00], [ 5.00,  15.00], [ 7.00,  14.00],
+                      [ 6.00,  12.00], [ 5.00,  12.00]])
+    >>> w0 = (a[:, None] == b).all(-1).any(-1)
+    array([0, 1, 1, 0, 0, 0])
+    >>> a[w0]
+    array([[ 5.00,  12.00], [ 6.00,  12.00]])
+    >>> w1 = (b[:, None] == a).all(-1).any(-1)
+    >>> b[w1]
+    array([[ 5.00,  12.00], [ 6.00,  12.00], [ 5.00,  12.00]])
+
+    Reference
+    ---------
+    `<https://stackoverflow.com/a/51352806/6828711>`_.
+    """
+    out = (a[:, None] == b).all(-1).any(-1)
+    if as_integer:
+        return out.astype('int')
+    return out
 
 
 def _is_right_side(p, strt, end):
@@ -371,7 +417,7 @@ def polyline_angles(a, fromNorth=False):
     a : array-like
         A Geo array or a list of arrays representing the polyline shapes
     """
-    bits = _bit_check_(a)
+    bits = _bit_check_(a, just_outer=False)
     out = []
     for b in bits:
         dxy = b[1:] - b[:-1]
@@ -392,15 +438,7 @@ def segment_angles(a, fromNorth=False):
 
     splitter = geo.To - np.arange(1, geo.N + 1)
     """
-    if hasattr(a, "IFT"):
-        a = a.outer_rings(asGeo=False)
-    elif a.dtype.name == "object":
-        if len(a) == 1:
-            a = [a]
-    elif len(a.shape) == 2:
-        a = [a]
-    else:
-        return None
+    a = _bit_check_(a, just_outer=False)
     ang = [_bit_segment_angles_(i, fromNorth) for i in a]
     return ang
 

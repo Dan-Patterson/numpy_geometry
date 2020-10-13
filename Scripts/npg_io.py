@@ -71,7 +71,7 @@ NUMS = FLOATS + INTS
 
 
 ft = {'bool': lambda x: repr(x.astype(np.int32)),
-      'float_kind': '{: 0.1f}'.format}
+      'float_kind': '{: 7.2f}'.format}
 np.set_printoptions(
     edgeitems=10, linewidth=160, precision=2, suppress=True,
     threshold=100, formatter=ft
@@ -199,6 +199,8 @@ def save_geo(g, f_name, folder):
         return None
     IFT, K, XT, SR = [g.IFT, g.K, g.XT, g.SR]  # g is a Geo array
     folder = folder.replace("\\", "/")
+    if f_name[-4:] == ".npz":
+        f_name = f_name[:-4]
     out_name = "{}/{}.npz".format(folder, f_name)
     np.savez(out_name, g=g, ift=IFT, kind=K, extents=XT, spatial_ref=SR)
     print("\nGeo array saved to ... {} ...".format(out_name))
@@ -295,6 +297,12 @@ def load_geojson(pth, full=False, geometry=True):
         A list of lists representing the features, their parts (for multipart
         features) and inner holes (for polygons).
 
+    Notes
+    -----
+    Using the Features to JSON tool in ArcGIS PRO, the .json option was used.
+    - Unchecked : The output will be created as Esri JSON (.json).
+    - Checked   : The output will be created in the GeoJSON format (.geojson).
+
     References
     ----------
     `geojson specification in detail
@@ -326,7 +334,7 @@ def load_geojson(pth, full=False, geometry=True):
         return coords
 
 
-def geojson_Geo(pth, kind=2, info=None):
+def geojson_Geo(pth, kind=2, info=None, to_origin=False):
     """Convert GeoJSON file to Geo array using `npGeo.arrays_to_Geo`.
 
     Parameters
@@ -340,8 +348,8 @@ def geojson_Geo(pth, kind=2, info=None):
     """
     coords = load_geojson(pth)
     # a_2d, ift, extents = npGeo.array_IFT(coords)
-    return npGeo.arrays_to_Geo(coords, kind=kind, info=info)
-    # return npGeo.Geo(a_2d, IFT=ift, Extent=extents, Kind=kind)
+    return npGeo.arrays_to_Geo(
+               coords, kind=kind, info=info, to_origin=to_origin)
 
 
 # ============================================================================
