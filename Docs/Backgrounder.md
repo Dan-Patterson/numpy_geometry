@@ -671,3 +671,4 @@ Bit_ID  : self.Bit  sequence order of each part in a shape
  004      4        25        30         1          1         0
  ```
 
+<img src="images/sq.png" align="center" width="300"/>
