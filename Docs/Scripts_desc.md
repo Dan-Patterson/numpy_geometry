@@ -26,7 +26,7 @@ Some useful functions to access and document featureclass information
 **dtype_info(a, as_string=False)**
 
 Return dtype information as lists or a string.
-```
+```python
 a = np.array([(0,  1,  2), (3,  4,  5), (6,  7,  8), (9, 10, 11)],
               dtype=[('f0', '<i4'), ('f1', '<i4'), ('f2', '<i4')])
 
@@ -41,8 +41,8 @@ Out[4]: ('f0, f1, f2', '<i4, <i4, <i4')
 
 Load saved arrays and supplemental information.
 
-```
- geo = npg.load_geo(f_name, True)
+```python
+geo = npg.load_geo(f_name, True)
 
 Loading...C:/Git_Dan/npgeom/data/g_arr.npz
 Arrays include...['g', 'ift', 'kind', 'extents', 'spatial_ref']
@@ -100,7 +100,7 @@ Read a structured/recarray created by save_txt.  Many options are specified in s
 The remainder of the functions deal with formatting attribute data and printing.
 
 
-```
+```python
 npg.npg_io
 '_ckw_', '_col_format', 'col_hdr', 'dtype_info', 'geojson_Geo', 'gms', 'load_geo', 'load_geojson',
  'load_txt', 'make_row_format', 'prn_', 'prn_geo', 'prn_q', 'prn_tbl', 'save_geo', 'save_txt
@@ -161,7 +161,7 @@ Geo arrays can be constructed from other ndarrays using **arrays_Geo**.
 Three sample arrays are shown below.
 They have been arranged in column format to save space.  
 
-```
+```python
 array(                  array([[[12., 18.], array([[14., 20.],
     [array([[10., 20.],         [12., 12.],        [10., 20.],
             [10., 10.],         [20., 12.],        [15., 28.],
@@ -187,7 +187,7 @@ array(                  array([[[12., 18.], array([[14., 20.],
 
 Both the array of arrays and the geo array are saved in the Scripts folder.
 To load the Geo array, save the files to disk.  You can save and load arrays using the follow syntax.  This was used to create the files saved here.
-```
+```python
 # ---- For single arrays
 np.save("c:/path_to_file/three_arrays.npy", z, allow_pickle=True, fix_imports=False)   # ---- save to disk
 
@@ -208,7 +208,8 @@ OLD
 
 **fc_info(in_fc, prn=True)**
 
-```fc_info(in_fc, prn=True)
+```python
+fc_info(in_fc, prn=True)
 
 FeatureClass:
    C:/Arc_projects/CoordGeom/CoordGeom.gdb/Shape2
