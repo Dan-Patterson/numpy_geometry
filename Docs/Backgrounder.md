@@ -6,7 +6,7 @@ IFT refers to the feature `id` value, the `from` and `to` points.
 
 To reduce numeric problems, the value of the lower left corner is subtracted from all coordinates moving coordinate space into quadrant I.  You could also subtract the mean value of the points which would center the shapes about the x-y axis origin.
 
-```
+```python
 test2(g, kind=2)  # a polygon featureclass with 3 shapes
 ```
 
@@ -15,7 +15,7 @@ test2(g, kind=2)  # a polygon featureclass with 3 shapes
 
 npg.dirr(g)
 
-```
+```python
 ----------------------------------------------------------------------
 | dir(npgeom) ...
 |    <class 'npgeom.Geo'>
