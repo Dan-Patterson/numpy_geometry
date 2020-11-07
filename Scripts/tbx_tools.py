@@ -122,6 +122,8 @@ from npg_arc_npg import (get_SR, get_shape_K, fc_to_Geo, Geo_to_fc,
                          Geo_to_arc_shapes)
 from npg_create import circle
 
+from npg_overlay import dissolve
+
 from scipy.spatial import Voronoi  # Delaunay
 
 import arcgisscripting as ags
@@ -160,7 +162,8 @@ tool_list = [
     'Extent Sort', 'Geometry Sort',
     'Area Sort', 'Length Sort',
     'Densify by Distance', 'Densify by Percent', 'Fill Holes',
-    'Rotate Features', 'Shift Features', 'Delaunay', 'Voronoi']
+    'Rotate Features', 'Shift Features', 'Dissolve Boundaries',
+    'Delaunay', 'Voronoi']
 
 
 # ===========================================================================
@@ -240,7 +243,8 @@ def _in_(in_fc, info):
     """Produce the Geo array."""
     SR = get_SR(in_fc)
     shp_kind, k = get_shape_K(in_fc)
-    g = fc_to_Geo(in_fc, geom_kind=k, info=info)
+    # fc_to_Geo(in_fc, geom_kind=2, minX=0, minY=0, sp_ref=None, info="")
+    g = fc_to_Geo(in_fc, geom_kind=k, sp_ref=SR.name, info=info)
     m = g.LL  # the lower left of the Geo array, which has been shifted
     oids = g.shp_ids
     return g, oids, shp_kind, k, m, SR
@@ -580,6 +584,18 @@ def shifter(in_fc, gdb, name, dX, dY):
     return
 
 
+# dissolve boundaries
+def dissolve_boundaries(in_fc, gdb, name):
+    """Dissolve shared boundaries between shapes"""
+    info = "boundary dissolve"
+    g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
+    out_kind = shp_kind
+    x, y = g.LL
+    g0 = dissolve(g, asGeo=True)
+    g0 = g0.translate(dx=x, dy=y)
+    _out_(g0, gdb, name, out_kind, SR)
+
+
 # ============================================================================
 # ---- Triangulation tools ---------------------------------------------------
 #
@@ -591,7 +607,7 @@ def tri_poly(in_fc, gdb, name, out_kind, constrained=True):
     x, y = g.LL
     g0 = out.translate(dx=x, dy=y)
     if constrained:
-        tmp_name = temp_fc(g0, shp_kind, SR)  # create a temporary featureclass
+        tmp_name = temp_fc(g0, "tmp", shp_kind, SR)  # make temp featureclass
         tmp_lyr = MakeFeatureLayer(tmp_name)
         SelectLayerByLocation(
             tmp_lyr, "WITHIN", tmp, None, "NEW_SELECTION", "NOT_INVERT")
@@ -752,6 +768,9 @@ def pick_tool(tool, in_fc, out_fc, gdb, name):
         dX = float(sys.argv[4])
         dY = float(sys.argv[5])
         shifter(in_fc, gdb, name, dX=dX, dY=dY)
+    elif tool == 'Dissolve Boundaries':
+        dissolve_boundaries(in_fc, gdb, name)
+
     #
     # ---- Triangulation
     elif tool == 'Delaunay':                     # ---- (1) Delaunay

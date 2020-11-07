@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
-"""Minimum area bounding circles
-
+r"""
+------------
 npg_min_circ
 ------------
 
 Script :
-    npg_min_circ.py for npgeom
+    npg_min_circ.py  # Minimum area bounding circles
 
 Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2019-08-30
+    2020-10-23
 
 Purpose
 -------
@@ -52,7 +52,7 @@ np.set_printoptions(
     edgeitems=5, threshold=500, floatmode='maxprec', precision=2,
     suppress=True, linewidth=120, nanstr='nan', infstr='inf', sign='-',
     formatter=ft
-)
+    )
 
 
 def circle_mini(radius=1.0, theta=10.0, xc=0.0, yc=0.0):
@@ -61,9 +61,9 @@ def circle_mini(radius=1.0, theta=10.0, xc=0.0, yc=0.0):
     Parameters
     ----------
     radius : number
-        Distance from centre
+        Distance from centre.
     theta : number
-        Angle of densification of the shape around 360 degrees
+        Angle of densification of the shape around 360 degrees.
     """
     angles = np.deg2rad(np.arange(180.0, -180.0 - theta, step=-theta))
     x_s = radius*np.cos(angles) + xc    # X values
@@ -156,9 +156,8 @@ def sub_1(pnts, prev, ptQ):
 
 # -------------------------------------------------------------------
 def sub_2(pnts, N, ptQ, ptP):
-    """Return the {cent, radius} for the smallest disc.
-
-    The disc encloses the points list with PointR, PointQ on its boundary.
+    """Return the {cent, radius} for the smallest disc.  The disc encloses the
+    points list with PointR, PointQ on its boundary.
     """
     if pnts.size == 0:
         pnts = np.array([[1.0, 1.0]])  # check

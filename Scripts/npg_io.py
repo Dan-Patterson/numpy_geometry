@@ -19,7 +19,7 @@ Script :
 Author :
     Dan_Patterson@carleton.ca
 
-Modified : 2020-09-17
+Modified : 2020-10-22
 
 Purpose
 -------
@@ -39,6 +39,10 @@ npGeo :
 References
 ----------
 **General**
+
+Example
+-------
+see : r"C:\Git_Dan\npgeom\docs\json_conversion_notes.txt"
 
 `Subclassing ndarrays
 <https://docs.scipy.org/doc/numpy/user/basics.subclassing.html>`_.
@@ -75,12 +79,13 @@ ft = {'bool': lambda x: repr(x.astype(np.int32)),
 np.set_printoptions(
     edgeitems=10, linewidth=160, precision=2, suppress=True,
     threshold=100, formatter=ft
-)
+    )
 
 __all__ = [
     'dtype_info', 'load_geo', 'save_geo', 'load_txt', 'save_txt',
     'load_geojson', 'geojson_Geo', 'prn_q', 'prn_', 'prn_tbl', 'prn_geo',
-]
+    'prn_Geo_shapes', '_svg'
+    ]
 
 
 # ---- (1) arrays : in and out------------------------------------------------
@@ -153,7 +158,7 @@ def load_geo(f_name, suppress_extras=True):
     -----
     From above: arrs = np.load(f_name)
     arrs : numpy.lib.npyio.NpzFile
-        The type of file
+        The type of file.
     other properties : dir(arrs)
         'allow_pickle', 'close', 'f', 'fid', 'files', 'get', 'items',
         'iteritems', 'iterkeys', 'keys', 'pickle_kwargs', 'values', 'zip'
@@ -225,11 +230,9 @@ def load_txt(name="arr.txt", data_type=None):
     see np.genfromtxt for all `args` and `kwargs`.
 
     """
-    a = np.genfromtxt(name, dtype=data_type,
-                      delimiter=",",
-                      names=True,
-                      autostrip=True,
-                      encoding=None)  # ,skip_header=1)
+    a = np.genfromtxt(
+        name, dtype=data_type, delimiter=", ", names=True, autostrip=True,
+        encoding=None)  # ,skip_header=1)
     return a
 
 
@@ -626,6 +629,139 @@ def prn_geo(a, rows_m=100, names=None, deci=2, width=75):
     # return row_frmt, hdr2  # uncomment for testing
 
 
+# ----  (4) print and display Geo and ndarrays
+#
+def prn_Geo_shapes(self, ids=None):
+    """Print the Geo array"""
+    cases = self.IFT[:, 0]
+    if ids is None:
+        ids = self.IFT[0]
+        w = np.isin(cases, cases)
+    elif isinstance(ids, (list, tuple)):
+        w = np.isin(cases, ids)
+    elif isinstance(ids, (int)):
+        w = np.isin(cases, ids)
+    if np.sum(w) == 0:
+        print("\nRecord ID not found...\n")
+        return None
+    rows = self.IFT[w]
+    hdr = "ID   : Shape ID by part\nring : outer 1, inner 0\n"
+    hdr += "ID  ring        x       y\n"
+    for i, row in enumerate(rows):
+        sub = self[row[1]:row[2]]
+        s0 = "{: 3.0f} {: 3.0f}  {!s:}\n".format(row[0], row[3], sub[0])
+        s1 = ""
+        for j in sub[1:]:
+            s1 += "{} {}\n".format(" "*8, j)
+        hdr += s0 + s1
+    print(hdr)
+
+
+def _svg(self, as_polygon=True):
+    """Format and show a Geo array, np.ndarray or list structure in SVG format.
+
+    Notes
+    -----
+    Geometry must be expected to form polylines or polygons.
+    IPython required.
+
+    >>> from IPython.display import SVG
+
+    Alternate colors::
+
+        white, silver, gray black, red, maroon, purple, blue, navy, aqua,
+        green, teal, lime, yellow, magenta, cyan
+    """
+    def svg_path(g_bits, scale_by, o_f_s):
+        """Make the svg from a list of 2d arrays"""
+        opacity, fill_color, stroke = o_f_s
+        pth = [" M {},{} " + "L {},{} "*(len(b) - 1) for b in g_bits]
+        ln = [pth[i].format(*b.ravel()) for i, b in enumerate(g_bits)]
+        pth = "".join(ln) + "z"
+        s = ('<path fill-rule="evenodd" fill="{0}" stroke="{1}" '
+             'stroke-width="{2}" opacity="{3}" d="{4}"/>'
+             ).format(fill_color, stroke, 1.5 * scale_by, opacity, pth)
+        return s
+    # ----
+    msg0 = "\nImport error..\n>>> from IPython.display import SVG\nfailed."
+    msg1 = "A Geo array or ndarray (with ndim >=2) is required."
+    # ----
+    # Geo array, np.ndarray check
+    try:
+        from IPython.core.display import SVG  # 2020-07-02
+    except ImportError:
+        print(dedent(msg0))
+        return None
+    # ---- checks for Geo or ndarray. Convert lists, tuples to np.ndarray
+    if isinstance(self, (list, tuple)):
+        dt = "float"
+        leng = [len(i) for i in self]
+        if min(leng) != max(leng):
+            dt = "O"
+        self = np.asarray(self, dtype=dt)
+    # if ('Geo' in str(type(g))) & (issubclass(g.__class__, np.ndarray)):
+    if hasattr(self, "IFT"):
+        GA = True
+        g_bits = self.bits
+        L, B = self.min(axis=0)
+        R, T = self.max(axis=0)
+    elif isinstance(self, np.ndarray):
+        GA = False
+        if self.ndim == 2:
+            g_bits = [self]
+            L, B = self.min(axis=0)
+            R, T = self.max(axis=0)
+        elif self.ndim == 3:
+            g_bits = [self[i] for i in range(self.shape[0])]
+            L, B = self.min(axis=(0, 1))
+            R, T = self.max(axis=(0, 1))
+        elif self.dtype.kind == 'O':
+            g_bits = []
+            for i, b in enumerate(self):
+                b = np.array(b)
+                if b.ndim == 2:
+                    g_bits.append(b)
+                elif b.ndim == 3:
+                    g_bits.extend([b[i] for i in range(b.shape[0])])
+            L, B = np.min(np.vstack([np.min(i, axis=0) for i in g_bits]),
+                          axis=0)
+            R, T = np.max(np.vstack([np.max(i, axis=0) for i in g_bits]),
+                          axis=0)
+        else:
+            print(msg1)
+            return None
+    else:
+        print(msg1)
+        return None
+    # ----
+    # derive parameters
+    if as_polygon:
+        o_f_s = ["0.75", "red", "black"]  # opacity, fill_color, stroke color
+    else:
+        o_f_s = ["1.0", "none", "red"]
+    # ----
+    d_x, d_y = (R - L, T - B)
+    hght = min([max([150., d_y]), 200])  # ---- height 150 to 200
+    width = int(d_x/d_y * hght)
+    scale_by = max([d_x, d_y]) / max([width, hght])
+    # ----
+    # derive the geometry path
+    pth_geom = svg_path(g_bits, scale_by, o_f_s)  # ---- svg path string
+    # construct the final output
+    view_box = "{} {} {} {}".format(L, B, d_x, d_y)
+    transform = "matrix(1,0,0,-1,0,{0})".format(T + B)
+    hdr = '<svg xmlns="http://www.w3.org/2000/svg" ' \
+          'xmlns:xlink="http://www.w3.org/1999/xlink" '
+    f0 = 'width="{}" height="{}" viewBox="{}" '.format(width, hght, view_box)
+    f1 = 'preserveAspectRatio="xMinYMin meet">'
+    f2 = '<g transform="{}">{}</g></svg>'.format(transform, pth_geom)
+    s = hdr + f0 + f1 + f2
+    if GA:  # Geo array display
+        self.SVG = s
+        return SVG(self.SVG)  # plot the representation
+    return SVG(s)  # np.ndarray display
+
+
 # =============================================================================
 # ----  Extras ---------------------------------------------------------------
 #
@@ -644,7 +780,7 @@ def gms(arr):
         yield level, len(arr)
         try:
             for row in arr:
-                # print("{}\n{}".format(dimensions(row, level +1)))
+                # print("{}\n".format(dimensions(row, level + 1)))
                 yield from get_dimensions(row, level + 1)
         except TypeError:  # not an iterable
             pass
@@ -662,9 +798,8 @@ if __name__ == "__main__":
     print("\n{}".format(script))
 
 """
-'C:/Git_Dan/npgeom/Polygons2_geo.geojson'
-'C:/Git_Dan/npgeom/data/Polygons2_esrijson.json'
-'C:/Git_Dan/npgeom/data/Polygons2_geojson.json'
+'C:/Git_Dan/npgeom/Project_npg/Data_files/sq.json'
+'C:/Git_Dan/npgeom/Project_npg/Data_files/sq.geojson'
 'C:/Git_Dan/npgeom/data/g.npz'
 """
 

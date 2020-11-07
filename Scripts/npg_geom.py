@@ -103,7 +103,7 @@ import sys
 import numpy as np
 
 from numpy.lib.recfunctions import unstructured_to_structured as uts
-# from numpy.lib.recfunctions import structured_to_unstructured as stu
+from numpy.lib.recfunctions import structured_to_unstructured as stu
 from numpy.lib.recfunctions import repack_fields
 
 from scipy.spatial import ConvexHull as CH
@@ -111,7 +111,8 @@ from scipy.spatial import Delaunay
 
 import npGeo as npg
 
-from npg_helpers import (_bit_area_, _in_extent_, _angles_3pnt_)
+from npg_helpers import (_get_base_, _bit_area_, _bit_min_max_,
+                         _in_extent_, _angles_3pnt_)
 from npg_pip import np_wn
 
 
@@ -133,22 +134,28 @@ __all__ = [
     'pnts_in_pnts',
     '_pnt_on_poly_', '_pnt_on_segment_', 'p_o_p',
     '_tri_pnts_', 'in_hole_check'
-]  # 'pnts_in_Geo'
+    ]  # 'pnts_in_Geo'
 
 
-def pnts_to_extent(pnts, as_pair=False):
+def pnts_to_extent(a, as_pair=False):
     """Return the extent of a geometry. (Left, Bottom, Right, Top).
 
     Parameters
     ----------
-    pnts : array-like
+    a : array-like
         An Nx2 array of point objects expected.
     as_pair : boolean
         True, returns a point pair [LB, RT].  False, returns a ravelled array
         [L, B, R, T]
+
+    Notes
+    -----
+    Uses `_bit_min_max_`.  This is faster for large arrays.
+    >>> ext = np.array([a[:, 0].min(), a[:, 1].min(),
+    ...                 a[:, 0].max(), a[:, 1].max()])
     """
-    pnts = np.atleast_2d(pnts)
-    ext = np.concatenate((np.min(pnts, axis=0), np.max(pnts, axis=0)))
+    a = _get_base_(a)
+    ext = _bit_min_max_(a)
     if as_pair:
         ext = ext.reshape(2, 2)
     return ext
@@ -156,6 +163,8 @@ def pnts_to_extent(pnts, as_pair=False):
 
 def common_extent(a, b):
     """Return the extent overlap for two polygons as L, B, R, T or None"""
+    a = _get_base_(a)
+    b = _get_base_(b)
     ext0 = np.concatenate((np.min(a, axis=0), np.max(a, axis=0)))
     ext1 = np.concatenate((np.min(b, axis=0), np.max(b, axis=0)))
     es = np.vstack((ext0, ext1))
@@ -267,6 +276,7 @@ def _dist_along_(a, dist=0):
     _percent_along_ : function
         Similar to this function but measures distance as a percentage.
     """
+    a = _get_base_(a)
     dxdy = a[1:, :] - a[:-1, :]                        # coordinate differences
     leng = np.sqrt(np.einsum('ij,ij->i', dxdy, dxdy))  # segment lengths
     cumleng = np.concatenate(([0], np.cumsum(leng)))   # cumulative length
@@ -299,6 +309,7 @@ def _percent_along_(a, percent=0):
     --------
     Called by `pnt_on_poly`.
     """
+    a = _get_base_(a)
     if percent > 1.:
         percent /= 100.
     dxdy = a[1:, :] - a[:-1, :]                        # coordinate differences
@@ -338,6 +349,7 @@ def _pnts_on_line_(a, spacing=1, is_percent=False):  # densify by distance
     -----
     Called by `pnt_on_poly`.
     """
+    a = _get_base_(a)
     N = len(a) - 1                                    # segments
     dxdy = a[1:, :] - a[:-1, :]                       # coordinate differences
     leng = np.sqrt(np.einsum('ij,ij->i', dxdy, dxdy))  # segment lengths
@@ -632,6 +644,7 @@ def polys_to_unique_pnts(a, as_structured=True):
     """
     uni, idx, cnts = np.unique(uts(a), return_index=True,
                                return_counts=True, axis=0)
+    uni = stu(uni)
     if as_structured:
         N = uni.shape[0]
         dt = [('New_ID', '<i4'), ('Xs', '<f8'), ('Ys', '<f8'), ('Num', '<i4')]

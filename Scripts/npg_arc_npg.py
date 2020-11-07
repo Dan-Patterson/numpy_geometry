@@ -15,7 +15,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2020-09-22
+    2020-10-19
 
 Purpose
 -------
@@ -24,6 +24,31 @@ Geo array and arcpy geometry support functions.
 Notes
 -----
 See `_npgeom_notes_.py` for extra notes.
+
+Using da.SearchCursor to project data::
+
+    fc2 = r"C:\Git_Dan\npgeom\Project_npg\tests.gdb\sq"
+    import arcpy
+    SR0 = arcpy.da.Describe(fc2)['spatialReference']
+    SR1 = arcpy.SpatialReference(4326)
+    # ---- in its native projected coordinate system
+    with arcpy.da.SearchCursor(
+            fc2, ['SHAPE@X', 'SHAPE@Y'], spatial_reference=SR0,
+            explode_to_points=False) as cur:
+        a = cur._as_narray()
+    # ---- projected to a GCS
+    with arcpy.da.SearchCursor(
+            fc2, ['SHAPE@X', 'SHAPE@Y'], spatial_reference=SR1,
+            explode_to_points=False) as cur:
+        b = cur._as_narray()
+    a
+    array([( 300005.48,  5000004.88), ( 300010.33,  5000010.33),
+           ( 300006.33,  5000011.22), ( 300005.75,  5000013.42)],
+          dtype=[('SHAPE@X', '<f8'), ('SHAPE@Y', '<f8')])
+    b
+    array([(-76.56,  45.14), (-76.56,  45.14),
+           (-76.56,  45.14), (-76.56,  45.14)],
+          dtype=[('SHAPE@X', '<f8'), ('SHAPE@Y', '<f8')])
 
 References
 ----------
@@ -49,11 +74,10 @@ from numpy.lib.recfunctions import structured_to_unstructured as stu
 # if 'npg' not in list(locals().keys()):
 #    import npgeom as npg
 
-# from npGeo import Geo
-from npGeo import *
+from npGeo import Geo
+# from npGeo import *
 
 # import arcpy
-
 from arcpy import (Array, Exists, Multipoint, Point, Polygon, Polyline)
 
 from arcpy.da import (
@@ -69,14 +93,17 @@ from arcpy.management import (
 script = sys.argv[0]  # print this should you need to locate the script
 
 __all__ = [
-    'get_SR', 'get_shape_K', 'fc_to_Geo', 'id_fr_to',  # option 1, use this ***
+    'get_SR', 'get_shape_K',
+    '_fc_shapes_', '_fc_as_narray_', '_fc_geo_interface_',
+    '_json_geom_',
+    'fc_to_Geo', 'id_fr_to',                        # option 1, use this ***
     'Geo_to_arc_shapes', 'Geo_to_fc', 'view_poly',  # back to fc
     'make_nulls', 'fc_data', 'tbl_data',            # get attributes
-    'fc2na', 'get_fc_shapes', 'array_poly', 'geometry_fc',
+    'fc2na', 'array_poly', 'geometry_fc',
     '_array_to_poly_', '_poly_to_array_',           # geometry to array
     '_poly_arr_', 'poly2array',                     # extras
-    'arc_union'  # arcpy functions
-]   # '_del_none', '__geo_interface__', '_flat',
+    'fc_union', 'shp_dissolve', 'fc_dissolve'       # arcpy functions
+    ]   # '_del_none', '__geo_interface__', '_flat',
 
 
 # ============================================================================
@@ -91,7 +118,6 @@ def get_SR(in_fc, verbose=False):
     return SR
 
 
-# geometry shape class to Geo shape class
 def get_shape_K(in_fc):
     """Return shape type for a featureclass.  Returns (kind, k)"""
     desc = Describe(in_fc)
@@ -104,13 +130,81 @@ def get_shape_K(in_fc):
         return (kind, 0)
 
 
+# ---- featureclass geometry using...
+def _fc_shapes_(in_fc, with_id=True):
+    """Return geometry from a featureclass as geometry objects."""
+    flds = ["SHAPE@"]
+    if with_id:
+        flds = ["OID@", "SHAPE@"]
+    with SearchCursor(in_fc, flds) as cursor:
+        if with_id:
+            a = [(row[0], row[1]) for row in cursor]
+        else:
+            a = [row[0] for row in cursor]
+    return a
+
+
+def _fc_as_narray_(in_fc, with_id=True):
+    """Return geometry from a featureclass using `as_narray`."""
+    flds = ["SHAPE@X", "SHAPE@Y"]
+    if with_id:
+        flds = ["OID@", "SHAPE@X", "SHAPE@Y"]
+    with SearchCursor(in_fc, flds, explode_to_points=True) as cursor:
+        a = cursor._as_narray()
+    del cursor
+    return a
+
+
+def _fc_geo_interface_(in_fc, with_id=True):
+    """Return geometry from a featureclass using `__geo_interface__`."""
+    flds = ["SHAPE@"]
+    if with_id:
+        flds = ["OID@", "SHAPE@"]
+    with SearchCursor(in_fc, flds) as cursor:
+        if with_id:
+            a = [(row[0], row[1].__geo_interface__['coordinates'])
+                 for row in cursor]
+        else:
+            a = [row[0].__geo_interface__['coordinates'] for row in cursor]
+    del cursor
+    return a
+
+
+# ---- geojson and json geometry...
+def _json_geom_(pth):
+    """Return polygon/polyline geometry from a geoJSON or JSON file.
+
+    Parameters
+    ----------
+    pth : text
+        The file path to the json or geojson file.  The file extension is key.
+
+    Notes
+    -----
+    No error checking is done to ensure that the file provided to the function
+    complies with the structure required.  It is a convenience function.
+    """
+    import json
+    json_type = pth.split(".")[-1]
+    with open(pth) as f:
+        data = json.load(f)  # kys = data.keys()
+    if json_type == 'geojson':
+        a = [i['geometry']['coordinates'] for i in data['features']]
+    elif json_type == 'json':
+        as_type = 'rings' if "Polygon" in data['geometryType'] else 'paths'
+        a = [i['geometry'][as_type] for i in data['features']]
+    else:
+        print("json file must end in `geojson` or `json` file extension.")
+    return a
+
+
 # ============================================================================
 # ---- (1) fc_to_Geo section
 # -- fc -> nparray -> Geo  uses FeatureClassToNumpyArray
 #
 # -- main function --
 #
-def fc_to_Geo(in_fc, geom_kind=2, minX=0, minY=0, info=""):
+def fc_to_Geo(in_fc, geom_kind=2, minX=0, minY=0, sp_ref=None, info=""):
     """Convert a FeatureClassToNumPyArray to a Geo array.
 
     This works with the geometry only.  Skip the attributes for later.  The
@@ -126,12 +220,14 @@ def fc_to_Geo(in_fc, geom_kind=2, minX=0, minY=0, info=""):
     minX, minY : numbers
         If these values are 0, then the minimum values will be determined and
         used to shift the data towards the origin.
+    sp_ref : text
+        Spatial reference name.  eg `'NAD_1983_CSRS_MTM_9'`
 
     Notes
     -----
-    >>> arr = FeatureClassToNumPyArray(
-    ...         in_fc, ['OID@', 'SHAPE@X', 'SHAPE@Y'], explode_to_points=True
-    ...         )
+    The `arcpy.da.Describe` method takes a substantial amount of time.
+    >>> %timeit Describe(fc2)
+    ... 355 ms ± 17.4 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
     """
     def _area_part_(a):
         """Mini e_area, used by areas and centroids"""
@@ -145,23 +241,17 @@ def fc_to_Geo(in_fc, geom_kind=2, minX=0, minY=0, info=""):
         """Clockwise check."""
         return 1 if _area_part_(a) > 0. else 0
 
-    def _SR_(in_fc, verbose=False):
-        """Return the spatial reference of a featureclass."""
-        desc = Describe(in_fc)
-        SR = desc['spatialReference']
-        return SR
-
     # ---- (1) Foundational steps
     # Create the array, extract the object id values.
     # To avoid floating point issues, extract the coordinates, round them to a
     # finite precision and shift them to the x-y origin
     #
     kind = geom_kind
-    sp_ref = _SR_(in_fc)
+    if sp_ref is None:      # sp_ref = get_SR(in_fc, verbose=False)
+        sp_ref = "undefined"
     a = FeatureClassToNumPyArray(
         in_fc, ['OID@', 'SHAPE@X', 'SHAPE@Y'],
-        spatial_reference=sp_ref, explode_to_points=True
-    )
+        explode_to_points=True)  # spatial_reference=sp_ref
     oids = a['OID@']
     xy = a[['SHAPE@X', 'SHAPE@Y']]
     mn = [np.min(xy['SHAPE@X']), np.min(xy['SHAPE@Y'])]
@@ -213,7 +303,7 @@ def fc_to_Geo(in_fc, geom_kind=2, minX=0, minY=0, info=""):
     IFT[:, 5] = pnt_nums
     #
     # ---- (6) Create the output array... as easy as ``a`` to ``z``
-    z = Geo(xy_arr, IFT, kind, Extent=extent, Info="test", SR=sp_ref.name)
+    z = Geo(xy_arr, IFT, kind, Extent=extent, Info="test", SR=sp_ref)
     out = copy.deepcopy(z)
     return out
 
@@ -281,12 +371,12 @@ def Geo_to_arc_shapes(geo, as_singlepart=True):
         Spatial reference object and output geometry are derived from input
         Geo array.
 
-    - `Geo_to_shapes` is called by `Geo_to_fc`.
+    - `Geo_to_arc_shapes` is called by `Geo_to_fc`.
     - `arr2poly` in the function, does the actual poly construction
 
     Example
     -------
-    >>> ps = Geo_to_shapes(g, as_singlepart=True)
+    >>> ps = Geo_to_arc_shapes(g, as_singlepart=True)
     >>> ps  # returns the single part representation of the polygons
     [(<Polygon object at 0x25f07f4d7f0[0x25f09232968]>, 1),
      (<Polygon object at 0x25f07f4d668[0x25f092327d8]>, 1),
@@ -363,7 +453,7 @@ def Geo_to_fc(geo, gdb=None, name=None, kind=None, SR=None):
 
 
 def view_poly(geo, id_num=1, view_as=2):
-    """View a since poly feature as an SVG in the console.
+    """View a single poly feature as an SVG in the console.
 
     Parameters
     ----------
@@ -445,12 +535,13 @@ def make_nulls(in_fc, include_oid=True, int_null=-999):
         return None, None
     in_flds = desc['fields']
     good = [f for f in in_flds if f.editable and f.type != 'Geometry']
+    # good = [f for f in in_flds if f.type != 'Geometry']
     fld_dict = {f.name: f.type for f in good}
     fld_names = list(fld_dict.keys())
     null_dict = {f: nulls[fld_dict[f]] for f in fld_names}
     # ---- insert the OBJECTID field
     if include_oid and desc['hasOID']:
-        oid_name = 'OID@'  # desc['OIDFieldName']
+        oid_name = desc['OIDFieldName']
         oi = {oid_name: -999}
         null_dict = dict(list(oi.items()) + list(null_dict.items()))
         fld_names.insert(0, oid_name)
@@ -471,9 +562,9 @@ def fc_data(in_fc, include_oid=True, int_null=-999):
         See `make_nulls` for description
     """
     null_dict, fld_names = make_nulls(in_fc, include_oid, int_null)
-    flds = ["OID@", "Shape", "SHAPE@", "SHAPE@X", "SHAPE@Y", "SHAPE@Z",
-            "SHAPE@Z", "SHAPE@XY", "SHAPE@TRUECENTROID", "SHAPE@JSON",
-            "SHAPE@AREA", "SHAPE@LENGTH"]
+    flds = ["Shape", "SHAPE@", "SHAPE@X", "SHAPE@Y", "SHAPE@Z",
+            "SHAPE@XY", "SHAPE@TRUECENTROID", "SHAPE@JSON",
+            "SHAPE@AREA", "SHAPE@LENGTH"]  # "OID@"
     new_names = [[i, i.replace("@", "__")][i in flds] for i in fld_names]
     a = FeatureClassToNumPyArray(
         in_fc, fld_names, skip_nulls=False, null_value=null_dict
@@ -547,23 +638,10 @@ def fc2na(in_fc):
     return oids, a, xy
 
 
-# ---- Array to poly features
-# Featureclass to shapes, using a searchcursor
-def get_fc_shapes(in_fc, SR=None):
-    """Return arcpy shapes from a featureclass.
-
-    Returns polygon, polyline, multipoint, or points.
-    """
-    if SR is None:
-        SR = get_SR(in_fc)
-    with SearchCursor(in_fc, "SHAPE@", spatial_reference=SR) as cur:
-        out = [row[0] for row in cur]
-        del cur
-    return out
-
-
+# ---- (5) Geo or ndarrays to poly features
+#
 def array_poly(arr, p_type=None, sr=None, IFT=None):
-    """Assemble poly features from arrays.
+    """Assemble poly features from Geo or ndarrays.
 
     Used by `geometry_fc` or it can be used separately.
 
@@ -606,15 +684,9 @@ def array_poly(arr, p_type=None, sr=None, IFT=None):
         elif as_type.upper() == 'POLYLINE':
             poly = Polyline(Array(aa), SR)
         return poly
-
-    def is_Geo_(obj):
-        """From : Function of npgeom.npGeo module"""
-        if hasattr(obj, "IFT"):
-            return True
-        return False
     # ----
     polys = []
-    if is_Geo_(arr):
+    if hasattr(arr, "IFT"):
         from_to = arr.IFT[:, 1:3]
         arr = [arr.XY[f:t] for f, t in from_to]  # --- _poly_pieces_ chunks
     for a in arr:
@@ -666,7 +738,7 @@ def geometry_fc(a, IFT, p_type=None, gdb=None, fname=None, sr=None):
 
 
 # ============================================================================
-# ---- (4) mini helpers -------------------------------------------------
+# ---- (6) mini helpers -------------------------------------------------
 #
 # ---- array to polygon/polyline
 #
@@ -730,9 +802,9 @@ def _poly_to_array_(polys):
 def _poly_arr_(poly):
     """Return coordinates of nested objects.
 
-    w = np.isin(part, None)
-    s = np.where(w)[0]
-    bits = np.split(part, s)
+    >>> w = np.isin(part, None)
+    >>> s = np.where(w)[0]
+    >>> bits = np.split(part, s)
     """
     def _split_(part):
         yield [(p.X, p.Y) for p in part if p]
@@ -779,17 +851,40 @@ def poly2array(polys):
     return out
 
 
+def _to_ndarray(in_fc, to_pnts=True):
+    """Convert searchcursor shapes an ndarray quickly.
+
+    Parameters
+    ----------
+    in_fc : featureclass
+    to_pnts : boolean
+        True, returns all points in the geometry.  False, returns the shape
+        centroid.
+
+    See Also
+    --------
+    `_geom_as_narray_` returns a simplified version.
+    """
+    flds = ['OID@', 'SHAPE@X', 'SHAPE@Y']
+    with SearchCursor(in_fc, flds, explode_to_points=to_pnts) as cur:
+        flds = cur.fields
+        dt = cur._dtype
+        a = cur._as_narray()
+    return a, flds, dt
+
+
 # ============================================================================
-# ---- arcpy functions
-def arc_union(in_fc, poly_type="polygon"):
-    r"""Union features in a featureclass
+# ---- (7) arcpy functions
+def fc_union(in_fc, poly_type="polygon"):
+    """Union features in a featureclass by building the output shape from
+    its individual parts.  Shared boundaries will be dissolved.
 
     Parameters
     ----------
     in_fc : featureclass
     poly_type : text
         Either `polygon` or `polyline`
-    fc = r"C:\Git_Dan\npgeom\Project_npg\tests.gdb\sq"
+    fc = "C:/Git_Dan/npgeom/Project_npg/tests.gdb/sq"
     """
     arr = []
     SR = get_SR(in_fc, verbose=False)
@@ -807,6 +902,30 @@ def arc_union(in_fc, poly_type="polygon"):
     else:
         print("Not polygon or polyline")
         return None
+
+
+def shp_dissolve(polys):
+    """Dissolve polygon boundaries"""
+    poly = polys[0]
+    for i, p in enumerate(polys[1:]):
+        poly = poly.union(p)
+    return poly
+
+
+def fc_dissolve(in_fc, poly_type="polygon"):
+    r"""Union features in a featureclass by building the output shape from
+    its individual parts.  Shared boundaries will be dissolved.
+
+    Parameters
+    ----------
+    in_fc : featureclass
+    poly_type : text
+        Either `polygon` or `polyline`
+    fc = r"C:\Git_Dan\npgeom\Project_npg\tests.gdb\sq"
+    """
+    with SearchCursor(in_fc, ['SHAPE@']) as cursor:
+        shps = [row[0] for row in cursor]
+    return shp_dissolve(shps)
 
 
 # ===========================================================================

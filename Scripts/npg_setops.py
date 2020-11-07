@@ -28,20 +28,24 @@ ndset::
 
 Notes
 -----
-_view_as_struct_(a)
+_view_as_struct_
     >>> a = np.array([[  0,   0], [  0, 100], [100, 100]])
-    >>> _view_as_struct_(a)
+    >>> _view_as_struct_(a, return_all=False)
     ... array([[(  0,   0)],
     ...        [(  0, 100)],
     ...        [(100, 100)]], dtype=[('f0', '<i4'), ('f1', '<i4')])
+    ...
+    >>> a_view, shp, dt = _view_as_struct_(a, return_all=True)
+    ... shp  #  (3, 2)
+    ... dt   #  dtype('int32')
 
-is_in
+nd_is_in
     >>> a = np.array([[  0,   0], [  0, 100], [100, 100]])
     >>> look_for = np.array([[  0, 100], [100, 100]])
-    >>> is_in(a, look_for, reverse=False)
+    >>> nd_isin(a, look_for, reverse=False)
     array([[  0, 100],
     ...    [100, 100]])
-    >>> is_in(a, look_for, reverse=True)
+    >>> nd_isin(a, look_for, reverse=True)
     array([[0, 0]])
 
 For the following:
@@ -100,7 +104,7 @@ import numpy as np
 
 
 ft = {'bool': lambda x: repr(x.astype(np.int32)),
-      'float_kind': '{: 0.3f}'.format}
+      'float_kind': '{: 6.2f}'.format}
 np.set_printoptions(edgeitems=10, linewidth=80, precision=2, suppress=True,
                     threshold=100, formatter=ft)
 np.ma.masked_print_option.set_display('-')  # change to a single -
@@ -134,11 +138,12 @@ def _view_as_struct_(a, return_all=False):
     -------
     Array view as structured/recarray, with shape = (N, 1)
 
-    See main documentation under ``Notes``.
+    References
+    ----------
+    See `unstructured_to_structured` in... numpy/lib/recfunctions.py
+
+    >>> from numpy.lib.recfunctions import unstructured_to_structured as uts
     """
-    if not isinstance(a, np.ndarray) or a.dtype.kind in ('O', 'V'):
-        print("\nA 2D ndarray is required as input.")
-        return None
     shp = a.shape
     dt = a.dtype
     a_view = a.view(dt.descr * shp[1])
@@ -147,9 +152,25 @@ def _view_as_struct_(a, return_all=False):
     return a_view
 
 
+def _check_dtype_(a_view, b_view):
+    """Check for equivalency in the dtypes.  If they are not equal, flag and
+    return True or False.
+    """
+    err = "\nData types are not equal, function failed.\n1. {}\n2. {}"
+    adtype = a_view.dtype.descr
+    bdtype = b_view.dtype.descr
+    if adtype != bdtype:
+        print(err.format(adtype, bdtype))
+        return False
+    return True
+
+
 def _unique1d_(ar, return_index=False, return_inverse=False,
                return_counts=False):
-    """Return unique array elements. From `np.lib.arraysetops`."""
+    """Return unique array elements. From `np.lib.arraysetops`.
+
+    `<https://github.com/numpy/numpy/blob/master/numpy/lib/arraysetops.py>`_.
+    """
     ar = np.asanyarray(ar).flatten()
     any_indices = return_index or return_inverse
     if any_indices:
@@ -175,19 +196,8 @@ def _unique1d_(ar, return_index=False, return_inverse=False,
     return ret
 
 
-def _check_dtype_(a_view, b_view):
-    """Check for equivalency in the dtypes.  If they are not equal, flag and
-    return True or False.
-    """
-    err = "\nData types are not equal, function failed.\n1. {}\n2. {}"
-    adtype = a_view.dtype.descr
-    bdtype = b_view.dtype.descr
-    if adtype != bdtype:
-        print(err.format(adtype, bdtype))
-        return False
-    return True
-
-
+# ---- Set functions
+#
 def nd_diff(a, b, invert=True):
     """See nd_intersect.  This just returns the opposite/difference."""
     return nd_intersect(a, b, invert=invert)
@@ -206,9 +216,42 @@ def nd_diffxor(a, b, uni=False):
     return ab.view(a.dtype).reshape(-1, ab.shape[0]).squeeze()
 
 
-def nd_in1d(a):
-    """Check for the presence of array in the other."""
-    pass
+def nd_in1d(a, b, assume_unique=False, invert=False):
+    """Check for the presence of array in the other.  Taken from `in1d` in...
+
+    `<https://github.com/numpy/numpy/blob/master/numpy/lib/arraysetops.py>`_.
+    """
+    ar1 = np.asarray(a).ravel()
+    ar2 = np.asarray(b).ravel()
+    contains_object = ar1.dtype.hasobject or ar2.dtype.hasobject
+    if len(ar2) < 10 * len(ar1) ** 0.145 or contains_object:
+        if invert:
+            mask = np.ones(len(ar1), dtype=bool)
+            for a in ar2:
+                mask &= (ar1 != a)
+        else:
+            mask = np.zeros(len(ar1), dtype=bool)
+            for a in ar2:
+                mask |= (ar1 == a)
+        return mask
+    # Otherwise use sorting
+    if not assume_unique:
+        ar1, rev_idx = np.unique(ar1, return_inverse=True)
+        ar2 = np.unique(ar2)
+    ar = np.concatenate((ar1, ar2))
+    order = ar.argsort(kind='mergesort')
+    sar = ar[order]
+    if invert:
+        bool_ar = (sar[1:] != sar[:-1])
+    else:
+        bool_ar = (sar[1:] == sar[:-1])
+    flag = np.concatenate((bool_ar, [invert]))
+    ret = np.empty(ar.shape, dtype=bool)
+    ret[order] = flag
+    if assume_unique:
+        return ret[:len(ar1)]
+    else:
+        return ret[rev_idx]
 
 
 def nd_intersect(a, b, invert=False):
@@ -235,14 +278,14 @@ def nd_intersect(a, b, invert=False):
     if not good:
         return None
     if len(a) > len(b):
-        idx = np.in1d(a_view, b_view, assume_unique=False, invert=invert)
+        idx = nd_in1d(a_view, b_view, assume_unique=False, invert=invert)
         return a[idx]
     else:
-        idx = np.in1d(b_view, a_view, assume_unique=False, invert=invert)
+        idx = nd_in1d(b_view, a_view, assume_unique=False, invert=invert)
         return b[idx]
 
 
-def nd_isin(a, look_for, reverse=False):
+def nd_isin(a, look_for, indices_only=False, reverse=False):
     """Check array `a` for the presence of records in array `look_for`.
 
     Parameters
@@ -251,6 +294,9 @@ def nd_isin(a, look_for, reverse=False):
         The array to check for the elements
     look_for : number, list or array
         what to use for the good
+    indices_only : boolean
+        True, returns the indices of where `look_for` is in `a`.  False,
+        returns the values found.
     reverse : boolean
         Switch the query look_for to `True` to find those not in `a`
     """
@@ -262,7 +308,9 @@ def nd_isin(a, look_for, reverse=False):
     inv = False
     if reverse:
         inv = True
-    idx = np.in1d(a_view, b_view, assume_unique=False, invert=inv)
+    idx = nd_in1d(a_view, b_view, assume_unique=False, invert=inv)
+    if indices_only:
+        return np.nonzero(idx)[0]
     return a[idx]
 
 
@@ -284,25 +332,23 @@ def nd_merge(a, b):
 
 
 def nd_union(a, b):
-    """Union views of arrays.
-
-    Return the unique, sorted array of values that are in either of the two
-    input arrays.
+    """Union views of arrays. Returns the unique, sorted array of values that
+    are in either of the two input arrays.
     """
     a_view = _view_as_struct_(a, return_all=False)
     b_view = _view_as_struct_(b, return_all=False)
     good = _check_dtype_(a_view, b_view)  # check dtypes
     if not good:
         return None
-    ab = np.union1d(a_view, b_view)
-#    ab = np.unique(np.concatenate((a_view, b_view), axis=None))
+    # ab = np.union1d(a_view, b_view)
+    ab = np.unique(np.concatenate((a_view, b_view), axis=None))
     return ab.view(a.dtype).reshape(ab.shape[0], -1).squeeze()
 
 
-def nd_uniq(a, return_index=False,
+def nd_uniq(a, return_index=True,
             return_inverse=False,
-            return_counts=False,
-            axis=None):
+            return_counts=True,
+            axis=0):
     """Taken from, but modified for Geo arrays.
 
     Parameters
@@ -311,12 +357,26 @@ def nd_uniq(a, return_index=False,
         For other array_like objects, see `unique` and `_unique1d` in:
 
     `<https://github.com/numpy/numpy/blob/master/numpy/lib/arraysetops.py>`_.
+
+    Notes
+    -----
+    Using True for `return_index` and/or `return_inverse` speeds up the
+    sorting process.  Example for 750k points as structured array::
+
+        st.dtype  # dtype([('f0', '<f8'), ('f1', '<f8')])
+        st.shape  # (748874, 1)
+
+        %timeit nd_uniq(st, True, False, False, 0)
+        170 ms ± 1.83 ms per loop (mean ± std. dev. of 7 runs, 10 loops each)
+        %timeit nd_uniq(st, False, False, False, 0)
+        345 ms ± 14.2 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
     """
     def reshape_uniq(uniq, shp, dt, axis):
         n = len(uniq)
         uniq = uniq.view(dt)
         uniq = uniq.reshape(n, *shp[1:])
-        uniq = np.moveaxis(uniq, 0, axis)
+        if axis != 0:
+            uniq = np.moveaxis(uniq, 0, axis)
         return uniq
     # ----
     if hasattr(a, "IFT"):
@@ -327,7 +387,7 @@ def nd_uniq(a, return_index=False,
             return out[0]
         return out
     else:
-        return np.unique(a, return_index, return_inverse, return_counts)
+        return np.unique(a, return_index, return_inverse, return_counts, axis)
 
 
 # ----------------------------------------------------------------------

@@ -34,23 +34,26 @@ ast.literal_eval(  *** find examples
 import sys
 from textwrap import dedent
 
-# import importlib
+import importlib
+
 import numpy as np
 from numpy.lib.recfunctions import repack_fields
-# from numpy.lib.recfunctions import structured_to_unstructured as stu
+from numpy.lib.recfunctions import structured_to_unstructured as stu
 # from numpy.lib.recfunctions import unstructured_to_structured as uts
 
-if 'npg' not in list(locals().keys()):
-    import npgeom as npg
-    from npgeom.npGeo import *
-from npg_arc_npg import get_SR, get_shapes, fc_to_Geo, poly2array, fc_data
+import npgeom as npg
+from npg_arc_npg import get_SR, fc_to_Geo, poly2array, fc_data
 
 # import npGeo
 # from npGeo import fc2na_geo, id_fr_to, _fill_float_array
-from arcpy.da import FeatureClassToNumPyArray  # SearchCursor
+# from arcpy.da import FeatureClassToNumPyArray  # SearchCursor
 
-# importlib.reload(npg)
-# importlib.reload(npg_arc)
+testing = True
+if testing:
+    importlib.reload(npg)
+    import npgeom as npg
+    # from npgeom.npGeo import *
+
 
 ft = {'bool': lambda x: repr(x.astype(np.int32)),
       'float_kind': '{: 0.2f}'.format}
@@ -64,12 +67,13 @@ script = sys.argv[0]  # print this should you need to locate the script
 # ===========================================================================
 # ---- current problem
 
-from npgeom.npg_plots import plot_polygons
-from npgeom.npg_overlay import (
-    _intersect_, intersects
-)
-from npgeom.npg_helpers import line_crosses, _in_extent_, polyline_angles
-from npgeom.npg_geom import _angles_
+
+# from npgeom.npg_plots import plot_polygons
+# from npgeom.npg_overlay import (
+#     _intersect_, intersects
+# )
+# from npgeom.npg_helpers import line_crosses, _in_extent_, polyline_angles
+# from npgeom.npg_geom import _angles_
 r"""
 directional buffer
 point_move_x = vertex_coords_x -
@@ -120,26 +124,14 @@ e.reshape(-1, 2, 2)  # for ndim=3
 
 """
 
-
-"""  MST ....
-connect shape points to follow the outline of a polygon
-Thinking about using mst to do this... see npg_analysis, mst there
-
-
-https://community.esri.com/blogs/dan_patterson/2017/01/31/spanning-trees
-
-
-"""
-
-
 # ---- common helpers
 #
-def polarToCartesian(centerX, centerY, radius, angleInDegrees):
-    """Polar coordinate conversion"""
-    angleInRadians = (angleInDegrees-90) * math.pi / 180.0
-    x = centerX + (radius * math.cos(angleInRadians))
-    y = centerY + (radius * math.sin(angleInRadians))
-    return (x, y)
+# def polarToCartesian(centerX, centerY, radius, angleInDegrees):
+#     """Polar coordinate conversion"""
+#     angleInRadians = (angleInDegrees-90) * math.pi / 180.0
+#     x = centerX + (radius * math.cos(angleInRadians))
+#     y = centerY + (radius * math.sin(angleInRadians))
+#     return (x, y)
 
 
 # ======
@@ -161,7 +153,7 @@ def angle_calculator(p0, cent, p1):
     x_1, y_1 = p1
     c_p0 = np.degrees(np.arctan2(y_0 - y_c, x_0 - x_c))
     c_p1 = np.degrees(np.arctan2(y_1 - y_c, x_1 - x_c))
-    btwn_cp0_cp1 = (c_p0 - c_p1 + 180) % 360 -180  # signed angle
+    btwn_cp0_cp1 = (c_p0 - c_p1 + 180) % 360 - 180  # signed angle
     return c_p0, c_p1, btwn_cp0_cp1
 
 
@@ -251,17 +243,17 @@ def buff_(poly, buff_dist=1):
 """
 
 
-def flat1(l):
+def flat1(lst):
     """Just does the basic flattening but doesnt yield where things are."""
-    def _flat(l, r):
+    def _flat(lst, r):
         """Flatten sequence."""
-        if not isinstance(l[0], (list, np.ndarray, tuple)):  # added [0]
-            r.append(l)
+        if not isinstance(lst[0], (list, np.ndarray, tuple)):  # added [0]
+            r.append(lst)
         else:
-            for i in l:
+            for i in lst:
                 r = r + flat(i)
         return r
-    return _flat(l, [])
+    return _flat(lst, [])
 
 
 def flat(container, cnt=0, flat_list=None, sze_lst=None):
@@ -456,17 +448,15 @@ def nested_shape(arr_like):
 # ----------------------------------------------------------------------------
 # ----
 #
-def tile_(a):
-    """Produce a line sweep"""
-    uniq_x = np.unique(a[:, 0])
-    uniq_y = np.unique(a[:, 1])
-    xs = uniq[:, 0]
-    ys = uniq[:, 1]
-    LB = np.min(uniq, axis=0)
-    RT = np.max(uniq, axis=0)
-    LR = np.array([LB[0], RT[0]])
-
-
+# def tile_(a):
+#     """Produce a line sweep"""
+#     uniq_x = np.unique(a[:, 0])
+#     uniq_y = np.unique(a[:, 1])
+#     # xs = uniq[:, 0]
+#     # ys = uniq[:, 1]
+#     LB = uniq_x[0], uniq_y[0]  # np.min(uniq, axis=0)
+#     RT = uniq_x[-1], uniq_y[-1]
+#     # LR = np.array([LB[0], RT[0]])
 # =========================================================================
 # ---- (1) test functions
 
@@ -478,57 +468,7 @@ Shape {} len {}
 """
 
 
-def _test_(in_fc=None, full=False):
-    """Demo files listed in __main__ section.
-
-    Usage
-    -----
-    in_fc, g = npg._tests_._test_()
-    """
-    if in_fc is None:
-        in_fc = r"C:/Git_Dan/npgeom/Project_npg/npgeom.gdb/Polygons2"
-    kind = 2
-    info = None
-    SR = get_SR(in_fc)
-    shapes = get_shapes(in_fc)
-    # ---- Do the work ----
-    poly_arr = poly2array(shapes)
-    tmp = fc_to_Geo(in_fc)
-    IFT = tmp.IFT
-    m = np.nanmin(tmp, axis=0)
-#    m = [300000., 5000000.]
-    arr = tmp - m
-    # poly_arr = [(i - m) for p in poly_arr for i in p]
-    # arr = arr.round(3)
-    g = npg.Geo(arr, IFT, kind, info)
-    d = fc_data(in_fc)
-    a = FeatureClassToNumPyArray(
-        in_fc, ['OID@', 'SHAPE@X', 'SHAPE@Y'], explode_to_points=True)
-    a_id = a['OID@']
-    g0xy = a[['SHAPE@X', 'SHAPE@Y']]
-    g0xy['SHAPE@X'] = np.round(a['SHAPE@X'] - m[0], 3)
-    g0xy['SHAPE@Y'] = np.round(a['SHAPE@Y'] - m[1], 3)
-    a = repack_fields(g0xy)
-#    g0xy = stu(g0xy)
-#    g0xy = g0xy - m
-    # g0xy = g0xy.round(3)
-    frmt = """
-    Type :  {}
-    IFT  :
-    {}
-    """
-    k_dict = {0: 'Points', 1: 'Polylines/lines', 2: 'Polygons'}
-    print(dedent(frmt).format(k_dict[kind], IFT))
-#    arr_poly_fc(a, p_type='POLYGON', gdb=gdb, fname='a_test', sr=SR, ids=ids)
-#    a = np.array([[0.,  0.], [0., 10.], [10., 10.], [10.,  0.], [0.,  0.]])
-#    a = npg.arrays_to_Geo(a, Kind=2, Info=None)
-    if full:
-        print("variables : SR, shapes, poly_arr, arr, IFT, g, g0xy, g0id")
-        return SR, shapes, poly_arr, arr, IFT, g, d, a, a_id
-    return in_fc, g, d
-
-
-def test2(g, kind=2):
+def test(g, kind=2):
     """Run some standard tests"""
     np.set_printoptions(
         edgeitems=3, linewidth=80, precision=2, suppress=True,
@@ -598,9 +538,9 @@ def test2(g, kind=2):
         ['g.first_bit(True).IFT', g.first_bit(True).IFT],
         ['g.first_part(True)', g.first_part(True)],
         ['g.first_part(True).IFT', g.first_part(True).IFT],
-        ['g.get_shape(ID=1, asGeo=True)', g.get_shape(ID=1, asGeo=True)],
-        ['g.get_shape(ID=3, asGeo=True).IFT',
-         g.get_shape(ID=3, asGeo=True).IFT],
+        ['g.get_shapes(ID=1, asGeo=True)', g.get_shapes(ids=1, asGeo=True)],
+        ['g.get_shapes(ids=3, asGeo=True).IFT',
+         g.get_shapes(ids=3, asGeo=True).IFT],
         ['g.outer_rings(asGeo=True)', g.outer_rings(asGeo=True)],
         ['g.outer_rings(asGeo=True).IFT', g.outer_rings(asGeo=True).IFT],
         ['g.areas(True)', g.areas(True)],
@@ -627,14 +567,14 @@ def test2(g, kind=2):
         ['g.is_convex()', g.is_convex()],
         ['g.is_multipart(as_structured=False)',
          g.is_multipart(as_structured=False)],
-        ['g.angles_polygon(inside=True, in_deg=True)',
-         g.angles_polygon(inside=True, in_deg=True)],
+        ['g.polygon_angles(inside=True, in_deg=True)',
+         g.polygon_angles(inside=True, in_deg=True)],
         ['g.bounding_circles(angle=5, return_xyr=False)',
          g.bounding_circles(angle=5, return_xyr=False)],
         ['g.min_area_rect(as_structured=False)',
          g.min_area_rect(as_structured=False)],
         ['g.triangulate(by_bit=False, as_polygon=True)',
-         g.triangulate(by_bit=False, as_polygon=True)],
+         g.triangulate(as_one=False, as_polygon=True)],
         ['g.fill_holes()', g.fill_holes()],
         ['g.holes_to_shape()', g.holes_to_shape()],
         ['g.multipart_to_singlepart(info="")',
@@ -653,17 +593,13 @@ def test2(g, kind=2):
     print(dedent(msg0).format(*props1))
     print("""\n---------\nMethods.....\n---------""")
     for i, m in enumerate(meths, 1):
-        try:
-            print("\n({}) {} ...\n{}".format(i, *m))
-        except ValueError:
-            print("\n{} failed".format(m[0]))
-        finally:
-            pass
+        print("\n({}) {} ...\n{}".format(i, *m))
 
 
 # ===========================================================================
 # ---- main section
 if __name__ == "__main__":
     """optional location for parameters"""
-    in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\Polygons"
+    # in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\Polygons"
+    in_fc1 = r"C:\Git_Dan\npgeom\Project_npg\tests.gdb\sq"
     in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\Polygons2"

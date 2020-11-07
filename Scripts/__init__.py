@@ -17,7 +17,7 @@ Author :
 - Dan_Patterson@carleton.ca
 - https://github.com/Dan-Patterson
 
-Modified : 2020-09-09
+Modified : 2020-10-07
     Creation date during 2019 as part of ``arraytools``.
 
 Purpose
@@ -89,19 +89,21 @@ import numpy as np
 
 # ---- import for npg
 import npgDocs, npGeo, npg_io, npg_geom, npg_pip, npg_helpers, npg_table
-import npg_create, npg_analysis, npg_overlay, npg_utils, npg_min_circ
+import npg_create, npg_analysis, npg_overlay
+import npg_setops, npg_utils, npg_min_circ
 
-from . npGeo import *  # noqa: F401, 403
-from . npg_io import *  # noqa: F401
-from . npg_geom import *  # noqa: F401
-from . npg_pip import *  # noqa: F401
-from . npg_helpers import *  # noqa: F401
-from . npg_table import *  # noqa: F401
-from . npg_create import *  # noqa: F401
-from . npg_analysis import *  # noqa: F401
-from . npg_overlay import *  # noqa: F401
-from . npg_utils import *  # noqa: F401
-from . npg_min_circ import *  # noqa: F401
+from . npGeo import *  # noqa: F401, F403
+from . npg_io import *  # noqa: F401, F403
+from . npg_geom import *  # noqa: F401, F403
+from . npg_pip import *  # noqa: F401, F403
+from . npg_helpers import *  # noqa: F401, F403
+from . npg_table import *  # noqa: F401, F403
+from . npg_create import *  # noqa: F401, F403
+from . npg_analysis import *  # noqa: F401, F403
+from . npg_overlay import *  # noqa: F401, F403
+from . npg_setops import *  # noqu: F401, F403
+from . npg_utils import *  # noqa: F401, F403
+from . npg_min_circ import *  # noqa: F401, F403
 
 # ---- docstring info for Geo and some methods
 from . npgDocs import (
@@ -127,7 +129,7 @@ npGeo.Geo.sort_by_extent.__doc__ += sort_by_extent_doc
 __all__ = [
     'npgDocs', 'npGeo', 'npg_io', 'npg_geom', 'npg_helpers', 'npg_overlay',
     'npg_table', 'npg_create', 'npg_analysis', 'npg_utils',
-    'npg_helpers', 'npg_min_circ'
+    'npg_setops', 'npg_helpers', 'npg_min_circ'
 ]
 
 __all__.extend(npgDocs.__all__)
@@ -140,6 +142,7 @@ __all__.extend(npg_table.__all__)
 __all__.extend(npg_create.__all__)
 __all__.extend(npg_analysis.__all__)
 __all__.extend(npg_overlay.__all__)
+__all__.extend(npg_setops.__all__)
 # __all__.extend(npg_min_circ.__all__)
 __all__.sort()
 

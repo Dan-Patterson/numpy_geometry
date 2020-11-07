@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2020-10-08
+    2020-10-23
 
 Purpose
 -------
@@ -36,11 +36,16 @@ References
 
 **Dissolve**
 
-`<C:\arc_pro\Resources\ArcToolBox\Scripts\Weights.py>`_.
-`<C:\arc_pro\Resources\ArcToolBox\Toolboxes\GeoAnalytics Desktop Tools.tbx\
-    DissolveBoundaries.tool>`_.
-`<https://pro.arcgis.com/en/pro-app/tool-reference/geoanalytics-desktop
-/dissolve-boundaries.htm>`_.
+Folder path::
+
+    C:\arc_pro\Resources\ArcToolBox\Scripts\Weights.py
+    C:\arc_pro\Resources\ArcToolBox\Toolboxes\
+    GeoAnalytics Desktop Tools.tbx\DissolveBoundaries.tool
+
+Web link
+
+`<https:\\pro.arcgis.com\\en\\pro-app\\tool-reference\\geoanalytics-desktop
+\\dissolve-boundaries.htm>`_.
 """
 # pycodestyle D205 gets rid of that one blank line thing
 # pylint: disable=C0103,C0302,C0415
@@ -55,9 +60,8 @@ import numpy as np
 
 import npgeom as npg
 from npg_pip import np_wn
-from npgeom.npg_helpers import (
-    _isin_2d_, _bit_check_, compare_geom, radial_sort
-    )
+from npgeom.npg_helpers import (_bit_area_, _is_clockwise_, _isin_2d_,
+                                _bit_check_, compare_geom, radial_sort)
 # pnts_in_poly, crossing_num,  line_crosses,
 
 # ---- optional imports
@@ -88,7 +92,7 @@ __all__ = [
     'append_',
     'merge_',
     '_union_', 'union_'
-]  # '_poly_intersect_poly',
+    ]  # '_poly_intersect_poly',
 
 
 # ----------------------------------------------------------------------------
@@ -343,7 +347,11 @@ def p_ints_p(poly0, poly1):
 
 
 def clip_(geo, c):
-    """Do the work"""
+    """Do the work
+
+    For testing use `sq` and
+    c = np.array([[0, 10.],[11., 13.], [12., 7.], [8., 2], [0., 10]])
+    """
     bounds = dissolve(geo)
     in_0 = np_wn(bounds, c)  # points_in_polygon(bounds, c)
     in_1 = np_wn(c, bounds)  # points_in_polygon(c, bounds)
@@ -416,6 +424,7 @@ def _intersect_(p0, p1, p2, p3):
     >>> y = y0 + t * (y1 - y0)
 
     `<http://paulbourke.net/geometry/pointlineplane/>`_.
+
     `<https://en.wikipedia.org/wiki/Intersection_(Euclidean_geometry)>`_.
     """
     null_pnt = np.array([np.nan, np.nan])
@@ -435,8 +444,8 @@ def _intersect_(p0, p1, p2, p3):
     if (t_numer < 0.0) == d_gt0:
         return null_pnt
     # ---- are s_numer and t_numer between 0 and 1 test
-#    if ((s_numer > denom) == d_gt0) and ((t_numer > denom) == d_gt0):
-#        return null_pnt  # ---- change to and from or in line above
+    if ((s_numer > denom) == d_gt0) and ((t_numer > denom) == d_gt0):
+        return null_pnt  # ---- change to and from or in line above
     t = t_numer / denom
     x = x0 + t * p01_x
     y = y0 + t * p01_y
@@ -447,7 +456,7 @@ def _intersect_(p0, p1, p2, p3):
     return np.array([x, y])  # , np.array([x2, y2])
 
 
-def intersects(args):
+def intersects(*args):
     """Line segment intersection check. **Largely kept for documentation**.
 
     Two lines or 4 points that form the lines.  This does not extrapolate to
@@ -646,6 +655,13 @@ def dissolve(a, asGeo=True):
         """Find.  Abbreviated form of `adjacent`, to use for slicing."""
         return (a[:, None] == b).all(-1).any(-1)
 
+    def _get_holes_(a):
+        """Return holes"""
+        holes = []
+        if len(a) > 1:
+            holes = a[1:]
+        return holes
+
     def cycle(b0, b1):
         """Cycle through the bits."""
         idx01 = _find_(b0, b1)
@@ -659,28 +675,44 @@ def dissolve(a, asGeo=True):
         out = np.concatenate((z0[0], z1, z0[-1]), axis=0)
         return out
     # ----
-    if hasattr(a, "IFT"):
-        is_multi = np.any(a.shp_part_cnt[:, 1] > 1)
-#        holes = a.inner_rings(False, False)
-        if is_multi:
-            a = a.multipart_to_singlepart()
-            # a = a.outer_rings(asGeo=True)
-            a = npg.roll_coords(a)
-    rings = _bit_check_(a, just_outer=True)  # get the outer rings for 1 and 2
-    if len(rings) < 2:
+    if isinstance(a, (list, tuple, np.ndarray)) and not hasattr(a, "IFT"):
+        a = npg.arrays_to_Geo(a, kind=2, info="", to_origin=True)
+    holes = None
+    is_multi = np.any(a.shp_part_cnt[:, 1] > 1)
+    if is_multi:
+        a = a.multipart_to_singlepart()
+        a = npg.roll_coords(a)
+    if a.N < 2:
         return None
-    out = rings[0]
+    shps = a.U
+    s0 = a.get_shapes([shps[0]], False)  # first shape including holes
+    holes = _get_holes_(s0)              # just the holes or empty list
     missed = []
-    for b1 in rings[1:]:
-        out2 = cycle(out, b1[:-1])
+    merged = [[shps[0], holes]]          # first shape ID, and its holes
+    out = s0[0]
+    for i in shps[1:]:
+        s1 = a.get_shapes([i], False)
+        out2 = cycle(out, s1[0][:-1])
         if out2 is None:
-            missed.append(b1)
+            missed.append([i, s1])
         else:
+            holes = _get_holes_(s1)
+            merged.append([i, holes])
             out = out2[:]
-    if len(missed) > 0:
-        out = [out] + missed
-#    if holes is not None:
-#        out = out + holes.tolist()
+    holes_ = [i[1] for i in merged if i[1]]
+    missed_ = [i[1] for i in missed if i[1]]
+    out = [out]
+    if holes_:
+        for i in holes_:
+            if isinstance(i, (list, tuple)):
+                for j in i:
+                    out.append(j)
+            else:
+                out.append(i)
+    # out.extend(holes_)
+    out = [out]  # once holes are done
+    if missed_:
+        out.extend(missed_)
     if asGeo:
         out = npg.arrays_to_Geo(
             out, kind=a.K, info="dissolved", to_origin=False)
@@ -923,7 +955,7 @@ def _union_(poly, clipper, is_polygon=True):
 def union_(poly, clipper, is_polygon=True):
     """Return. Test main program"""
     if not hasattr(poly, "IFT"):
-        print("\nGeo array required for `to_this`\n")
+        print("\nGeo array required for `poly`\n")
         return
     cw = poly.CW
     ccw = np.zeros(cw.shape, np.bool_)

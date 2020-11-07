@@ -11,7 +11,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2020-01-14
+    2020-10-23
 
 Purpose
 -------
@@ -48,7 +48,7 @@ __all__ = [
     'closest_n', 'distances', 'not_closer', 'n_check', 'n_near',
     'n_spaced', '_x_sect_2', 'intersection_pnt', 'knn', 'knn0',
     '_dist_arr_', '_e_dist_', 'mst', 'connect', 'concave'
-]
+    ]
 
 
 # ===========================================================================
@@ -127,14 +127,14 @@ def n_near(a, N=3, ordered=True, return_all=False):
 
     Parameters
     ----------
-    `a` : array
+    a : array
         An ndarray of uniform int or float dtype.  Extract the fields
         representing the x,y coordinates before proceeding.
-    `N` : number
+    N : number
          Number of closest points to return.
-    `ordered` : boolean
+    ordered : boolean
         True, return results sorted by distance.
-    `return_all` : boolean
+    return_all : boolean
         True, returns coordinates, distance and combined array.  False, return
         a structured array containing the from-to coordinates and their
         distances.
@@ -338,11 +338,11 @@ def knn(p, pnts, k=1, return_dist=True):
     Parameters
     ----------
     p : array
-        x,y reference point
+        x,y reference point.
     pnts : array
-        Points array to examine
+        Points array to examine.
     k : integer
-        The `k` in k-nearest neighbours
+        The `k` in k-nearest neighbours.
 
     Returns
     -------
@@ -374,15 +374,15 @@ def knn0(pnts, p, k):
     Parameters
     ----------
     points : array
-        list of points
+        List of points.
     p : array-like
-        reference point, two numbers representing x, y
+        Reference point, two numbers representing x, y.
     k : integer
-        number of neighbours
+        Number of neighbours.
 
     Returns
     -------
-    list of the k nearest neighbours, based on squared distance
+    List of the k nearest neighbours, based on squared distance.
     """
     p = np.asarray(p)
     pnts = np.asarray(pnts)
@@ -412,9 +412,16 @@ def _dist_arr_(a, verbose=False):
 def _e_dist_(a):
     """Return a 2D square-form euclidean distance matrix.
 
-    For other dimensions, use e_dist in ein_geom.py
+    For other dimensions, use e_dist in ein_geom.py.  For a 2D array, array
+    shapes can be determined using either method below.  The
+    shapes are as follows::
+
+    >>> # a.shape => (N, 2)
+    >>> b = a.reshape(np.prod(a.shape[:-1]), 1, a.shape[-1])  # for any shape
+    >>> b = a[:, None, :]  # faster for 2D
+    >>> # b.shape => (N, 1, 2)
     """
-    b = a.reshape(np.prod(a.shape[:-1]), 1, a.shape[-1])
+    b = a[:, None, :]
     diff = a - b
     d = np.sqrt(np.einsum('ijk,ijk->ij', diff, diff)).squeeze()
     # d = np.triu(d)
@@ -424,7 +431,7 @@ def _e_dist_(a):
 def mst(arr, calc_dist=True):
     """Determine the minimum spanning tree for a set of points or weights.
 
-    The spanning tree uses the inter-point distances as their `W`eights
+    The spanning tree uses the inter-point distances as their `W`eights.
 
     Parameters
     ----------
@@ -450,8 +457,8 @@ def mst(arr, calc_dist=True):
              [6.1, 4.0], [6.5, 6.8], [7.1, 7.6], [7.3, 2.0], [7.4, 1.0],
              [7.7, 9.6], [8.5, 6.5], [9.0, 4.7], [9.6, 1.6], [9.7, 9.6]])
     """
-    arr = np.unique(arr, True, False, False, axis=0)[0]
-    W = arr[~np.isnan(arr[:, 0])]
+    W = np.unique(arr, axis=0)
+    # W = arr[~np.isnan(arr[:, 0])]
     a_copy = np.copy(W)
     if calc_dist:
         W = _e_dist_(W)
@@ -530,16 +537,16 @@ def concave(points, k, pip_check=False):
     Parameters
     ----------
     points : array-like
-        initially the input set of points with duplicates removes and
-        sorted on the Y value first, lowest Y at the top (?)
+        Initially the input set of points with duplicates removes and
+        sorted on the Y value first, lowest Y at the top (?).
     k : integer
-        initially the number of points to start forming the concave hull,
-        k will be the initial set of neighbors
+        Initially the number of points to start forming the concave hull,
+        `k` will be the initial set of neighbors.
     pip_check : boolean
         Whether to do the final point in polygon check.  Not needed for closely
         spaced dense point patterns.
     knn0, intersects, angle, point_in_polygon : functions
-        Functions used by `concave`
+        Functions used by `concave`.
 
     Requires
     --------
@@ -563,13 +570,13 @@ def concave(points, k, pip_check=False):
 
         Requires
         --------
-          intersects(line0, line1) or intersects(p0, p1, p2, p3)
-            p0, p1 -> line 1
-            p2, p3 -> line 2
+        intersects(line0, line1) or intersects(p0, p1, p2, p3)
+        - p0, p1 -> line 1
+        - p2, p3 -> line 2
 
         Returns
         -------
-            boolean, if the segments do intersect
+        Boolean, if the segments do intersect.
 
         References
         ----------

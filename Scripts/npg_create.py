@@ -13,7 +13,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2020-09-17
+    2020-10-23
 
 Purpose
 -------
@@ -36,10 +36,15 @@ References
 
 `Circumgon
 <https://en.wikipedia.org/wiki/Circumgon>`_.
+
 The vector from the incenter to the area centroid, GA , of a circumgonal
-region and the vector from the incenter to the centroid of its boundary
- (outer edge points), GB , are related by
-GB = 3/2*GA where GA is the unit circle radius
+region and the vector from the incenter to the centroid of its boundary, GB,
+(outer edge points) , are related by
+
+>>> GB = 3./2. * GA   # where GA is the unit circle radius
+
+`hexagon website
+<https://www.redblobgames.com/grids/hexagons>`_.
 
 `hexagonal tiling
 <https://en.wikipedia.org/wiki/Hexagonal_tiling>`_.
@@ -79,7 +84,7 @@ import sys
 import numpy as np
 
 import npGeo as npg
-from npg_plots import plot_mixed, plot_2d, plot_polygons
+from npg_plots import plot_mixed  # plot_2d, plot_polygons
 
 ft = {'bool': lambda x: repr(x.astype(np.int32)),
       'float_kind': '{: 0.1f}'.format}
@@ -256,8 +261,8 @@ def arc_sector(outer=10, inner=9, start=1, stop=6, step=0.1):
 
     Requires
     --------
-      `arc_` is used to produce the arcs, the top arc is rotated clockwise and
-      the bottom remains in the order produced to help form closed-polygons.
+    `arc_` is used to produce the arcs, the top arc is rotated clockwise and
+    the bottom remains in the order produced to help form closed-polygons.
     """
     s_s = [start, stop]
     s_s.sort()
@@ -292,13 +297,14 @@ def circle(radius=100, clockwise=True, theta=1, rot=0.0, scale=1,
 
     Returns
     -------
-    List of coordinates for the circle/ellipse
+    List of coordinates for the circle/ellipse.
 
     Notes
     -----
     You can also use np.linspace if you want to specify point numbers.
-    np.linspace(start, stop, num=50, endpoint=True, retstep=False)
-    np.linspace(-180, 180, num=720, endpoint=True, retstep=False)
+
+    >>> np.linspace(start, stop, num=50, endpoint=True, retstep=False)
+    >>> np.linspace(-180, 180, num=720, endpoint=True, retstep=False)
     """
     if clockwise:
         angles = np.deg2rad(np.arange(180.0, -180.0 - theta, step=-theta))
@@ -465,7 +471,6 @@ def rectangle(dx=1, dy=-1,
 
     The first `cell` will be in the top-left and the last `cell` in the
     bottom-right.
-
     """
     X = [0.0, 0.0, dx, dx, 0.0]       # X, Y values for a unit square
     Y = [0.0, dy, dy, 0.0, 0.0]
@@ -497,7 +502,6 @@ def triangle(dx=1, dy=1,
     Parameters
     ----------
     See `rectangles` for shared parameter explanation..
-
     """
     a, dx, b = dx/2.0, dx, dx*1.5
     Xu = [0.0, a, dx, 0.0]   # X, Y values for a unit triangle, point up
@@ -530,7 +534,6 @@ def hex_flat(dx=1, dy=1,
     Parameters
     ----------
     See `rectangles` for shared parameter explanation.
-
     """
     f_rad = np.deg2rad([180., 120., 60., 0., -60., -120., -180.])
     X = np.cos(f_rad) * dy
@@ -559,7 +562,6 @@ def hex_pointy(dx=1, dy=1,
     Parameters
     ----------
     See `rectangles` for shared parameter explanation.
-
     """
     p_rad = np.deg2rad([150., 90, 30., -30., -90., -150., 150.])
     X = np.cos(p_rad) * dx
@@ -887,9 +889,17 @@ def spiral_archim(N, n, inward=False, clockwise=True):
 
 def spiral_sqr(ULx=-10, n_max=100):
     """Create a square spiral from the centre in a clockwise direction
-    : ULx = upper left x coordinate, relative to center (0, 0)
-    : n-max = maximum number of iterations should ULx not be reached
-    :- see spirangle, Ulam spiral
+
+    Parameters
+    ----------
+    ULx : number
+        This is the upper left x coordinate, relative to center (0, 0).
+    n-max : number
+        The maximum number of iterations should ULx not be reached.
+
+    Notes
+    -----
+        See spirangle, Ulam spiral.
     """
     def W(x, y, c):
         x -= c[0]
@@ -976,7 +986,7 @@ def from_spiral(A):
 
 
 def repeat(seed=None, corner=[0, 0], x_cols=1, y_rows=1, angle=0):
-    """Create the array of pnts to pass on to arcpy .
+    """Create the array of pnts to pass to arcpy .
 
     Numpy magic is used to produce a fishnet of the desired in_shp.
 
@@ -1018,7 +1028,7 @@ def mini_weave(n):
     Parameters
     ----------
     n : segments
-       z is sliced to ensure compliance
+       z is sliced to ensure compliance.
 
     >>> a = mini_weave(11)
     >>> e_leng(a)
@@ -1046,7 +1056,7 @@ def _test_data(plot=False):
          [6.1, 4.0], [6.5, 6.8], [7.1, 7.6], [7.3, 2.0], [7.4, 1.0],
          [7.7, 9.6], [8.5, 6.5], [9.0, 4.7], [9.6, 1.6], [9.7, 9.6]]
     )
-    rand_state = np.random.RandomState(123)
+    # rand_state = np.random.RandomState(123)
     b = np.random.random(size=(100, 2))*10
     h, e = np.histogramdd(b, [np.arange(11), np.arange(11)])
     r = rectangle(
@@ -1063,4 +1073,4 @@ def _test_data(plot=False):
 # __main__ .... code section
 if __name__ == "__main__":
     print("Script path {}".format(script))
-    a = _test_data(plot=False)
+    # a = _test_data(plot=False)

@@ -359,7 +359,7 @@ Return a list of ndarrays or optionally a new Geo array.
 Use True for `to_clockwise` to convert holes to outer rings.
 """
 
-# ---- ... pull_shapes
+# ---- ... get_shapes
 get_shapes_doc = r"""
 
 The original IDs are added to the `Info` property of the output array.
