@@ -1350,6 +1350,10 @@ class Geo(np.ndarray):
         print(dedent(docs))
         npg_io.prn_tbl(self.IFT_str)
 
+    def roll_shapes(self):
+        """Run ``roll_coords`` as a method."""
+        return roll_coords(self)
+
     # ---- (9) print, display Geo
     def p(self, ids=None):
         """Print the Geo array."""
@@ -1798,6 +1802,11 @@ def reindex_shapes(a, prn=True, start=0, end=-1):
     z['Pnt_Id'] = final[:, 0]
     z['Shp_ID'] = final[:, 1]
     z['Uniq_Id'] = final[:, 2]
+    #
+    z0 = np.zeros((len(a.IFT), 3), dtype='int')
+    z0[:, 0] = a.IFT[:, 0]
+    z0[:, 1] = a.Fr
+    z0[0:, 2] = a.To - 1
     if prn:
         msg = """
             Pnt_ID  : point id in the polygon sequences
@@ -1817,8 +1826,12 @@ def reindex_shapes(a, prn=True, start=0, end=-1):
         print("\nNew   Old")
         for i in q:
             print("{:<3} : {}".format(i[0], i[1]))
+        #
+        print("\n ID  start / end  points")
+        for i in z0:
+            print("{:<3} : {:>4} {:>5}".format(*i))
         return None
-    return z, q
+    return z, q, z0
 
 
 # ---- update the docstrings

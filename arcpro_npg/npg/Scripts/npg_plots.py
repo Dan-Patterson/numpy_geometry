@@ -176,6 +176,8 @@ def plot_mixed(data, title="Title", invert_y=False, ax_lbls=None):
     ax.set_aspect('equal', adjustable='box')
     scatter_params(plt, fig, ax, title, ax_lbls)
     # ----
+    if len(data) == 5:
+        data = [data]
     for i, vals in enumerate(data):
         pnts, kind, color, marker, connect = vals
         if kind == 0:
@@ -270,13 +272,20 @@ def plot_2d(pnts, label_pnts=False, connect=False,
                'D', 'd', 'P', 'X')  # MarkerStyle.filled_markers
     # ---- set basic parameters ----
     scatter_params(plt, fig, ax, title, ax_lbls)
+    if isinstance(pnts, (list, tuple)):
+        if isinstance(pnts[0], (list, tuple)):
+            if len(pnts[0]) == 2:
+                pnts = np.asarray()
+            else:
+                print("check your input data")
+                return None
     if hasattr(pnts, 'IFT'):  # Geo array
         mn = np.min(pnts.mins(by_bit=True), axis=0)
         mx = np.max(pnts.maxs(by_bit=True), axis=0)
         pnts = pnts.bits  # convert to object array
-    elif isinstance(pnts, (list, tuple)):
-        mn = np.min([i.min(axis=0) for i in pnts], axis=0)
-        mx = np.max([i.max(axis=0) for i in pnts], axis=0)
+    # elif isinstance(pnts, (list, tuple)):
+    #     mn = np.min([i.min(axis=0) for i in pnts], axis=0)
+    #     mx = np.max([i.max(axis=0) for i in pnts], axis=0)
     elif isinstance(pnts, np.ndarray):
         if pnts.dtype.kind == 'O':
             mn = np.min([i.min(axis=0) for i in pnts], axis=0)
@@ -301,11 +310,13 @@ def plot_2d(pnts, label_pnts=False, connect=False,
             marker = markers[i]  # see markers = MarkerStyle.filled_markers
             color = colors[i]
             _scatter(p, plt, color, marker)
-            to_connect = connect[i]
-            to_label = label_pnts[i]
+            to_connect = connect  # [i]
+            to_label = label_pnts  # [i]
             if to_connect:
                 _line(p, plt, color, marker, linewdth=2)
             if to_label:
+                if (p[0][:, None] == p[-1]).all(-1).any(-1):
+                    p = p[:-1]
                 _label_pnts(p, plt)
     plt.show()
 

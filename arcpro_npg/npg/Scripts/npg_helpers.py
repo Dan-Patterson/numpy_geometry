@@ -918,6 +918,9 @@ def shape_finder(arr):
     #
     cnt = 1
     info = []
+    if isinstance(arr, (list, tuple, np.ndarray)):
+        if len(arr[0]) == 2:
+            arr = [arr]
     for a0 in arr:
         a0 = _arr_(a0)  # ---- create an appropriate array
         if a0.dtype.kind in 'efdg' or len(a0.shape) > 1:
