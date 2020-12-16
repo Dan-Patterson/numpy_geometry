@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# noqa: D205, D400
 r"""
 ---------
 npg_table
@@ -10,22 +11,22 @@ npg_table
 
 Script :
     npg_table.py
-
 Author :
     Dan_Patterson@carleton.ca
-
 Modified :
-    2020-03-31
+    2020-12-12
 
 Purpose
 -------
 Tools for working with tabular data in the Geo class.
 
-data types handled :
-    - i : integer
-    - u : unsigned integer
-    - f : float
-    - U : Unicode text
+Data types handled::
+
+    i : integer
+    u : unsigned integer
+    f : float
+    U : Unicode text
+
 >>> np.iinfo(np.int32).min # -2147483648
 >>> np.iinfo(np.int16).min # -32768
 >>> np.iinfo(np.int8).min  # -128
@@ -83,12 +84,10 @@ import numpy.lib.recfunctions as rfn
 import npg_io
 import npg_arc_npg
 
-ft = {"bool": lambda x: repr(x.astype(np.int32)),
-      "float_kind": "{: 7.2f}".format}
 np.set_printoptions(
-    edgeitems=10, linewidth=80, precision=2, suppress=True, threshold=100,
-    formatter=ft
-)
+    edgeitems=10, linewidth=120, precision=3, suppress=True, threshold=200,
+    formatter={"bool": lambda x: repr(x.astype(np.int32)),
+               "float_kind": '{: 7.3f}'.format})
 np.ma.masked_print_option.set_display("-")  # change to a single -
 
 script = sys.argv[0]  # print this should you need to locate the script
@@ -385,7 +384,7 @@ def merge_arrays(a, others):
 
 
 # ---- Crosstabulation tools -------------------------------------------------
-# ---- fancy print/string formatter for crosstabulation and pivot
+# -- fancy print/string formatter for crosstabulation and pivot
 def _prn(r, c, a, stat_name="Total"):
     """Fancy print formatting."""
     r = r.tolist()
@@ -637,7 +636,7 @@ def col_stats(a, fields=None, deci=2, verbose=False):
     if isinstance(fields, str):
         fields = [fields]
     num_flds = _get_numeric_fields(a, fields)
-    # ---- made it thus far
+    # -- made it thus far
     if len(num_flds) == 0:
         num_flds = ["array"]
         s_lst = [calc_stats(a.ravel(), axis=None, deci=deci)]
@@ -758,7 +757,7 @@ def find_a_in_b(a, b, fld_names=None):
     if a_names is not None:
         small = struct2nd(a)
     big = b[fld_names]
-    big = struct2nd(big)  # ---- call to struct2nd or `stu`
+    big = struct2nd(big)  # -- call to struct2nd or `stu`
     if a.ndim == 1:  # last slice, if  [:2] instead, it returns both indices
         indices = np.where((big == small).all(-1))[0]
     elif a.ndim == 2:
@@ -790,7 +789,7 @@ def find_in(a, col, what, where="in", any_case=True, pull="all"):
     -------
     >>> find_text(a, col=`FULLNAME`, what=`ABBEY`, pull=a.dtype.names[:2])
     """
-    # ---- error checking section ----
+    # -- error checking section ----
     e0 = """
     Query error: You provided...
     dtype: {}  col: {} what: {}  where: {}  any_case: {}  extract: {}
@@ -814,7 +813,7 @@ def find_in(a, col, what, where="in", any_case=True, pull="all"):
         if sum(r) != len(r):
             print(err1.format(pull, names))
             return None
-    # ---- query section
+    # -- query section
     # convert column values and query to lowercase, if text, then query
     c = a[col]
     if c.dtype.kind in ("i", "f", "c"):
@@ -825,13 +824,13 @@ def find_in(a, col, what, where="in", any_case=True, pull="all"):
         what = what.lower()
     where = where.lower()[0]
     if where == "i":
-        q = np.char.find(c, what) >= 0   # ---- is in query ----
+        q = np.char.find(c, what) >= 0   # -- is in query ----
     elif where == "s":
-        q = np.char.startswith(c, what)  # ---- startswith query ----
+        q = np.char.startswith(c, what)  # -- startswith query ----
     elif where == "eq":
         q = np.char.equal(c, what)
     elif where == "en":
-        q = np.char.endswith(c, what)    # ---- endswith query ----
+        q = np.char.endswith(c, what)    # -- endswith query ----
     if q.sum() == 0:
         print("none found")
         return None
@@ -974,7 +973,7 @@ def n_smallest_vals(a, group_fld=None, val_fld=None, num=1):
 
 
 # ---- to organize-----------------------------------------------------------
-# ---- running count
+#
 def running_count(a, to_label=False):
     """Perform a running count on a 1D array.
 

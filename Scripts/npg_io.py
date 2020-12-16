@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# noqa: D205, D400
 r"""
 --------
   npg_io
@@ -19,7 +20,8 @@ Script :
 Author :
     Dan_Patterson@carleton.ca
 
-Modified : 2020-10-22
+Modified :
+    2020-10-22
 
 Purpose
 -------
@@ -29,16 +31,12 @@ Requires npGeo to implement the array geometry class.
 See Also
 --------
 __init__ :
-    The `.../npgeom/__init__.py` script has further information on arcpy
+    The ``.../npgeom/__init__.py`` script has further information on arcpy
     related functionality.
 npGeo :
     A fuller description of the Geo class, its methods and properties is given
-    `.../npgeom/npGeo`.  This script focuses on getting arcpy or geojson
+    ``.../npgeom/npGeo``.  This script focuses on getting arcpy or geojson
     geometry into numpy arrays.
-
-References
-----------
-**General**
 
 Example
 -------
@@ -84,7 +82,7 @@ np.set_printoptions(
 __all__ = [
     'dtype_info', 'load_geo', 'save_geo', 'load_txt', 'save_txt',
     'load_geojson', 'geojson_Geo', 'prn_q', 'prn_', 'prn_tbl', 'prn_geo',
-    'prn_Geo_shapes', '_svg'
+    'prn_as_obj', 'prn_Geo_shapes', '_svg'
     ]
 
 
@@ -421,13 +419,13 @@ def make_row_format(dim=3, cols=5, a_kind='f', deci=1,
                     a_max=10, a_min=-10, width=100, prnt=False):
     """Format the row based on input parameters.
 
-    `dim` - int
+    dim - int
         Number of dimensions.
-    `cols` : int
+    cols : int
         Columns per dimension.
 
-    `a_kind`, `deci`, `a_max` and `a_min` allow you to specify a data type,
-    number of decimals and maximum and minimum values to test formatting.
+    ``a_kind``, ``deci``, ``a_max`` and ``a_min`` allow you to specify a data
+    type, number of decimals and maximum and minimum values to test formatting.
     """
     if a_kind not in NUMS:
         a_kind = 'f'
@@ -452,6 +450,7 @@ def make_row_format(dim=3, cols=5, a_kind='f', deci=1,
 
 def prn_(a, deci=2, width=120, prefix=". . "):
     """Alternate format to prn_nd function from `arraytools.frmts`.
+
     Inputs are largely the same.
 
     Parameters
@@ -585,10 +584,10 @@ def prn_geo(a, rows_m=100, names=None, deci=2, width=75):
     width : int
         Print width in characters.
     """
-    # ----
+    # --
     if names is None:
         names = ['shape', 'part', 'X', 'Y']
-    # ---- slice off excess rows, stack upper and lower slice using rows_m
+    # -- slice off excess rows, stack upper and lower slice using rows_m
     if not hasattr(a, 'IFT'):
         print("Requires a Geo array")
         return None
@@ -596,7 +595,7 @@ def prn_geo(a, rows_m=100, names=None, deci=2, width=75):
     c = [np.repeat(ift[i, 0], ift[i, 2] - ift[i, 1])
          for i, p in enumerate(ift[:, 0])]
     c = np.concatenate(c)
-    # ---- p: __ shape end, p0: x parts, p1: o start of parts, pp: concatenate
+    # -- p: __ shape end, p0: x parts, p1: o start of parts, pp: concatenate
     p = np.where(np.diff(c, append=0) == 1, "___", "")
     p1 = np.asarray(["" if i not in ift[:, 2] else 'o' for i in range(len(p))])
     p0 = np.asarray(["-" if i == 'o' else "" for i in p1])
@@ -605,16 +604,16 @@ def prn_geo(a, rows_m=100, names=None, deci=2, width=75):
         a = a[:rows_m]
         c = c[:rows_m]
         p = p[:rows_m]
-    # ---- get the column formats from ... _ckw_ and _col_format ----
+    # -- get the column formats from ... _ckw_ and _col_format ----
     deci = [0, 0, deci, deci]
     flds = [c, pp, a[:, 0], a[:, 1]]
     pairs = [_ckw_(flds[n], names[n], deci[n])
              for n, name in enumerate(names)]  # -- column info
     dts, wdths = _col_format(pairs, deci)      # format column
-    # ---- slice off excess columns
+    # -- slice off excess columns
     c_sum = np.cumsum(wdths)               # -- determine where to slice the
     N = len(np.where(c_sum < width)[0])    # columns that exceed ``width``
-    # ---- Assemble the formats and print
+    # -- Assemble the formats and print
     # row_frmt = " {:>03.0f} " + "  ".join([('{' + i + '}') for i in dts[:N]])
     row_frmt = " {:>03.0f} {:>5.0f}  {!s:<4}  {:>6.2f}  {:>6.2f}"
     hdr = ["!s:<" + "{}".format(wdths[i]) for i in range(N)]
@@ -631,8 +630,27 @@ def prn_geo(a, rows_m=100, names=None, deci=2, width=75):
 
 # ----  (4) print and display Geo and ndarrays
 #
+def prn_as_obj(self, full=False):
+    """Print the Geo array as an object array."""
+    arrs = self.as_arrays()
+    ids = np.unique(self.IDs)
+    fmt = [str(arr).replace("([", "\n"+" "*7) for arr in arrs]
+    if full:
+        self.structure()
+    else:
+        print("\nArray structure by sub-array.")
+    fr_to = [["[", " "], ["]]", ""], ["]", ""], ["(", ""], [",\n", "\n"],
+             [")", ""], [", dtype=object", ""]]
+    for i, z in enumerate(fmt):
+        for fr, to in fr_to:
+            z = z.replace(fr, to)
+            z = z.rstrip()
+        print("\n...{}\n{}".format(ids[i], z))
+    return
+
+
 def prn_Geo_shapes(self, ids=None):
-    """Print the Geo array"""
+    """Print the Geo array."""
     cases = self.IFT[:, 0]
     if ids is None:
         ids = self.IFT[0]
@@ -673,7 +691,7 @@ def _svg(self, as_polygon=True):
         green, teal, lime, yellow, magenta, cyan
     """
     def svg_path(g_bits, scale_by, o_f_s):
-        """Make the svg from a list of 2d arrays"""
+        """Make the svg from a list of 2d arrays."""
         opacity, fill_color, stroke = o_f_s
         pth = [" M {},{} " + "L {},{} "*(len(b) - 1) for b in g_bits]
         ln = [pth[i].format(*b.ravel()) for i, b in enumerate(g_bits)]

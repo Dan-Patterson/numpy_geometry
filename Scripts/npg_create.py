@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# noqa: D205, D400
 r"""
 ----------
 npg_create
@@ -83,13 +84,14 @@ import sys
 # from functools import wraps
 import numpy as np
 
-import npGeo as npg
+import npGeo
+from npGeo import arrays_to_Geo
 from npg_plots import plot_mixed  # plot_2d, plot_polygons
 
-ft = {'bool': lambda x: repr(x.astype(np.int32)),
-      'float_kind': '{: 0.1f}'.format}
-np.set_printoptions(edgeitems=10, linewidth=80, precision=2, suppress=True,
-                    threshold=500, formatter=ft)
+np.set_printoptions(
+    edgeitems=10, linewidth=120, precision=3, suppress=True, threshold=200,
+    formatter={"bool": lambda x: repr(x.astype(np.int32)),
+               "float_kind": '{: 7.3f}'.format})
 np.ma.masked_print_option.set_display('-')  # change to a single -
 
 script = sys.argv[0]  # print this should you need to locate the script
@@ -426,7 +428,7 @@ def ellipse(x_radius=1.0, y_radius=1.0,
             pnts = [pnts]
         frmt = "x_rad {}, y_rad {}, theta {}, x_c {}, y_c {}"
         txt = frmt.format(x_radius, y_radius, theta, xc, yc)
-        return npg.arrays_to_Geo(pnts, kind=2, info=txt)
+        return arrays_to_Geo(pnts, kind=2, info=txt)
     return pnts
 
 
@@ -482,7 +484,7 @@ def rectangle(dx=1, dy=-1,
     if asGeo:
         frmt = "dx {}, dy {}, x_cols {}, y_rows {}, LB ({},{})"
         txt = frmt.format(dx, dy, x_cols, y_rows, orig_x, orig_y)
-        return npg.arrays_to_Geo(a, kind=2, info=txt)
+        return arrays_to_Geo(a, kind=2, info=txt)
     return a
 
 
@@ -520,7 +522,7 @@ def triangle(dx=1, dy=1,
     if asGeo:
         frmt = "dx {}, dy {}, x_cols {}, y_rows {}, LB ({},{})"
         txt = frmt.format(dx, dy, x_cols, y_rows, orig_x, orig_y)
-        return npg.arrays_to_Geo(a, kind=2, info=txt)
+        return arrays_to_Geo(a, kind=2, info=txt)
     return a
 
 
@@ -548,7 +550,7 @@ def hex_flat(dx=1, dy=1,
     if asGeo:
         frmt = "dx {}, dy {}, x_cols {}, y_rows {}, LB ({},{})"
         txt = frmt.format(dx, dy, x_cols, y_rows, orig_x, orig_y)
-        return npg.arrays_to_Geo(hexs, kind=2, info=txt)
+        return arrays_to_Geo(hexs, kind=2, info=txt)
     return hexs
 
 
@@ -576,7 +578,7 @@ def hex_pointy(dx=1, dy=1,
     if asGeo:
         frmt = "dx {}, dy {}, x_cols {}, y_rows {}, LB ({},{})"
         txt = frmt.format(dx, dy, x_cols, y_rows, orig_x, orig_y)
-        return npg.arrays_to_Geo(hexs, kind=2, info=txt)
+        return arrays_to_Geo(hexs, kind=2, info=txt)
     return hexs
 
 
@@ -888,7 +890,7 @@ def spiral_archim(N, n, inward=False, clockwise=True):
 
 
 def spiral_sqr(ULx=-10, n_max=100):
-    """Create a square spiral from the centre in a clockwise direction
+    """Create a square spiral from the centre in a clockwise direction.
 
     Parameters
     ----------
@@ -945,7 +947,7 @@ def spiral_sqr(ULx=-10, n_max=100):
 #  https://stackoverflow.com/questions/36834505/
 #        creating-a-spiral-array-in-python
 def spiral_cw(A):
-    """Docstring"""
+    """Docstring."""
     A = np.array(A)
     out = []
     while(A.size):
@@ -955,7 +957,7 @@ def spiral_cw(A):
 
 
 def spiral_ccw(A):
-    """Docstring"""
+    """Docstring."""
     A = np.array(A)
     out = []
     while(A.size):
@@ -965,12 +967,12 @@ def spiral_ccw(A):
 
 
 def base_spiral(nrow, ncol):
-    """Docstring"""
+    """Docstring."""
     return spiral_ccw(np.arange(nrow*ncol).reshape(nrow, ncol))[::-1]
 
 
 def to_spiral(A):
-    """Docstring"""
+    """Docstring."""
     A = np.array(A)
     B = np.empty_like(A)
     B.flat[base_spiral(*A.shape)] = A.flat
@@ -978,7 +980,7 @@ def to_spiral(A):
 
 
 def from_spiral(A):
-    """Docstring"""
+    """Docstring."""
     A = np.array(A)
     return A.flat[base_spiral(*A.shape)].reshape(A.shape)
 

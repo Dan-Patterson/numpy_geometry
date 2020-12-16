@@ -1,16 +1,18 @@
 # -*- coding: utf-8 -*-
+# noqa: E401, D205, D400, F401
+# pylint: disable=C0410
 r"""
-npgeom
-======
+npg  NumPy Geometry
+===================
 
-**npgeom module __init__ file**
+**npg module __init__ file**
 
 Normal usage:
 
-    >>> import npgeom as npg
+    >>> import npg
 
 Script :
-    npgeom.__init__.py.
+    npg.__init__.py.
 
 Author :
     Dan Patterson
@@ -79,51 +81,64 @@ Note:  Python resides in... (substitute `arc_pro` for your install folder).
 >>> C:\arc_pro\bin\Python\envs\arcgispro-py3
 
 """
+# noqa: E401, F401, F403, C0410
 # pyflakes: disable=E0401,F403,F401
 # pylint: disable=unused-import
-# pylint: disable=W0611
 # pylint: disable=E0401
 # ---- sys, np imports
 import sys
 import numpy as np
 
 # ---- import for npg
-import npgDocs, npGeo, npg_io, npg_geom, npg_pip, npg_helpers, npg_table
-import npg_create, npg_analysis, npg_overlay
-import npg_setops, npg_utils, npg_min_circ
 
-from . npGeo import *  # noqa: F401, F403
-from . npg_io import *  # noqa: F401, F403
-from . npg_geom import *  # noqa: F401, F403
-from . npg_pip import *  # noqa: F401, F403
-from . npg_helpers import *  # noqa: F401, F403
-from . npg_table import *  # noqa: F401, F403
-from . npg_create import *  # noqa: F401, F403
-from . npg_analysis import *  # noqa: F401, F403
-from . npg_overlay import *  # noqa: F401, F403
-from . npg_setops import *  # noqu: F401, F403
-from . npg_utils import *  # noqa: F401, F403
-from . npg_min_circ import *  # noqa: F401, F403
+import npgDocs
+import npGeo
+import npg_helpers
+import npg_pip
+import npg_geom
+import npg_min_circ
+import npg_overlay
+import npg_analysis
+import npg_setops
+import npg_io
+import npg_table
+import npg_create
+import npg_utils
 
-# ---- docstring info for Geo and some methods
-from . npgDocs import (
+
+from npgDocs import (
     npGeo_doc, Geo_hlp, array_IFT_doc, dirr_doc, shapes_doc, parts_doc,
     outer_rings_doc, inner_rings_doc, get_shapes_doc, sort_by_extent_doc,
     radial_sort_doc
 )
-npGeo.__doc__ += npGeo_doc
-npGeo.Geo.__doc__ += Geo_hlp
-npGeo.array_IFT.__doc__ += array_IFT_doc
-npGeo.dirr.__doc__ += dirr_doc
+from npGeo import *
+from npg_helpers import *
+from npg_pip import *
+from npg_geom import *
+from npg_min_circ import *
+from npg_overlay import *
+from npg_analysis import *
+from npg_setops import *
+from npg_io import *
+from npg_table import *
+from npg_create import *
+from npg_utils import *
 
-npGeo.Geo.shapes.__doc__ += shapes_doc
-npGeo.Geo.parts.__doc__ += parts_doc
-npGeo.Geo.outer_rings.__doc__ += outer_rings_doc
-npGeo.Geo.inner_rings.__doc__ += inner_rings_doc
-npGeo.Geo.get_shapes.__doc__ += get_shapes_doc
-npGeo.Geo.radial_sort.__doc__ += radial_sort_doc
-npGeo.Geo.sort_by_extent.__doc__ += sort_by_extent_doc
-# npGeo.Geo.IFT.__doc__ = array_IFT_doc
+# ---- docstring info for Geo and some methods
+
+# npGeo.__doc__ += npGeo_doc
+# npGeo.Geo.__doc__ += Geo_hlp
+# npGeo.array_IFT.__doc__ += array_IFT_doc
+# npGeo.dirr.__doc__ += dirr_doc
+
+# npGeo.Geo.shapes.__doc__ += shapes_doc
+# npGeo.Geo.parts.__doc__ += parts_doc
+# npGeo.Geo.outer_rings.__doc__ += outer_rings_doc
+# npGeo.Geo.inner_rings.__doc__ += inner_rings_doc
+# npGeo.Geo.get_shapes.__doc__ += get_shapes_doc
+# npGeo.Geo.radial_sort.__doc__ += radial_sort_doc
+# npGeo.Geo.sort_by_extent.__doc__ += sort_by_extent_doc
+
 
 # ---- define __all__
 __all__ = [
@@ -146,6 +161,12 @@ __all__.extend(npg_setops.__all__)
 # __all__.extend(npg_min_circ.__all__)
 __all__.sort()
 
+__helpers__ = npg_helpers.__helpers__
+__helpers__.extend(npg_geom.__helpers__)
+__helpers__.extend(npg_analysis.__helpers__)
+__helpers__.extend(npg_overlay.__helpers__)
+__helpers__.sort()
+
 msg = """
 ----------------------------------------------
 ---- ... (n)um(p)y (g)eometry ... npg ... ----
@@ -167,4 +188,5 @@ Modules not imported by default...
 """
 pth = __path__[0]
 print(msg.format(pth, sys.version, sys.exec_prefix, np.__version__))
+del pth
 del msg

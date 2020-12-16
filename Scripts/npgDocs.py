@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# noqa: D205, D400
 r"""
 -----------
 npgDocs.py
@@ -39,7 +40,7 @@ import numpy as np
 ft = {"bool": lambda x: repr(x.astype(np.int32)),
       "float_kind": '{: 0.2f}'.format}
 np.set_printoptions(
-    edgeitems=10, linewidth=120, precision=2, suppress=True, threshold=200,
+    edgeitems=10, linewidth=80, precision=2, suppress=True, threshold=200,
     formatter=ft
 )
 
@@ -49,12 +50,15 @@ script = sys.argv[0]  # print this should you need to locate the script
 __all__ = ['npGeo_doc', 'Geo_hlp',
            'shapes_doc', 'parts_doc',
            'outer_rings_doc', 'inner_rings_doc',
-           'get_shapes_doc', 'radial_sort_doc',
-           'sort_by_extent_doc',
+           'get_shapes_doc', 'is_in_doc',
+           'bounding_circles_doc', 'convex_hulls_doc', 'extent_rectangles_doc',
+           'od_pairs_doc', 'pnt_on_poly_doc', 'sort_by_area_doc',
+           'radial_sort_doc', 'sort_by_extent_doc',
            'array_IFT_doc', 'dirr_doc'
            ]
 
 author_date = r"""
+
 Author :
     Dan Patterson
 - Dan_Patterson@carleton.ca
@@ -66,10 +70,13 @@ Author :
 
 def _update_docstring(obj, doc):
     """Update/expand a docstring.
+
     Based on _add_docstring in function_base.py
     """
     try:
         obj.__doc__ = doc
+        # or
+        # obj.__doc__ += doc
     except Exception:
         pass
 
@@ -141,7 +148,7 @@ lists and/or arrays.
 >>> g = npg.Geo(a, IFT)
 >>> g.__dict__.keys()
 ... dict_keys(['IFT', 'K', 'Info', 'IDs', 'Fr', 'To', 'CW', 'PID', 'Bit', 'FT',
-...  'IP', 'N', 'U', 'SR', 'X', 'Y', 'XY', 'LL', 'UR', 'Z', 'hlp'])
+...            'IP', 'N', 'U', 'SR', 'X', 'Y', 'XY', 'LL', 'UR', 'Z', 'hlp'])
 >>> sorted(g.__dict__.keys())
 ... ['Bit', 'CW', 'FT', 'Fr', 'IDs', 'IFT', 'IP', 'Info', 'K', 'LL', 'N',
 ...  'PID','SR', 'To', 'U', 'UR', 'X', 'XY', 'Y', 'Z', 'hlp']
@@ -154,6 +161,8 @@ __init__.py :
     General comments about the package.
 npg_io.py :
     Import and conversion routines for the Geo class.
+npg_helpers.py :
+    Many helper functions used the Geo class and often for ndarrays generally.
 npg_geom :
     Methods/functions for working with the Geo class or used by it.
 npg_table :
@@ -176,7 +185,7 @@ minimum for the whole dataset:
 
 **Useage of methods**
 
-`g` is a Geo instance with 2 shapes.  Both approaches yield the same results.
+``g`` is a Geo instance with 2 shapes.  Both approaches yield the same results.
 
 >>> Geo.centers(g)
 array([[ 5.  , 14.93],
@@ -184,6 +193,19 @@ array([[ 5.  , 14.93],
 >>> g.centers()
 array([[ 5.  , 14.93],
        [15.5 , 15.  ]])
+
+
+**Slicing options**
+
+Alternate slicing used for `od_pairs`, `segment_angles`, `rotate`
+When appropriate, you can slice using from-to pairs, just subtract 1 from the
+`to` value to remove values that traverse the last point in one feature with
+the first point in a subsequent pair
+
+>>> current = [ ...do something with p... for p in self.bits]
+>>> z = ...do something with self...
+>>> slice [z[ft[0]:ft[1] - 1] for ft in self.FT]
+
 
 References
 ----------
@@ -222,15 +244,16 @@ Load file::
 
 **how to test for Geo array**
 
->>> if ('Geo' in str(type(obj))) & (issubclass(obj.__class__, np.ndarray)):
+>>> if hasattr(g, "IFT"):
         print(`do stuff`)
 ... # end of check
 
+All Geo arrays require the IFT property.
+
 """
 
-# ----------------------------------------------------------------------------
 # ---- (2) ... Geo class
-# ---- ... Geo_hlp
+# --- Geo_hlp
 
 Geo_hlp = r"""
 
@@ -318,6 +341,7 @@ array([[ 1,  0,  5,  1,   1,  0],  # first shape, first part, outer ring
                      dtype=int64)
 """
 
+# ---- (3) shapes_doc
 shapes_doc = r"""
 
 Returns
@@ -332,6 +356,7 @@ locations. Finally, slice the actual coordinates for each range.
 
 """
 
+# ---- (4) parts_doc
 parts_doc = r"""
 
 Returns
@@ -341,8 +366,10 @@ to get the first and last from-to points, then slice the XY
 coordinates.
 """
 
-# ---- ... outer_rings
+# ---- (5) outer_rings
 outer_rings_doc = r"""
+
+Recalculate `from` and `to` indices if output is a Geo array.
 
 Returns
 -------
@@ -350,8 +377,11 @@ A new Geo array with holes discarded.  The IFT is altered to adjust for the
 removed points. If there are not holes, `self.bits` is returned.
 """
 
-# ---- ... inner_rings
+# ---- (6) inner_rings
 inner_rings_doc = r"""
+
+Reorder holes to outer rings if desired (`to_clockwise`).
+Recalculate `extent` for Geo array output.
 
 Returns
 -------
@@ -359,7 +389,7 @@ Return a list of ndarrays or optionally a new Geo array.
 Use True for `to_clockwise` to convert holes to outer rings.
 """
 
-# ---- ... get_shapes
+# ---- (7) get_shapes
 get_shapes_doc = r"""
 
 The original IDs are added to the `Info` property of the output array.
@@ -380,7 +410,112 @@ Notes
 >>> a.pull_shapes([1, 3, 5])  # get selected shapes
 """
 
-# ---- ... radial_sort
+# ---- (8) is_in
+is_in_doc = r"""
+
+Parameters
+----------
+pnts : Nx2 array
+    The array representing the point to query.
+reverse_check : boolean
+    True queries the pnts array for common points in the Geo array.
+values, indices : boolean
+    True, returns the values in common and their indices.  False for
+    either omits that particular return.
+"""
+
+# ---- (9) convex_hull
+convex_hulls_doc = r"""
+
+Parameters
+----------
+by_part : boolean
+    False for whole shape.  True for shape parts if present.
+threshold : integer
+    Points... less than threshold uses simple CH method, greater than,
+    uses scipy.
+"""
+# ---- (10) extent_rectangles
+extent_rectangles_doc = r"""
+
+Points are ordered clockwise from the bottom left, with the first and
+last points the same.  Requires an Advanced license in Pro for
+equivalent functionality.
+
+See Also
+--------
+`aoi_extent` and `aoi_rectangles`
+"""
+
+# ---- (11) bounding_circles
+bounding_circles_doc = r"""
+
+Parameters
+----------
+angle : number
+    Angles to form n-gon.  A value of 10 will yield 36 point circle.
+shift_back : boolean
+    Return to original coordinates if applicable.
+return_xyr : boolean {optional}
+    Return circle center and radius.
+
+Returns
+-------
+Circle points and optionally, the circle center and radius.
+"""
+
+# ---- (12) od_pairs
+od_pairs_doc = r"""
+
+Traversing around the perimeter of polygons, along polylines or
+between point sequences.
+
+Returns
+-------
+An list of arrays of origin-destination pairs for each bit in a shape.
+
+See Also
+--------
+`segment_polys` Geo method and `polys_to_segments` in npg_geom.
+"""
+
+# ---- (13) pnt_on_poly
+pnt_on_poly_doc = r"""
+
+Parameters
+----------
+by_dist : boolean
+    Enter the actual planar distance if True.  If False, then enter the
+    percentage between 0 and 100.
+val : number
+    Value to enter depends on ``by_dist``.
+as_structured : boolean
+    True to return a structured array.
+
+Requires
+--------
+geom._dist_along_(a, dist=val)         # by_dist True
+geom._percent_along_(a, percent=val)   # by_dist False
+
+Emulates
+`arcpy Polyline class, positionAlongLine (value, {use_percentage})
+<https://pro.arcgis.com/en/pro-app/arcpy/classes/polyline.htm>`_.
+"""
+
+# ---- (14) sort_by_area
+sort_by_area_doc = r"""
+
+Parameters
+----------
+ascending : boolean
+    True, in ascending order of shape area. False, in descending order.
+just_indices : boolean
+    True, returns a structured array of old and new IDs representing
+    the change in order based on the area sort option.  The actual
+    array is not returned.
+"""
+
+# ---- (15) radial_sort
 radial_sort_doc = r"""
 
 The features will be sorted so that their first coordinate is in the
@@ -396,6 +531,7 @@ Geo array, with points radially sorted (about their center).
 Notes
 -----
 Angles relative to the x-axis.
+
 >>> rad = np.arange(-6, 7.)*np.pi/6
 >>> np.degrees(rad)
 ... array([-180., -150., -120., -90., -60., -30.,  0.,
@@ -407,7 +543,7 @@ References
 -messy-array-for-plotting>`_.
 """
 
-# ---- ... sort_by_extent
+# ---- (16) sort_by_extent
 sort_by_extent_doc = r"""
 
 Parameters
@@ -457,8 +593,7 @@ References
 """
 
 
-# ----------------------------------------------------------------------------
-# ---- (3) ... array_IFT
+# ---- (17) ... array_IFT
 array_IFT_doc = r"""
 
 Parameters
@@ -491,8 +626,7 @@ Notes
 """
 
 
-# ----------------------------------------------------------------------------
-# ---- (4) ... dirr function
+# ---- (18) ... dirr function
 dirr_doc = r"""
 
 Source, ``arraytools.py_tools`` has a pure python equivalent.
@@ -517,32 +651,33 @@ See the `inspect` module for possible additions like `isfunction`,
 
 Example
 -------
->>> npg.dirr(g)
-----------------------------------------------------------------------
-| dir(npgeom) ...
-|    <class 'npgeom.Geo'>
--------
-  (001)  ... Geo class ...       Bit                     CW
-  (002)  FT                      Fr                      H
-  (003)  IDs                     IFT                     IFT_str
-  (004)  IP                      Info                    K
-  (005)  LL                      N                       PID
-  (006)  SR                      SVG                     To
-  (007)  U                       UR                      X
-  (008)  XT                      XY                      Y
-  (009)  Z                       __author__              __dict__
-  (010)  __module__              __name__                angles_polygon
-  (011)  angles_polyline         aoi_extent              aoi_rectangle
-  (012)  areas                   bit_IFT                 bit_ids
-... snip
+sample dir of a Geo array::
+
+    npg.dirr(sq)
+
+    ----------------------------------------------------------------------
+    | dir(npgeom) ...
+    |    <class 'npgeom.Geo'>
+    -------
+      (001)  ... Geo class ...
+      (002)  Bit                       CW                        FT
+      (003)  Fr                        H                         IDs
+      (004)  IFT                       IFT_str                   IP
+      (005)  Info                      K                         LL
+      (006)  N                         PID                       SR
+      (007)  SVG                       To                        U
+      (008)  UR                        X                         XT
+      (009)  XY                        Y                         Z
+      (010)  __author__                __dict__                  __module__
+      (011)  __name__                  aoi_extent                aoi_rectangle
+      (012)  areas                     as_arrays                 as_lists
+      (013)  bit_IFT                   bit_ids                   bit_pnt_cnt
+      (014)  bit_seq                   bits                      boundary
+    ... snip
+
 """
 
 
 # ---- Final main section ----------------------------------------------------
 if __name__ == "__main__":
     """optional location for parameters"""
-    print("\nRunning... {}\n".format(script))
-#    in_fc = r"C:\Git_Dan\npgeom\npgeom.gdb\Polygons"
-#    in_fc = r"C:\Git_Dan\npgeom\npgeom.gdb\Polygons2"
-#    in_fc = r"C:\Git_Dan\npgeom\npgeom.gdb\Polylines2"
-#    in_fc = r"C:\Git_Dan\npgeom\npgeom.gdb\Polygon2pnts"

@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-r"""
+# noqa: D205, D400
+r"""---.
+
 ------------
 npg_analysis
 ------------
@@ -34,25 +36,27 @@ Derived from arraytools ``convex_hull, mst, near, n_spaced``
 # import sys
 from textwrap import dedent
 import numpy as np
-from numpy.lib.recfunctions import unstructured_to_structured as uts
-from numpy.lib.recfunctions import repack_fields
-from numpy.lib.recfunctions import structured_to_unstructured as stu
+# from numpy.lib.recfunctions import unstructured_to_structured as uts
+# from numpy.lib.recfunctions import repack_fields
+# from numpy.lib.recfunctions import structured_to_unstructured as stu
 
-ft = {'bool': lambda x: repr(x.astype(np.int32)),
-      'float_kind': '{: 0.3f}'.format}
-np.set_printoptions(edgeitems=5, linewidth=120, precision=2, suppress=True,
-                    threshold=100, formatter=ft)
+np.set_printoptions(
+    edgeitems=10, linewidth=120, precision=3, suppress=True, threshold=200,
+    formatter={"bool": lambda x: repr(x.astype(np.int32)),
+               "float_kind": '{: 7.3f}'.format})
 np.ma.masked_print_option.set_display('-')  # change to a single -
 
 __all__ = [
     'closest_n', 'distances', 'not_closer', 'n_check', 'n_near',
     'n_spaced', '_x_sect_2', 'intersection_pnt', 'knn', 'knn0',
-    '_dist_arr_', '_e_dist_', 'mst', 'connect', 'concave'
+    'mst', 'connect', 'concave'
     ]
+__helpers__ = ['_dist_arr_', '_e_dist_']
 
+__all__ = __helpers__ + __all__
 
 # ===========================================================================
-# ---- distance related
+# ---- (1) distance related
 def closest_n(a, N=3, ordered=True):
     """See the `n_near` docstring."""
     coords, dist, n_array = n_near(a, N=N, ordered=ordered)
@@ -161,14 +165,14 @@ def n_near(a, N=3, ordered=True, return_all=False):
     dt = [('ID', '<i4'), *dt_near, *dt_dist]
     n_array = np.zeros((rows,), dtype=dt)
     n_array['ID'] = np.arange(rows)
-    # ---- distance matrix calculation using einsum ----
+    # -- distance matrix calculation using einsum ----
     if ordered:
         a = a[np.argsort(a[:, 0])]
     b = a.reshape(np.prod(a.shape[:-1]), 1, a.shape[-1])
     diff = b - a
     dist = np.einsum('ijk,ijk->ij', diff, diff)
     d = np.sqrt(dist).squeeze()
-    # ---- format for use in structured array output ----
+    # -- format for use in structured array output ----
     # steps are outlined as follows....
     #
     kv = np.argsort(d, axis=1)       # sort 'd' on last axis to get keys
@@ -176,7 +180,7 @@ def n_near(a, N=3, ordered=True, return_all=False):
     s0, s1, s2 = coords.shape
     coords = coords.reshape((s0, s1 * s2))
     dist = np.sort(d)[:, 1:]         # slice sorted distances, skip 1st
-    # ---- construct the structured array ----
+    # -- construct the structured array ----
     dt_names = n_array.dtype.names
     s0, s1, s2 = (1, (N+1) * 2 + 1, len(dt_names))
     for i in range(0, s1):           # coordinate field names
@@ -242,10 +246,11 @@ def n_spaced(L=0, B=0, R=10, T=10, min_space=1, num=10, verbose=True):
     return a0
 
 
-# ---- intersection
+# ---- (2) intersection
 #
 def _x_sect_2(args):
     """Line intersection with extrapolation if needed.
+
     Inputs are two lines or 4 points.
 
     Example
@@ -268,7 +273,7 @@ def _x_sect_2(args):
     else:
         raise AttributeError("Pass 2, 2-pnt lines or 4 points to the function")
     #
-    # ---- First check
+    # -- First check
     # Given 4 points, if there are < 4 unique, then the segments intersect
     u, cnts = np.unique((p0, p1, p2, p3), return_counts=True, axis=0)
     if len(u) < 4:
@@ -282,18 +287,18 @@ def _x_sect_2(args):
     s02_x = p0[0] - p2[0]
     s02_y = p0[1] - p2[1]
     #
-    # ---- Second check ----   np.cross(p1-p0, p3-p2)
+    # -- Second check ----   np.cross(p1-p0, p3-p2)
     denom = (s10_x * s32_y - s32_x * s10_y)  # .item()
     if denom == 0.0:  # collinear
         return False, None
     #
-    # ---- Third check ----  np.cross(p1-p0, p0-p2)
+    # -- Third check ----  np.cross(p1-p0, p0-p2)
     positive_denom = denom > 0.0  # denominator greater than zero
     s_numer = (s10_x * s02_y - s10_y * s02_x)  # .item()
 #    if (s_numer < 0) == positive_denom:
 #        return False
     #
-    # ---- Fourth check ----  np.cross(p3-p2, p0-p2)
+    # -- Fourth check ----  np.cross(p3-p2, p0-p2)
     t_numer = s32_x * s02_y - s32_y * s02_x
 #    if (t_numer < 0) == positive_denom:
 #        return False
@@ -302,7 +307,7 @@ def _x_sect_2(args):
        ((t_numer > denom) == positive_denom):
         return False, None
     #
-    # ---- check to see if the intersection point is one of the input points
+    # -- check to see if the intersection point is one of the input points
     # substitute p0 in the equation  These are the intersection points
     t = t_numer / denom
     intersection_point = [p0[0] + (t * s10_x), p0[1] + (t * s10_y)]
@@ -329,7 +334,7 @@ def intersection_pnt(p0, p1, p2, p3):
     return arr * n3
 
 
-# ---- k-nearest neighbors
+# ---- (3) k-nearest neighbors
 # knn0 used by concave hulls
 #
 def knn(p, pnts, k=1, return_dist=True):
@@ -368,7 +373,7 @@ def knn(p, pnts, k=1, return_dist=True):
     return pnts[idx][:k]
 
 
-def knn0(pnts, p, k):
+def knn0(p, pnts, k):
     """Calculate the `k` nearest neighbours for a given point, `p`.
 
     Parameters
@@ -380,6 +385,12 @@ def knn0(pnts, p, k):
     k : integer
         Number of neighbours.
 
+    Notes
+    -----
+    Removing the point ``p`` from the ``pnts`` list will take time, so trickery
+    is used in argsort to just omit the first index since its distance will be
+    zero.  Add 1 to the ``k`` value to ensure that you slice 3 points.
+
     Returns
     -------
     List of the k nearest neighbours, based on squared distance.
@@ -388,11 +399,11 @@ def knn0(pnts, p, k):
     pnts = np.asarray(pnts)
     diff = pnts - p[np.newaxis, :]
     d = np.einsum('ij,ij->i', diff, diff)
-    idx = np.argsort(d)[:k]
+    idx = np.argsort(d)[1:k + 1]  # Note remove the first point
     return pnts[idx].tolist()
 
 
-# ---- minimum spanning tree
+# ---- (4) minimum spanning tree
 #
 def _dist_arr_(a, verbose=False):
     """Minimum spanning tree preparation."""
@@ -528,9 +539,8 @@ def connect(a, dist_arr, edges):
 """
 
 
-# ---- find
+# ---- (5) concave hull
 #
-# ---- concave hull
 def concave(points, k, pip_check=False):
     """Return the concave hull for given points.
 
@@ -591,7 +601,7 @@ def concave(points, k, pip_check=False):
         else:
             raise AttributeError("Use 2, 2-pnt lines or 4 points.")
         #
-        # ---- First check ----   np.cross(p1-p0, p3-p2 )
+        # -- First check ----   np.cross(p1-p0, p3-p2 )
         p0_x, p0_y, p1_x, p1_y, p2_x, p2_y, p3_x, p3_y = *p0, *p1, *p2, *p3
         s10_x = p1_x - p0_x
         s10_y = p1_y - p0_y
@@ -601,7 +611,7 @@ def concave(points, k, pip_check=False):
         if denom == 0.0:
             return False
         #
-        # ---- Second check ----  np.cross(p1-p0, p0-p2 )
+        # -- Second check ----  np.cross(p1-p0, p0-p2 )
         den_gt0 = denom > 0
         s02_x = p0_x - p2_x
         s02_y = p0_y - p2_y
@@ -609,7 +619,7 @@ def concave(points, k, pip_check=False):
         if (s_numer < 0) == den_gt0:
             return False
         #
-        # ---- Third check ----  np.cross(p3-p2, p0-p2)
+        # -- Third check ----  np.cross(p3-p2, p0-p2)
         t_numer = s32_x * s02_y - s32_y * s02_x
         if (t_numer < 0) == den_gt0:
             return False
@@ -617,7 +627,7 @@ def concave(points, k, pip_check=False):
         if ((s_numer > denom) == den_gt0) or ((t_numer > denom) == den_gt0):
             return False
         #
-        # ---- check if the intersection point is one of the input points
+        # -- check if the intersection point is one of the input points
         t = t_numer / denom
         # substitute p0 in the equation
         x = p0_x + (t * s10_x)
@@ -649,7 +659,7 @@ def concave(points, k, pip_check=False):
                 if y_cal < y:
                     return True
         return False
-    # ----
+    # --
     k = max(k, 3)  # Make sure k >= 3
     if isinstance(points, np.ndarray):  # Remove duplicates if not done already
         p_set = np.unique(points, axis=0).tolist()
@@ -667,12 +677,14 @@ def concave(points, k, pip_check=False):
     hull = [frst_p]       # Initialize hull with first point
     p_set.remove(frst_p)  # Remove first point from p_set
     prev_ang = 0
-    # ----
+    # --
     while (cur_p != frst_p or len(hull) == 1) and len(p_set) != 0:
         if len(hull) == 3:
             p_set.append(frst_p)          # Add first point again
-        knn_pnts = knn0(p_set, cur_p, k)  # Find nearest neighbours
+        # ---- Find nearest neighbours
+        knn_pnts = knn0(cur_p, p_set, k)
         cur_pnts = sorted(knn_pnts, key=lambda x: -_angle_(x, cur_p, prev_ang))
+        # --
         its = True
         i = -1
         while its and i < len(cur_pnts) - 1:

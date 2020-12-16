@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# noqa: D205, D400
 r"""
 ------------
 npg_min_circ
@@ -41,18 +42,15 @@ translated to origin :
     (0.9080813432488977, 0.8327111343034483, 24.323287017466253)
 direct calculation :
     (421646.74554089626, 4596389.8247540779, 24.323287017466253)
+
 """
 
 import numpy as np
 
-ft = {'bool': lambda x: repr(x.astype(np.int32)),
-      'float_kind': '{: 8.2f}'.format}
-
 np.set_printoptions(
-    edgeitems=5, threshold=500, floatmode='maxprec', precision=2,
-    suppress=True, linewidth=120, nanstr='nan', infstr='inf', sign='-',
-    formatter=ft
-    )
+    edgeitems=5, linewidth=10, precision=3, suppress=True, threshold=200,
+    formatter={"bool": lambda x: repr(x.astype(np.int32)),
+               "float_kind": '{: 7.3f}'.format})
 
 
 def circle_mini(radius=1.0, theta=10.0, xc=0.0, yc=0.0):
@@ -156,8 +154,9 @@ def sub_1(pnts, prev, ptQ):
 
 # -------------------------------------------------------------------
 def sub_2(pnts, N, ptQ, ptP):
-    """Return the {cent, radius} for the smallest disc.  The disc encloses the
-    points list with PointR, PointQ on its boundary.
+    """Return the {cent, radius} for the smallest disc.
+
+    The disc encloses the points list with PointR, PointQ on its boundary.
     """
     if pnts.size == 0:
         pnts = np.array([[1.0, 1.0]])  # check

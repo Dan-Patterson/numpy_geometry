@@ -1,16 +1,19 @@
 # -*- coding: utf-8 -*-
+# noqa: D205, D400
 """
-=====
+-----
 ndset
-=====
+-----
 
-Script :   ndset.py
+Script :
+    ndset.py
+Author :
+    Dan_Patterson@carleton.ca
+Modified :
+    2020-10-11
 
-Author :   Dan_Patterson@carleton.ca
-
-Modified : 2020-10-11
-
-Purpose :
+Purpose
+-------
 
 This set of functions is largely directed to extending some of numpy set
 functions to apply to Nxd shaped arrays as well as structured and recarrays.
@@ -103,10 +106,10 @@ import sys
 import numpy as np
 
 
-ft = {'bool': lambda x: repr(x.astype(np.int32)),
-      'float_kind': '{: 6.2f}'.format}
-np.set_printoptions(edgeitems=10, linewidth=80, precision=2, suppress=True,
-                    threshold=100, formatter=ft)
+np.set_printoptions(
+    edgeitems=10, linewidth=120, precision=3, suppress=True, threshold=200,
+    formatter={"bool": lambda x: repr(x.astype(np.int32)),
+               "float_kind": '{: 7.3f}'.format})
 np.ma.masked_print_option.set_display('-')  # change to a single -
 
 script = sys.argv[0]  # print this should you need to locate the script
@@ -127,6 +130,7 @@ __all__ = ['_view_as_struct_',
 
 def _view_as_struct_(a, return_all=False):
     """Key function to get uniform 2d arrays to be viewed as structured arrays.
+
     A bit of trickery, but it works for all set-like functionality
 
     Parameters
@@ -153,8 +157,9 @@ def _view_as_struct_(a, return_all=False):
 
 
 def _check_dtype_(a_view, b_view):
-    """Check for equivalency in the dtypes.  If they are not equal, flag and
-    return True or False.
+    """Check for equivalency in the dtypes.
+
+    If they are not equal, flag and return True or False.
     """
     err = "\nData types are not equal, function failed.\n1. {}\n2. {}"
     adtype = a_view.dtype.descr
@@ -204,8 +209,9 @@ def nd_diff(a, b, invert=True):
 
 
 def nd_diffxor(a, b, uni=False):
-    """Use setxor... it is slower than nd_diff, 36 microseconds vs 18.2
-    but this is faster for large sets
+    """Use setxor... it is slower than nd_diff.
+
+    36 microseconds vs 18.2 but this is faster for large sets
     """
     a_view = _view_as_struct_(a, return_all=False)
     b_view = _view_as_struct_(b, return_all=False)
@@ -217,7 +223,7 @@ def nd_diffxor(a, b, uni=False):
 
 
 def nd_in1d(a, b, assume_unique=False, invert=False):
-    """Check for the presence of array in the other.  Taken from `in1d` in...
+    """Check for the presence of array in the other.  Taken from `in1d` in.
 
     `<https://github.com/numpy/numpy/blob/master/numpy/lib/arraysetops.py>`_.
     """
@@ -315,8 +321,9 @@ def nd_isin(a, look_for, indices_only=False, reverse=False):
 
 
 def nd_merge(a, b):
-    """Merge views of 2 ndarrays or recarrays.  Duplicates are not removed, use
-    nd_union instead.
+    """Merge views of 2 ndarrays or recarrays.
+
+    Duplicates are not removed, use nd_union instead.
     """
     ab = None
     if (a.dtype.kind in ('f', 'i')) and (b.dtype.kind in ('f', 'i')):
@@ -332,8 +339,10 @@ def nd_merge(a, b):
 
 
 def nd_union(a, b):
-    """Union views of arrays. Returns the unique, sorted array of values that
-    are in either of the two input arrays.
+    """Union views of arrays.
+
+    Returns the unique, sorted array of values that are in either of the two
+    input arrays.
     """
     a_view = _view_as_struct_(a, return_all=False)
     b_view = _view_as_struct_(b, return_all=False)

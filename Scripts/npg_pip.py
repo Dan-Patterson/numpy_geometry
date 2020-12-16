@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# noqa: D205, D400
 r"""
 -------
 npg_pip
@@ -11,12 +12,10 @@ and uses numpy enhancements.
 
 Script :
     npg_pip.py
-
 Author :
     Dan_Patterson@carleton.ca
 
     `<https://github.com/Dan-Patterson>`_.
-
 Modified :
     2020-10-24
 
@@ -80,12 +79,10 @@ import numpy as np
 # from numpy.lib.recfunctions import repack_fields
 
 # noqa: E501
-ft = {"bool": lambda x: repr(x.astype(np.int32)),
-      "float_kind": '{: 0.2f}'.format}
 np.set_printoptions(
-    edgeitems=10, linewidth=120, precision=2, suppress=True, threshold=200,
-    formatter=ft
-)
+    edgeitems=10, linewidth=120, precision=3, suppress=True, threshold=200,
+    formatter={"bool": lambda x: repr(x.astype(np.int32)),
+               "float_kind": '{: 7.3f}'.format})
 
 script = sys.argv[0]  # print this should you need to locate the script
 
@@ -99,7 +96,10 @@ __all__ = [
 #
 def _is_right_side(p, strt, end):
     """Determine if point (p) is `inside` a line segment (strt-->end).
-    See : line_crosses, in_out_crosses in npg_helpers.
+
+    See Also
+    --------
+    line_crosses, in_out_crosses in npg_helpers.
     position = sign((Bx - Ax) * (Y - Ay) - (By - Ay) * (X - Ax))
 
     Returns
@@ -186,7 +186,7 @@ def winding_num(pnts, poly):
     ...    [ 21.00,  0.00]])
     """
     def cal_w(p, poly):
-        """Do the calculation"""
+        """Do the calculation."""
         w = 0
         y = p[1]
         ys = poly[:, 1]

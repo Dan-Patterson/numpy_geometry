@@ -1,5 +1,6 @@
 # -*- coding: UTF-8 -*-
-"""
+# noqa: D205, D400
+r"""
 ---------
 npg_plots
 ---------
@@ -53,13 +54,15 @@ colors-in-matplotlib>`_.
 `Voxels in matplotlib
 <https://stackoverflow.com/questions/56752954/how-to-scale-the-voxel-
 dimensions-with-matplotlib>`_.
+
 """
 # ---- imports, formats, constants ----
 
 import sys
+# from textwrap import dedent
 import numpy as np
 # import npg_create
-# import npgeom as npg
+# import npg
 
 # import matplotlib
 import matplotlib.pyplot as plt
@@ -67,10 +70,10 @@ from matplotlib.collections import LineCollection
 # import matplotlib.lines as lines
 # from matplotlib.markers import MarkerStyle
 
-ft = {'bool': lambda x: repr(x.astype('int32')),
-      'float': '{: 0.1f}'.format}
-np.set_printoptions(edgeitems=10, linewidth=80, precision=2,
-                    suppress=True, threshold=100, formatter=ft)
+np.set_printoptions(
+    edgeitems=10, linewidth=120, precision=3, suppress=True, threshold=200,
+    formatter={"bool": lambda x: repr(x.astype(np.int32)),
+               "float_kind": '{: 7.3f}'.format})
 np.ma.masked_print_option.set_display('-')
 
 script = sys.argv[0]
@@ -78,8 +81,48 @@ script = sys.argv[0]
 __all__ = ['plot_2d', 'plot_3d', 'plot_polygons', 'plot_mesh']
 
 
-# ---- functions ----
+# ---- (1) helper functions ----
 #
+def axis_mins_maxs(pnts):
+    """Return axis mins, maxes from data point (``pnts``), values.
+
+    Parameters
+    ----------
+    pnts : Geo array or ndarray
+        If the array is a Geo array or an ndarray with an ``object`` dtype.
+        ``pnts`` will be altered if necessary.  In all cases, they are
+        returned to the calling function.
+    """
+    msg = r"""
+        A Geo array or ndarray with dtype='O' is required.
+        Check your input data.
+        """
+    if isinstance(pnts, (list, tuple)):
+        if isinstance(pnts[0], (list, tuple)):
+            if len(pnts[0]) == 2:
+                pnts = np.asarray()
+            else:
+                print(msg)
+                return None
+    if hasattr(pnts, 'IFT'):  # Geo array
+        mn = np.min(pnts.mins(by_bit=True), axis=0)
+        mx = np.max(pnts.maxs(by_bit=True), axis=0)
+        pnts = pnts.bits  # convert to object array
+
+    elif isinstance(pnts, np.ndarray):
+        if pnts.dtype.kind == 'O':
+            mn = np.min([i.min(axis=0) for i in pnts], axis=0)
+            mx = np.max([i.max(axis=0) for i in pnts], axis=0)
+        else:
+            mn = pnts.min(axis=0)
+            mx = pnts.max(axis=0)
+            pnts = [pnts]
+    buff = (mx - mn) * 0.05  # 5% space buffer
+    x_min, y_min = np.floor(mn - buff)
+    x_max, y_max = np.ceil(mx + buff)
+    return pnts, x_min, y_min, x_max, y_max
+
+
 def subplts(plots=1, by_col=True, max_rc=4):
     """Return subplot layout.
 
@@ -134,9 +177,13 @@ def scatter_params(plt, fig, ax, title="Title", ax_lbls=None):
     return
 
 
+# ---- (2) plot types
+#
 def plot_mixed(data, title="Title", invert_y=False, ax_lbls=None):
     """Plot mixed data.
 
+    Parameters
+    ----------
     data : list of lists
         [[values, type, color, marker, connect]]
 
@@ -147,7 +194,9 @@ def plot_mixed(data, title="Title", invert_y=False, ax_lbls=None):
     """
 
     def _label_pnts(pnts, plt):
-        """Label the points. Note: to skips the last label for polygons, use
+        """Label the points.
+
+        Note: to skips the last label for polygons, use
         zip(lbl[:-1], pnts[:-1, 0], pnts[:-1, 1])
         """
         lbl = np.arange(len(pnts))
@@ -170,15 +219,17 @@ def plot_mixed(data, title="Title", invert_y=False, ax_lbls=None):
     ax.set_aspect('equal', adjustable='box')
     scatter_params(plt, fig, ax, title, ax_lbls)
     # ----
+    if len(data) == 5:
+        data = [data]
     for i, vals in enumerate(data):
         pnts, kind, color, marker, connect = vals
         if kind == 0:
             _scatter(pnts, plt, color='black', marker='s')
             _label_pnts(pnts, plt)
         elif kind == 2:
-            # cmap = plt.cm.get_cmap('hsv', len(pnts))
+            cmap = plt.cm.get_cmap('hsv', len(pnts))
             for j, p in enumerate(pnts):
-                # clr = cmap(j)  # clr=np.random.random(3,)  # clr = "b"
+                clr = cmap(j)  # clr=np.random.random(3,)  # clr = "b"
                 clr = 'None'
                 _line(p, plt)  # color, marker, linewdth=2)
                 plt.fill(*zip(*p), facecolor=clr)
@@ -210,6 +261,10 @@ def plot_2d(pnts, label_pnts=False, connect=False,
         True for point labels.
     connect : boolean or list of booleans
         True to connect points in sequential order.
+
+    Required
+    --------
+    ``scatterparams``, ``axis_mins_maxs``
 
     Notes
     -----
@@ -247,7 +302,9 @@ def plot_2d(pnts, label_pnts=False, connect=False,
                  linewidth=linewdth)
 
     def _label_pnts(pnts, plt):
-        """Label the points. Note: to skips the last label for polygons, use
+        """Label the points.
+
+        Note: to skips the last label for polygons, use
         zip(lbl[:-1], pnts[:-1, 0], pnts[:-1, 1])
         """
         lbl = np.arange(len(pnts))
@@ -262,23 +319,7 @@ def plot_2d(pnts, label_pnts=False, connect=False,
                'D', 'd', 'P', 'X')  # MarkerStyle.filled_markers
     # ---- set basic parameters ----
     scatter_params(plt, fig, ax, title, ax_lbls)
-    if hasattr(pnts, 'IFT'):  # Geo array
-        mn = np.min(pnts.mins(by_bit=True), axis=0)
-        mx = np.max(pnts.maxs(by_bit=True), axis=0)
-        pnts = pnts.bits  # convert to object array
-    elif isinstance(pnts, (list, tuple)):
-        mn = np.min([i.min(axis=0) for i in pnts], axis=0)
-        mx = np.max([i.max(axis=0) for i in pnts], axis=0)
-    elif isinstance(pnts, np.ndarray):
-        if pnts.dtype.kind == 'O':
-            mn = np.min([i.min(axis=0) for i in pnts], axis=0)
-            mx = np.max([i.max(axis=0) for i in pnts], axis=0)
-        else:
-            mn = pnts.min(axis=0)
-            mx = pnts.max(axis=0)
-    buff = (mx - mn) * 0.05  # 5% space buffer
-    x_min, y_min = np.floor(mn - buff)
-    x_max, y_max = np.ceil(mx + buff)
+    pnts, x_min, y_min, x_max, y_max = axis_mins_maxs(pnts)
     #
     plt.xlim(x_min, x_max)
     plt.ylim(y_min, y_max)
@@ -295,6 +336,8 @@ def plot_2d(pnts, label_pnts=False, connect=False,
             if connect:
                 _line(p, plt, color, marker, linewdth=2)
             if label_pnts:
+                if (p[0][:, None] == p[-1]).all(-1).any(-1):
+                    p = p[:-1]
                 _label_pnts(p, plt)
     plt.show()
 
@@ -370,10 +413,13 @@ def plot_polygons(arr, outline=True):
     if hasattr(arr, 'IFT'):
         cw = arr.CW
         shapes = arr.bits
-    else:
-    #     cw = np.repeat(1, arr.shape[0])
-    #    shapes = np.copy(arr)
-        shapes = np.copy(arr)
+    elif isinstance(arr, np.ndarray):
+        if len(arr.shape) == 2:
+            shapes = [arr]
+        else:
+            shapes = arr
+    elif isinstance(arr, (list, tuple)):
+        shapes = arr
     fig, ax = plt.subplots(1, 1)
     fig.set_figheight = 8
     fig.set_figwidth = 8
@@ -474,11 +520,18 @@ def _demo():
                   [5.3, 9.5], [5.5, 5.7], [6.1, 4.0], [6.5, 6.8],
                   [7.1, 7.6], [7.3, 2.0], [7.4, 1.0], [7.7, 9.6],
                   [8.5, 6.5], [9.0, 4.7], [9.6, 1.6], [9.7, 9.6]])
-    plot_2d([a], label_pnts=False, connect=False,
-            title='Points no closer than... test',
-            invert_y=False, ax_lbls=None
-            )
-    return a
+    z = np.array([[0.4,  0.5], [1.2,  3.6], [1.9,  4.6], [2.9,  5.9],
+                  [1.2,  9.1], [5.3,  9.5], [7.7,  9.6], [9.7,  9.6],
+                  [9.0,  4.7], [9.6,  1.6], [7.4,  1.0], [4.3,  3.0],
+                  [0.4,  0.5]])
+    # z = npg.concave(a, 3, True)
+    plot_2d([z, a], [False, True], [True, False],
+            title='Points and concave hull')
+    # plot_2d([a], label_pnts=False, connect=False,
+    #         title='Points no closer than... test',
+    #         invert_y=False, ax_lbls=None
+    #         )
+    return
 
 
 # ---------------------------------------------------------------------

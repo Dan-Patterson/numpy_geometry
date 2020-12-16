@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# noqa: D205, D400
 r"""
 
 npg_utils
@@ -11,7 +12,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2020-06-27
+    2020-12-12
 
 Purpose
 -------
@@ -99,17 +100,17 @@ import os
 from textwrap import dedent, indent, wrap
 # import warnings
 import numpy as np
-from numpy.lib.recfunctions import unstructured_to_structured as uts
+# from numpy.lib.recfunctions import unstructured_to_structured as uts
 
 # warnings.simplefilter('ignore', FutureWarning)
 
 # from arcpytools import fc_info, tweet  #, frmt_rec, _col_format
 # import arcpy
 
-ft = {'bool': lambda x: repr(x.astype(np.int32)),
-      'float_kind': '{: 0.3f}'.format}
-np.set_printoptions(edgeitems=10, linewidth=80, precision=2, suppress=True,
-                    threshold=300, formatter=ft)
+np.set_printoptions(
+    edgeitems=10, linewidth=120, precision=3, suppress=True, threshold=200,
+    formatter={"bool": lambda x: repr(x.astype(np.int32)),
+               "float_kind": '{: 7.3f}'.format})
 np.ma.masked_print_option.set_display('-')  # change to a single -
 
 script = sys.argv[0]  # print this should you need to locate the script
@@ -224,7 +225,7 @@ def doc_func(func=None, verbose=True):
     def demo_func():
         """Demonstrate retrieving and documenting module and function info."""
         def sub():
-            """Return sub in dummy"""
+            """Return sub in dummy."""
             print("sub")
         return None
     #
@@ -273,7 +274,7 @@ def doc_func(func=None, verbose=True):
 # ----------------------------------------------------------------------
 # ---- (2) get_func .... code section ----
 def get_func(func, line_nums=True, output=False):
-    """Get function information (ie. for a def)
+    """Get function information (ie. for a def).
 
     Parameters
     ----------
@@ -448,9 +449,7 @@ def get_module_info(obj, max_number=100, verbose=True):
 
 
 def find_def(defs, module_name):
-    """
-    find_def
-    Find occurences of a function in a module
+    """Find occurences of a function in a module.
 
     np.lookfor(what, module=None, import_modules=True, regenerate=False,
             output=None):
@@ -472,7 +471,7 @@ def find_def(defs, module_name):
 # ----------------------------------------------------------------------
 # ---- (4) wrapper .... code section ----
 def _wrapper(a, wdth=70, verbose=True):
-    """Wrap stuff using textwrap.wrap
+    """Wrap stuff using ``textwrap.wrap``.
 
     Notes
     -----
@@ -555,6 +554,7 @@ def doc_deco(func, doc):
 #
 def get_dir(path, ignore=['__init__', '__pycache__']):
     """Get the directory list from a path, excluding geodatabase folders.
+
     Used by.. folders
 
     >>> get_dir('C:/Git_Dan/arraytools')
@@ -562,7 +562,7 @@ def get_dir(path, ignore=['__init__', '__pycache__']):
      'C:/Git_Dan/arraytools/analysis',
      ... snip ...
      'C:/Git_Dan/arraytools/__pycache__']
-    >>> # ---- common path prefix
+    >>> # -- common path prefix
     >>> os.path.commonprefix(get_dir('C:/Git_Dan/arraytools'))
     'C:/Git_Dan/arraytools/'
     """
@@ -679,9 +679,6 @@ def dir_py(obj, colwise=False, cols=3, prn=True):
         print(txt_out)
     else:
         return txt_out
-
-
-
 
 
 # ----------------------------------------------------------------------
