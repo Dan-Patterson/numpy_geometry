@@ -26,11 +26,11 @@
 
 **NOTE**
 
-1 This is the main working repository for *Free_tools*.  I update that when major work is complete here.
+1 This is the main working repository for *arcpro_npg* aka, *Free_tools*.  I update that when major work is complete here.
 
 2 See the **Docs** folder for other documentation, or click on the links above.
 
-3 The **Scripts** folder contains the scripts associated with the **Geo** array, a subclass of a *numpy* ndarray.  The script, *tbx_tools.py* is the controlling script associated with the *npGeom.tbx* toolbox.
+3 The **arcpro_npg** folder contains the scripts associated with the **Geo** array, a subclass of a *numpy* ndarray.  The script, *tbx_tools.py* is the controlling script associated with the *npGeom.tbx* toolbox.
 
 ----
 A numpy geometry class and functions that work with arcpy and ESRI featureclasses is provided here to facilitate working with vector geometry using the ndarray as its base.
@@ -41,7 +41,8 @@ When trying to work with numpy and the geometries, this creates problems since g
 
 What I set out to do was create a uniform 2D array of coordinates and a companion array which denotes the feature ID and the from-to point pairs.  This is similar to the FeatureClassToNumPy array approach, but that particular function and its inverse, are only useful for simple singlepart geometries.
 
-I will document and build on these tools set with examples.  I am only working with featureclasses stored in a file geodatabase.
+I will document and build on these tools set with examples.  
+Generally, I am only working with featureclasses stored in a file geodatabase.  There are tools to derive geometries from geojson format or other formats capable of generating array-like structures.
 
 ----
 **Some links**
