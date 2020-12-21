@@ -49,7 +49,8 @@ Extras
 
 >>> not_in = [
 ...     '__all__', '__builtins__', '__cached__', '__doc__', '__file__',
-...     '__loader__', '__name__', '__package__', '__spec__', 'np', 'npg', 'sys'
+...     '__loader__', '__name__', '__package__', '__spec__', 'np', 'npg',
+...     'sys', 'script'
 ...     ]
 
 >>> __all__ = [i for i in dir(npg.npg_helpers)
@@ -68,23 +69,22 @@ import sys
 # from textwrap import dedent
 
 import numpy as np
-# from numpy.lib.recfunctions import unstructured_to_structured as uts
+from numpy.lib.recfunctions import unstructured_to_structured as uts
 # from numpy.lib.recfunctions import repack_fields
 
-if 'npg' not in list(locals().keys()):
-    import npGeo as npg
-
+# if 'npg' not in list(locals().keys()):
+#     import npg
 
 script = sys.argv[0]  # print this should you need to locate the script
 
 nums = 'efdgFDGbBhHiIlLqQpP'
 
-# ---- See script header
+# -- See script header
 __all__ = [
-    'common_pnts', 'compare_geom', 'crossings', 'flat', 'in_out_crosses',
-    'interweave', 'keep_geom', 'line_crosses', 'nums', 'polyline_angles',
-    'radial_sort', 'remove_geom', 'script', 'segment_angles', 'shape_finder',
-    'sort_xy', 'stride_2d'
+    'common_pnts', 'compare_geom', 'flat', 'interweave', 'keep_geom',
+    'polyline_angles',
+    'radial_sort', 'remove_geom', 'segment_angles', 'shape_finder',
+    'dist_angle_sort', 'sort_xy', 'stride_2d'
     ]
 
 __helpers__ = [
@@ -96,7 +96,12 @@ __helpers__ = [
     '_translate_'
     ]  # ---- core bit functions
 
+__all__ = __helpers__ + __all__
 
+
+# ---------------------------------------------------------------------------
+# ---- (1) Helpers
+#
 def _get_base_(a):
     """Return the base array of a Geo array.  Shave off microseconds."""
     if hasattr(a, "IFT"):
@@ -149,7 +154,20 @@ def _from_to_pnts_(a, as_pairs=False):
 
 
 def _to_lists_(a, outer_only=True):
-    """Return list or list of lists for a Geo or ndarray."""
+    """Return list or list of lists for a Geo or ndarray.
+
+    Parameters
+    ----------
+    a : array-like
+        Either a Geo array or ndarray.
+    outer_only : boolean
+        True, returns the outer-rings of a Geo array.  False, returns the bit.
+
+    See Also
+    --------
+    ``Geo_to_lists``, ``Geo_to_arrays`` if you want to maintain the potentially
+    nested structure of the geometry.
+    """
     if hasattr(a, "IFT"):
         if outer_only:
             return a.outer_rings(False)  # a.bits
@@ -165,7 +183,8 @@ def _to_lists_(a, outer_only=True):
         return a
 
 
-# ---- bit helpers ----
+# ---------------------------------------------------------------------------
+# ---- (2) bit helpers
 #
 def _angles_3pnt_(a, inside=True, in_deg=True):
     """Worker for Geo `polygon_angles`, `polyline_angles` and `min_area_rect`.
@@ -181,6 +200,18 @@ def _angles_3pnt_(a, inside=True, in_deg=True):
         to `right-side` for polylines.
     in_deg : boolean
         True for degrees, False for radians.
+
+    Notes
+    -----
+    Sum of interior angles of a polygon with ``n`` edges::
+
+        (n − 2)π radians or (n − 2) × 180 degrees
+        n = number of unique vertices
+
+    | euler`s formula
+    | number of faces + number of vertices - number of edges = 2
+    | rectangle : 1 + 5 - 4 = 2
+    | triangle  : 1 + 4 - 3 = 2
     """
     if np.allclose(a[0], a[-1]):                 # closed loop, remove dupl.
         a = a[:-1]
@@ -271,7 +302,8 @@ def _bit_segment_angles_(a, fromNorth=False):
     return ang
 
 
-# ---- Condition checking
+# ---------------------------------------------------------------------------
+# ---- (3) Condition checking
 #
 def _is_clockwise_(a):
     """Return whether the sequence (polygon) is clockwise oriented or not."""
@@ -486,12 +518,12 @@ def _rotate_(a, R, as_group):
         return None
     shapes = _bit_check_(a)
     out = []
-    if as_group:  # ---- rotate as a whole
+    if as_group:  # -- rotate as a whole
         cent = np.mean(a.XY, axis=0)
         return np.einsum('ij,jk->ik', a.XY - cent, R) + cent
-    # ----
+    #
     uniqs = []
-    for chunk in shapes:  # ---- rotate individually
+    for chunk in shapes:  # -- rotate individually
         _, idx = np.unique(chunk, True, axis=0)
         uniqs.append(chunk[np.sort(idx)])
     cents = [np.mean(i, axis=0) for i in uniqs]
@@ -501,7 +533,8 @@ def _rotate_(a, R, as_group):
     return out
 
 
-# ---- Geo or ndarray stuff
+# ---------------------------------------------------------------------------
+# ---- (4) Geo / ndarray stuff
 #
 def polyline_angles(a, fromNorth=False):
     """Polyline/segment angles.
@@ -538,123 +571,8 @@ def segment_angles(a, fromNorth=False):
     return ang
 
 
-# ---- `crossing` and related methods ----------------------------------------
-# related functions
-# See : line_crosses, in_out_crosses
-#  pnt_right_side : single point relative to the line
-#  line_crosses   : checks both segment points relative to the line
-#  in_out_crosses # a variante of the above, with a different return signature
-
-def line_crosses(p0, p1, p2, p3):
-    """Determine if a line is `inside` another line segment.
-
-    Parameters
-    ----------
-    p0, p1, p2, p3 : array-like
-        X,Y coordinates of the subject (p0-->p1) and clipping (p2-->p3) lines.
-
-    Returns
-    -------
-    The result indicates which points, if any, are on the inward bound side of
-    a polygon (aka, right side). The clip edge (p2-->p3) is for clockwise
-    oriented polygons and its segments. If `a` and `b` are True, then both are
-    inside.  False for both means that they are on the outside of the clipping
-    segment.
-    """
-    x0, y0, x1, y1, x2, y2, x3, y3 = *p0, *p1, *p2, *p3
-    dc_x = x3 - x2
-    dc_y = y3 - y2
-    # ---- check p0 and p1 separately and return the result
-    a = (y0 - y2) * dc_x <= (x0 - x2) * dc_y
-    b = (y1 - y2) * dc_x <= (x1 - x2) * dc_y
-    return a, b
-
-
-def in_out_crosses(*args):
-    """Return whether two line segments cross.
-
-    Line segment (p0-->p1) is crossed by a cutting/clipping
-    segment (p2-->p3).  `inside` effectively means `right side` for clockwise
-    oriented polygons.
-
-    Parameters
-    ----------
-    p0p1, p2p3 : line segments
-        Line segments with their identified start-end points, as below
-    p0, p1, p2, p3 : array-like
-        X,Y coordinates of the subject (p0-->p1) and clipping (p2-->p3) lines.
-
-    Requires
-    --------
-    `_line_crosses_` method
-
-    Returns
-    -------
-    - -1 both segment points are outside the clipping segment.
-    - 0  the segment points cross the clipping segment with one point inside.
-         and one point outside.
-    - 1  both segment points are inside the clipping segment.
-
-    """
-    msg = "\nPass 2, 2-pnt lines or 4 points to the function\n"
-    args = np.asarray(args)
-    if np.size(args) == 8:
-        if len(args) == 2:  # two lines
-            p0, p1, p2, p3 = *args[0], *args[1]
-        elif len(args) == 4:  # four points
-            p0, p1, p2, p3 = args
-        else:
-            print(msg)
-            return
-    else:
-        print(msg)
-        return
-    # ----
-    a, b = line_crosses(p0, p1, p2, p3)
-    if a and b:
-        return 1
-    elif a or b:
-        return 0
-    elif not a and not b:
-        return -1
-
-
-def crossings(geo, clipper):
-    """Determine if lines cross. multiline implementation of above."""
-    bounds = npg.dissolve(geo)  # **** need to fix dissolve
-    p0s = bounds[:-1]
-    p1s = bounds[1:]
-    p2s = clipper[:-1]
-    p3s = clipper[1:]
-    n = len(p0s)
-    m = len(p2s)
-    in_ = []
-    out_ = []
-    crosses_ = []
-    x_pnts = []
-    for j in range(m):
-        p2, p3 = p2s[j], p3s[j]
-        for i in range(n):
-            p0, p1 = p0s[i], p1s[i]
-            ar = np.asarray([p0, p1, p2, p3])
-            a, b = line_crosses(p0, p1, p2, p3)
-            if a and b:
-                # return 1
-                in_.append(ar)
-            elif a or b:
-                # return 0
-                crosses_.append(ar)
-                x0 = npg._intersect_(p0, p1, p2, p3)
-                # print(p0, p1, p2, p3, x0)
-                x_pnts.append(x0)
-            # elif not a and not b:
-            else:
-                # return -1
-                out_.append(ar)
-    return in_, out_, crosses_, x_pnts
-
-
-# ---- compare, remove, keep geometry ----------------------------------------
+# ---------------------------------------------------------------------------
+# ---- (5) compare, remove, keep geometry
 #
 def common_pnts(pnts, self, remove_common=True):
     """Check for coincident points between `pnts` and the Geo array.
@@ -749,7 +667,8 @@ def remove_geom(arr, look_for, **kwargs):
                         invert=True, return_idx=False)
 
 
-# ---- sort coordinates
+# ---------------------------------------------------------------------------
+# ---- (6) sort coordinates
 #
 def sort_xy(a, x_ascending=True, y_ascending=True):
     """Sort points by coordinates.
@@ -772,6 +691,38 @@ def sort_xy(a, x_ascending=True, y_ascending=True):
         if x_ascending:
             return a[np.lexsort((x_s, y_s))]
         return a[np.lexsort((-x_s, y_s))]
+
+
+def dist_angle_sort(a, sort_point=None, close_poly=True):
+    """Return a radial and distance sort of points relative to point.
+
+    Parameters
+    ----------
+    a : array-like
+        The array to sort.
+    sort_point : list
+        The [x, y] value of the sort origin.  If ``None``, then the minimum
+        x,y value from the inputs is used.
+
+    Useful for polygons.  First and last point equality is checked.
+    """
+    def _e_2d_(a, p):
+        """Array points to point distance."""
+        diff = a - p[None, :]
+        return np.sqrt(np.einsum('ij,ij->i', diff, diff))
+
+    a = np.array(a)
+    min_f = np.array([np.min(a[:, 0]), np.mean(a[:, 1])])
+    dxdy = np.subtract(a, np.atleast_2d(min_f))
+    ang = np.degrees(np.arctan2(dxdy[:, 1], dxdy[:, 0]))
+    dist = _e_2d_(a, min_f)
+    ang_dist = np.vstack((ang, dist)).T
+    keys = np.argsort(uts(ang_dist))
+    rev_keys = keys[::-1]   # works
+    arr = a[rev_keys]
+    if np.all(arr[0] == arr[-1]):
+        arr = np.concatenate((arr, arr[0][None, :]), axis=0)
+    return arr
 
 
 def radial_sort(a, extent_center=True, close_poly=True, clockwise=True):
@@ -815,7 +766,7 @@ def interweave(arr, as_3d=False):
     Parameters
     ----------
     arr : ndarray
-        The array shapes must be the same.
+        A 2d ndarray.
     as_3d : boolean
         If True, an (N, 2, 2) shaped array is returned, otherwise the
         `from-to` values appear on the same line with a (N, 4) shape.
@@ -852,18 +803,18 @@ def stride_2d(a, win=(2, 2), stepby=(1, 1)):
     -------
     Create from-to points::
 
-        # ---- produces a `view` and not a copy
-        >>> a = array([[0, 1], [2, 3], [4, 5]])
+        # -- produces a `view` and not a copy
+        >>> a = np.array([[0, 1], [2, 3], [4, 5]])
         >>> stride_2d(a.ravel(), win=(4,), stepby=(2,))
 
         array([[0, 1, 2, 3],
                [2, 3, 4, 5]])
 
-        # ---- alternatives, but they produce copies
+        # -- alternatives, but they produce copies
         >>> np.concatenate((a[:-1], a[1:]), axis=1)
         >>> np.asarray(list(zip(a[:-1], a[1:])))
 
-        # ---- concatenate is faster, with 500 points in `s`.
+        # -- concatenate is faster, with 500 points in `s`.
         %timeit stride_2d(s.ravel(), win=(4,), stepby=(2,))
         21.7 µs ± 476 ns per loop (mean ± std. dev. of 7 runs, 10000 loops
 
@@ -890,7 +841,8 @@ def stride_2d(a, win=(2, 2), stepby=(1, 1)):
     return a_s.squeeze()
 
 
-# ---- others ---------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# ---- (7) others functions
 #
 def shape_finder(arr):
     """Provide the structure of an array/list which may be uneven and nested.
@@ -901,14 +853,32 @@ def shape_finder(arr):
         An list/tuple/array of objects. In this case points. Shapes are
         usually formed as parts with/without holes and they may have multiple
         parts.
+
+    Notes
+    -----
+    >>> # -- 3 shapes, (1, 2, 3)
+    >>> array([[1, 0, 0, (5, 2)],
+               [1, 0, 1, (5, 2)],  shape 1 has 2 parts (0, 1)
+               [1, 0, 2, (4, 2)],     part 0 has 4 parts (0, 1, 2, 3)
+               [1, 0, 3, (4, 2)],
+               [1, 1, 0, (5, 2)],     part 1 has 2 parts (0, 1)
+               [1, 1, 1, (4, 2)],
+               [2, 0, 0, (9, 2)],  shape 2 has 2 parts
+               [2, 1, 0, (10, 2)],    part 1 has 4 parts (0, 1, 2, 3)
+               [2, 1, 1, (4, 2)],
+               [2, 1, 2, (4, 2)],
+               [2, 1, 3, (4, 2)],
+               [3, 0, 0, (4, 2)]], shape 3 has 1 part consisting of 4 points
+              dtype=object)
     """
     def _len_check_(arr):
         """Check iterator lengths."""
         if len(arr) == 1:
             return False
-        q = [len(a) == len(arr[0])
-             if hasattr(a, '__iter__') else False
-             for a in arr]
+        q = [len(a) == len(arr[0])      # check subarray and array lengths
+             if hasattr(a, '__iter__')  # if it is an iterable
+             else False                 # otherwise, return False
+             for a in arr]              # for each subarray in the array
         return np.all(q)
 
     def _arr_(arr):
@@ -918,28 +888,35 @@ def shape_finder(arr):
     #
     cnt = 1
     info = []
-    if isinstance(arr, (list, tuple, np.ndarray)):
-        if len(arr[0]) == 2:
-            arr = [arr]
-    for a0 in arr:
-        a0 = _arr_(a0)  # ---- create an appropriate array
+    if isinstance(arr, (list, tuple)):
+        if len(arr[0]) == 2 and isinstance(arr[0][0], (int, float)):
+            arrs = [arr]
+        else:
+            arrs = [i for i in arr if hasattr(i, '__len__')]
+    elif isinstance(arr, np.ndarray):
+        if arr.dtype.kind == "O":
+            arrs = arr
+        elif len(arr.shape) == 2:
+            arrs = [arr]
+    for ar in arrs:
+        a0 = _arr_(ar)  # -- create an appropriate array
         if a0.dtype.kind in 'efdg' or len(a0.shape) > 1:
-            info.append([cnt, 0, 0, *a0.shape])
+            info.append([cnt, 0, 0, a0.shape])
         else:
             i = 0
             for a1 in a0:
                 a1 = _arr_(a1)
                 j = 0
                 if a1.dtype.kind in 'efdg' or len(a1.shape) > 1:
-                    info.append([cnt, i, j, *a1.shape])
+                    info.append([cnt, i, j, a1.shape])
                 else:
                     for a2 in a1:
                         a2 = _arr_(a2)
-                        info.append([cnt, i, j, *a2.shape])
+                        info.append([cnt, i, j, a2.shape])
                         j += 1
                 i += 1
         cnt += 1
-    return np.array(info)
+    return np.array(info, dtype="O")
 
 
 def flat(lst):
@@ -955,8 +932,23 @@ def flat(lst):
     return _flat(lst, [])
 
 
+def project_pnt_to_line(x1, y1, x2, y2, xp, yp):
+    """Project a point on to a line to get perpendicular location."""
+    x12 = x2 - x1
+    y12 = y2 - y1
+    dotp = x12 * (xp - x1) + y12 * (yp - y1)
+    dot12 = x12 * x12 + y12 * y12
+    if dot12:
+        coeff = dotp / dot12
+        lx = x1 + x12 * coeff
+        ly = y1 + y12 * coeff
+        return lx, ly
+    else:
+        return None
+
+
 # ===========================================================================
-# ---- main section
+# ---- ==== main section
 if __name__ == "__main__":
     """optional location for parameters"""
     in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\Polygons"

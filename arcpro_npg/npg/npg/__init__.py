@@ -90,6 +90,7 @@ import sys
 import numpy as np
 
 # ---- import for npg
+
 import npgDocs
 import npGeo
 import npg_helpers
@@ -100,31 +101,34 @@ import npg_overlay
 import npg_analysis
 import npg_setops
 import npg_io
+import npg_prn
 import npg_table
 import npg_create
 import npg_utils
 
-from . npgDocs import (
+
+from npgDocs import (
     npGeo_doc, Geo_hlp, array_IFT_doc, dirr_doc, shapes_doc, parts_doc,
     outer_rings_doc, inner_rings_doc, get_shapes_doc, sort_by_extent_doc,
     radial_sort_doc
 )
-from . npGeo import *
-from . npg_helpers import *
-from . npg_pip import *
-from . npg_geom import *
-from . npg_min_circ import *
-from . npg_overlay import *
-from . npg_analysis import *
-from . npg_setops import *
-from . npg_io import *
-from . npg_table import *
-from . npg_create import *
-from . npg_utils import *
+from npGeo import *
+from npg_helpers import *
+from npg_pip import *
+from npg_geom import *
+from npg_min_circ import *
+from npg_overlay import *
+from npg_analysis import *
+from npg_setops import *
+from npg_io import *
+from npg_prn import *
+from npg_table import *
+from npg_create import *
+from npg_utils import *
 
 # ---- docstring info for Geo and some methods
 
-npGeo.__doc__ += npGeo_doc
+# npGeo.__doc__ += npGeo_doc
 # npGeo.Geo.__doc__ += Geo_hlp
 # npGeo.array_IFT.__doc__ += array_IFT_doc
 # npGeo.dirr.__doc__ += dirr_doc
@@ -149,6 +153,7 @@ __all__.extend(npgDocs.__all__)
 __all__.extend(npGeo.__all__)
 __all__.extend(npg_io.__all__)
 __all__.extend(npg_geom.__all__)
+__all__.extend(npg_prn.__all__)
 __all__.extend(npg_pip.__all__)
 __all__.extend(npg_helpers.__all__)
 __all__.extend(npg_table.__all__)
@@ -176,7 +181,7 @@ python version and location ...
 numpy version ...
 ... {}
 Usage...
-... import npgeom as npg
+... import npg
 
 Modules not imported by default...
 ... npg_arc_npg

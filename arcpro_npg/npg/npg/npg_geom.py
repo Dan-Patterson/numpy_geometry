@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2020-11-23
+    2020-12-17
 
 Purpose
 -------
@@ -128,6 +128,7 @@ from scipy.spatial import ConvexHull as CH
 from scipy.spatial import Delaunay
 
 import npGeo
+
 from npg_helpers import (_get_base_, _bit_area_, _bit_min_max_,
                          _in_extent_, _angles_3pnt_)
 from npg_pip import np_wn
@@ -140,7 +141,7 @@ np.ma.masked_print_option.set_display('-')  # change to a single -
 
 script = sys.argv[0]  # print this should you need to locate the script
 
-# ---- See script header
+# -- See script header
 __all__ = [
     'CH', 'Delaunay', 'bin_pnts', 'common_extent', 'densify_by_distance',
     'densify_by_factor', 'dist_to_segment', 'eucl_dist', 'extent_to_poly',
@@ -154,10 +155,14 @@ __all__ = [
 __helpers__ = [
     '_angles_3pnt_', '_bit_area_', '_bit_min_max_', '_ch_', '_ch_scipy_',
     '_ch_simple_', '_dist_along_', '_e_2d_', '_get_base_', '_in_extent_',
-    '_percent_along_', '_pnt_on_poly_', '_pnt_on_segment_', '_pnts_on_line_'
+    '_is_pnt_on_line_', '_percent_along_', '_pnt_on_poly_',
+    '_pnt_on_segment_', '_pnts_on_line_'
     ]
 
+__all__ = __helpers__ + __all__
 
+
+# ===========================================================================
 # ---- helpers
 #
 def _e_2d_(a, p):
@@ -242,6 +247,30 @@ def _percent_along_(a, percent=0):
     xt = x0 * (1. - t) + (x1 * t)
     yt = y0 * (1. - t) + (y1 * t)
     return np.array([xt, yt])
+
+
+def _is_pnt_on_line_(start, end, xy, tolerance=0.0):
+    """Perform a distance check of whether a point is on a line.
+
+    Notes
+    -----
+    ``tolerance`` is normally not needed unless you want to examine points
+    quite close to a segment.
+    """
+    #
+    def dist(a, b):
+        """Add math.sqrt() for actual distance."""
+        return np.sqrt((b[0] - a[0])**2 + (b[1] - a[1])**2)
+    #
+    line_leng = dist(start, end)
+    if tolerance == 0.0:
+        d = dist(start, xy) + dist(end, xy) == line_leng
+    else:
+        d = (dist(start, xy) + dist(end, xy)) - line_leng
+        d = -tolerance <= d <= tolerance
+    if d:
+        return True
+    return False
 
 
 def _pnts_on_line_(a, spacing=1, is_percent=False):  # densify by distance
@@ -371,7 +400,7 @@ def _pnt_on_poly_(pnt, poly):
     poly = np.asarray(poly)
     if np.all(poly[0] == poly[-1]):  # strip off any duplicate points
         poly = poly[:-1]
-    # ---- determine the distances
+    # -- determine the distances
     d = _e_2d_(poly, pnt)   # abbreviated edist =>  d = e_dist(poly, pnt)
     key = np.argsort(d)[0]  # dist = d[key]
     if key == 0:  # np.vstack((poly[-1:], poly[:3]))
@@ -397,7 +426,8 @@ def _pnt_on_poly_(pnt, poly):
     return r
 
 
-# ---- extent
+# ----------------------------------------------------------------------------
+# ---- (1) extent functions
 #
 def pnts_to_extent(a, as_pair=False):
     """Return the extent of a geometry. (Left, Bottom, Right, Top).
@@ -465,9 +495,9 @@ def extent_to_poly(extent, kind=2):
     return npGeo.arrays_to_Geo([ext], kind=kind, info="extent to poly")
 
 
-# ==== ====================================================
-# ---- distance related
-
+# ----------------------------------------------------------------------------
+# ---- (2) distance related
+#
 def find_closest(a, pnt):
     """Find the closest point within a Geo array, its index and distance."""
     dist = _e_2d_(a, pnt)
@@ -515,14 +545,14 @@ def eucl_dist(a, b, metric='euclidean'):
     return dist_arr
 
 
-def dist_to_segment(x1, y1, x2, y2, x3, y3):  # x3,y3 is the point
+def dist_to_segment(x1, y1, x2, y2, x3, y3):  # x3, y3 is the point
     """Return the distance to a line segment (x1, y1), (x2, y2) to (x3, y3).
 
     `<https://stackoverflow.com/questions/849211/shortest-distance-between
     -a-point-and-a-line-segment/2233538#2233538>`_.
     """
-    px = x2-x1
-    py = y2-y1
+    px = x2 - x1
+    py = y2 - y1
     norm = px*px + py*py
     u = ((x3 - x1) * px + (y3 - y1) * py) / float(norm)
     if u > 1:
@@ -543,7 +573,8 @@ def dist_to_segment(x1, y1, x2, y2, x3, y3):  # x3,y3 is the point
     return dist
 
 
-# ---- densify
+# ----------------------------------------------------------------------------
+# ---- (3) densification
 #
 def densify_by_factor(a, factor=2):
     """Densify a 2D array using np.interp.
@@ -614,7 +645,8 @@ def densify_by_distance(a, spacing):
     return _pnts_on_line_(a, spacing)
 
 
-# ---- buffer, scale
+# ----------------------------------------------------------------------------
+# ---- (4) buffer, scale
 #
 def scale_by_area(poly, factor=1, asGeo=False):
     """Scale a polygon geometry by its area.
@@ -648,7 +680,7 @@ def scale_by_area(poly, factor=1, asGeo=False):
         alpha = np.sqrt(factor * area_ / area_)
         scaled = shifted * [alpha, alpha]
         return scaled + cent
-    # ----
+    # --
     if npGeo.is_Geo(poly):
         final = [_area_scaler_(a, factor) for a in poly.bits]
     else:
@@ -750,7 +782,7 @@ def offset_buffer(poly, buff_dist=1, keep_holes=False, asGeo=False):
                 b = _buff_(a, buff_dist)
                 final.append(b)
         return final
-    # ----
+    # --
     # Buffer Geo arrays or ndarray
     if npGeo.is_Geo(poly):
         final = _buffer_Geo_(poly, buff_dist, keep_holes)
@@ -762,7 +794,8 @@ def offset_buffer(poly, buff_dist=1, keep_holes=False, asGeo=False):
     return final  # fr_to, z, final
 
 
-# ---- convex hulls
+# ----------------------------------------------------------------------------
+# ---- (5) convex hulls
 #
 def _ch_scipy_(points):
     """Convex hull using scipy.spatial.ConvexHull.
@@ -776,7 +809,7 @@ def _ch_scipy_(points):
 
 
 def _ch_simple_(points):
-    """Calculate the convex hull for given points.
+    r"""Calculate the convex hull for given points.
 
     Removes null_pnts, finds the unique points, then determines the hull from
     the remaining.
@@ -787,7 +820,7 @@ def _ch_simple_(points):
         xa, ya = a
         xb, yb = b
         return (xa - xo) * (yb - yo) - (ya - yo) * (xb - xo)
-    # ----
+    # --
     _, idx = np.unique(points, return_index=True, axis=0)
     points = points[idx]
     if len(points) <= 3:
@@ -817,7 +850,8 @@ def _ch_(points, threshold=50):
     return _ch_simple_(points)
 
 
-# ---- mabr (min. area bounding rectangle)
+# ----------------------------------------------------------------------------
+# ---- (6) mabr (min. area bounding rectangle)
 #
 def mabr(polys, p_centers, p_angles):
     """Determine the minimum area bounding rectangle for polygons.
@@ -856,7 +890,7 @@ def mabr(polys, p_centers, p_angles):
         c, s = np.cos(angle), np.sin(angle)
         R = np.array(((c, -s), (s, c)))
         return np.einsum('ij,jk->ik', a - cent, R) + cent
-    # ----
+    # --
     # Determine their convex hulls for the outer rings.
     # Obtain the angles, extents and centers for each hull.
     rects = []
@@ -869,7 +903,7 @@ def mabr(polys, p_centers, p_angles):
         vals = [area_old, p_centers[i], np.inf, Xmin, Ymin, Xmax, Ymax]
         for angle in uni_:
             ch2 = _rot_(ch, p_centers[i], angle, False)  # translate, rotate
-            area_, LBRT = _extent_area_(ch2)  # ---- determine area
+            area_, LBRT = _extent_area_(ch2)  # -- determine area
             Xmin, Ymin, Xmax, Ymax = LBRT
             if area_ <= area_old:
                 area_old = area_
@@ -880,7 +914,8 @@ def mabr(polys, p_centers, p_angles):
     return rects
 
 
-# ---- triangulation, Delaunay helper
+# ----------------------------------------------------------------------------
+# ---- (7) triangulation, Delaunay helper
 #
 def triangulate_pnts(pnts):
     """Triangulate the points and return the triangles.
@@ -907,7 +942,7 @@ def triangulate_pnts(pnts):
     p = pnts - avg
     tri = Delaunay(p)
     simps = tri.simplices
-    # ---- indices holder, fill with indices, repeat first and roll CW
+    # -- indices holder, fill with indices, repeat first and roll CW
     # translate the points back
     z = np.zeros((len(simps), 4), dtype='int32')
     z[:, :3] = simps
@@ -918,7 +953,8 @@ def triangulate_pnts(pnts):
     return new_pnts.tolist()
 
 
-# ---- poly conversion helpers
+# ----------------------------------------------------------------------------
+# ---- (8) poly* conversion
 #
 def polys_to_unique_pnts(a, as_structured=True):
     """Based on `polys_to_points`.
@@ -962,7 +998,7 @@ def polys_to_segments(self, as_basic=True, to_orig=False, as_3d=False):
     if self.K not in (1, 2):
         print("Poly* features required.")
         return None
-    # ---- basic return as ndarray used by common_segments
+    # -- basic return as ndarray used by common_segments
     if as_3d:  # The array cannot be basic if it is 3d
         as_basic = False
     if to_orig:
@@ -970,18 +1006,18 @@ def polys_to_segments(self, as_basic=True, to_orig=False, as_3d=False):
         b_vals = [tmp[ft[0]:ft[1]] for ft in self.FT]   # shift to orig extent
     else:
         b_vals = self.bits
-    # ---- Do the concatenation
+    # -- Do the concatenation
     fr_to = np.concatenate([np.concatenate((b[:-1], b[1:]), axis=1)
                             for b in b_vals], axis=0)
-    # ---- return if simple and not 3d representation
+    # -- return if simple and not 3d representation
     if as_basic:
         return fr_to
-    # ---- return 3d from-to representation
+    # -- return 3d from-to representation
     if as_3d:
         fr_to = fr_to[:, :4]
         s0, s1 = fr_to.shape
         return fr_to.reshape(s0, s1//2, s1//2)
-    # ----structured array section
+    # -- structured array section
     # add bit ids and lengths to the output array
     b_ids = self.IFT
     segs = np.asarray([[[b_ids[i][0], *(b_ids[i][-2:])], len(b) - 1]
@@ -1012,7 +1048,7 @@ def simplify_lines(a, deviation=10):
 
 
 # ----------------------------------------------------------------------------
-# ---- pnts in, or on, geometries
+# ---- (9) pnts in, or on, geometries
 #
 def pnts_in_pnts(pnts, geo, just_common=True):
     """Check to see if pnts are coincident (common) with pnts in a Geo array.

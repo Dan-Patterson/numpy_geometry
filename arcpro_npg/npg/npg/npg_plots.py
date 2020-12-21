@@ -18,7 +18,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2020-06-29
+    2020-12-20
 
 Purpose
 -------
@@ -59,6 +59,7 @@ dimensions-with-matplotlib>`_.
 # ---- imports, formats, constants ----
 
 import sys
+# from textwrap import dedent
 import numpy as np
 # import npg_create
 # import npg
@@ -80,8 +81,50 @@ script = sys.argv[0]
 __all__ = ['plot_2d', 'plot_3d', 'plot_polygons', 'plot_mesh']
 
 
-# ---- functions ----
+# ---- (1) helper functions ----
 #
+def axis_mins_maxs(pnts):
+    """Return axis mins, maxes from data point (``pnts``), values.
+
+    Parameters
+    ----------
+    pnts : Geo array or ndarray
+        If the array is a Geo array or an ndarray with an ``object`` dtype.
+        ``pnts`` will be altered if necessary.  In all cases, they are
+        returned to the calling function.
+    """
+    msg = r"""
+        A Geo array or ndarray with dtype='O' is required.
+        Check your input data.
+        """
+    if isinstance(pnts, (list, tuple)):
+        if isinstance(pnts[0], (list, tuple)):
+            if len(pnts[0]) == 2:
+                pnts = np.asarray(pnts)
+            else:
+                print(msg)
+                return None
+        else:
+            pnts = np.asarray(pnts, dtype='O')
+    if hasattr(pnts, 'IFT'):  # Geo array
+        mn = np.min(pnts.mins(by_bit=True), axis=0)
+        mx = np.max(pnts.maxs(by_bit=True), axis=0)
+        pnts = pnts.bits  # convert to object array
+
+    elif isinstance(pnts, np.ndarray):
+        if pnts.dtype.kind == 'O':
+            mn = np.min([i.min(axis=0) for i in pnts], axis=0)
+            mx = np.max([i.max(axis=0) for i in pnts], axis=0)
+        else:
+            mn = pnts.min(axis=0)
+            mx = pnts.max(axis=0)
+            pnts = [pnts]
+    buff = (mx - mn) * 0.05  # 5% space buffer
+    x_min, y_min = np.floor(mn - buff)
+    x_max, y_max = np.ceil(mx + buff)
+    return pnts, x_min, y_min, x_max, y_max
+
+
 def subplts(plots=1, by_col=True, max_rc=4):
     """Return subplot layout.
 
@@ -136,6 +179,8 @@ def scatter_params(plt, fig, ax, title="Title", ax_lbls=None):
     return
 
 
+# ---- (2) plot types
+#
 def plot_mixed(data, title="Title", invert_y=False, ax_lbls=None):
     """Plot mixed data.
 
@@ -184,9 +229,9 @@ def plot_mixed(data, title="Title", invert_y=False, ax_lbls=None):
             _scatter(pnts, plt, color='black', marker='s')
             _label_pnts(pnts, plt)
         elif kind == 2:
-            # cmap = plt.cm.get_cmap('hsv', len(pnts))
+            cmap = plt.cm.get_cmap('hsv', len(pnts))
             for j, p in enumerate(pnts):
-                # clr = cmap(j)  # clr=np.random.random(3,)  # clr = "b"
+                clr = cmap(j)  # clr=np.random.random(3,)  # clr = "b"
                 clr = 'None'
                 _line(p, plt)  # color, marker, linewdth=2)
                 plt.fill(*zip(*p), facecolor=clr)
@@ -218,6 +263,10 @@ def plot_2d(pnts, label_pnts=False, connect=False,
         True for point labels.
     connect : boolean or list of booleans
         True to connect points in sequential order.
+
+    Required
+    --------
+    ``scatterparams``, ``axis_mins_maxs``
 
     Notes
     -----
@@ -272,31 +321,7 @@ def plot_2d(pnts, label_pnts=False, connect=False,
                'D', 'd', 'P', 'X')  # MarkerStyle.filled_markers
     # ---- set basic parameters ----
     scatter_params(plt, fig, ax, title, ax_lbls)
-    if isinstance(pnts, (list, tuple)):
-        if isinstance(pnts[0], (list, tuple)):
-            if len(pnts[0]) == 2:
-                pnts = np.asarray()
-            else:
-                print("check your input data")
-                return None
-    if hasattr(pnts, 'IFT'):  # Geo array
-        mn = np.min(pnts.mins(by_bit=True), axis=0)
-        mx = np.max(pnts.maxs(by_bit=True), axis=0)
-        pnts = pnts.bits  # convert to object array
-    # elif isinstance(pnts, (list, tuple)):
-    #     mn = np.min([i.min(axis=0) for i in pnts], axis=0)
-    #     mx = np.max([i.max(axis=0) for i in pnts], axis=0)
-    elif isinstance(pnts, np.ndarray):
-        if pnts.dtype.kind == 'O':
-            mn = np.min([i.min(axis=0) for i in pnts], axis=0)
-            mx = np.max([i.max(axis=0) for i in pnts], axis=0)
-        else:
-            mn = pnts.min(axis=0)
-            mx = pnts.max(axis=0)
-            pnts = [pnts]
-    buff = (mx - mn) * 0.05  # 5% space buffer
-    x_min, y_min = np.floor(mn - buff)
-    x_max, y_max = np.ceil(mx + buff)
+    pnts, x_min, y_min, x_max, y_max = axis_mins_maxs(pnts)
     #
     plt.xlim(x_min, x_max)
     plt.ylim(y_min, y_max)
@@ -310,11 +335,9 @@ def plot_2d(pnts, label_pnts=False, connect=False,
             marker = markers[i]  # see markers = MarkerStyle.filled_markers
             color = colors[i]
             _scatter(p, plt, color, marker)
-            to_connect = connect  # [i]
-            to_label = label_pnts  # [i]
-            if to_connect:
+            if connect:
                 _line(p, plt, color, marker, linewdth=2)
-            if to_label:
+            if label_pnts:
                 if (p[0][:, None] == p[-1]).all(-1).any(-1):
                     p = p[:-1]
                 _label_pnts(p, plt)
@@ -474,7 +497,7 @@ plt.show()
 
 
 # ----------------------------------------------------------------------------
-# ---- running script or testing code section ----
+# ---- (3) testing section ----
 
 def plot_mst(a, pairs):
     """Plot minimum spanning tree test."""
