@@ -13,7 +13,7 @@
 **New home base**
 
 The image above reflects the tools as they stand on 2020/11/30. 
-The main script controlling all tools in the toolbox is *tbx_tools.py* in the *...npg/Scripts* subfolder. 
+The main script controlling all tools in the toolbox is *tbx_tools.py* in this folder. 
 
 ----
 
