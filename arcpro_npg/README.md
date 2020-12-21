@@ -24,9 +24,15 @@ These demo scripts and the toolbox show how numpy and arcpy can play nice togeth
 In some cases, the outputs are only one option of what the Esri tool provides, for example #6 Polygons to Polylines, is just that... a simple conversion of the geometry type, no fancy intersection and overlap stuff... you get what you pay for, but the widest use is probably the simplest.
 
 
-## Last update : 2020-12-18 ##
+## Last update : 2020-12-20 ##
 
 This is not an exhaustive or definitive list of the toolbox functionality... consider it a sampling:
+
+**Dissolve Boundaries**
+
+Dissolve shared edges in polygon geometry.  The polygons do not need to share a common attribute.  All shared edges are deleted and holes are removed.  Edges that meet at a point are not considered shared since there is no 2D space between the points.
+
+https://community.esri.com/t5/python-blog/dissolve-boundaries/ba-p/1011337
 
 **Feature Envelope to Polygon**
 
