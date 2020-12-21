@@ -35,7 +35,7 @@
 ----
 A numpy geometry class and functions that work with arcpy and ESRI featureclasses is provided here to facilitate working with vector geometry using the ndarray as its base.
 
-This is a work in progress, so bear with me.  The intent of the Geo class is to treat the geometry of featureclasses as one entity.  See **npGeo.py** in the Scripts section for details.  Converting esri's arcpy geometry objects to array representations is contained in **npg_io.py**. Most approaches I have see so far tend to construct the geometric representations of geometries using some variant of arcpy cursors.
+This is a work in progress, so bear with me.  The intent of the Geo class is to treat the geometry of featureclasses as one entity.  See **npGeo.py** in subsequent sections for details.  Converting esri's arcpy geometry objects to array representations is contained in **npg_io.py**. Most approaches I have see so far tend to construct the geometric representations of geometries using some variant of arcpy cursors.
 
 When trying to work with numpy and the geometries, this creates problems since geometry is rarely a collection of simple shapes (eg. rectangles, circles, triangles).  Object arrays containing the coordinates are the norm.  An object array is created when the number of points per feature and/or feature part are not uniform.  For example, a square with a triangular hole in it, will have an outer ring, oriented clockwise consisting of a list of 5 points with the first and last point being the same.  The triangular hole will be represented by 4 points oriented counterclockwise.  Now that arrangement of points can be used to represent a polygon, a closed-loop polyline or a multipoint.  The same points can be used to represent 3 distinctly different geometric objects.
 
@@ -48,6 +48,8 @@ Generally, I am only working with featureclasses stored in a file geodatabase.  
 **Some links**
 
 *2020*
+
+[Dissolve Boundaries](https://community.esri.com/t5/python-blog/dissolve-boundaries/ba-p/1011337)
 
 [Thiessen/Voronoi and Delaunay](https://community.esri.com/people/danretired/blog/2020/06/16/free-advanced-tools-thiessen-polygons-delaunay-triangulation)
 
