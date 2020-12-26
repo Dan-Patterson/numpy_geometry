@@ -42,6 +42,7 @@ Out[4]: ('f0, f1, f2', '<i4, <i4, <i4')
 Load saved arrays and supplemental information.
 
 ```python
+
 geo = npg.load_geo(f_name, True)
 
 Loading...C:/Git_Dan/npgeom/data/g_arr.npz
@@ -101,6 +102,7 @@ The remainder of the functions deal with formatting attribute data and printing.
 
 
 ```python
+
 npg.npg_io
 '_ckw_', '_col_format', 'col_hdr', 'dtype_info', 'geojson_Geo', 'gms', 'load_geo', 'load_geojson',
  'load_txt', 'make_row_format', 'prn_', 'prn_geo', 'prn_q', 'prn_tbl', 'save_geo', 'save_txt
@@ -110,12 +112,14 @@ npg.npg_io
 
 <a href="url"><img src="../images/npg_arc_npg.png" align="right" height="auto" width="150" ></a>
 
-```
+```python
+
 in_fc = 'C:/Arc_projects/CoordGeom/CoordGeom.gdb/Shape2'
 ```
 **get_SR(in_fc, verbose=False)**
 
-```
+```python
+
 getSR(in_fc, verbose=False)
 <SpatialReference object at 0x2168428a1d0[0x216842398b0]>
 
@@ -152,7 +156,6 @@ There are a variety of other functions that deal with converting between geometr
 ## npGeo.py
 
 
-
 <a href="url"><img src="../images/npGeo.png" align="right" height="auto" width="450" ></a>
 
 This is where the Geo class is housed along with methods and properties applicable to it.  The Geo class inherits from the numpy ndarray and methods applied to Geo arrays generally returns arrays of that class.
@@ -187,6 +190,7 @@ array(                  array([[[12., 18.], array([[14., 20.],
 
 Both the array of arrays and the geo array are saved in the Scripts folder.
 To load the Geo array, save the files to disk.  You can save and load arrays using the follow syntax.  This was used to create the files saved here.
+
 ```python
 # ---- For single arrays
 np.save("c:/path_to_file/three_arrays.npy", z, allow_pickle=True, fix_imports=False)   # ---- save to disk
@@ -218,7 +222,9 @@ Shape           OBJECTID      Polygon   NAD_1983_CSRS_MTM_9
 ```
 
 **fc_fld_info(in_fc, prn=True)**
-```
+
+```python
+
 fc_fld_info(in_fc, prn=True)
 
 FeatureClass:
@@ -235,7 +241,9 @@ INSIDE_Y      Double            8 True      False
 ```
 
 **fc_geom_info(in_fc, SR=None, prn=True, start=0, num=50)**
-```
+
+```python
+
 fc_geom_info(in_fc, SR=None, prn=True, start=0, num=50)
 
 Featureclass:
@@ -247,7 +255,10 @@ Featureclass:
 ```
 
 **fc_composition(in_fc, SR=None, prn=True, start=0, end=50)**
-```fc_composition(in_fc, SR=None, prn=True, start=0, end=50)
+
+```python
+
+fc_composition(in_fc, SR=None, prn=True, start=0, end=50)
 
 C:/Arc_projects/CoordGeom/CoordGeom.gdb/Shape2
 Shapes :   3
@@ -267,7 +278,8 @@ Points :   43
 
 **arr = tbl_arr(in_fc)**
 
-```
+```python
+
 arr = tbl_arr(in_fc)
 
 array([(1,  86.47,  78., 300004.72, 5000014.73, 300004.72, 5000014.73),
@@ -281,7 +293,8 @@ array([(1,  86.47,  78., 300004.72, 5000014.73, 300004.72, 5000014.73),
 
 **prn_tbl(arr)**
 
-```
+```python
+
 prn_tbl(arr)
 
 OID_    Shape_Length    Shape_Area    CENTROID_X    CENTROID_Y    INSIDE_X     INSIDE_Y    
