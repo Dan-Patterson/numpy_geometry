@@ -22,7 +22,8 @@ The point coordinates with (300,000 m, 5,000,000 m, MTM 9) subtracted from their
 
 
 
-```
+```python
+
  npg.prn_geo(g)  # ---- Geo array representation of a polygon featureclass
 
  pnt shape  part     X       Y     
@@ -74,7 +75,8 @@ The point coordinates with (300,000 m, 5,000,000 m, MTM 9) subtracted from their
 This shape (s2) is simply represented by the last 2 columns, the first 2 columns are solely for printing purposes.
 The sequence of points is identified by their Id and From and To points (IFT)
 
-```
+```python
+
 g.IFT
 array([[  1,   0,   5,   1,   1,   0],
        [  1,   5,  10,   0,   1,   1],
@@ -87,8 +89,10 @@ array([[  1,   0,   5,   1,   1,   0],
    ], dtype=int64)
 
 ```
-I added another method to the pack to expand upon the IFT information. 
-```
+I added another method to the pack to expand upon the IFT information.
+
+```python
+
 g.info  # ---- g.info returns extent, shape, part, point and structure information
 --------------
 Extents :
@@ -110,7 +114,9 @@ Points :   145
   ... snip ...
 ```
 There is an alternate approach...
-```
+
+```python
+
 npg.prn_tbl(g.IFT_str)
 
 ...    OID_    From_pnt    To_pnt    Ring_type    Part_ID    Bit_seq  
@@ -140,13 +146,14 @@ This will obviously not be possible in all situations, but every bit helps.
 
 ndarray values from esri geometry
 ---------------------------------
-The arcpy geometry
-------------------
 
+arcpy geometry
+------------------
 
 This is what the geometry looks like for the first shape (multipart with holes).
 
-```
+```python
+
 p0
 <Polygon object at 0x2a193f76128[0x2a18ea2d8a0]>
 
@@ -163,7 +170,9 @@ p0[:2]  # ---- two parts, so slice
          <Point (300006.0, 5000017.0, #, #)>]>]
 ```
 The polygon consists of two parts, represented as the arcpy.Array.  This in turn consists of sequences of arcpy.Point values with outer rings ordered clockwise and inner rings/holes, order counter-clockwise.  Inner and outer rings are separated by None, rather than a null point since a null point, unfortunately, has X and Y values of 0.
-```
+
+```python
+
 (arcpy.Point()
 <Point (0.0, 0.0, #, #)>
 ```
@@ -175,7 +184,8 @@ The standby, great for singlepart simple shapes.  You have to read the X, and Y 
 
 In the examples below, extra effort would have to be made to subtract the extent minimum from each point to obtain their values relative to it.
 
-```
+```python
+
 a0 = arcpy.da.FeatureClassToNumPyArray(in_fc3, ['SHAPE@X', 'SHAPE@Y'], explode_to_points=True, spatial_reference=SR)
 a0
 array([(300010., 5000020.), (300010., 5000010.), (300000., 5000010.), (300000., 5000020.),
@@ -195,11 +205,13 @@ SearchCursors and the ``__geo_interface__`` method
 --------------------------------------------------
 Works, and useful if you intend to work with the arcgis module.  There are variants on this as well depending on whether you want arrays or arrays or just an array of objects.
 
-```
+```python
+
 with arcpy.da.SearchCursor(in_fc3, 'SHAPE@', None, SR) as cursor:
     a1 = [row[0].__geo_interface__['coordinates'] for row in cursor] 
 ```
-```
+```python
+
 a1  # ---- as a list of values ----
 [[[[(300010.0, 5000020.0),
     (300010.0, 5000010.0),
@@ -260,7 +272,8 @@ Searchcursors and `_as_narray`
 ----------------------------
 A related ditty, however, you have to specify the fields directly and you essentially get the equivalent of FeatureClassToNumPyArray.
 
-```
+```python
+
 cur = arcpy.da.SearchCursor(in_fc2, ['OID@', 'SHAPE@X', 'SHAPE@Y'], spatial_reference=SR, explode_to_points=True)
 
 cur._as_narray()  # ---- The worker
@@ -289,6 +302,17 @@ cur.fields   # ==> ('OID@', 'SHAPE@X', 'SHAPE@Y')
 
 The parts and the geometry are not identified within the sequences.  Constructing points from the above is no big deal, but polylines and polygons would fail miserably... as shown in this example.
 
-The need to identify parts and holes in polygons prompted this study to see whether arcpy geometries could be represented in a different manner in numpy array format.  Currently, there are operations that cannot be done simply on arcpy geometries that are so simple in numpy.  Want to shift some polygons a couple of meters?  Just shuffle through a search cursor disassemble the point to an arcpy.Array, cycle through each point (checking for None), then doing the math on each point.  Finally, just reassemble the points array and reconstitute the polygon.  In numpy, if the whole dataset can be represented as an Nx2 array... you just add/subtract from the whole array.  Other functions, like convex hulls will require you to operate on 'chunks' of the array, rather than on the whole dataset at once.  At least nothing needs to be devolved to its smallest part first.  More on this in subsequent sections.
+The need to identify parts and holes in polygons prompted this study to see whether arcpy geometries could be represented in a different manner in numpy array format.  
+Currently, there are operations that cannot be done simply on arcpy geometries that are so simple in numpy.
+
+Want to shift some polygons a couple of meters?
+  - just shuffle through a search cursor disassemble the point to an arcpy.Array, 
+  - cycle through each point (checking for None), then doing the math on each point, 
+  - finally, just reassemble the points array and reconstitute the polygon.
+  
+In numpy, if the whole dataset can be represented as an Nx2 array... you just add/subtract from the whole array.
+Other functions, like convex hulls will require you to operate on 'chunks' of the array, rather than on the whole dataset at once.  At least nothing needs to be devolved to its smallest part first.
+
+More on this in subsequent sections.
 
 
