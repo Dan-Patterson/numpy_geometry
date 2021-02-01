@@ -1,4 +1,4 @@
-[back](./numpy_geometry)
+[back](/numpy_geometry/)
 
 # Geo array basics
 
