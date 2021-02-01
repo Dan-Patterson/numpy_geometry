@@ -34,6 +34,7 @@ from npg_helpers import (
     _bit_min_max_, _bit_length_, _rotate_, polyline_angles
     )
 import npg_io
+import npg_prn
 import npg_min_circ as sc
 
 
@@ -199,7 +200,7 @@ class Geo(np.ndarray):
         args = [str(self.LL), str(self.UR), len(self.U), info_.shape[0],
                 info_['To_pnt'][-1], self.SR]
         print(dedent(frmt).format(*args))
-        npg_io.prn_tbl(info_)
+        npg_prn.prn_tbl(info_)
 
     # ---- IFT : shape, part, bit
     # see also self.U, self.PID
@@ -1313,8 +1314,8 @@ class Geo(np.ndarray):
         return np.array([len(i) for i in chunks])
 
     def dupl_pnts(self, as_structured=False):
-        """Duplicate points as a structured array, or as ndarray and counts."""
-        uni, idx, cnts = np.unique(self, True, False, True, axis=0)
+        """Duplicate points as structured array, or as ndarray with counts."""
+        uni, cnts = np.unique(self, return_counts=True, axis=0)
         dups = uni[cnts > 1]
         num = cnts[cnts > 1]
         if as_structured:
@@ -1329,7 +1330,7 @@ class Geo(np.ndarray):
 
     def uniq_pnts(self, as_structured=False):
         """Return unique points as a structured array."""
-        uni, idx, cnts = np.unique(self, True, False, True, axis=0)
+        uni, cnts = np.unique(self, return_counts=True, axis=0)
         uni = uni[cnts == 1]
         num = cnts[cnts == 1]
         if as_structured:
@@ -1360,7 +1361,7 @@ class Geo(np.ndarray):
         ----
         """
         print(dedent(docs))
-        npg_io.prn_tbl(self.IFT_str)
+        npg_prn.prn_tbl(self.IFT_str)
 
     def roll_shapes(self):
         """Run ``roll_coords`` as a method."""
@@ -1369,15 +1370,15 @@ class Geo(np.ndarray):
     # ---- (9) print, display Geo
     def prn(self, ids=None):
         """Print all shapes if ``ids=None``, otherwise, provide an id list."""
-        npg_io.prn_Geo_shapes(self, ids)
+        npg_prn.prn_Geo_shapes(self, ids)
 
     def prn_obj(self, full=False):
         """Print as an object array."""
-        npg_io.prn_as_obj(self, full)
+        npg_prn.prn_as_obj(self, full)
 
     def svg(self, as_polygon=True):
         """View the Geo array as an svg."""
-        return npg_io._svg(self, as_polygon)
+        return npg_prn._svg(self, as_polygon)
 
 
 # ---- == End of class definition ==
@@ -1419,7 +1420,7 @@ def roll_coords(self):
 
 
 def array_IFT(in_arrays, shift_to_origin=False):
-    """Produce the Geo array construction information (See also `npgDocs`)."""
+    """Produce the Geo array.  Construction information in ``npgDocs``."""
     id_too = []
     a_2d = []
     if isinstance(in_arrays, (list, tuple)):
@@ -1496,8 +1497,13 @@ def arrays_to_Geo(in_arrays, kind=2, info=None, to_origin=False):
     in_arrays : arrays/lists/tuples
         `in_arrays` can be created by adding existing 2D arrays to a list.
         You can also convert poly features to arrays using ``poly2arrays``.
-    Kind : integer
+    kind : integer
         Points (0), polylines (1) or polygons (2).
+    info : text
+        Optional descriptive text.
+    to_origin : boolean
+        True, shifts the data so that the lower left of the data is set to the
+        (0, 0) origin.
 
     Requires
     --------
@@ -1512,7 +1518,7 @@ def arrays_to_Geo(in_arrays, kind=2, info=None, to_origin=False):
     Notes
     -----
     `a_2d` will usually be an object array from ``array_IFT``.
-    It needs to be recast to a `float` array to proceed.
+    It needs to be recast to a `float` array with shape Nx2 to proceed.
 
     See Also
     --------
@@ -1581,9 +1587,10 @@ def Geo_to_arrays(g, shift_back=True):
     subs = []
     for ft in frto1:
         vals = bits_[ft[0]:ft[1]]
-        dt = "O" if len(vals) > 1 else "float"
+        dt = "O" if len(vals) > 1 or len(subs) > 1 else "float"
         if ft[1] in w0:
             subs.append(np.asarray(vals, dtype=dt).squeeze())
+            # dt = "O" if len(subs) > 1 else "float"
             arrs.append(np.asarray(subs, dtype=dt).squeeze())
             subs = []
         else:
@@ -1628,7 +1635,7 @@ def Geo_to_lists(g, shift_back=True):
             v = [i.tolist() for i in vals]
             if len(v) >= 1:
                 v = [[tuple(j) for j in i] for i in v]
-            subs.append(v)     # -- or extend... keep checking
+            subs.extend(v)     # -- or append or extend... keep checking
             arrs.append(subs)  # -- or extend... keep checking
             subs = []
         else:
@@ -1687,7 +1694,7 @@ def check_geometry(self):
     if np.sum(check_0) > 0:
         c2 = self.IDs[check_0]
         print("\ng.CW and g.Bit mismatch\n{}\n...IFT info\n".format(c2))
-        npg_io.prn_tbl(self.IFT_str)
+        npg_prn.prn_tbl(self.IFT_str)
     elif np.sum(check_1) > 0:
         c3 = self.IDs[check_1]
         print("\nError in ring orientation\n... shapes {}\n".format(c3))
@@ -1713,6 +1720,8 @@ def dirr(obj, colwise=False, cols=3, prn=True):
         a.extend(sorted(geom.__all__))
         a.extend(["\n... I/O ...", "", ""])
         a.extend(sorted(npg_io.__all__))
+        a.extend(["\n... prn ...", "", ""])
+        a.extend(sorted(npg_prn.__all__))
         a.extend(["\n... npg_geom  helpers ...", "", ""])
         a.extend(sorted(geom.__helpers__))
         a.extend(["\n... npg_helpers  helpers ...", "", ""])
@@ -1747,7 +1756,13 @@ def dirr(obj, colwise=False, cols=3, prn=True):
 
 
 def is_Geo(obj, verbose=False):
-    """Check the input to see if it is a Geo array.  Used by `roll_coords."""
+    """Check the input to see if it is a Geo array.  Used by `roll_coords.
+
+    Notes
+    -----
+    More simply, just use ``hasattr(obj, "IFT")`` since all Geo arrays have
+    this attribute.
+    """
     if hasattr(obj, "IFT"):
         return True
     if verbose:

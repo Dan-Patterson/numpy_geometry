@@ -144,7 +144,7 @@ script = sys.argv[0]  # print this should you need to locate the script
 # -- See script header
 __all__ = [
     'CH', 'Delaunay', 'bin_pnts', 'common_extent', 'densify_by_distance',
-    'densify_by_factor', 'dist_to_segment', 'eucl_dist', 'extent_to_poly',
+    'densify_by_factor', 'eucl_dist', 'extent_to_poly',
     'find_closest', 'in_hole_check', 'mabr', 'npGeo', 'np_wn',
     'offset_buffer', 'pnts_in_pnts', 'pnts_on_poly', 'pnts_to_extent',
     'polys_to_segments', 'polys_to_unique_pnts', 'repack_fields',
@@ -153,9 +153,9 @@ __all__ = [
     ]
 
 __helpers__ = [
-    '_angles_3pnt_', '_bit_area_', '_bit_min_max_', '_ch_', '_ch_scipy_',
-    '_ch_simple_', '_dist_along_', '_e_2d_', '_get_base_', '_in_extent_',
-    '_is_pnt_on_line_', '_percent_along_', '_pnt_on_poly_',
+    '__helpers__', '_angles_3pnt_', '_bit_area_', '_bit_min_max_', '_ch_',
+    '_ch_scipy_', '_ch_simple_', '_dist_along_', '_e_2d_', '_get_base_',
+    '_in_extent_', '_is_pnt_on_line_', '_percent_along_', '_pnt_on_poly_',
     '_pnt_on_segment_', '_pnts_on_line_'
     ]
 
@@ -163,10 +163,13 @@ __all__ = __helpers__ + __all__
 
 
 # ===========================================================================
-# ---- helpers
+# ---- (1) distance helpers
 #
 def _e_2d_(a, p):
-    """Array points to point distance."""
+    """Array points, ``a``,  to point ``p``, distance.
+
+    Use to determine distance of a point to a segment or segments.
+    """
     diff = a - p[None, :]
     return np.sqrt(np.einsum('ij,ij->i', diff, diff))
 
@@ -426,8 +429,55 @@ def _pnt_on_poly_(pnt, poly):
     return r
 
 
+def find_closest(a, pnt):
+    """Find the closest point within a Geo array, its index and distance."""
+    dist = _e_2d_(a, pnt)
+    idx = np.argmin(dist)
+    return np.asarray(a[idx]), idx, dist[idx]
+
+
+def eucl_dist(a, b, metric='euclidean'):
+    """Distance calculation for 1D, 2D and 3D points using einsum.
+
+    Parameters
+    ----------
+    a, b : array like
+        Inputs, list, tuple, array in 1, 2 or 3D form.
+    metric : string
+        Euclidean ('e', 'eu'...), sqeuclidean ('s', 'sq'...),
+
+    Notes
+    -----
+    Mini e_dist for 2d points array and a single point.
+
+    >>> def e_2d(a, p):
+            diff = a - p[np.newaxis, :]  # a and p are ndarrays
+            return np.sqrt(np.einsum('ij,ij->i', diff, diff))
+
+    >>> a.shape  # (5, 2)
+    >>> a[:, np.newaxis]  # (5, 1, 2)
+    >>> (np.prod(a.shape[:-1]), 1, a.shape[-1])  # (5, 1, 2)
+
+    See Also
+    --------
+    `arraytools` has more functions and documentation.
+    """
+    a = np.atleast_2d(a)
+    b = np.atleast_2d(b)
+    if a.ndim >= 2:
+        a = a[:, np.newaxis]  # see old version above
+    if b.ndim > 2:
+        b = b[:, np.newaxis]  # ditto
+    diff = a - b
+    dist_arr = np.einsum('ijk,ijk->ij', diff, diff)
+    if metric[:1] == 'e':
+        dist_arr = np.sqrt(dist_arr)
+    dist_arr = np.squeeze(dist_arr)
+    return dist_arr
+
+
 # ----------------------------------------------------------------------------
-# ---- (1) extent functions
+# ---- (2) extent functions
 #
 def pnts_to_extent(a, as_pair=False):
     """Return the extent of a geometry. (Left, Bottom, Right, Top).
@@ -493,84 +543,6 @@ def extent_to_poly(extent, kind=2):
     B, T = min(B, T), max(B, T)
     ext = np.array([[L, B], [L, T], [R, T], [R, B], [L, B]])
     return npGeo.arrays_to_Geo([ext], kind=kind, info="extent to poly")
-
-
-# ----------------------------------------------------------------------------
-# ---- (2) distance related
-#
-def find_closest(a, pnt):
-    """Find the closest point within a Geo array, its index and distance."""
-    dist = _e_2d_(a, pnt)
-    idx = np.argmin(dist)
-    return np.asarray(a[idx]), idx, dist[idx]
-
-
-def eucl_dist(a, b, metric='euclidean'):
-    """Distance calculation for 1D, 2D and 3D points using einsum.
-
-    Parameters
-    ----------
-    a, b : array like
-        Inputs, list, tuple, array in 1, 2 or 3D form.
-    metric : string
-        Euclidean ('e', 'eu'...), sqeuclidean ('s', 'sq'...),
-
-    Notes
-    -----
-    Mini e_dist for 2d points array and a single point.
-
-    >>> def e_2d(a, p):
-            diff = a - p[np.newaxis, :]  # a and p are ndarrays
-            return np.sqrt(np.einsum('ij,ij->i', diff, diff))
-
-    >>> a.shape  # (5, 2)
-    >>> a[:, np.newaxis]  # (5, 1, 2)
-    >>> (np.prod(a.shape[:-1]), 1, a.shape[-1])  # (5, 1, 2)
-
-    See Also
-    --------
-    `arraytools` has more functions and documentation.
-    """
-    a = np.atleast_2d(a)
-    b = np.atleast_2d(b)
-    if a.ndim >= 2:
-        a = a[:, np.newaxis]  # see old version above
-    if b.ndim > 2:
-        b = b[:, np.newaxis]  # ditto
-    diff = a - b
-    dist_arr = np.einsum('ijk,ijk->ij', diff, diff)
-    if metric[:1] == 'e':
-        dist_arr = np.sqrt(dist_arr)
-    dist_arr = np.squeeze(dist_arr)
-    return dist_arr
-
-
-def dist_to_segment(x1, y1, x2, y2, x3, y3):  # x3, y3 is the point
-    """Return the distance to a line segment (x1, y1), (x2, y2) to (x3, y3).
-
-    `<https://stackoverflow.com/questions/849211/shortest-distance-between
-    -a-point-and-a-line-segment/2233538#2233538>`_.
-    """
-    px = x2 - x1
-    py = y2 - y1
-    norm = px*px + py*py
-    u = ((x3 - x1) * px + (y3 - y1) * py) / float(norm)
-    if u > 1:
-        u = 1
-    elif u < 0:
-        u = 0
-    x = x1 + u * px
-    y = y1 + u * py
-    dx = x - x3
-    dy = y - y3
-    # Note: If the actual distance does not matter,
-    # if you only want to compare what this function
-    # returns to other results of this function, you
-    # can just return the squared distance instead
-    # (i.e. remove the sqrt) to gain a little performance
-
-    dist = (dx*dx + dy*dy)**.5
-    return dist
 
 
 # ----------------------------------------------------------------------------

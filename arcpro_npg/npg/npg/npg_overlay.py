@@ -19,7 +19,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2020-10-23
+    2021-01-25
 
 Purpose
 -------
@@ -61,14 +61,18 @@ import sys
 # from textwrap import dedent
 import numpy as np
 
-from npGeo import Geo, array_IFT, arrays_to_Geo, roll_coords
+if 'npg' not in list(locals().keys()):
+    import npg
+# import npGeo
+# from npGeo import array_IFT, arrays_to_Geo, roll_coords
 from npg_pip import np_wn
+# import npg_helpers
 from npg_helpers import (_to_lists_, _bit_check_, _in_LBRT_,
                          remove_geom, radial_sort)
 
-# ---- optional imports
-from numpy.lib.recfunctions import structured_to_unstructured as stu
-from numpy.lib.recfunctions import unstructured_to_structured as uts
+# -- optional imports
+# from numpy.lib.recfunctions import structured_to_unstructured as stu
+# from numpy.lib.recfunctions import unstructured_to_structured as uts
 # from numpy.lib.recfunctions import repack_fields
 
 # noqa: E501
@@ -85,20 +89,23 @@ script = sys.argv[0]  # print this should you need to locate the script
 # TwoPI = np.pi * 2.0
 
 __all__ = [
-    'pnt_segments',
-    'p_ints_p', 'intersections', 'clip_',
+    'pnt_segment_info',
+    'p_ints_p', 'intersections',
     'intersects',
+    'dissolve',
     'adjacent', 'adjacency_matrix',
     'append_',
     'merge_',
-    'union_'
+    'union_as_one',
+    'line_crosses', 'in_out_crosses', 'crossings'
     ]  # 'dissolve',
 __helpers__ = ['_intersect_', '_adj_']
+
+__all__ = __helpers__ + __all__
 
 # ----------------------------------------------------------------------------
 # ---- (1) helpers/mini functions
 #
-
 # c0 = np.logical_and(yp[i] <= y, y < yp[j])
 # c1 = np.logical_and(yp[j] <= y, y < yp[i])
 # np.logical_or(c0, c1)
@@ -107,7 +114,95 @@ __helpers__ = ['_intersect_', '_adj_']
 #           c = !c;
 
 
-def pnt_segments(g):
+def _adj_(a, full=False):
+    """Determine adjacency for a polygon Geo array's outer rings.
+
+    # Parameters
+    ----------
+    a : Geo array
+    full : boolean
+        True, returns a full report of the shapes being compared (f_shp, t_shp)
+        and the input point ids.  The common points are returned from t_shp and
+        their point and polygon id values.
+        False, simply returns the adjacent polygon ids (f_shp, t_shp).
+
+    Returns
+    -------
+    Two arrays, the adjacency information and the outer_rings.
+    """
+    out = []
+    ids = a.shp_pnt_ids
+    fr_to = a.FT
+    f_shps = a.IDs
+    arr = a.XY
+    for i, f_t in enumerate(fr_to[:-1]):
+        f_shp = f_shps[i]
+        f, t = f_t
+        w = (arr[f:t][:, None] == arr[t:]).any(0).all(-1)  # .tolist()
+        if np.sum(w) > 0:
+            pnt_shp = ids[t:][w]
+            t_shp = np.unique(pnt_shp[:, 1])  # t_shp = pnt_shp[0][1]
+            if full:
+                common = arr[t:][w]
+                out.append([[f_shp] + t_shp.tolist(), f_t, common, pnt_shp])
+            else:
+                out.append(np.asarray([f_shp] + t_shp.tolist()))
+    return out
+
+
+def _intersect_(p0, p1, p2, p3):
+    """Return the intersection of two segments.
+
+    The intersection of the segments, (p0-->p1) and (p0-->p2) or
+    the extrapolation point if they don't cross.
+
+    Notes
+    -----
+    Checks section.
+    # d_gt0 = d_nom > 0
+    # t1 = d_nom == 0.0
+    # t2 = (b_num < 0) == d_gt0
+    # t3 = (a_num < 0) == d_gt0
+    # t4 = np.logical_or((b_num > d_nom) == d_gt0, (a_num > d_nom) == d_gt0)
+    # good = ~(t1 + t2 + t3 + t4)
+
+    >>> denom   = (y3 - y2) * (x1 - x0) - (x3 - x2) * (y1 - y0)
+    >>> s_num = (x1 - x0) * (y0 - y2) - (y1 - y0) * (x0 - x2)
+    >>> t_num = (x3 - x2) * (y0 - y2) - (y3 - y2) * (x0 - x2)
+    >>> t = t_num / denom
+    >>> x = x0 + t * (x1 - x0)
+    >>> y = y0 + t * (y1 - y0)
+
+    `<http://paulbourke.net/geometry/pointlineplane/>`_.
+
+    `<https://en.wikipedia.org/wiki/Intersection_(Euclidean_geometry)>`_.
+    """
+    null_pnt = np.array([np.nan, np.nan])
+    x0, y0 = p0
+    p10_x, p10_y = np.subtract(p1, p0)
+    p02_x, p02_y = np.subtract(p0, p2)
+    p32_x, p32_y = np.subtract(p3, p2)
+    # -- denom = (y3 - y2) * (x1 - x0) - (x3 - x2) * (y1 - y0)
+    denom = (p32_y * p10_x - p32_x * p10_y)  # np.cross(p0-p1, p2-p3)
+    if denom == 0.0:
+        return (False, null_pnt)
+    d_gt0 = denom > 0.
+    s_num = p10_x * p02_y - p10_y * p02_x
+    if (s_num < 0.0) == d_gt0:
+        return (False, null_pnt)
+    t_num = p32_x * p02_y - p32_y * p02_x
+    if (t_num < 0.0) == d_gt0:
+        return (False, null_pnt)
+    # -- are s_num and t_num between 0 and 1 test
+    if ((s_num > denom) == d_gt0) and ((t_num > denom) == d_gt0):
+        return null_pnt  # -- change to and from or in line above
+    t = t_num / denom
+    x = x0 + t * p10_x
+    y = y0 + t * p10_y
+    return (True, np.array([x, y]))
+
+
+def pnt_segment_info(g):
     """Return point segmentation information.
 
     Notes
@@ -132,11 +227,11 @@ def pnt_segments(g):
 
 
 # ----------------------------------------------------------------------------
-# ---- (3) clip, intersect geometry
+# ---- (2) intersect geometry
 #  `p_ints_p` is the main function
 #  `intersections` uses this to batch intersect multiple polygons as input
 #  and intersectors.
-
+#
 def p_ints_p(poly0, poly1):
     """Intersect two polygons.  Used in clipping.
 
@@ -164,6 +259,8 @@ def p_ints_p(poly0, poly1):
     | line b : p2-->p3
 
     >>> d_nom = (y3 - y2) * (x1 - x0) - (x3 - x2) * (y1 - y0)
+    >>>       = (y3[:, None] - y2) * (x1[:, None] - x0) -
+    ...         (x3[:, None] - x2) * (y1[:, None] - x0)
     >>> a_num = (x3 - x2) * (y0 - y2) - (y3 - y2) * (x0 - x2)  # ==> u_a
     >>> b_num = (x1 - x0) * (y0 - y2) - (y1 - y0) * (x0 - x2)  # ==> u_b
     >>> u_a = a_num/d_nom  # if d_nom != 0
@@ -172,31 +269,34 @@ def p_ints_p(poly0, poly1):
     if 0 <= u_a, u_b <=1 then the intersection is on both segments
     """
     poly0, poly1 = [i.XY if hasattr(i, "IFT") else i for i in [poly0, poly1]]
-    p01 = poly0[1:] - poly0[:-1]
-    p01_x, p01_y = p01.T
-    p23 = poly1[1:] - poly1[:-1]
-    p23_x, p23_y = p23.T
+    p10 = poly0[1:] - poly0[:-1]
+    p32 = poly1[1:] - poly1[:-1]
+    p10_x, p10_y = p10.T
+    p32_x, p32_y = p32.T
     p02 = poly0[:-1] - poly1[:-1][:, None]
-    d_nom = (p23_y[:, None] * p01_x) - (p23_x[:, None] * p01_y)
-    b_num = p01_x * p02[..., 1] - p01_y * p02[..., 0]
-    a_num = p23_x[:, None] * p02[..., 1] - p23_y[:, None] * p02[..., 0]
+    d_nom = (p32_y[:, None] * p10_x) - (p32_x[:, None] * p10_y)
+    a_num = p32_x[:, None] * p02[..., 1] - p32_y[:, None] * p02[..., 0]
+    b_num = p10_x * p02[..., 1] - p10_y * p02[..., 0]
+    #
     with np.errstate(all='ignore'):  # divide='ignore', invalid='ignore'):
         u_a = a_num/d_nom
         u_b = b_num/d_nom
-        z0 = np.logical_and(0. <= u_a, u_a <= 1.)
-        z1 = np.logical_and(0. <= u_b, u_b <= 1.)
-        bth = z0 & z1
-        xs = u_a * p01_x + poly0[:-1][:, 0]
-        ys = u_a * p01_y + poly0[:-1][:, 1]
-        # *** np.any(bth, axis=1)
+        z0 = np.logical_and(u_a >= 0., u_a <= 1.)
+        z1 = np.logical_and(u_b >= 0., u_b <= 1.)
+        both = z0 & z1
+        xs = u_a * p10_x + poly0[:-1][:, 0]
+        ys = u_a * p10_y + poly0[:-1][:, 1]
+        # *** np.any(both, axis=1)
         # yields the segment on the clipper that the points are on
-    xs = xs[bth]
-    ys = ys[bth]
+        # *** np.sum(bth, axis=1)  how many intersections on clipper
+        #     np.sum(both, axis=0)  intersections on the polygon
+    xs = xs[both]
+    ys = ys[both]
     if xs.size > 0:
         final = np.zeros((len(xs), 2))
         final[:, 0] = xs
         final[:, 1] = ys
-        return final  # np.unique(final, axis=0)
+        return final  # z0, z1, both  # np.unique(final, axis=0)
     return None
 
 
@@ -234,14 +334,14 @@ def intersections(polys, overlays, outer_only=True, stacked=False):
     #
     polys = _to_lists_(polys, outer_only)
     overlays = _to_lists_(overlays, outer_only)
-    # ----
+    # --
     output = []
     cl_info = []
     for i, ov in enumerate(overlays):
         clip_extent = np.concatenate((np.min(ov, axis=0), np.max(ov, axis=0)))
         for j, p in enumerate(polys):
             if _in_LBRT_(p, clip_extent):
-                result = p_ints_p(p, ov)
+                result = p_ints_p(p, ov)  # call to p_ints_p
                 if result is not None:
                     output.append(result)
                     cl_info.append([i, j])
@@ -250,100 +350,8 @@ def intersections(polys, overlays, outer_only=True, stacked=False):
     return output, cl_info
 
 
-def clip_(geo, c):
-    """Do the work.
-
-    https://github.com/fonttools/pyclipper/tree/master/pyclipper
-
-    For testing use `sq` and
-    c = np.array([[0, 10.],[11., 13.], [12., 7.], [8., 2], [0., 10]])
-    """
-    def _e_2d_(a, p):
-        """Array points to point distance."""
-        diff = a - p[None, :]
-        return np.sqrt(np.einsum('ij,ij->i', diff, diff))
-
-    if not hasattr(geo, 'IFT'):
-        geo = arrays_to_Geo(geo)
-    bounds = dissolve(geo).XY
-    in_0 = np_wn(bounds, c)  # points_in_polygon(bounds, c)  # 30 micro
-    in_1 = np_wn(c, bounds)  # points_in_polygon(c, bounds)
-    x_sect0 = p_ints_p(bounds[::-1], c)  # clips points in clockwise order
-    # x_sect1 = p_ints_p(bounds, c[::-1])
-    test = [in_0, in_1, x_sect0]
-    final = []
-    for i in test:
-        if hasattr(i, 'size'):
-            if i.size > 0:
-                final.append(np.atleast_2d(i))
-    if final:
-        # return radial_sort(np.vstack(final))
-        final = np.vstack(final)
-        min_f = np.array([np.min(final[:, 0]), np.mean(final[:, 1])])
-        dxdy = np.subtract(final, np.atleast_2d(min_f))
-        ang = np.degrees(np.arctan2(dxdy[:, 1], dxdy[:, 0]))  # 2.0
-        dist = _e_2d_(final, min_f)
-        ang_dist = np.vstack((ang, dist)).T  # 4.7
-        keys = np.argsort(uts(ang_dist))    # 17.7
-        rev = keys[::-1]   # works
-        return final[rev]
-    return None
-
-
-def _intersect_(p0, p1, p2, p3):
-    """Return the intersection of two segments.
-
-    The intersection of the segments, (p0-->p1) and (p0-->p2) or
-    the extrapolation point if they don't cross.
-
-    Notes
-    -----
-    Checks section.
-    # d_gt0 = d_nom > 0
-    # t1 = d_nom == 0.0
-    # t2 = (b_num < 0) == d_gt0
-    # t3 = (a_num < 0) == d_gt0
-    # t4 = np.logical_or((b_num > d_nom) == d_gt0, (a_num > d_nom) == d_gt0)
-    # good = ~(t1 + t2 + t3 + t4)
-
-    >>> denom   = (y3 - y2) * (x1 - x0) - (x3 - x2) * (y1 - y0)
-    >>> s_numer = (x1 - x0) * (y0 - y2) - (y1 - y0) * (x0 - x2)
-    >>> t_numer = (x3 - x2) * (y0 - y2) - (y3 - y2) * (x0 - x2)
-    >>> t = t_numer / denom
-    >>> x = x0 + t * (x1 - x0)
-    >>> y = y0 + t * (y1 - y0)
-
-    `<http://paulbourke.net/geometry/pointlineplane/>`_.
-
-    `<https://en.wikipedia.org/wiki/Intersection_(Euclidean_geometry)>`_.
-    """
-    null_pnt = np.array([np.nan, np.nan])
-    x0, y0 = p0
-    p01_x, p01_y = np.subtract(p1, p0)
-    p02_x, p02_y = np.subtract(p0, p2)
-    p23_x, p23_y = np.subtract(p3, p2)
-    # ---- denom = (y3 - y2) * (x1 - x0) - (x3 - x2) * (y1 - y0)
-    denom = (p23_y * p01_x - p23_x * p01_y)  # np.cross(p0-p1, p2-p3)
-    if denom == 0.0:
-        return null_pnt
-    d_gt0 = denom > 0.
-    s_numer = p01_x * p02_y - p01_y * p02_x
-    if (s_numer < 0.0) == d_gt0:
-        return null_pnt
-    t_numer = p23_x * p02_y - p23_y * p02_x
-    if (t_numer < 0.0) == d_gt0:
-        return null_pnt
-    # ---- are s_numer and t_numer between 0 and 1 test
-    if ((s_numer > denom) == d_gt0) and ((t_numer > denom) == d_gt0):
-        return null_pnt  # ---- change to and from or in line above
-    t = t_numer / denom
-    x = x0 + t * p01_x
-    y = y0 + t * p01_y
-    return np.array([x, y])
-
-
 def intersects(*args):
-    """Line segment intersection check. **Largely kept for documentation**.
+    r"""Line segment intersection check. **Largely kept for documentation**.
 
     Two lines or 4 points that form the lines.  This does not extrapolate to
     find the intersection, they either intersect or they don't
@@ -387,105 +395,77 @@ def intersects(*args):
     `<https://stackoverflow.com/questions/563198/how-do-you-detect-where-two-
     line-segments-intersect#565282>`_.
 
+    `<https://scicomp.stackexchange.com/questions/8895/vertical-and-horizontal
+    -segments-intersection-line-sweep>`_.
     """
-    if isinstance(args, np.ndarray):
-        args = args.tolist()
+    msg = "A list/array representing 4 points required"
     if len(args) == 2:
-        p0, p1, p2, p3 = *args[0], *args[1]
+        a, b = args
+        if len(a) == 2 and len(b) == 2:
+            p0, p1, p2, p3 = *a, *b
+        else:
+            raise AttributeError(msg)
     elif len(args) == 4:
         p0, p1, p2, p3 = args
     else:
-        raise AttributeError("Pass 2, 2-pnt lines or 4 points to the function")
+        raise AttributeError(msg)
     #
-    # ---- First check
+    # -- First check, but it is expensive, so omit
     # Given 4 points, if there are < 4 unique, then the segments intersect
-    u, cnts = np.unique((p0, p1, p2, p3), return_counts=True, axis=0)
-    if len(u) < 4:
-        intersection_pnt = u[cnts > 1]
-        return True, intersection_pnt
+    # u, cnts = np.unique((p0, p1, p2, p3), return_counts=True, axis=0)
+    # if len(u) < 4:
+    #     intersection_pnt = u[cnts > 1]
+    #     return True, intersection_pnt
     #
-    x0, y0, x1, y1, x2, y2, x3, y3 = *p0, *p1, *p2, *p3  # points to xs and ys
+    # x0, y0, x1, y1, x2, y2, x3, y3 = *p0, *p1, *p2, *p3  # pnts to xs and ys
     #
-    # ---- Second check ----   np.cross(p1-p0, p3-p2)
-    denom = (x1 - x0) * (y3 - y2) - (y1 - y0) * (x3 - x2)
-    t1 = denom == 0.0
-    if t1:  # collinear
-        return (False, "collinear/parallel")
+    x0, y0 = p0
+    x10, y10 = p1 - p0
+    x32, y32 = p3 - p2
+    x02, y02 = p0 - p2
+    # -- Second check ----   denom = np.cross(p1-p0, p3-p2)
+    # denom = (x1 - x0) * (y3 - y2) - (y1 - y0) * (x3 - x2)
+    denom = x10 * y32 - y10 * x32
+    if denom == 0.0:  # "(1) denom = 0 ... collinear/parallel"
+        return (False, None)
     #
-    # ---- Third check ----  np.cross(p1-p0, p0-p2)
+    # -- Third check ----  s_num = np.cross(p1-p0, p0-p2)
     denom_gt0 = denom > 0  # denominator greater than zero
-    s_numer = (x1 - x0) * (y0 - y2) - (y1 - y0) * (x0 - x2)
-    t2 = (s_numer < 0) == denom_gt0
-    if t2:
-        msg = "s_num {} den {} cross(p1-p0, p0-p2) = 0".format(s_numer, denom)
-        return (False, msg)
+    # s_num = (x1 - x0) * (y0 - y2) - (y1 - y0) * (x0 - x2)
+    s_num = x10 * y02 - y10 * x02
+    if (s_num < 0) == denom_gt0:  # "(2) (s_n < 0) == (denom > 0) : False"
+        return (False, None)
     #
-    # ---- Fourth check ----  np.cross(p3-p2, p0-p2)
-    t_numer = (x3 - x2) * (y0 - y2) - (y3 - y2) * (x0 - x2)
-    t3 = (t_numer < 0) == denom_gt0
-    if t3:
-        msg = "t_num {} den {} cross(p3-p2, p0-p2) = 0".format(t_numer, denom)
-        return (False, msg)
+    # -- Fourth check ----  np.cross(p3-p2, p0-p2)
+    # t_num = (x3 - x2) * (y0 - y2) - (y3 - y2) * (x0 - x2)
+    t_num = x32 * y02 - y32 * x02
+    if (t_num < 0) == denom_gt0:  # "(3) (t_n < 0) == (denom > 0) : False"
+        return (False, None)
     #
-    # ---- Fifth check ----
-    t4 = np.logical_or((s_numer > denom) == denom_gt0,
-                       (t_numer > denom) == denom_gt0
-                       )
-    if t4:
-        return (False, "numerator(s) check")
+    # -- Fifth check ----
+    t4 = np.logical_or(
+        (s_num > denom) == denom_gt0, (t_num > denom) == denom_gt0)
+    if t4:  # "(4) numerator checks fail"
+        return (False, None)
     #
-    # ---- check to see if the intersection point is one of the input points
+    # -- check to see if the intersection point is one of the input points
     # substitute p0 in the equation  These are the intersection points
-    t = t_numer / denom
-    x = x0 + t * (x1 - x0)
-    y = y0 + t * (y1 - y0)
+    t = t_num / denom
+    x = x0 + t * x10  # (x1 - x0)
+    y = y0 + t * y10  # (y1 - y0)
+    #
     # be careful that you are comparing tuples to tuples, lists to lists
     if sum([(x, y) == tuple(i) for i in [p0, p1, p2, p3]]) > 0:
-        return (True, "intersects at an input point {}, {}".format(x, y))
+        # return (True, "(5) intersects at an input point {}, {}".format(x, y))
+        return (True, (x, y))
     return (True, (x, y))
 
 
 # ----------------------------------------------------------------------------
 # ---- (3) dissolve shared boundaries
 #
-def _adj_(a, full=False):
-    """Determine adjacency for a polygon Geo array's outer rings.
-
-    # Parameters
-    ----------
-    a : Geo array
-    full : boolean
-        True, returns a full report of the shapes being compared (f_shp, t_shp)
-        and the input point ids.  The common points are returned from t_shp and
-        their point and polygon id values.
-        False, simply returns the adjacent polygon ids (f_shp, t_shp).
-
-    Returns
-    -------
-    Two arrays, the adjacency information and the outer_rings.
-    """
-    out = []
-    ids = a.shp_pnt_ids
-    fr_to = a.FT
-    f_shps = a.IDs
-    arr = a.XY
-    for i, f_t in enumerate(fr_to[:-1]):
-        f_shp = f_shps[i]
-        f, t = f_t
-        w = (arr[f:t][:, None] == arr[t:]).any(0).all(-1)  # .tolist()
-        if np.sum(w) > 0:
-            pnt_shp = ids[t:][w]
-            t_shp = np.unique(pnt_shp[:, 1])  # t_shp = pnt_shp[0][1]
-            if full:
-                common = arr[t:][w]
-                out.append([[f_shp] + t_shp.tolist(), f_t, common, pnt_shp])
-            else:
-                out.append(np.asarray([f_shp] + t_shp.tolist()))
-    return out
-
-
 def dissolve(a, asGeo=True):
-    r"""Dissolve polygons sharing edges.
+    """Dissolve polygons sharing edges.
 
     Parameters
     ----------
@@ -494,10 +474,6 @@ def dissolve(a, asGeo=True):
         lists/arrays or an object array representing geometry.
     asGeo : boolean
         True, returns a Geo array. False returns a list of arrays.
-
-    Requires
-    --------
-    `_adj_` to determine shared boundaries.
 
     Notes
     -----
@@ -511,10 +487,13 @@ def dissolve(a, asGeo=True):
     def _adjacent_(a, b):
         """Check adjacency between 2 polygon shapes."""
         s = np.sum((a[:, None] == b).all(-1).any(-1))
-        return True if s > 0 else False
+        if s > 0:
+            return True
+        return False
 
     def _cycle_(b0, b1):
         """Cycle through the bits."""
+
         def _find_(a, b):
             """Find.  Abbreviated form of ``adjacent``, to use for slicing."""
             return (a[:, None] == b).all(-1).any(-1)
@@ -522,7 +501,7 @@ def dissolve(a, asGeo=True):
         idx01 = _find_(b0, b1)
         if idx01.sum() == 0:
             return None
-        elif idx01[0] == 1:  # you can't split between the first and last pnt.
+        if idx01[0] == 1:  # you can't split between the first and last pnt.
             b0, b1 = b1, b0
             idx01 = _find_(b0, b1)
         dump = b0[idx01]
@@ -586,11 +565,12 @@ def dissolve(a, asGeo=True):
         else:
             out = r
     if asGeo:
-        out = arrays_to_Geo(out, 2, "dissolved", False)
-        out = roll_coords(out)
+        out = npg.arrays_to_Geo(out, 2, "dissolved", False)
+        out = npg.roll_coords(out)
     return out  # , missed
 
 
+# ----------------------------------------------------------------------------
 # ---- (4) adjacency
 #
 def adjacent(a, b):
@@ -610,7 +590,9 @@ def adjacent(a, b):
     points.
     """
     s = np.sum((a[:, None] == b).all(-1).any(-1))
-    return True if s > 0 else False
+    if s > 0:
+        return True
+    return False
 
 
 def adjacency_matrix(a, prn=False):
@@ -618,7 +600,7 @@ def adjacency_matrix(a, prn=False):
 
     Parameters
     ----------
-    a : array_like
+    a : array-like
         A Geo array, list of lists/arrays or an object array representing
         polygon geometry.
 
@@ -632,13 +614,13 @@ def adjacency_matrix(a, prn=False):
 
     Example::
 
-        ad =adjacency_matrix(a)             # ---- 5 polygons shapes
+        ad =adjacency_matrix(a)             # -- 5 polygons shapes
         array([[ 0, -1, -1,  3,  4],
                [-1,  1, -1, -1, -1],
                [-1, -1,  2, -1, -1],
                [ 0, -1, -1,  3,  4],
                [ 0, -1, -1,  3,  4]])
-        ad >= 0                             # ---- where there are links
+        ad >= 0                             # -- where there are links
         array([[1, 0, 0, 1, 1],
                [0, 1, 0, 0, 0],
                [0, 0, 1, 0, 0],
@@ -661,7 +643,7 @@ def adjacency_matrix(a, prn=False):
         du = ud[::-1]
         for i in du:
             if i[0] - i[1] != 0:
-                arr[arr == i[1]] = i[0]
+                arr[arr == i[1]] = i[0]  # reclass back to original values
             # else:
             #     arr[arr == i[0]] = i[0]
         return arr
@@ -728,15 +710,15 @@ def append_(this, to_this):
     """
     if not hasattr(to_this, "IFT"):
         print("\nGeo array required for `to_this`\n")
-        return
+        return None
     if hasattr(this, "IFT"):
         a_stack = this.XY
         IFT = this.IFT
         if this.K != to_this.K:
             print("\nGeo array `kind` is not the same,\n")
-            return
+            return None
     else:
-        a_stack, IFT, extent = array_IFT(this)
+        a_stack, IFT, extent = npg.array_IFT(this)
     last = to_this.IFT[-1, :]
     add_ = []
     for i, row in enumerate(IFT, 1):
@@ -747,7 +729,7 @@ def append_(this, to_this):
     xys = np.vstack((to_this.XY, a_stack))
     kind = to_this.K
     sr = to_this.SR
-    out = Geo(xys, IFT=new_ift, Kind=kind, Extent=None, Info="", SR=sr)
+    out = npg.Geo(xys, IFT=new_ift, Kind=kind, Extent=None, Info="", SR=sr)
     return out
 
 
@@ -785,7 +767,7 @@ def merge_(this, to_this):
     a = this      # --- rename to simplify the input names
     b = to_this   # merge a to b, or this to_this
     if not hasattr(b, 'IFT'):
-        b = arrays_to_Geo(b)
+        b = npg.arrays_to_Geo(b)
     b_XY = b.XY
     b_IFT = b.IFT
     if hasattr(this, 'IFT'):
@@ -798,7 +780,7 @@ def merge_(this, to_this):
         a = np.asarray(a)
         if a.ndim == 2:
             a = [a]
-        a_XY, a_IFT, extent = array_IFT(a)
+        a_XY, a_IFT, extent = npg.array_IFT(a)
         a_XY = a_XY + extent[0]
     last = b.IFT[-1, :]
     add_ = []
@@ -810,15 +792,15 @@ def merge_(this, to_this):
     xys = np.vstack((b_XY, a_XY))
     kind = b.K
     sr = b.SR
-    out = Geo(xys, IFT=new_ift, Kind=kind, Extent=None, Info="", SR=sr)
+    out = npg.Geo(xys, IFT=new_ift, Kind=kind, Extent=None, Info="", SR=sr)
     return out
 
 
 # ----------------------------------------------------------------------------
 # ---- (7) union geometry
 #
-def union_(a, b, is_polygon=True):
-    """Union polyline/polygon features.
+def union_as_one(a, b):
+    """Union polygon features with a dissolve of internal shared edges.
 
     Parameters
     ----------
@@ -840,9 +822,9 @@ def union_(a, b, is_polygon=True):
         a = a.outer_rings()
     if hasattr(b, "IFT"):
         b = b.outer_rings()
-    # ---- get the intersection points
+    # -- get the intersection points
     x_sect = p_ints_p(a, b)
-    if not x_sect:
+    if x_sect is None:
         return np.asarray([a, b], dtype="O")
     a_in_b = np_wn(a, b)
     b_in_a = np_wn(b, a)
@@ -858,6 +840,236 @@ def union_(a, b, is_polygon=True):
                       )
     srt_ = radial_sort(stack, close_poly=True, clockwise=True)
     return srt_
+
+
+# ----------------------------------------------------------------------------
+# ---- (8) `crossing` and related methods ------------------------------------
+# related functions
+# See : line_crosses, in_out_crosses
+#  pnt_right_side : single point relative to the line
+#  line_crosses   : checks both segment points relative to the line
+#  in_out_crosses # a variant of the above, with a different return signature
+
+def line_crosses(p0, p1, p2, p3, as_integers=False):
+    """Determine if a line is `inside` another line segment.
+
+    Parameters
+    ----------
+    p0, p1, p2, p3 : array-like
+        X,Y coordinates of the subject (p0-->p1) and clipping (p2-->p3) lines.
+
+    Returns
+    -------
+    The result indicates which points, if any, are on the inward bound side of
+    a polygon (aka, right side). The clip edge (p2-->p3) is for clockwise
+    oriented polygons and its segments. If `a` and `b` are True, then both are
+    inside.  False for both means that they are on the outside of the clipping
+    segment.
+    """
+    x0, y0, x1, y1, x2, y2, x3, y3 = *p0, *p1, *p2, *p3
+    dc_x = x3 - x2
+    dc_y = y3 - y2
+    # -- check p0 and p1 separately and return the result
+    a = (y0 - y2) * dc_x <= (x0 - x2) * dc_y
+    b = (y1 - y2) * dc_x <= (x1 - x2) * dc_y
+    if as_integers:
+        return a*1, b*1
+    return a, b
+
+
+def in_out_crosses(*args):
+    """Return whether two line segments cross.
+
+    Line segment (p0-->p1) is crossed by a cutting/clipping
+    segment (p2-->p3).  `inside` effectively means `right side` for clockwise
+    oriented polygons.
+
+    Parameters
+    ----------
+    p0p1, p2p3 : line segments
+        Line segments with their identified start-end points, as below
+    p0, p1, p2, p3 : array-like
+        X,Y coordinates of the subject (p0-->p1) and clipping (p2-->p3) lines.
+
+    Requires
+    --------
+    `_line_crosses_` method
+
+    Returns
+    -------
+    -  2 both segment points are inside the clipping segment.
+    -  1 start point is inside
+    -  0 both points are outside
+    - -1 end point is inside
+
+    """
+    msg = "\nPass 2, 2-pnt lines or 4 points to the function\n"
+    args = np.asarray(args)
+    if np.size(args) == 8:
+        if len(args) == 2:  # two lines
+            p0, p1, p2, p3 = *args[0], *args[1]
+        elif len(args) == 4:  # four points
+            p0, p1, p2, p3 = args
+        else:
+            print(msg)
+            return
+    else:
+        print(msg)
+        return None
+    # --
+    a, b = line_crosses(p0, p1, p2, p3)
+    a = a * 1
+    b = b * 1
+    if (a == 1) and (b == 1):    # both on right
+        return 2
+    elif (a == 1) and (b == 0):  # start on right
+        return 1
+    elif (a == 0) and (b == 0):  # both on left
+        return 0
+    elif (a == 0) and (b == 1):  # end on right
+        return -1
+    else:
+        return -999
+
+
+def crossings(geo, clipper):
+    """Determine if lines cross. multiline implementation of above."""
+    if hasattr(geo, "IFT"):
+        bounds = dissolve(geo)  # **** need to fix dissolve
+    else:
+        bounds = geo
+    p0s = bounds[:-1]
+    p1s = bounds[1:]
+    p2s = clipper[:-1]
+    p3s = clipper[1:]
+    n = len(p0s)
+    m = len(p2s)
+#    in_ = []
+#    out_ = []
+    crosses_ = []
+#    x_pnts = []
+    for j in range(m):
+        p2, p3 = p2s[j], p3s[j]
+        for i in range(n):
+            p0, p1 = p0s[i], p1s[i]
+            crosses_.append(intersects(p0, p1, p2, p3))  # this seems to work
+    return crosses_
+
+
+# ----------------------------------------------------------------------------
+# ---- (9) polygon from points
+#
+def left_right_pnts(a):
+    """Return the two points that contain the min and max ``X`` coordinate.
+
+    Notes
+    -----
+    These points are used to form a line.  This line can be used by
+    ``line_side`` to classify points with respect to it.  Classification is
+    obviously based on the direction the line points.
+    If there are duplicate x values, then the first is taken.  In either case,
+    an array of (2,) is returned.  This could be altered to take the higher y
+    value or the y average for that x.
+    """
+    srted = np.sort(a[:, 0])
+    min_x, max_x = srted[[0, -1]]
+    lft = a[np.where(a[:, 0] == min_x)[0]]
+    rght = a[np.where(a[:, 0] == max_x)[0]]
+    return np.array([lft[0], rght[0]])
+
+
+def line_side(pnts, line=None):
+    """Return the side of a line that the points lie on.
+
+    Parameters
+    ----------
+    pnts : array-like
+        The points to examine as an Nx2 array.
+    line : array-like or None
+        If None, then the left, right-most points are used to construct it.
+
+    References
+    ----------
+    `<https://stackoverflow.com/questions/1560492/how-to-tell-whether-a-point
+    -is-to-the-right-or-left-side-of-a-line>`_.
+
+    Notes
+    -----
+    Above the line is left, below the line is right.  A-B is the line, x, y is
+    a point.  This is vectorized by numpy
+
+    >>> sign((Bx - Ax) * (Y - Ay) - (By - Ay) * (X - Ax))
+    """
+    if line is None:
+        A, B = line = np.array(left_right_pnts(pnts))
+    else:
+        A, B = line
+    BAx, BAy = line[1] - line[0]
+    XAx = pnts[:, 0] - A[0]
+    YAy = pnts[:, 1] - A[1]
+    return np.sign(BAx * YAy - BAy * XAx).astype('int')
+
+
+def _line_crossing_(clip_, poly):
+    """Determine if a line is `inside` another line segment.
+
+    Notes
+    -----
+    The original ***
+    See _line_cross_ in npg_clip ***
+
+    Multi-line implementation of line_crosses.
+    Used by ``z``.
+
+    points inside clipper
+    >>> w0.all(0).nonzero()[0]         # both on right of all segments
+    >>> (w1 == 1).any(0).nonzero()[0]  # start on right
+    >>> (w2 == 1).any(0).nonzero()[0]  # end on right
+    >>> (w3 == 1).any(0).nonzero()[0]  # both on left of all segments
+    """
+    x0s, y0s = poly[:-1].T   # x0s = poly[:-1, 0], y0s = poly[:-1, 1]
+    x1s, y1s = poly[1:]. T   # x1s = poly[1:, 0],  y1s = poly[1:, 1]
+    x2s, y2s = clip_[:-1].T  # x2s = clip_[:-1, 0], y2s = clip_[:-1, 1]
+    x3s, y3s = clip_[1:].T   # x3s = clip_[1:, 0],  y3s = clip_[1:, 1]
+    dcx = x3s - x2s
+    dcy = y3s - y2s
+    a_0 = (y0s - y2s[:, None]) * dcx[:, None]
+    a_1 = (x0s - x2s[:, None]) * dcy[:, None]
+    b_0 = (y1s - y2s[:, None]) * dcx[:, None]
+    b_1 = (x1s - x2s[:, None]) * dcy[:, None]
+    a = (a_0 <= a_1)
+    b = (b_0 <= b_1)
+    w0 = np.logical_and(a == 1, b == 1)   # both on right
+    z0 = np.where(w0 == 1, 2, 0)          # 2
+    w1 = np.logical_and(a == 1, b == 0)   # start on right
+    z1 = np.where(w1 == 1, 1, 0)          # 1
+    w2 = np.logical_and(a == 0, b == 1)   # end on right
+    z2 = np.where(w2 == 1, -1, 0)         # -1
+    w3 = np.logical_and(a == 0, b == 0)   # both on left
+    z3 = np.where(w3 == 1, -2, 0)         # -2
+    z = z0 + z1 + z2 + z3
+    return z, a, b
+
+
+# def polygon_from_points(a):
+#     """Use the above to sort and merge into a polygon.
+
+#     References
+#     ----------
+#     `<https://stackoverflow.com/questions/14263284/create-non-intersecting
+#     -polygon-passing-through-all-given-points>`_.
+#     """
+#     line = left_right_pnts(a)
+#     side = line_side(a, line)
+#     a_a = a[side == -1]  # below
+#     a_b = a[side == 1]   # above
+#     a_c = a[side == 0]   # on
+#     a_bc = np.concatenate((a_b, a_c), axis=0)
+#     top = a_bc[np.argsort(uts(a_bc))]
+#     bottom = a_a[np.argsort(uts(a_a))[::-1]]
+#     poly = np.vstack((top, bottom))
+#     poly = np.concatenate((poly, np.atleast_2d(poly[0])), axis=0)
+#     return poly
 
 
 # ---- Final main section ----------------------------------------------------

@@ -125,6 +125,22 @@ def axis_mins_maxs(pnts):
     return pnts, x_min, y_min, x_max, y_max
 
 
+def _get_cmap_(plt, n, name='hsv'):
+    """Return a color map associated with the size of the data.
+
+    Notes
+    -----
+    Returns a function that maps each index in 0, 1, ..., `n-1` to a distinct
+    RGB color; the keyword argument name must be a standard mpl colormap name.
+
+    Reference
+    ---------
+    `<https://stackoverflow.com/questions/14720331/how-to-generate-
+    random-colors-in-matplotlib>`_.
+    """
+    return plt.cm.get_cmap(name, n)
+
+
 def subplts(plots=1, by_col=True, max_rc=4):
     """Return subplot layout.
 
@@ -386,7 +402,7 @@ def plot_3d(a):
     plt.show()
 
 
-def plot_polygons(arr, outline=True):
+def plot_polygons(arr, outline=True, random_colors=False):
     """Plot Geo array poly boundaries.
 
     Parameters
@@ -411,7 +427,7 @@ def plot_polygons(arr, outline=True):
         """Connect the points."""
         X, Y = p[:, 0], p[:, 1]
         plt.plot(X, Y, color='black', linestyle='solid', linewidth=2)
-    # ----
+    # --
     if hasattr(arr, 'IFT'):
         cw = arr.CW
         shapes = arr.bits
@@ -429,18 +445,24 @@ def plot_polygons(arr, outline=True):
     plt.tight_layout(pad=0.2, h_pad=0.1, w_pad=0.1)
     ax.set_aspect('equal', adjustable='box')
     # cmap = plt.cm.get_cmap(plt.cm.viridis, 143)  # default colormap
-    cmap = plt.cm.get_cmap('jet', len(shapes))  # 'hsv'
+    colors_ = ['black', 'blue', 'green', 'red', 'darkgrey', 'magenta',
+               'darkblue', 'darkred', 'darkgreen', 'grey'] * 2
     for i, shape in enumerate(shapes):
         if outline:   # _line(shape, plt)  # alternate, see line for options
-            plt.fill(*zip(*shape), facecolor='none', edgecolor='black',
-                     linewidth=3)
-        else:
-            if cw[i] == 0:
-                clr = "w"
+            if random_colors:
+                plt.fill(*zip(*shape), fill='none', facecolor='none',
+                         edgecolor=colors_[i], linewidth=3)
             else:
-                clr = cmap(i)  # clr=np.random.random(3,)  # clr = "b"
+                plt.fill(*zip(*shape), fill='none', facecolor='none',
+                         edgecolor='black', linewidth=3)
+        else:
+            if hasattr(arr, 'IFT'):
+                if cw[i] == 0:
+                    clr = "w"
+            else:
+                clr = colors_[i]  # clr=np.random.random(3,)  # clr = "b"
             plt.fill(*zip(*shape), facecolor=clr)
-    # ----
+    # --
     plt.show()
     return plt
 
@@ -451,21 +473,38 @@ def plot_mesh(x=None, y=None):
     Parameters
     ----------
     x, y : arrays
-        Arrays of sequential values representing the x and y ranges
+        Arrays of sequential values representing the x and y ranges. if `None`
+        then an example meshgrid is created.
+
     Requires
     --------
     If not initially imported, add this to the script or function.
+
     >>> from matplotlib.collections import LineCollection
 
     https://stackoverflow.com/questions/47295473/how-to-plot-using-
     matplotlib-python-colahs-deformed-grid
+
+    Notes
+    -----
+    Stack two polygons or coordinate data sets to form a plane-sweep.  This
+    will yield the unique coordinate pairs for x and y
+
+    >>> b1c0 = np.unique(np.concatenate((b1, c0), axis=0), axis=0)
+    >>> # or
+    >>> x, y = np.unique(np.concatenate((b1, c0), axis=0), axis=0).T  # .T
+
     """
     if x is None or y is None:
         x, y = np.meshgrid(np.linspace(0, 1, 11), np.linspace(0, 0.6, 7))
+    else:
+        x = np.sort(x)
+        y = np.sort(y)
+        x, y = np.meshgrid(x, y)
     segs1 = np.stack((x[:, [0, -1]], y[:, [0, -1]]), axis=2)
     segs2 = np.stack((x[[0, -1], :].T, y[[0, -1], :].T), axis=2)
     fig, ax = plt.subplots(1, 1)
-    # ---- use scatter_params to set defaults
+    # -- use scatter_params to set defaults
     scatter_params(plt, fig, ax, title="Mesh", ax_lbls=['X', 'Y'])
     ax.add_collection(LineCollection(np.concatenate((segs1, segs2))))
     ax.autoscale(enable=True, axis='both', tight=None)

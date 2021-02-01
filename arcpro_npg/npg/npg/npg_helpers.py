@@ -16,7 +16,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2020-10-07
+    2020-12-25
 
 Purpose
 -------
@@ -62,7 +62,7 @@ Extras
 """
 
 # pylint: disable=C0103,C0415
-# pylint: disable=R0914,R1710,R1705
+# pylint: disable=R0912, R0913, R0914, R1710, R1705
 # pylint: disable=W0105,W0212,W0612,W0613
 
 import sys
@@ -75,6 +75,9 @@ from numpy.lib.recfunctions import unstructured_to_structured as uts
 # if 'npg' not in list(locals().keys()):
 #     import npg
 
+# import npg_prn  # noqa
+from npg_prn import prn_tbl  # used by ``shape_finder``
+
 script = sys.argv[0]  # print this should you need to locate the script
 
 nums = 'efdgFDGbBhHiIlLqQpP'
@@ -84,16 +87,16 @@ __all__ = [
     'common_pnts', 'compare_geom', 'flat', 'interweave', 'keep_geom',
     'polyline_angles',
     'radial_sort', 'remove_geom', 'segment_angles', 'shape_finder',
-    'dist_angle_sort', 'sort_xy', 'stride_2d'
+    'coerce2array', 'dist_angle_sort', 'sort_xy', 'stride_2d', 'reclass_ids'
     ]
 
 __helpers__ = [
-    '_angles_3pnt_', '_area_centroid_', '_bit_area_', '_bit_check_',
-    '_bit_crossproduct_', '_bit_length_', '_bit_min_max_',
-    '_bit_segment_angles_', '_from_to_pnts_', '_get_base_', '_in_LBRT_',
-    '_in_extent_', '_is_ccw_', '_is_clockwise_', '_is_right_side', '_isin_2d_',
-    '_pnts_in_extent_', '_rotate_', '_scale_', '_to_lists_', '_trans_rot_',
-    '_translate_'
+    'prn_tbl', '_angles_3pnt_', '_od_angles_dist_', '_area_centroid_',
+    '_bit_area_', '_bit_check_', '_bit_crossproduct_', '_bit_length_',
+    '_bit_min_max_', '_bit_segment_angles_', '_from_to_pnts_', '_get_base_',
+    '_in_LBRT_', '_in_extent_', '_is_ccw_', '_is_clockwise_', '_is_right_side',
+    '_isin_2d_', '_pnts_in_extent_', '_rotate_', '_scale_', '_to_lists_',
+    '_trans_rot_', '_translate_', '_perp_'
     ]  # ---- core bit functions
 
 __all__ = __helpers__ + __all__
@@ -112,7 +115,7 @@ def _get_base_(a):
 def _bit_check_(a, just_outer=False):
     """Check for bits and convert if necessary.
 
-    a : array_like
+    a : array-like
         Either a Geo array or a list of lists.  Conversion to bits or outer
         rings as desired.
     just_outer : boolean
@@ -184,7 +187,7 @@ def _to_lists_(a, outer_only=True):
 
 
 # ---------------------------------------------------------------------------
-# ---- (2) bit helpers
+# ---- (2) geometry helpers
 #
 def _angles_3pnt_(a, inside=True, in_deg=True):
     """Worker for Geo `polygon_angles`, `polyline_angles` and `min_area_rect`.
@@ -226,6 +229,45 @@ def _angles_3pnt_(a, inside=True, in_deg=True):
     if in_deg:
         angles = np.degrees(angles)
     return angles
+
+
+def _od_angles_dist_(arr, is_polygon=True):
+    """Return origin-destination angles and distances.
+
+    Parameters
+    ----------
+    is_polygon : boolean
+        The first and last point are sliced off.  The first point is used
+        as the origin and the last is a duplicate of the first.
+
+    Notes
+    -----
+    The pnts array is rotated to the LL of the extent.  The first point is
+    used as the origin and is sliced off of the remaining list.  If
+    `is_polygon` is True, then the duplicated last point will be removed.
+    """
+    def _e_2d_(a, p):
+        """See npg_helpers ``_e_2d_``."""
+        diff = a - p[None, :]
+        return np.sqrt(np.einsum('ij,ij->i', diff, diff))
+
+    def _LL_(arr):
+        """Return the closest point to the lower left of the array."""
+        LL = np.min(arr, axis=0)
+        idx = np.argmin(_e_2d_(arr, LL))
+        return idx
+
+    num = _LL_(arr)
+    min_f = arr[num]
+    arr_ordered = np.concatenate((arr[num:-1], arr[:num], [arr[num]]), axis=0)
+    if is_polygon:
+        arr = arr_ordered[1:-1]
+    else:
+        arr = arr_ordered[1:]
+    dxdy = arr - min_f
+    ang = np.degrees(np.arctan2(dxdy[:, 1], dxdy[:, 0]))
+    dist = _e_2d_(arr, min_f)
+    return arr_ordered, ang, dist
 
 
 def _area_centroid_(a):
@@ -300,6 +342,96 @@ def _bit_segment_angles_(a, fromNorth=False):
     if fromNorth:
         ang = np.mod((450.0 - ang), 360.)
     return ang
+
+
+def _rotate_(a, R, as_group):
+    """Rotation helper.
+
+    Parameters
+    ----------
+    geo_arr : array
+        The input geo array, which is split here.
+    as_group : boolean
+        True, all shapes are rotated about the extent center.  False, each
+        shape is rotated about its center.
+    R : array
+        The rotation matrix, passed on from Geo.rotate.
+    clockwise : boolean
+    """
+    if not hasattr(a, "IFT"):
+        print("Geo array required")
+        return None
+    shapes = _bit_check_(a)
+    out = []
+    if as_group:  # -- rotate as a whole
+        cent = np.mean(a.XY, axis=0)
+        return np.einsum('ij,jk->ik', a.XY - cent, R) + cent
+    #
+    uniqs = []
+    for chunk in shapes:  # -- rotate individually
+        _, idx = np.unique(chunk, True, axis=0)
+        uniqs.append(chunk[np.sort(idx)])
+    cents = [np.mean(i, axis=0) for i in uniqs]
+    for i, chunk in enumerate(shapes):
+        ch = np.einsum('ij,jk->ik', chunk - cents[i], R) + cents[i]
+        out.append(ch)
+    return out
+
+
+def _scale_(a, factor=1):
+    """Scale a geometry equally."""
+    a = _get_base_(a)
+    cent = np.min(a, axis=0)
+    shift_orig = a - cent
+    scaled = shift_orig * [factor, factor]
+    return scaled + cent
+
+
+def _translate_(a, dx=0, dy=0):
+    """Move/shift/translate by dx, dy to a new location.
+
+    Parameters
+    ----------
+    a : array-like
+        A 2D array of coordinates with (x, y) shape or (N, x, y).
+    dx, dy : numbers, list
+        If dy is None, then dx must be array-like consisting of two values.
+
+    Notes
+    -----
+    >>> dx, dy = np.mean(a, axis=0)  # to center about the x,y origin.
+    """
+    a = _get_base_(a)
+    if a.ndim == 1:
+        a = a.reshape(1, a.shape[0], 2)
+        return np.array([i + [dx, dy] for i in a])
+    else:
+        return a + [dx, dy]
+
+
+def _trans_rot_(a, angle=0.0, clockwise=False):
+    """Rotate shapes about their center or individually."""
+    a = _get_base_(a)
+    if clockwise:
+        angle = -angle
+    angle = np.radians(angle)
+    c, s = np.cos(angle), np.sin(angle)
+    R = np.array(((c, s), (-s, c)))
+    cent = np.mean(np.unique(a, axis=0), axis=0)
+    return np.einsum('ij,jk->ik', a - cent, R) + cent
+
+
+def _perp_(a):
+    """Perpendicular to array."""
+    b = np.empty_like(a)
+    b_dim = b.ndim
+    if b_dim == 1:
+        b[0] = -a[1]
+        b[1] = a[0]
+    elif b_dim == 2:
+        b[:, 0] = -a[:, 1]
+        b[:, 1] = a[:, 0]
+    return b
 
 
 # ---------------------------------------------------------------------------
@@ -456,83 +588,6 @@ def _pnts_in_extent_(pnts, extent=None, return_index=False):
     return np.all(idx)
 
 
-def _translate_(a, dx=0, dy=0):
-    """Move/shift/translate by dx, dy to a new location.
-
-    Parameters
-    ----------
-    a : array-like
-        A 2D array of coordinates with (x, y) shape or (N, x, y).
-    dx, dy : numbers, list
-        If dy is None, then dx must be array-like consisting of two values.
-
-    Notes
-    -----
-    >>> dx, dy = np.mean(a, axis=0)  # to center about the x,y origin.
-    """
-    a = _get_base_(a)
-    if a.ndim == 1:
-        a = a.reshape(1, a.shape[0], 2)
-        return np.array([i + [dx, dy] for i in a])
-    else:
-        return a + [dx, dy]
-
-
-def _trans_rot_(a, angle=0.0, clockwise=False):
-    """Rotate shapes about their center or individually."""
-    a = _get_base_(a)
-    if clockwise:
-        angle = -angle
-    angle = np.radians(angle)
-    c, s = np.cos(angle), np.sin(angle)
-    R = np.array(((c, s), (-s, c)))
-    cent = np.mean(np.unique(a, axis=0), axis=0)
-    return np.einsum('ij,jk->ik', a - cent, R) + cent
-
-
-def _scale_(a, factor=1):
-    """Scale a geometry equally."""
-    a = _get_base_(a)
-    cent = np.min(a, axis=0)
-    shift_orig = a - cent
-    scaled = shift_orig * [factor, factor]
-    return scaled + cent
-
-
-def _rotate_(a, R, as_group):
-    """Rotation helper.
-
-    Parameters
-    ----------
-    geo_arr : array
-        The input geo array, which is split here.
-    as_group : boolean
-        True, all shapes are rotated about the extent center.  False, each
-        shape is rotated about its center.
-    R : array
-        The rotation matrix, passed on from Geo.rotate.
-    clockwise : boolean
-    """
-    if not hasattr(a, "IFT"):
-        print("Geo array required")
-        return None
-    shapes = _bit_check_(a)
-    out = []
-    if as_group:  # -- rotate as a whole
-        cent = np.mean(a.XY, axis=0)
-        return np.einsum('ij,jk->ik', a.XY - cent, R) + cent
-    #
-    uniqs = []
-    for chunk in shapes:  # -- rotate individually
-        _, idx = np.unique(chunk, True, axis=0)
-        uniqs.append(chunk[np.sort(idx)])
-    cents = [np.mean(i, axis=0) for i in uniqs]
-    for i, chunk in enumerate(shapes):
-        ch = np.einsum('ij,jk->ik', chunk - cents[i], R) + cents[i]
-        out.append(ch)
-    return out
-
-
 # ---------------------------------------------------------------------------
 # ---- (4) Geo / ndarray stuff
 #
@@ -590,7 +645,7 @@ def common_pnts(pnts, self, remove_common=True):
     --------
     `np_geom.pnts_in_pnts` for a variant with slightly different returns.
     """
-    w = np.where(np.equal(pnts, self).all(-1))[0]
+    w = np.where(np.equal(pnts[:, None], self).all(-1))[0]
     if len(w) > 0:
         uni = np.unique(pnts[w], axis=0)
         w1 = np.where((pnts == uni[:, None]).all(-1))[1]
@@ -603,9 +658,9 @@ def common_pnts(pnts, self, remove_common=True):
 
 
 def compare_geom(arr, look_for, unique=True, invert=False, return_idx=False):
-    """Look for duplicates in two 2D arrays.  This can be points or segments.
+    """Look for duplicates or common points in two 2D arrays.
 
-    ** can use to find duplicates between 2 arrays ie compare_arrays **
+    ** Used to find points or segments that are common between geometries. **
 
     Parameters
     ----------
@@ -636,12 +691,6 @@ def compare_geom(arr, look_for, unique=True, invert=False, return_idx=False):
     ... array([[ 5.,  5.],
     ...        [10., 10.]])
     """
-    def _iterate_(N, n):
-        """Return combinations for array lengths."""
-        import itertools
-        combos = itertools.combinations(np.arange(N), n)
-        return combos
-
     result = (arr[:, None] == look_for).all(-1).any(-1)  # ** see reference
     if sum(result) == 0:
         return None
@@ -712,7 +761,7 @@ def dist_angle_sort(a, sort_point=None, close_poly=True):
         return np.sqrt(np.einsum('ij,ij->i', diff, diff))
 
     a = np.array(a)
-    min_f = np.array([np.min(a[:, 0]), np.mean(a[:, 1])])
+    min_f = np.array([np.min(a[:, 0]), np.min(a[:, 1])])
     dxdy = np.subtract(a, np.atleast_2d(min_f))
     ang = np.degrees(np.arctan2(dxdy[:, 1], dxdy[:, 0]))
     dist = _e_2d_(a, min_f)
@@ -773,7 +822,7 @@ def interweave(arr, as_3d=False):
     """
     fr_to = np.concatenate((arr[:-1], arr[1:]), axis=1)
     if as_3d:
-        return fr_to.reshape(-1, 2, 2)  # for ndim=3d
+        return fr_to.reshape((-1, 2, 2))  # for ndim=3d
     return fr_to
 
 
@@ -844,7 +893,7 @@ def stride_2d(a, win=(2, 2), stepby=(1, 1)):
 # ---------------------------------------------------------------------------
 # ---- (7) others functions
 #
-def shape_finder(arr):
+def shape_finder(arr, start=0, prn=False, structured=True):
     """Provide the structure of an array/list which may be uneven and nested.
 
     Parameters
@@ -853,6 +902,21 @@ def shape_finder(arr):
         An list/tuple/array of objects. In this case points. Shapes are
         usually formed as parts with/without holes and they may have multiple
         parts.
+    start : integer
+        Start number to use for the counter.  Usually 0 or 1.
+    prn : boolean
+        True, to print the output.  False returns a structured array.
+    structured : boolean
+        True, returns a structured array if prn is False, otherwise an ndarray
+        is returned.
+
+    Requires
+    --------
+    ``prn_tbl`` from npg_prn.
+
+    Used by
+    -------
+    ``npg_prn.prn_lists`` and ``npg_prn.prn_arrays``.
 
     Notes
     -----
@@ -886,7 +950,7 @@ def shape_finder(arr):
         dt = 'float' if _len_check_(arr) else 'O'
         return np.asarray(arr, dtype=dt).squeeze()
     #
-    cnt = 1
+    cnt = start
     info = []
     if isinstance(arr, (list, tuple)):
         if len(arr[0]) == 2 and isinstance(arr[0][0], (int, float)):
@@ -901,22 +965,96 @@ def shape_finder(arr):
     for ar in arrs:
         a0 = _arr_(ar)  # -- create an appropriate array
         if a0.dtype.kind in 'efdg' or len(a0.shape) > 1:
-            info.append([cnt, 0, 0, a0.shape])
+            info.append([cnt, 0, 0, a0.shape[0]])
         else:
             i = 0
             for a1 in a0:
                 a1 = _arr_(a1)
                 j = 0
                 if a1.dtype.kind in 'efdg' or len(a1.shape) > 1:
-                    info.append([cnt, i, j, a1.shape])
+                    info.append([cnt, i, j, a1.shape[0]])
                 else:
                     for a2 in a1:
                         a2 = _arr_(a2)
-                        info.append([cnt, i, j, a2.shape])
+                        info.append([cnt, i, j, a2.shape[0]])
                         j += 1
                 i += 1
         cnt += 1
-    return np.array(info, dtype="O")
+    dt = [("shape", "i8"), ("part", "i8"), ("bit", "i8"), ("Nx2", "i8")]
+    info = np.array(info)
+    if structured:
+        out = np.zeros((len(info),), dtype=dt)
+        names = out.dtype.names
+        for i, nme in enumerate(names):
+            out[nme] = info[:, i]
+        if prn:
+            prn_tbl(out)
+            return
+        return out
+    else:
+        return info
+
+
+def coerce2array(arr, start=0):
+    """Return arrays using the principles of ``shape_finder``.
+
+    arr : array-like
+        Either lists of lists, lists or arrays, arrays of lists or similar.
+        There is the expectation that the objects represent Nx2 geometry
+        objects with potentially multiple parts and bits.
+    start : integer
+        Either use 0 or 1 for array part numbering purposes.
+
+    Returns
+    -------
+    Most likely an object array will be returned if the input structure is
+    also nested.
+    """
+    #
+    def _len_check_(arr):
+        """Check iterator lengths."""
+        arr = np.asarray(arr, dtype='O').squeeze()
+        if arr.shape[0] == 1:
+            return False, len(arr)
+        q = [len(a) == len(arr[0])      # check subarray and array lengths
+             if hasattr(a, '__iter__')  # if it is an iterable
+             else False                 # otherwise, return False
+             for a in arr]              # for each subarray in the array
+        return np.all(q), len(arr)
+
+    def _arr_(arr):
+        """Assign dtype based on nested array lengths from `_len_check_`."""
+        if isinstance(arr, np.ndarray):
+            if arr.ndim == 2:
+                return arr
+        result = [_len_check_(i) for i in arr]
+        out = []
+        if len(result) == 1:
+            return np.asarray(arr, dtype='float').squeeze()
+        for i, r in enumerate(result):
+            if r[0]:
+                out.append(np.asarray(arr[i], dtype='float').squeeze())
+            else:
+                sub = []
+                chk2 = _len_check_(arr[i])
+                if chk2[0]:
+                    out.append(np.asarray(arr[i], dtype='float').squeeze())
+                else:
+                    chk3 = _len_check_(arr[i])
+                    print("chk3 {}".format(chk3))
+                    for ar in arr[i]:
+                        sub.append(np.asarray(ar, dtype='float').squeeze())
+                    dt1 = 'O' if len(sub) > 1 else 'float'
+                    out.append(np.asarray(sub, dtype=dt1))
+        return np.asarray(out, dtype='O')
+    #
+    out = []
+    chk = _len_check_(arr)
+    if chk[0] and chk[1] > 2:
+        return np.array(arr)
+    for ar in arr:
+        out.append(_arr_(ar))
+    return np.array(out, dtype="O")
 
 
 def flat(lst):
@@ -933,7 +1071,7 @@ def flat(lst):
 
 
 def project_pnt_to_line(x1, y1, x2, y2, xp, yp):
-    """Project a point on to a line to get perpendicular location."""
+    """Project a point on to a line to get the perpendicular location."""
     x12 = x2 - x1
     y12 = y2 - y1
     dotp = x12 * (xp - x1) + y12 * (yp - y1)
@@ -945,6 +1083,51 @@ def project_pnt_to_line(x1, y1, x2, y2, xp, yp):
         return lx, ly
     else:
         return None
+
+
+def reclass_ids(vals=None):
+    """Reclass a 1d sequence of integers.  Usually used to reclass ID values.
+
+    Parameters
+    ----------
+    vals : integers
+        A sequence of integers representing ID values for objects.  They may
+        contain gaps in the sequence and duplicates of values.
+
+    Notes
+    -----
+    Reclass an array to integer classes based upon unique values.
+    Unique values are easily determined by sorting, finding successive
+    differences as a reverse boolean, then producing and assigning a
+    cumulative sum.
+    """
+    if vals is None:
+        return None
+    idx = np.arange(len(vals), dtype="int32")
+    ordr = np.zeros(len(vals), dtype="int32")
+    dt = [("ID", "int32"), ("Values", "U5"), ("Order", "int32")]
+    a = np.array(list(zip(idx, vals, ordr)), dtype=dt)
+    #
+    # sort the array, determine where consecutive values are equal
+    # reclass them using an inverse boolean and produce a cumulative sum
+    s_idx = np.argsort(a, order=['Values', 'ID'])
+    final = a[s_idx]
+    boolv = final['Values'][:-1] == final['Values'][1:]  # read very carefully
+    w = np.where(boolv, 0, 1)   # find indices where they are the same
+    # sort back
+    final["Order"][1:] = np.cumsum(w)  # csum[1:] = np.cumsum(w)
+    final = final[np.argsort(final, order=['ID'])]
+    # frmt = "{}\nInput array...\n{!r:}\n\nFinal array\n{!r:}"
+    # args = [dedent(recl_ids.__doc__), a.reshape(-1, 1), final.reshape(-1, 1)]
+    # print(dedent(frmt).format(*args))
+    return final['Order']  # a, final
+
+
+def _iterate_(N, n):
+    """Return combinations for array lengths."""
+    import itertools
+    combos = itertools.combinations(np.arange(N), n)
+    return combos
 
 
 # ===========================================================================
