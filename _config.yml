@@ -1,5 +1,27 @@
+# --- Required options --- #
+
 theme: jekyll-theme-cayman
+
+# Name of website
 name: NumPy Geometry
-description: Working with geometry with numpy.
+description: Working with geometry using numpy.
+
+# Your name to show in the footer
+author: Dan Patterson
+
+# exclude:
+# --- Logo --- #
+
+# Image to show in the navigation bar - works best with a square image
+# Remove this parameter if you don't want an image in the navbar
+# avatar: "/assets/img/avatar-icon.png"
+
+# If you want to have an image logo in the top-left corner instead of having the title of the website,
+# then specify the following parameter
+#title-img: /path/to/image
+
 url: "https://dan-patterson.github.io/numpy_geometry"
 markdown: GFM
+
+# --- reference ---
+# https://github.com/daattali/beautiful-jekyll/blob/master/_config.yml
