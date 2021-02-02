@@ -26,8 +26,25 @@ url: "https://dan-patterson.github.io/numpy_geometry"
 # kramdown
 markdown: GFM
 
-# Gems
-gems:
+navbar-links:
+  About Me: "Test about me link"
+  Resources:
+    - NumPy help: "https://numpy.org/devdocs/user/index.html"
+    - Learn markdown: "https://www.markdowntutorial.com/"
+  Github home: "https://github.com/Dan-Patterson"
+  
+  # Alternatively, the navbar, footer, and page background can be set to an image
+# instead of colour
+
+#navbar-img: "/assets/img/bgimage.png"
+#footer-img: "/assets/img/bgimage.png"
+#page-img: "/assets/img/bgimage.png"
+plugins:
   - jekyll-paginate
+  - jekyll-sitemap
+
+# Gems
+#gems:
+#  - jekyll-paginate
 # --- reference ---
 # https://github.com/daattali/beautiful-jekyll/blob/master/_config.yml
