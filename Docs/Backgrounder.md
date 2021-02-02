@@ -733,5 +733,5 @@ Bit_ID  : self.Bit  sequence order of each part in a shape
  004      4        25        30         1          1         0
  ```
 
-<a href="url"><img src="https://github.com/Dan-Patterson/numpy_geometry/images/sq.png" align="center" height="auto" width="300" ></a>
+<a href="url"><img src="https://github.com/Dan-Patterson/numpy_geometry/blob/master/images/sq.png" align="center" height="auto" width="300" ></a>
 
