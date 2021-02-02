@@ -1,5 +1,7 @@
 # Geo array basics
 
+<a href="url"><img src="../images/sq.png" align="right" height="auto" width="200" ></a>
+
 Import **npg** and take a subsample of some featureclass (in_fc) geometry objects (g).
 
 IFT refers to the feature `id` value, the `from` and `to` points.
@@ -732,6 +734,4 @@ Bit_ID  : self.Bit  sequence order of each part in a shape
  003      3        19        25         1          1         0
  004      4        25        30         1          1         0
  ```
-
-<a href="url"><img src="../images/sq.png" align="right" height="auto" width="200" ></a>
 
