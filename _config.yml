@@ -8,7 +8,8 @@ description: Working with geometry using numpy.
 
 # Your name to show in the footer
 author: Dan Patterson
-  url:  https://dan-patterson.github.io/numpy_geometry
+  
+url: "https://dan-patterson.github.io/numpy_geometry"
 
 # url: https://github.com/Dan-Patterson "https://dan-patterson.github.io/numpy_geometry"
 # exclude:
