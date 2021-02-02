@@ -137,22 +137,25 @@ npg_helpers  helpers ...
 
 __new__(cls, g=None, IFT=None, Kind=2, Info="Geo array")
 
-g : array_like
-    A 2D array sequence of points with shape (N, 2).
-IFT : array_like
-    Defines, the I(d)F(rom)T(o) and other structural elements that are
+**g : array_like**
+  - A 2D array sequence of points with shape (N, 2).
+
+**IFT : array_like**
+  - Defines, the I(d)F(rom)T(o) and other structural elements that are
     present in polyline or polygon geometry that `arr` represents.
     Shape (N, 6) required.
-Kind : integer
-    Points (0), polylines/lines (1) and polygons (2).
-Info : text (optional)
-    Optional information if needed.
+
+**Kind : integer**
+  - Points (0), polylines/lines (1) and polygons (2).
+
+**Info : text (optional)**
+  - Optional information if needed.
 
 ----
 
 **Properties**
 
-```
+```python
 g      the ndarray of xy coordinates
 g.T  # ---- g.T shown
 # ---- Geo[[Xs], [Ys]]
@@ -174,7 +177,7 @@ The structure and relationships between the array elements is given in the ``IFT
 
 g.IFT  ==> Id, From, To - shape ID, from-to points in the shape
 
-```
+```python
 g.IFT
 array([[ 1,  0,  5,  1,  1,  0],
        [ 1,  5, 10,  0,  1,  1],
@@ -189,8 +192,18 @@ array([[ 1,  0,  5,  1,  1,  0],
        [ 2, 54, 58,  0,  2,  3],
        [ 3, 58, 62,  1,  1,  0]], dtype=int64)
 ```
-Geo array ==> shape identification (IDs), from (FR), to (To), clockwise (CW), part ids (PID), bit ids (Bit), from-to (FT), shape type (K), information string (Info)
-```
+Geo array ==> 
+  - shape identification (IDs)
+  - from (FR)
+  - to (To)
+  - clockwise (CW)
+  - part ids (PID)
+  - bit ids (Bit)
+  - from-to (FT)
+  - shape type (K)
+  - information string (Info)
+
+```python
 g.IDs  IFT[:, 0]   shape identifier
 [1 1 1 ... 2 2 3]
 
@@ -313,7 +326,8 @@ shape, part and bit ids     : shp_ids, part_ids, bit_ids
 shape, part and bit counts  : shp_IFT, part_IFT, bit_IFT
 
 x, y and XY coordinates     : X, Y, XY)
-```
+
+```python
 - sample size, unique shapes
 g.N ... 3 ...  len(uni)   #  uni, idx = np.unique(arr.IDs, True)
 g.U ... [1 2 3] ...  g.IDs[idx]
@@ -419,7 +433,7 @@ g.bits
 
 ----
 
-```
+```python
 (1) g.first_bit(True) ...
 [[ 10.00  10.00]
  [ 10.00  0.00]
@@ -713,7 +727,7 @@ g.bits
 ----
 
 A simplified informational table of a Geo array's IFT array with annotations.  Useful for documentation purposes.
-```
+```python
 sq2.structure()
 
 Geo array structure
