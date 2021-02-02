@@ -1,11 +1,14 @@
 # --- Required options --- #
 
-theme: jekyll-theme-cayman
+title: NumPy Geometry
+theme: jekyll-theme-dinky
+# theme: jekyll-theme-cayman
+show_downloads: true
 
 # Name of website
 name: NumPy Geometry
 description: Working with geometry using numpy.
-
+![Thumbnail of Dinky](thumbnail.png)
 # Your name to show in the footer
 author: Dan Patterson
   
