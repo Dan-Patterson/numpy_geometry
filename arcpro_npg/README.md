@@ -19,9 +19,19 @@ The main script controlling all tools in the toolbox is *tbx_tools.py* in this f
 
 Developed in ArcGIS Pro 2.7 - 2.6, python 3.7.9 and 3.6.x-3.6.10 and numpy 1.16.5-1.19.2.
 
-These demo scripts and the toolbox show how numpy and arcpy can play nice together and generate geometries that are normally only available at the ArcGIS Pro Advanced level.  The tools are already provided to do this, but less attention is paid to the attributes.  Usually a spatial and/or attribute join enables one to bring the attributes from the input class to the output class.  This can be done after the geometry is created, or I may have done so during script construction (depending on how bored I was).
+These demo scripts and the toolbox show how numpy and arcpy can play nice together and generate geometries that are normally only available at the ArcGIS Pro Advanced level.  The tools are already provided to do this, but less attention is paid to the attributes.
 
-In some cases, the outputs are only one option of what the Esri tool provides, for example #6 Polygons to Polylines, is just that... a simple conversion of the geometry type, no fancy intersection and overlap stuff... you get what you pay for, but the widest use is probably the simplest.
+Usually a spatial and/or attribute join enables one to bring the attributes from the input class to the output class.
+
+This can be done after the geometry is created, or I may have done so during script construction (depending on how bored I was).
+
+In some cases, the outputs are only one option of what the Esri tool provides, for example
+
+    #6 Polygons to Polylines, is just that... 
+
+a simple conversion of the geometry type, no fancy intersection and overlap stuff... 
+
+You get what you pay for, but the widest use is probably the simplest.
 
 ----
 ## Last update : 2020-12-20 ##
