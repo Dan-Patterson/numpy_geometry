@@ -83,6 +83,3 @@ Generally, I am only working with featureclasses stored in a file geodatabase.  
 
 [Geometry: forms of the same feature](https://community.esri.com/t5/python-blog/geometry-forms-of-the-same-feature-7/ba-p/902680)
 
-[Links to the script documentation](https://github.com/Dan-Patterson/numpy_geometry/blob/master/Scripts/README.md)
-
-
