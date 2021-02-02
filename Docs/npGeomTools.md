@@ -66,4 +66,3 @@ The tool listing provides densification options, filling holes in polygons, and 
 
 Voronoi diagram (aka Thiessen polygons) and Delaunay triangulations, round out the tools so far.
 
-../numpy_geometry/images/npGeomTools.png
