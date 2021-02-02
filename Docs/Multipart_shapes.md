@@ -1,13 +1,4 @@
-<a href="url"><img src="../images/Shape2.png" align="center" height="200" width="auto" ></a>
-
-
-
-
-
-
-
-
-
+<a href="url"><img src="../images/Shape2.png" align="right" height="200" width="auto" ></a>
 
 # Multipart shapes
 
