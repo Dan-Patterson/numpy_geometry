@@ -30,9 +30,11 @@ This is not an exhaustive or definitive list of the toolbox functionality... con
 
 **Dissolve Boundaries**
 
-Dissolve shared edges in polygon geometry.  The polygons do not need to share a common attribute.  All shared edges are deleted and holes are removed.  Edges that meet at a point are not considered shared since there is no 2D space between the points.
+<img src="images/dissolve_sq2_1.png" align="right" width="250"/> <img src="images/dissolve_sq2_0.png" align="right" width="250"/>
+Dissolve shared edges in polygon geometry.  The polygons do not need to share a common attribute.
+All shared edges are deleted and holes are removed.  Edges that meet at a point are not considered shared since there is no 2D space between the points.
 
-https://community.esri.com/t5/python-blog/dissolve-boundaries/ba-p/1011337
+[Dissolve boundaries](https://community.esri.com/t5/python-blog/dissolve-boundaries/ba-p/1011337)
 
 **Feature Envelope to Polygon**
 
