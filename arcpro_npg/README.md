@@ -85,7 +85,7 @@ Another container that has been around for a long time in a variety of formats a
 
 Another tool that should be free for such basic functionality.
 
-[Create classes from multiple columns](https://community.esri.com/blogs/dan_patterson/2016/03/03/create-classes-from-multiple-columns]
+[Create classes from multiple columns](https://community.esri.com/blogs/dan_patterson/2016/03/03/create-classes-from-multiple-columns)
     
   *ArcGIS Pro help* [Frequency](https://pro.arcgis.com/en/pro-app/tool-reference/analysis/frequency.htm)
 
