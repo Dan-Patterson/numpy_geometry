@@ -86,19 +86,19 @@ Arrays include...['g', 'ift', 'kind', 'extents', 'spatial_ref']
 
 **save_geo(g, f_name, folder)**
 
-Save an array as an npz file.
+    Save an array as an npz file.
 
 **save_txt(a, name="arr.txt", sep=", ", dt_hdr=True)**
 
-Save a NumPy structured/recarray to text.
+    Save a NumPy structured/recarray to text.
 
 **load_txt(name="arr.txt", data_type=None)**
 
-Read a structured/recarray created by save_txt.  Many options are specified in save_txt.  If you wish to modify this, modify save_txt as well.
+    Read a structured/recarray created by save_txt.  Many options are specified in save_txt.  If you wish to modify this, modify save_txt as well.
 
 **Others**
 
-The remainder of the functions deal with formatting attribute data and printing.
+    The remainder of the functions deal with formatting attribute data and printing.
 
 
 ```python
@@ -158,7 +158,9 @@ There are a variety of other functions that deal with converting between geometr
 
 <a href="url"><img src="../images/npGeo.png" align="right" height="auto" width="450" ></a>
 
-This is where the Geo class is housed along with methods and properties applicable to it.  The Geo class inherits from the numpy ndarray and methods applied to Geo arrays generally returns arrays of that class.
+This is where the Geo class is housed along with methods and properties applicable to it.
+
+The Geo class inherits from the numpy ndarray and methods applied to Geo arrays generally returns arrays of that class.
 
 Geo arrays can be constructed from other ndarrays using **arrays_Geo**.
 Three sample arrays are shown below.
