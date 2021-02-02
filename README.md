@@ -81,8 +81,8 @@ Generally, I am only working with featureclasses stored in a file geodatabase.  
 
 [Don't believe what you see](https://community.esri.com/blogs/dan_patterson/2019/05/09/geometry-dont-believe-what-you-see-6)
 
-[Geometry: forms of the same feature](https://community.esri.com/blogs/dan_patterson/2019/05/13/geometry-forms-of-the-same-feature-7)
+[Geometry: forms of the same feature](https://community.esri.com/t5/python-blog/geometry-forms-of-the-same-feature-7/ba-p/902680)
 
-[Links to the script documentation](https://github.com/Dan-Patterson/npGeo/blob/master/Scripts/README.md)
+[Links to the script documentation](https://github.com/Dan-Patterson/numpy_geometry/blob/master/Scripts/README.md)
 
 
