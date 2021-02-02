@@ -51,6 +51,10 @@ Generally, I am only working with featureclasses stored in a file geodatabase.  
 
 [Dissolve Boundaries](https://community.esri.com/t5/python-blog/dissolve-boundaries/ba-p/1011337)
 
+[Conda, the dependency trail](https://community.esri.com/t5/python-blog/conda-the-dependency-trail/ba-p/904040)
+
+[Densify by distance](https://community.esri.com/t5/python-blog/densify-by-distance/ba-p/1004894)
+
 [Thiessen/Voronoi and Delaunay](https://community.esri.com/people/danretired/blog/2020/06/16/free-advanced-tools-thiessen-polygons-delaunay-triangulation)
 
 [Point tools](https://community.esri.com/people/danretired/blog/2020/05/15/point-tools-for-pro)
