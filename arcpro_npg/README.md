@@ -34,57 +34,58 @@ This is not an exhaustive or definitive list of the toolbox functionality... con
 Dissolve shared edges in polygon geometry.  The polygons do not need to share a common attribute.
 All shared edges are deleted and holes are removed.  Edges that meet at a point are not considered shared since there is no 2D space between the points.
 
-[Dissolve boundaries](https://community.esri.com/t5/python-blog/dissolve-boundaries/ba-p/1011337)
+  *Blog post* [Dissolve boundaries](https://community.esri.com/t5/python-blog/dissolve-boundaries/ba-p/1011337)
 
 **Feature Envelope to Polygon**
 
 Using the Geo array class, the extent of polyline and polygon features are created from their constituent points.
 
-https://pro.arcgis.com/en/pro-app/tool-reference/data-management/feature-envelope-to-polygon.htm
+  *ArcGIS Pro help* [Feature envelope to polygon](https://pro.arcgis.com/en/pro-app/tool-reference/data-management/feature-envelope-to-polygon.htm)
 
 **Convex hulls**
 
 Simple convex hull implementation in python, or scipy (feature points > than a threshold)
 
-https://pro.arcgis.com/en/pro-app/tool-reference/data-management/minimum-bounding-geometry.htm
+  *ArcGIS Pro help* [Minimum bounding geometry](https://pro.arcgis.com/en/pro-app/tool-reference/data-management/minimum-bounding-geometry.htm)
 
 **Feature to Point**
 
 For polygon features.  Reduces the points to a representative centroid.
 
-https://pro.arcgis.com/en/pro-app/tool-reference/data-management/feature-to-point.htm
+  *ArcGIS Pro help* [Feature to point](https://pro.arcgis.com/en/pro-app/tool-reference/data-management/feature-to-point.htm)
 
 **Split Line at Vertices**
 
 As it says.  I chose to keep the order of the resultant line segments as they were and not remove apparent `duplicates` for line segments that occur on shared borders.  In such cases, the shared segments will have the same points, but their from-to order is reversed.  There are cases to be made for keeping them or removing them... however, if they are removed, then they are harder to add back in should one want to recreate polygon geometry from the line segments.
 
-https://pro.arcgis.com/en/pro-app/tool-reference/data-management/split-line-at-vertices.htm
+  *ArcGIS Pro help* [Split line at vertices](https://pro.arcgis.com/en/pro-app/tool-reference/data-management/split-line-at-vertices.htm)
 
 **Feature Vertices to Points**
 
 Convert polygon features to a centroid.  One point is returned for multipart shapes, but this could be altered if someone has a use-case that might be relevant.
 
-https://pro.arcgis.com/en/pro-app/tool-reference/data-management/feature-vertices-to-points.htm
+  *ArcGIS Pro help* [Feature vertices to points](https://pro.arcgis.com/en/pro-app/tool-reference/data-management/feature-vertices-to-points.htm)
 
 **Polygons to Polylines**
 
 Really... You are just changing from polygons to polylines.  They are still a closed geometry, nothing fancy geometry-wise.  Should definitely be **Freed** from its shackles.
 
-https://pro.arcgis.com/en/pro-app/tool-reference/data-management/feature-to-polygon.htm
+  *ArcGIS Pro help* [Feature to polygon](https://pro.arcgis.com/en/pro-app/tool-reference/data-management/feature-to-polygon.htm)
 
 **Bounding Circles**
-
+<img src="images/circles.png" align="right" width="250"/>
 Another container that has been around for a long time in a variety of formats and readily implemented in python.  Sort-of ported this over from an old toolbox for ArcMap, but redone for the new geom class.  Speedy and accurate.
 
-https://pro.arcgis.com/en/pro-app/tool-reference/data-management/minimum-bounding-geometry.htm
+  *ArcGIS Pro help* [Minimum area bounding circles](https://pro.arcgis.com/en/pro-app/tool-reference/data-management/minimum-bounding-geometry.htm)
+
 
 **Frequency**
 
 Another tool that should be free for such basic functionality.
 
-https://community.esri.com/blogs/dan_patterson/2016/03/03/create-classes-from-multiple-columns
+[Create classes from multiple columns](https://community.esri.com/blogs/dan_patterson/2016/03/03/create-classes-from-multiple-columns]
     
-https://pro.arcgis.com/en/pro-app/tool-reference/analysis/frequency.htm
+  *ArcGIS Pro help* [Frequency](https://pro.arcgis.com/en/pro-app/tool-reference/analysis/frequency.htm)
 
 
 
