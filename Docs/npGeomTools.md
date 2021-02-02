@@ -42,7 +42,11 @@ The options for `conversion` are as follows:
 
 `Vertices to points` applies to polyline/polygon geometry.
 
-`Polygons to polylines` is also a convenience function since it only requires a `Kind (K)` conversion in the Geo class.  The reciprocal function was not implemented because I didn't want to provide a whole load of geometry checks.  If you have polyline geometry that you know will create well-formed polygons, simply change `K`.
+`Polygons to polylines` is also a convenience function since it only requires a `Kind (K)` conversion in the Geo class.
+
+The reciprocal function was not implemented because I didn't want to provide a whole load of geometry checks.
+
+If you have polyline geometry that you know will create well-formed polygons, simply change `K`.
 
 
 <a href="url"><img src="../images/containers.png" align="left" height="auto" width="200" ></a>
