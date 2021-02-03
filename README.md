@@ -35,6 +35,16 @@
 
 3 The **arcpro_npg** folder contains the scripts associated with the **Geo** array, a subclass of a *numpy* ndarray.  The script, *tbx_tools.py* is the controlling script associated with the *npGeom.tbx* toolbox.
 
+4 Folder structure in this repository.
+
+    - numpy_geometry
+      - arcpro_npg  : main folder for numpy geometry and FreeTools
+          - images  : documentation images
+          - npg     : toolbox and main script
+              - npg : scripts location
+      - Docs        : main and ancillary documentation
+      - images      : main documentation images
+
 ----
 A numpy geometry class and functions that work with arcpy and ESRI featureclasses is provided here to facilitate working with vector geometry using the ndarray as its base.
 
