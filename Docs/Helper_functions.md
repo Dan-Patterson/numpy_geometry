@@ -2,7 +2,7 @@
 
 There are several levels of information that can be acquired for Geo arrays.
 
-The most basic is attached as an info tag to the array itself.  This property is uppercase **Info**.
+The most basic is attached as an info tag to the array itself.  This property is proper case **Info**.
 ```python
 
 g.Info
