@@ -94,7 +94,8 @@ Arrays include...['g', 'ift', 'kind', 'extents', 'spatial_ref']
 
 **load_txt(name="arr.txt", data_type=None)**
 
-    Read a structured/recarray created by save_txt.  Many options are specified in save_txt.  If you wish to modify this, modify save_txt as well.
+Read a structured/recarray created by save_txt.  Many options are specified in save_txt.
+If you wish to modify this, modify save_txt as well.
 
 **Others**
 
