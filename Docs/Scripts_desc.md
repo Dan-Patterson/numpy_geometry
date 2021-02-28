@@ -26,6 +26,7 @@ Some useful functions to access and document featureclass information
 **dtype_info(a, as_string=False)**
 
 Return dtype information as lists or a string.
+
 ```python
 a = np.array([(0,  1,  2), (3,  4,  5), (6,  7,  8), (9, 10, 11)],
               dtype=[('f0', '<i4'), ('f1', '<i4'), ('f2', '<i4')])
