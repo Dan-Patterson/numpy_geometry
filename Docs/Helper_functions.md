@@ -24,7 +24,7 @@ Parts  :    10
 Points :    55
 Sp Ref : NAD 1983 CSRS MTM  9
 
-  OID_    Fr_pnt    To_pnt    CW_CCW    Part_ID    Bit_ID  
+       OID_    Fr_pnt    To_pnt    CW_CCW    Part_ID    Bit_ID  
 ----------------------------------------------------------------
  000      1         0         7         1          1         0
  001      1         7        11         0          1         1
