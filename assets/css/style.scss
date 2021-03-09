@@ -33,6 +33,31 @@ section {
   padding-bottom:50px;
 }
 
+/* Tables */
+
+table {
+  width:100%;
+}
+
+table {
+  border: 1px solid #ccc;
+  margin-bottom: 32px;
+  text-align: left;
+ }
+
+th {
+  font-family: 'Arvo', Helvetica, Arial, sans-serif;
+	font-size: 14px;
+	font-weight: normal;
+  padding: 10px;
+  background: #f2f6ff;
+  color: #000000;
+ }
+
+td {
+  padding: 10px;
+	background: #ccc;
+ }
 
 /* Footer */
 
