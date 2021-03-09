@@ -1,16 +1,26 @@
 # Geo array helpers
 
+**Properties and methods**
+
+| --- | ---- | -------- | -------- |
+|Info | info | geo_info | structure|
+| --- | ---- | -------- | -------- |
+
 There are several levels of information that can be acquired for Geo arrays.
 
-The most basic is attached as an info tag to the array itself.  This property is proper case **Info**.
+The most basic is attached as an ``info`` property to the array itself.  This property is proper case **Info**.
 ```python
 
 g.Info
 'rolled'
 ```
 
-A fuller description describing the extent, the number of shapes, parts and points and a textual presentation of the Geo array's IFT information can be derived using
-the lowercase **info** property.
+A fuller description can be derived using the lowercase **info** property.  The following is returned.
+- extent, 
+- number of shapes
+- number of parts
+- number of points
+- textual presentation of the Geo array's ``IFT`` information. 
 
 ```python
 
@@ -38,9 +48,10 @@ Sp Ref : NAD 1983 CSRS MTM  9
  009      9        50        55         1          1         0
 ```
 
-The similarities and differences between the Geo array and the base ndarray is ascribed to a method.
+The similarities and differences between the Geo array and the base ndarray is ascribed to the ``geo_info`` method.
 
-All common properties can be determined using `npg.dirr` while the output from `npg.geo_info` is subdivided into the properties and methods specific to a geo array, their base and special properties.
+All common properties can be determined using ``npg.dirr`` while the output from ``npg.geo_info`` is subdivided into the properties
+and methods specific to a geo array, their base and special properties.
 
 ```python
 
