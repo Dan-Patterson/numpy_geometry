@@ -2,7 +2,7 @@
 
 **Properties and methods**
 
-| --- | ---- | -------- | -------- |
+
 |Info | info | geo_info | structure|
 | --- | ---- | -------- | -------- |
 
