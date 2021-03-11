@@ -72,7 +72,7 @@ NUMS = FLOATS + INTS
 
 
 ft = {'bool': lambda x: repr(x.astype(np.int32)),
-      'float_kind': '{: 7.2f}'.format}
+      'float_kind': '{: 6.2f}'.format}
 np.set_printoptions(
     edgeitems=10, linewidth=160, precision=2, suppress=True,
     threshold=100, formatter=ft

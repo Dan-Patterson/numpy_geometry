@@ -48,9 +48,9 @@ from npgDocs import (
     )  # shapes_doc, parts_doc
 
 np.set_printoptions(
-    edgeitems=10, linewidth=120, precision=3, suppress=True, threshold=200,
+    edgeitems=10, linewidth=120, precision=2, suppress=True, threshold=200,
     formatter={"bool": lambda x: repr(x.astype(np.int32)),
-               "float_kind": '{: 7.3f}'.format})
+               "float_kind": '{: 6.2f}'.format})
 
 
 script = sys.argv[0]  # print this should you need to locate the script

@@ -16,7 +16,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2020-12-25
+    2021-03-08
 
 Purpose
 -------
@@ -96,7 +96,7 @@ __helpers__ = [
     '_bit_min_max_', '_bit_segment_angles_', '_from_to_pnts_', '_get_base_',
     '_in_LBRT_', '_in_extent_', '_is_ccw_', '_is_clockwise_', '_is_right_side',
     '_isin_2d_', '_pnts_in_extent_', '_rotate_', '_scale_', '_to_lists_',
-    '_trans_rot_', '_translate_', '_perp_'
+    '_trans_rot_', '_translate_', '_perp_', 'cartesian_product'
     ]  # ---- core bit functions
 
 __all__ = __helpers__ + __all__
@@ -115,6 +115,8 @@ def _get_base_(a):
 def _bit_check_(a, just_outer=False):
     """Check for bits and convert if necessary.
 
+    Parameters
+    ----------
     a : array-like
         Either a Geo array or a list of lists.  Conversion to bits or outer
         rings as desired.
@@ -998,6 +1000,8 @@ def shape_finder(arr, start=0, prn=False, structured=True):
 def coerce2array(arr, start=0):
     """Return arrays using the principles of ``shape_finder``.
 
+    Parameters
+    ----------
     arr : array-like
         Either lists of lists, lists or arrays, arrays of lists or similar.
         There is the expectation that the objects represent Nx2 geometry
@@ -1121,6 +1125,41 @@ def reclass_ids(vals=None):
     # args = [dedent(recl_ids.__doc__), a.reshape(-1, 1), final.reshape(-1, 1)]
     # print(dedent(frmt).format(*args))
     return final['Order']  # a, final
+
+
+def cartesian_product(sequences):
+    """Construct an index grid using 1D array_like sequences.
+
+    arrays : array_like
+        At least 2 array_like sequences to form the indices/product.
+
+    Example
+    -------
+    >>> cartesian_product([[0, 1]), [0, 1, 2]])
+    ...array([[0, 0],
+    ...       [0, 1],
+    ...       [0, 2],
+    ...       [1, 0],
+    ...       [1, 1],
+    ...       [1, 2]])
+    >>> cartesian_product([[0], [2, 3], [5, 4]])
+    ...array([[0, 2, 5],
+    ...       [0, 2, 4],
+    ...       [0, 3, 5],
+    ...       [0, 3, 4]])
+
+    Reference
+    ---------
+    `<https://stackoverflow.com/questions/11144513/cartesian-product-of-x-and
+    -y-array-points-into-single-array-of-2d-points>`_.
+    """
+    arrays = [np.array(i) for i in sequences]
+    len_ = len(arrays)
+    dtype = np.result_type(*arrays)
+    arr = np.empty([len(a) for a in arrays] + [len_], dtype=dtype)
+    for i, a in enumerate(np.ix_(*arrays)):
+        arr[..., i] = a
+    return arr.reshape(-1, len_)
 
 
 def _iterate_(N, n):

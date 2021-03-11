@@ -14,7 +14,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2020-10-23
+    2021-03-07
 
 Purpose
 -------
@@ -84,7 +84,8 @@ import sys
 # from functools import wraps
 import numpy as np
 
-import npGeo as npg
+import npGeo
+from npGeo import arrays_to_Geo
 from npg_plots import plot_mixed  # plot_2d, plot_polygons
 
 np.set_printoptions(
@@ -176,24 +177,23 @@ def code_grid(x_cols=1, y_rows=1,
     return c
 
 
-# ---- helpers ---- rot_matrix -----------------------------------------------
+# ---- helpers ---------------------------------------------------------------
 #
 def rot_matrix(angle=0, nm_3=False):
-    """Return the rotation matrix given points and rotation angle.
+    """Return the rotation matrix given a rotation angle.
 
     Parameters
     ----------
-    Rotation angle in degrees and whether the matrix will be used with
-    homogenous coordinates.
+    angle : number
+        Rotation angle in degrees.
+    nm_3 : boolean
+        True, if the desired matrix is to be used with homogenous coordinates.
+        False if applied to simple 2D coordinates (X, Y).
 
     Returns
     -------
     rot_m : matrix
         Rotation matrix for 2D transform.
-
-    nm_3 : boolean
-        True, is for use with homogenous coordinates, otherwise, leave as
-        False
 
     Notes
     -----
@@ -215,7 +215,7 @@ def rot_matrix(angle=0, nm_3=False):
 # ---- arc_sector, convex hull, circle ellipse, hexagons, rectangles,
 #      triangle, xy-grid --
 #
-def arc_(radius=100, start=0, stop=1, step=0.1, xc=0.0, yc=0.0):
+def arc_(radius=100, start=0, stop=1, step=0.1, xc=0.0, yc=0.0, asGeo=True):
     """Create an arc from a specified radius, centre and start/stop angles.
 
     Parameters
@@ -241,10 +241,12 @@ def arc_(radius=100, start=0, stop=1, step=0.1, xc=0.0, yc=0.0):
     x_s = radius * np.cos(angle)         # X values
     y_s = radius * np.sin(angle)         # Y values
     pnts = np.array([x_s, y_s]).T + [xc, yc]
+    if asGeo:
+        return arrays_to_Geo(pnts, kind=2)
     return pnts
 
 
-def arc_sector(outer=10, inner=9, start=1, stop=6, step=0.1):
+def arc_sector(outer=10, inner=9, start=1, stop=6, step=0.1, asGeo=True):
     """Form an arc sector bounded by a distance specified by two radii.
 
     Parameters
@@ -273,11 +275,13 @@ def arc_sector(outer=10, inner=9, start=1, stop=6, step=0.1):
     bott = arc_(inner, start, stop, step, 0.0, 0.0)
     close = top[0]
     pnts = np.concatenate((top, bott, [close]), axis=0)
+    if asGeo:
+        return arrays_to_Geo(pnts, kind=2)
     return pnts
 
 
 def circle(radius=100, clockwise=True, theta=1, rot=0.0, scale=1,
-           xc=0.0, yc=0.0):
+           xc=0.0, yc=0.0, asGeo=True):
     """Produce a circle/ellipse depending on parameters.
 
     Parameters
@@ -318,6 +322,8 @@ def circle(radius=100, clockwise=True, theta=1, rot=0.0, scale=1,
         rot_mat = rot_matrix(angle=rot)
         pnts = (np.dot(rot_mat, pnts.T)).T
     pnts = pnts + [xc, yc]
+    if asGeo:
+        return arrays_to_Geo(pnts, kind=2)
     return pnts
 
 
@@ -339,7 +345,9 @@ def circle_mini(radius=1.0, theta=10.0, xc=0.0, yc=0.0):
     return pnts
 
 
-def circle_ring(outer=100, inner=0, theta=10, rot=0, scale=1, xc=0.0, yc=0.0):
+def circle_ring(outer=100, inner=0, theta=10, rot=0, scale=1,
+                xc=0.0, yc=0.0,
+                asGeo=True):
     """Create a multi-ring buffer around a center point (xc, yc).
 
     Parameters
@@ -371,7 +379,11 @@ def circle_ring(outer=100, inner=0, theta=10, rot=0, scale=1, xc=0.0, yc=0.0):
         return top
     bott = circle(inner, clockwise=False, theta=theta, rot=rot, scale=scale,
                   xc=xc, yc=yc)
-    return np.concatenate((top, bott), axis=0)
+
+    pnts = np.concatenate((top, bott), axis=0)
+    if asGeo:
+        return arrays_to_Geo(pnts, kind=2)
+    return pnts
 
 
 def circ_3pa(arr):
@@ -407,8 +419,7 @@ def ellipse(x_radius=1.0, y_radius=1.0,
             theta=10.,
             xc=0.0, yc=0.0,
             kind=2,
-            asGeo=True,
-            ):
+            asGeo=True):
     """Produce an ellipse depending on parameters.
 
     Parameters
@@ -421,13 +432,16 @@ def ellipse(x_radius=1.0, y_radius=1.0,
     angles = np.deg2rad(np.arange(180.0, -180.0-theta, step=-theta))
     x_s = x_radius * np.cos(angles) + xc    # X values
     y_s = y_radius * np.sin(angles) + yc    # Y values
-    pnts = np.array(list(zip(x_s, y_s)))
+    # pnts = np.array(list(zip(x_s, y_s)))  # the slow way
+    pnts = np.zeros((x_s.shape[0], 2), x_s.dtype)
+    pnts[:, 0] = x_s
+    pnts[:, 1] = y_s
     if asGeo:
         if not isinstance(pnts, list):
             pnts = [pnts]
         frmt = "x_rad {}, y_rad {}, theta {}, x_c {}, y_c {}"
         txt = frmt.format(x_radius, y_radius, theta, xc, yc)
-        return npg.arrays_to_Geo(pnts, kind=2, info=txt)
+        return arrays_to_Geo(pnts, kind=2, info=txt)
     return pnts
 
 
@@ -440,8 +454,7 @@ def rectangle(dx=1, dy=-1,
               x_cols=1, y_rows=1,
               orig_x=0, orig_y=1,
               kind=2,
-              asGeo=True,
-              ):
+              asGeo=True):
     """Create a point array to represent a series of rectangles or squares.
 
     Parameters
@@ -449,7 +462,7 @@ def rectangle(dx=1, dy=-1,
     dx, dy : number
         x direction increment, +ve moves west to east, left/right.
         y direction increment, -ve moves north to south, top/bottom.
-    x_cols, y_rows : ints
+    x_cols, y_rows : integers
         The number of columns and rows to produce.
     orig_x, orig_y : number
         Planar coordinates assumed.  You can alter the location of the origin
@@ -463,19 +476,20 @@ def rectangle(dx=1, dy=-1,
     -------
     Stating the obvious... squares form when dx == dy.
 
+    X = [0.0, 0.0, dx, dx, 0.0] # X, Y values for a unit square
+    Y = [0.0, dy, dy, 0.0, 0.0]
+
     Cells are constructed clockwise from the bottom-left.  The rectangular grid
     is constructed from the top-left.  Specifying an origin (upper left) of
     (0, 2) yields a bottom-right corner of (3,0) when the following are used.
 
     >>> z = rectangle(dx=1, dy=1, x_cols=3, y_rows=2, orig_x=0, orig_y=2,
-                kind=2, asGeo=False)
+    ...               kind=2, asGeo=False)
 
     The first `cell` will be in the top-left and the last `cell` in the
     bottom-right.
     """
-    X = [0.0, 0.0, dx, dx, 0.0]       # X, Y values for a unit square
-    Y = [0.0, dy, dy, 0.0, 0.0]
-    seed = np.array(list(zip(X, Y)))  # [dx0, dy0] keep for insets
+    seed = np.array([[0.0, 0.0], [0.0, dy], [dx, dy], [dx, 0.0], [0.0, 0.0]])
     a = [seed + [j * dx, i * dy]      # make the shapes
          for i in range(0, y_rows)      # cycle through the rows
          for j in range(0, x_cols)]     # cycle through the columns
@@ -483,7 +497,7 @@ def rectangle(dx=1, dy=-1,
     if asGeo:
         frmt = "dx {}, dy {}, x_cols {}, y_rows {}, LB ({},{})"
         txt = frmt.format(dx, dy, x_cols, y_rows, orig_x, orig_y)
-        return npg.arrays_to_Geo(a, kind=2, info=txt)
+        return arrays_to_Geo(a, kind=2, info=txt)
     return a
 
 
@@ -491,26 +505,22 @@ def triangle(dx=1, dy=1,
              x_cols=1, y_rows=1,
              orig_x=0, orig_y=1,
              kind=2,
-             asGeo=True,
-             ):
+             asGeo=True):
     """Create a row of meshed triangles.
 
     The triangles are essentially bisected squares and not equalateral.
-    The triangles per row will note be terminated in half triangles to
+    The triangles per row will not be terminated in half triangles to
     `square off` the area of coverage.  This is to ensure that all geometries
     have the same area and point construction.
 
     Parameters
     ----------
-    See `rectangles` for shared parameter explanation..
+    See `rectangles` for shared parameter explanation.
     """
     a, dx, b = dx/2.0, dx, dx*1.5
-    Xu = [0.0, a, dx, 0.0]   # X, Y values for a unit triangle, point up
-    Yu = [0.0, dy, 0.0, 0.0]
-    Xd = [a, b, dx, a]       # X, Y values for a unit triangle, point down
-    Yd = [dy, dy, 0.0, dy]   # shifted by dx
-    seedU = np.vstack((Xu, Yu)).T  # np.array(list(zip(Xu, Yu)))
-    seedD = np.vstack((Xd, Yd)).T  # np.array(list(zip(Xd, Yd)))
+    # X, Y values for a unit triangle, point up and point down
+    seedU = np.array([[0.0, 0.0], [a, dy], [dx, 0.0], [0.0, 0.0]])
+    seedD = np.array([[a, dy], [b, dy], [dx, 0.0], [a, dy]])
     seed = np.array([seedU, seedD])
     a = [seed + [j * dx, i * dy]       # make the shapes
          for i in range(0, y_rows)       # cycle through the rows
@@ -521,7 +531,7 @@ def triangle(dx=1, dy=1,
     if asGeo:
         frmt = "dx {}, dy {}, x_cols {}, y_rows {}, LB ({},{})"
         txt = frmt.format(dx, dy, x_cols, y_rows, orig_x, orig_y)
-        return npg.arrays_to_Geo(a, kind=2, info=txt)
+        return arrays_to_Geo(a, kind=2, info=txt)
     return a
 
 
@@ -549,7 +559,7 @@ def hex_flat(dx=1, dy=1,
     if asGeo:
         frmt = "dx {}, dy {}, x_cols {}, y_rows {}, LB ({},{})"
         txt = frmt.format(dx, dy, x_cols, y_rows, orig_x, orig_y)
-        return npg.arrays_to_Geo(hexs, kind=2, info=txt)
+        return arrays_to_Geo(hexs, kind=2, info=txt)
     return hexs
 
 
@@ -577,7 +587,7 @@ def hex_pointy(dx=1, dy=1,
     if asGeo:
         frmt = "dx {}, dy {}, x_cols {}, y_rows {}, LB ({},{})"
         txt = frmt.format(dx, dy, x_cols, y_rows, orig_x, orig_y)
-        return npg.arrays_to_Geo(hexs, kind=2, info=txt)
+        return arrays_to_Geo(hexs, kind=2, info=txt)
     return hexs
 
 
@@ -889,7 +899,7 @@ def spiral_archim(N, n, inward=False, clockwise=True):
 
 
 def spiral_sqr(ULx=-10, n_max=100):
-    """Create a square spiral from the centre in a clockwise direction
+    """Create a square spiral from the centre in a clockwise direction.
 
     Parameters
     ----------
@@ -942,11 +952,11 @@ def spiral_sqr(ULx=-10, n_max=100):
     return coords
 
 
-# -------Excellent one-------------------------------------------------------
+# -- Excellent one-------------------------------------------------------
 #  https://stackoverflow.com/questions/36834505/
 #        creating-a-spiral-array-in-python
 def spiral_cw(A):
-    """Docstring"""
+    """Docstring."""
     A = np.array(A)
     out = []
     while(A.size):
@@ -956,7 +966,7 @@ def spiral_cw(A):
 
 
 def spiral_ccw(A):
-    """Docstring"""
+    """Docstring."""
     A = np.array(A)
     out = []
     while(A.size):
@@ -966,12 +976,12 @@ def spiral_ccw(A):
 
 
 def base_spiral(nrow, ncol):
-    """Docstring"""
+    """Docstring."""
     return spiral_ccw(np.arange(nrow*ncol).reshape(nrow, ncol))[::-1]
 
 
 def to_spiral(A):
-    """Docstring"""
+    """Docstring."""
     A = np.array(A)
     B = np.empty_like(A)
     B.flat[base_spiral(*A.shape)] = A.flat
@@ -979,7 +989,7 @@ def to_spiral(A):
 
 
 def from_spiral(A):
-    """Docstring"""
+    """Docstring."""
     A = np.array(A)
     return A.flat[base_spiral(*A.shape)].reshape(A.shape)
 
@@ -1049,7 +1059,7 @@ def mini_weave(n):
 def _test_data(plot=False):
     """Sample test data.
 
-    a, r = _test_data(plot=False)
+    a, r, b, h, e = _test_data(plot=False)
     """
     a = np.array(
         [[0.4, 0.5], [1.2, 9.1], [1.2, 3.6], [1.9, 4.6], [2.9, 5.9],

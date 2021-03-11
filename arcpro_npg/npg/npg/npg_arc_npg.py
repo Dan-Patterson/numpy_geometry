@@ -32,12 +32,12 @@ Using da.SearchCursor to project data::
     import arcpy
     SR0 = arcpy.da.Describe(fc2)['spatialReference']
     SR1 = arcpy.SpatialReference(4326)
-    # ---- in its native projected coordinate system
+    # --   in its native projected coordinate system
     with arcpy.da.SearchCursor(
             fc2, ['SHAPE@X', 'SHAPE@Y'], spatial_reference=SR0,
             explode_to_points=False) as cur:
         a = cur._as_narray()
-    # ---- projected to a GCS
+    # --   projected to a GCS
     with arcpy.da.SearchCursor(
             fc2, ['SHAPE@X', 'SHAPE@Y'], spatial_reference=SR1,
             explode_to_points=False) as cur:
@@ -131,7 +131,7 @@ def get_shape_K(in_fc):
         return (kind, 0)
 
 
-# ---- featureclass geometry using...
+# ---- (1) featureclass geometry using...
 def _fc_shapes_(in_fc, with_id=True):
     """Return geometry from a featureclass as geometry objects."""
     flds = ["SHAPE@"]
@@ -171,7 +171,7 @@ def _fc_geo_interface_(in_fc, with_id=True):
     return a
 
 
-# ---- geojson and json geometry...
+# ---- (2) geojson and json geometry...
 def _json_geom_(pth):
     """Return polygon/polyline geometry from a geoJSON or JSON file.
 
@@ -200,7 +200,7 @@ def _json_geom_(pth):
 
 
 # ============================================================================
-# ---- (1) fc_to_Geo section
+# ---- (3) fc_to_Geo section
 # -- fc -> nparray -> Geo  uses FeatureClassToNumpyArray
 #
 # -- main function --
@@ -242,7 +242,7 @@ def fc_to_Geo(in_fc, geom_kind=2, minX=0, minY=0, sp_ref=None, info=""):
         """Clockwise check."""
         return 1 if _area_part_(a) > 0. else 0
 
-    # ---- (1) Foundational steps
+    # -- (1) Foundational steps
     # Create the array, extract the object id values.
     # To avoid floating point issues, extract the coordinates, round them to a
     # finite precision and shift them to the x-y origin
@@ -258,7 +258,7 @@ def fc_to_Geo(in_fc, geom_kind=2, minX=0, minY=0, sp_ref=None, info=""):
     mn = [np.min(xy['SHAPE@X']), np.min(xy['SHAPE@Y'])]
     mx = [np.max(xy['SHAPE@X']), np.max(xy['SHAPE@Y'])]
     extent = np.array([mn, mx])
-    # ---- shift if needed
+    # -- shift if needed
     dx, dy = mn
     if minX != 0.:
         dx = minX  # mn[0] - minX
@@ -269,18 +269,18 @@ def fc_to_Geo(in_fc, geom_kind=2, minX=0, minY=0, sp_ref=None, info=""):
     xy.dtype.names = ['X', 'Y']
     xy = repack_fields(xy)
     #
-    # ---- (2) Prepare the oid data for use in identifying from-to points.
+    # -- (2) Prepare the oid data for use in identifying from-to points.
     uniq, indx, cnts = np.unique(oids, True, return_counts=True)
     id_vals = oids[indx]
     indx = np.concatenate((indx, [a.shape[0]]))
     #
-    # ---- (3) Construct the IFT data using `id_fr_to` to carry the load.
+    # -- (3) Construct the IFT data using `id_fr_to` to carry the load.
     IFT_ = np.asarray(id_fr_to(xy, oids))
     cols = IFT_.shape[0]
     IFT = np.full((cols, 6), -1, dtype=np.int32)
     IFT[:, :3] = IFT_
     #
-    # ---- (4) clockwise check for polygon parts to identify outer/inner rings
+    # -- (4) clockwise check for polygon parts to identify outer/inner rings
     if kind == 2:  # polygons
         xy_arr = stu(xy)   # View the data as an unstructured array
         cl_wise = np.array([_cw_(xy_arr[i[1]:i[2]]) for i in IFT_])
@@ -288,7 +288,7 @@ def fc_to_Geo(in_fc, geom_kind=2, minX=0, minY=0, sp_ref=None, info=""):
         cl_wise = np.full_like(oids, -1)
     IFT[:, 3] = cl_wise
     #
-    # ---- (5) construct part_ids and pnt_nums
+    # -- (5) construct part_ids and pnt_nums
     if kind == 2:
         parts = [np.cumsum(IFT[:, 3][IFT[:, 0] == i]) for i in id_vals]
         part_ids = np.concatenate(parts)
@@ -303,7 +303,7 @@ def fc_to_Geo(in_fc, geom_kind=2, minX=0, minY=0, sp_ref=None, info=""):
     IFT[:, 4] = part_ids
     IFT[:, 5] = pnt_nums
     #
-    # ---- (6) Create the output array... as easy as ``a`` to ``z``
+    # -- (6) Create the output array... as easy as ``a`` to ``z``
     z = Geo(xy_arr, IFT, kind, Extent=extent, Info="test", SR=sp_ref)
     out = copy.deepcopy(z)
     return out
@@ -352,7 +352,7 @@ def id_fr_to(a, oids):
 
 
 # ============================================================================
-# ---- (2) Geo to arcpy shapes ----------------------------------------
+# ---- (4) Geo to arcpy shapes ----------------------------------------
 #
 def Geo_to_arc_shapes(geo, as_singlepart=True):
     """Create poly features from a Geo array.
@@ -385,7 +385,7 @@ def Geo_to_arc_shapes(geo, as_singlepart=True):
      (<Polygon object at 0x25f07f4d208[0x25f092324b8]>, 2),
      (<Polygon object at 0x25f07f4d4a8[0x25f0af15558]>, 3)]
     """
-    # ---- helper
+    # -- helper
     def arr2poly(a, SR):
         """Construct the poly feature from lists or arrays.
 
@@ -428,7 +428,7 @@ def Geo_to_arc_shapes(geo, as_singlepart=True):
 
 
 # ============================================================================
-# ---- (3) Geo to featureclass ----------------------------------------------
+# ---- (5) Geo to featureclass ----------------------------------------------
 def Geo_to_fc(geo, gdb=None, name=None, kind=None, SR=None):
     """Return a FeatureClass from a Geo array."""
     SR = SR
@@ -493,7 +493,7 @@ def view_poly(geo, id_num=1, view_as=2):
 
 
 # ============================================================================
-# ---- (4) attribute data
+# ---- (6) attribute data
 # Change FC <null> to a useful nodata value
 def make_nulls(in_fc, include_oid=True, int_null=-999):
     """Return null values for a list of fields objects.
@@ -540,7 +540,7 @@ def make_nulls(in_fc, include_oid=True, int_null=-999):
     fld_dict = {f.name: f.type for f in good}
     fld_names = list(fld_dict.keys())
     null_dict = {f: nulls[fld_dict[f]] for f in fld_names}
-    # ---- insert the OBJECTID field
+    # -- insert the OBJECTID field
     if include_oid and desc['hasOID']:
         oid_name = desc['OIDFieldName']
         oi = {oid_name: -999}
@@ -639,7 +639,7 @@ def fc2na(in_fc):
     return oids, a, xy
 
 
-# ---- (5) Geo or ndarrays to poly features
+# ---- (7) Geo or ndarrays to poly features
 #
 def array_poly(arr, p_type=None, sr=None, IFT=None):
     """Assemble poly features from Geo or ndarrays.
@@ -685,7 +685,7 @@ def array_poly(arr, p_type=None, sr=None, IFT=None):
         elif as_type.upper() == 'POLYLINE':
             poly = Polyline(Array(aa), SR)
         return poly
-    # ----
+    # --
     polys = []
     if hasattr(arr, "IFT"):
         from_to = arr.IFT[:, 1:3]
@@ -739,9 +739,9 @@ def geometry_fc(a, IFT, p_type=None, gdb=None, fname=None, sr=None):
 
 
 # ============================================================================
-# ---- (6) mini helpers -------------------------------------------------
+# ---- (8) mini helpers -------------------------------------------------
 #
-# ---- array to polygon/polyline
+# -- array to polygon/polyline
 #
 def _array_to_poly_(arr, SR=None, as_type="Polygon"):
     """Convert array-like objects to arcpy geometry.
@@ -754,7 +754,7 @@ def _array_to_poly_(arr, SR=None, as_type="Polygon"):
     arr : list-like
         A list of arrays representing the poly parts, or an object array.
     SR : spatial reference
-        Leave as None if not known.
+        Leave as None if not known.  Enclose in quotes. eg. "4326"
     as_type : text
         Polygon or Polyline.
 
@@ -776,7 +776,6 @@ def _array_to_poly_(arr, SR=None, as_type="Polygon"):
     return poly
 
 
-# ---- polygon/polyline to array
 def _poly_to_array_(polys):
     """Convert polyline or polygon shapes to arrays for use in numpy.
 
@@ -790,7 +789,7 @@ def _poly_to_array_(polys):
         sub = []
         pt = Point()  # arcpy.Point()
         for arr in poly:
-            pnts = [[pt.X, pt.Y] for pt in arr if pt]
+            pnts = [[p.X, p.Y] for p in arr if pt]
             sub.append(np.asarray(pnts, dtype='O'))
         return sub
     # ----
@@ -877,7 +876,7 @@ def _to_ndarray(in_fc, to_pnts=True):
 
 
 # ============================================================================
-# ---- (7) arcpy functions
+# ---- (9) arcpy functions
 def fc_union(in_fc, poly_type="polygon"):
     """Union features in a featureclass.
 
