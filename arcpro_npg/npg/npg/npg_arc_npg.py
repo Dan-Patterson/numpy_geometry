@@ -104,7 +104,7 @@ __all__ = [
     '_array_to_poly_', '_poly_to_array_',           # geometry to array
     '_poly_arr_', 'poly2array',                     # extras
     'fc_union', 'shp_dissolve', 'fc_dissolve'       # arcpy functions
-    ]   # '_del_none', '__geo_interface__', '_flat',
+]   # '_del_none', '__geo_interface__', '_flat',
 
 
 # ============================================================================
@@ -236,7 +236,7 @@ def fc_to_Geo(in_fc, geom_kind=2, minX=0, minY=0, sp_ref=None, info=""):
         x1, y0 = (a.T)[:, :-1]
         e0 = np.einsum('...i,...i->...i', x0, y0)
         e1 = np.einsum('...i,...i->...i', x1, y1)
-        return np.sum((e0 - e1)*0.5)
+        return np.sum((e0 - e1) * 0.5)
 
     def _cw_(a):
         """Clockwise check."""
@@ -498,7 +498,7 @@ def view_poly(geo, id_num=1, view_as=2):
 def make_nulls(in_fc, include_oid=True, int_null=-999):
     """Return null values for a list of fields objects.
 
-    Thes excludes objectid and geometry related fields.
+    This excludes objectid and geometry related fields.
     Throw in whatever else you want.
 
     Parameters

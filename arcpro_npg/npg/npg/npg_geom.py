@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# noqa: D205, D400
+# noqa: D205, D400, F403
 r"""
 ----------------------------------
 npg_geom: Geometry focused methods
@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2020-12-17
+    2021-02-26
 
 Purpose
 -------
@@ -134,9 +134,9 @@ from npg_helpers import (_get_base_, _bit_area_, _bit_min_max_,
 from npg_pip import np_wn
 
 np.set_printoptions(
-    edgeitems=10, linewidth=100, precision=3, suppress=True, threshold=200,
+    edgeitems=10, linewidth=100, precision=2, suppress=True, threshold=200,
     formatter={"bool": lambda x: repr(x.astype(np.int32)),
-               "float_kind": '{: 7.3f}'.format})
+               "float_kind": '{: 6.2f}'.format})
 np.ma.masked_print_option.set_display('-')  # change to a single -
 
 script = sys.argv[0]  # print this should you need to locate the script
@@ -150,19 +150,49 @@ __all__ = [
     'polys_to_segments', 'polys_to_unique_pnts', 'repack_fields',
     'scale_by_area', 'script', 'segments_to_polys', 'simplify_lines', 'stu',
     'triangulate_pnts', 'uts'
-    ]
+]
 
 __helpers__ = [
-    '__helpers__', '_angles_3pnt_', '_bit_area_', '_bit_min_max_', '_ch_',
+    '_angles_3pnt_', '_bit_area_', '_bit_min_max_', '_ch_',
     '_ch_scipy_', '_ch_simple_', '_dist_along_', '_e_2d_', '_get_base_',
-    '_in_extent_', '_is_pnt_on_line_', '_percent_along_', '_pnt_on_poly_',
-    '_pnt_on_segment_', '_pnts_on_line_'
-    ]
+    '_in_extent_', '_is_pnt_on_line_', '_percent_along_',
+    '_closest_pnt_on_poly_', '_pnt_on_segment_', '_add_pnts_on_line_'
+]
 
 __all__ = __helpers__ + __all__
 
 
 # ===========================================================================
+# ---- general helpers
+def _view_as_struct_(a, return_all=False):
+    """Key function to get uniform 2d arrays to be viewed as structured arrays.
+
+    A bit of trickery, but it works for all set-like functionality.
+    Use ``uts`` for more complicated dtypes.
+
+    Parameters
+    ----------
+    a : array
+        Geo array or ndarray to be viewed.
+
+    Returns
+    -------
+    Array view as structured/recarray, with shape = (N, 1)
+
+    References
+    ----------
+    See `unstructured_to_structured` in... numpy/lib/recfunctions.py
+
+    >>> from numpy.lib.recfunctions import unstructured_to_structured as uts
+    """
+    shp = a.shape
+    dt = a.dtype
+    a_view = a.view(dt.descr * shp[1])[..., 0]
+    if return_all:
+        return a_view, shp, dt
+    return a_view
+
+
 # ---- (1) distance helpers
 #
 def _e_2d_(a, p):
@@ -276,7 +306,7 @@ def _is_pnt_on_line_(start, end, xy, tolerance=0.0):
     return False
 
 
-def _pnts_on_line_(a, spacing=1, is_percent=False):  # densify by distance
+def _add_pnts_on_line_(a, spacing=1, is_percent=False):  # densify by distance
     """Add points, at a fixed spacing, to an array representing a line.
 
     **See**  `densify_by_distance` for documentation.
@@ -348,10 +378,10 @@ def _pnt_on_segment_(pnt, seg):
     return xy, np.hypot(d[0], d[1])
 
 
-def _pnt_on_poly_(pnt, poly):
+def _closest_pnt_on_poly_(pnt, poly):
     """Find closest point location on a polygon/polyline.
 
-    See : `p_o_p` for batch running of multiple points to a polygon.
+    See : `pnts_on_poly` for batch running of multiple points to a polygon.
 
     Parameters
     ----------
@@ -363,13 +393,13 @@ def _pnt_on_poly_(pnt, poly):
 
     Requires
     --------
-    ``_e_2d_`` from above is required
+    ``_e_2d_`` is required
 
     Returns
     -------
-    A list of [x, y, distance, angle] for the intersection point on the line.
-    The angle is relative to north from the origin point to the point on the
-    polygon.
+    A list of [(x0, y0), (x1, y1), distance, angle] values for the from point
+    and the intersection point on the line. The angle is relative to north
+    from the origin point to the point on the polygon.
 
     Notes
     -----
@@ -406,7 +436,7 @@ def _pnt_on_poly_(pnt, poly):
     # -- determine the distances
     d = _e_2d_(poly, pnt)   # abbreviated edist =>  d = e_dist(poly, pnt)
     key = np.argsort(d)[0]  # dist = d[key]
-    if key == 0:  # np.vstack((poly[-1:], poly[:3]))
+    if key == 0:            # np.vstack((poly[-1:], poly[:3]))
         seg = np.concatenate((poly[-1:], poly[:3]), axis=0)
     elif (key + 1) >= len(poly):  # np.vstack((poly[-2:], poly[:1]))
         seg = np.concatenate((poly[-2:], poly[:1]), axis=0)
@@ -430,7 +460,15 @@ def _pnt_on_poly_(pnt, poly):
 
 
 def find_closest(a, pnt):
-    """Find the closest point within a Geo array, its index and distance."""
+    """Find the closest point within a Geo array, its index and distance.
+
+    See Also
+    --------
+    ``closest_pnt_on_poly`` is used for point on poly* features and includes
+    any required projection onto their edges for the new point feature.
+
+    ``_pnt_on_segment_`` is similar but does point placement.
+    """
     dist = _e_2d_(a, pnt)
     idx = np.argmin(dist)
     return np.asarray(a[idx]), idx, dist[idx]
@@ -614,7 +652,7 @@ def densify_by_distance(a, spacing):
     `<https://stackoverflow.com/questions/51512197/python-equidistant-points
     -along-a-line-joining-set-of-points/51514725>`_.
     """
-    return _pnts_on_line_(a, spacing)
+    return _add_pnts_on_line_(a, spacing)
 
 
 # ----------------------------------------------------------------------------
@@ -702,7 +740,7 @@ def offset_buffer(poly, buff_dist=1, keep_holes=False, asGeo=False):
         segs = []
         bit = np.array(bit)
         for i in range(bit.shape[0] - 1):
-            x1, y1, x2, y2 = *bit[i], *bit[i+1]
+            x1, y1, x2, y2 = *bit[i], *bit[i + 1]
             r = buff_dist / np.hypot(x2 - x1, y2 - y1)
             vx, vy = (x2 - x1) * r, (y2 - y1) * r
             pnt0 = (x1 - vy, y1 + vx)
@@ -724,7 +762,7 @@ def offset_buffer(poly, buff_dist=1, keep_holes=False, asGeo=False):
         p0 = poly[:-1]
         p1 = poly[1:]
         diff = p1 - p0
-        r = buff_dist/np.sqrt(np.einsum('ij,ij->i', diff, diff))
+        r = buff_dist / np.sqrt(np.einsum('ij,ij->i', diff, diff))
         vy_vx = (diff * r[:, None] * [1, -1])[:, ::-1]
         pnts0 = p0 + vy_vx
         pnts1 = p1 + vy_vx
@@ -934,7 +972,8 @@ def polys_to_unique_pnts(a, as_structured=True):
     Allows for recreation of original point order and unique points.
     Structured arrays is used for sorting.
     """
-    uni, idx, cnts = np.unique(uts(a), return_index=True,
+    a = _view_as_struct_(a)  # replace `uts` with an abbreviated version
+    uni, idx, cnts = np.unique(a, return_index=True,
                                return_counts=True, axis=0)
     uni = stu(uni)
     if as_structured:
@@ -988,7 +1027,7 @@ def polys_to_segments(self, as_basic=True, to_orig=False, as_3d=False):
     if as_3d:
         fr_to = fr_to[:, :4]
         s0, s1 = fr_to.shape
-        return fr_to.reshape(s0, s1//2, s1//2)
+        return fr_to.reshape(s0, s1 // 2, s1 // 2)
     # -- structured array section
     # add bit ids and lengths to the output array
     b_ids = self.IFT
@@ -1057,10 +1096,10 @@ def pnts_in_pnts(pnts, geo, just_common=True):
 
 
 def pnts_on_poly(pnts, poly):
-    """Run multiple `_pnt_on_poly_`."""
+    """Run multiple `_closest_pnt_on_poly_`."""
     result = []
     for p in pnts:
-        result.append(_pnt_on_poly_(p, poly))
+        result.append(_closest_pnt_on_poly_(p, poly))
     result = np.asarray(result)
     dt = [('X0', '<f8'), ('Y0', '<f8'), ('X1', '<f8'), ('Y1', '<f8'),
           ('Dist', '<f8'), ('Angle', '<f8')]

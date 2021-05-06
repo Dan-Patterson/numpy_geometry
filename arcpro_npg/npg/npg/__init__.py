@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# noqa: E401, D205, D400, F401
+# noqa: E401, D205, D400, F401, F403
 # pylint: disable=C0410
 r"""
 npg  NumPy Geometry
@@ -19,7 +19,7 @@ Author :
 - Dan_Patterson@carleton.ca
 - https://github.com/Dan-Patterson
 
-Modified : 2020-10-07
+Modified : 2021-05-02
     Creation date during 2019 as part of ``arraytools``.
 
 Purpose
@@ -96,6 +96,7 @@ import npGeo
 import npg_helpers
 import npg_pip
 import npg_geom
+import npg_clip
 import npg_min_circ
 import npg_overlay
 import npg_analysis
@@ -116,6 +117,7 @@ from npGeo import *
 from npg_helpers import *
 from npg_pip import *
 from npg_geom import *
+from npg_clip import *
 from npg_min_circ import *
 from npg_overlay import *
 from npg_analysis import *
@@ -144,15 +146,22 @@ from npg_utils import *
 
 # ---- define __all__
 __all__ = [
-    'npgDocs', 'npGeo', 'npg_io', 'npg_geom', 'npg_helpers', 'npg_overlay',
-    'npg_table', 'npg_create', 'npg_analysis', 'npg_utils',
+    'npgDocs', 'npGeo', 'npg_io', 'npg_geom', 'npg_clip', 'npg_helpers',
+     'npg_overlay', 'npg_table', 'npg_create', 'npg_analysis', 'npg_utils',
     'npg_setops', 'npg_helpers', 'npg_min_circ'
 ]
+
+__helpers__ = [
+    'npGeo_doc', 'Geo_hlp', 'array_IFT_doc', 'dirr_doc', 'shapes_doc',
+    'parts_doc', 'outer_rings_doc', 'inner_rings_doc', 'get_shapes_doc',
+    'sort_by_extent_doc', 'radial_sort_doc'
+    ]
 
 __all__.extend(npgDocs.__all__)
 __all__.extend(npGeo.__all__)
 __all__.extend(npg_io.__all__)
 __all__.extend(npg_geom.__all__)
+__all__.extend(npg_clip.__all__)
 __all__.extend(npg_prn.__all__)
 __all__.extend(npg_pip.__all__)
 __all__.extend(npg_helpers.__all__)
@@ -164,8 +173,9 @@ __all__.extend(npg_setops.__all__)
 # __all__.extend(npg_min_circ.__all__)
 __all__.sort()
 
-__helpers__ = npg_helpers.__helpers__
+__helpers__.extend(npg_helpers.__helpers__)
 __helpers__.extend(npg_geom.__helpers__)
+__helpers__.extend(npg_clip.__helpers__)
 __helpers__.extend(npg_analysis.__helpers__)
 __helpers__.extend(npg_overlay.__helpers__)
 __helpers__.sort()

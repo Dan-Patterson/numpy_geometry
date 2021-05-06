@@ -19,7 +19,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2020-12-20
+    2021-05-04
 
 Purpose
 -------
@@ -35,7 +35,7 @@ npGeo :
     ``.../npgeom/npGeo``.
 
 """
-# pylint: disable=C0103, C0302, C0330, C0415
+# pylint: disable=C0103, C0302, C0415
 # pylint: disable=E0611, E1101, E1136, E1121
 # pylint: disable=R0902, R0904, R0914
 # pylint: disable=W0105, W0201, W0212, W0221, W0612, W0614, W0621, W0105
@@ -44,17 +44,21 @@ import sys
 from textwrap import indent, dedent
 import numpy as np
 
-import npGeo
+# import npGeo
+
+import npg_helpers as n_h
+# from npg_helpers import shape_finder
 
 # ---- Keep for now.
-# from numpy.lib.recfunctions import structured_to_unstructured as stu
+from numpy.lib.recfunctions import structured_to_unstructured as stu
 # from numpy.lib.recfunctions import unstructured_to_structured as uts
 # import npGeo
 # from npGeo import *
 
+
 # ---- Constants -------------------------------------------------------------
 #
-script = sys.argv[0]
+script = sys.argv[0]  # print this should you need to locate the script
 
 FLOATS = np.typecodes['AllFloat']
 INTS = np.typecodes['AllInteger']
@@ -64,12 +68,11 @@ NUMS = FLOATS + INTS
 ft = {'bool': lambda x: repr(x.astype(np.int32)),
       'float_kind': '{: 7.2f}'.format}
 np.set_printoptions(
-    edgeitems=10, linewidth=160, precision=2, suppress=True,
-    threshold=100, formatter=ft
-    )
+    edgeitems=5, linewidth=120, precision=2, suppress=True, threshold=100,
+    formatter=ft)
 
-__all__ = ['prn_q', 'prn_', 'prn_tbl', 'prn_geo', 'prn_as_obj',
-           'prn_Geo_shapes', '_svg']
+__all__ = ['prn_q', 'prn_', 'prn_tbl', 'prn_geo', 'prn_lists', 'prn_arrays',
+           'prn_as_obj', 'prn_Geo_shapes', '_svg']
 
 
 # ============================================================================
@@ -128,8 +131,8 @@ def _col_format(pairs, deci):
 #
 def col_hdr(num=8):
     """Print numbers from 1 to 10*num to show column positions."""
-    args = [(('{:<10}')*num).format(*'0123456789'),
-            '0123456789'*num, '-'*10*num]
+    args = [(('{:<10}') * num).format(*'0123456789'),
+            '0123456789' * num, '-' * 10 * num]
     s = "\n{}\n{}\n{}".format(args[0][1:], args[1][1:], args[2])  # *args)
     print(s)
 
@@ -138,7 +141,7 @@ def make_row_format(dim=3, cols=5, a_kind='f', deci=1,
                     a_max=10, a_min=-10, width=100, prnt=False):
     """Format the row based on input parameters.
 
-    dim - int
+    dim : int
         Number of dimensions.
     cols : int
         Columns per dimension.
@@ -152,16 +155,16 @@ def make_row_format(dim=3, cols=5, a_kind='f', deci=1,
     m_fmt = max(len(m_.format(a_max, deci)), len(m_.format(a_min, deci))) + 1
     w_fmt = w_.format(m_fmt, deci)
     suffix = '  '
-    while m_fmt*cols*dim > width:
+    while m_fmt * cols * dim > width:
         cols -= 1
         suffix = '.. '
-    row_sub = (('{' + w_fmt + '}')*cols + suffix)
-    row_frmt = (row_sub*dim).strip()
+    row_sub = (('{' + w_fmt + '}') * cols + suffix)
+    row_frmt = (row_sub * dim).strip()
     if prnt:
         frmt = "Row format: dim cols: ({}, {})  kind: {} decimals: {}\n\n{}"
         print(dedent(frmt).format(dim, cols, a_kind, deci, row_frmt))
-        a = np.random.randint(a_min, a_max+1, dim*cols)
-        col_hdr(width//10)  # run col_hdr to produce the column headers
+        a = np.random.randint(a_min, a_max + 1, dim * cols)
+        col_hdr(width // 10)  # run col_hdr to produce the column headers
         print(row_frmt.format(*a))
     else:
         return row_frmt
@@ -185,14 +188,14 @@ def prn_(a, deci=2, width=120, prefix=". . "):
         block = np.hstack([sub[j] for j in range(s0)])
         txt = ""
         if i is not None:
-            fr = ("({}" + ", {}"*len(a.shape[1:]) + ")\n")
+            fr = ("({}" + ", {}" * len(a.shape[1:]) + ")\n")
             txt = fr.format(i, *sub.shape)
         for line in block:
             ln = frmt.format(*line)[:linewidth]
             end = ["\n", "...\n"][len(ln) >= linewidth]
-            txt += indent(ln + end, ". . ")
+            txt += indent(ln + end, prefix)
         return txt
-    # ---- main section ----
+    # -- main section ----
     # out = "\n{}... ndim: {}  shape: {}\n".format(title, a.ndim, a.shape)
     out = "\n"
     linewidth = width
@@ -200,7 +203,7 @@ def prn_(a, deci=2, width=120, prefix=". . "):
         return a
     if a.ndim == 2:
         a = a.reshape((1,) + a.shape)
-    # ---- pull the 1st and 3rd dimension for 3D and 4D arrays
+    # -- pull the 1st and 3rd dimension for 3D and 4D arrays
     frmt = make_row_format(dim=a.shape[-3],
                            cols=a.shape[-1],
                            a_kind=a.dtype.kind,
@@ -224,7 +227,7 @@ def prn_(a, deci=2, width=120, prefix=". . "):
 
 
 def prn_tbl(a, rows_m=20, names=None, deci=2, width=75):
-    """Format a structured array with a mixed dtype.
+    """Print and format a structured array with a mixed dtype.
 
     Parameters
     ----------
@@ -246,7 +249,7 @@ def prn_tbl(a, rows_m=20, names=None, deci=2, width=75):
     Alternate formats and information in `g.info` and `g.structure()` where
     `g` in a geo array.
     """
-    # ----
+    # --
     if hasattr(a, "IFT"):  # geo array
         a = a.IFT_str
     dtype_names = a.dtype.names
@@ -255,17 +258,17 @@ def prn_tbl(a, rows_m=20, names=None, deci=2, width=75):
         return None
     if names is None:
         names = dtype_names
-    # ---- slice off excess rows, stack upper and lower slice using rows_m
+    # -- slice off excess rows, stack upper and lower slice using rows_m
     if a.shape[0] > rows_m * 2:
         a = np.hstack((a[:rows_m], a[-rows_m:]))
-    # ---- get the column formats from ... _ckw_ and _col_format ----
+    # -- get the column formats from ... _ckw_ and _col_format ----
     pairs = [_ckw_(a[name], name, deci) for name in names]  # -- column info
     dts, wdths = _col_format(pairs, deci)                   # format column
-    # ---- slice off excess columns
+    # -- slice off excess columns
     c_sum = np.cumsum(wdths)               # -- determine where to slice
     N = len(np.where(c_sum < width)[0])    # columns that exceed ``width``
     a = a[list(names[:N])]
-    # ---- Assemble the formats and print
+    # -- Assemble the formats and print
     tail = ['', ' ...'][N < len(names)]
     row_frmt = "  ".join([('{' + i + '}') for i in dts[:N]])
     hdr = ["!s:<" + "{}".format(wdths[i]) for i in range(N)]
@@ -281,11 +284,12 @@ def prn_tbl(a, rows_m=20, names=None, deci=2, width=75):
             txt.append(t)
     msg = "\n".join(txt)
     print(msg)
+    return None
     # return row_frmt, hdr2  # uncomment for testing
 
 
 def prn_geo(a, rows_m=100, names=None, deci=2, width=75):
-    """Format a structured array with a mixed dtype.
+    """Print and format a structured array with a mixed dtype.
 
     Derived from arraytools.frmts and the prn_rec function therein.
 
@@ -344,45 +348,132 @@ def prn_geo(a, rows_m=100, names=None, deci=2, width=75):
         txt.append(row_frmt.format(i, c[i], pp[i], a[i, 0], a[i, 1]))
     msg = "\n".join(txt)
     print(msg)
+    return None
     # return row_frmt, hdr2  # uncomment for testing
 
 
 # ----  (2) print & display Geo and ndarrays
 #
-def prn_as_obj(self, full=False):
-    """Print the Geo array as an object array."""
-    if hasattr(self, "IFT"):
-        arrs = self.as_arrays()
-        ids = np.unique(self.IDs)
-    else:
-        arrs = self
-        ids = np.arange(len(arrs))
-    fmt = [str(arr).replace("([", "\n"+" "*7) for arr in arrs]
-    if full:
-        self.structure()
-    else:
-        print("\nArray structure by sub-array.")
-    fr_to = [["[", " "],
-             ["]]", ""],
-             ["]", ""],
-             ["(", ""],
-             [",\n", "\n"],
-             [")", "\n"],
-             [", dtype=object", ""]
-             ]
-    for i, z in enumerate(fmt):
-        for fr, to in fr_to:
-            z = z.replace(fr, to)
-            z = z.rstrip()
-        print("\n...{}\n{}".format(ids[i], z))
+def prn_lists(a, max_=None, prn_structure=False):
+    """Print nested lists as string.
+
+    See Also
+    --------
+    ``npg_helpers.shape_finder`` to print or return the structure of the nested
+    structure.
+    """
+    if prn_structure:
+        n_h.shape_finder(a, prn=True)
+    if max_ is None:
+        max_ = 70
+    for i, v in enumerate(a):
+        print(f"\n({i})...")
+        for j in v:
+            vals = repr(j).split("],")
+            for val in vals:
+                val = "{}]".format(val)
+                s_len = len(val)
+                ending = ["", " ..."][s_len > max_]
+                print("{}{}".format(indent(val[:max_], "   "), ending))
+    # return
+
+
+def prn_arrays(a, edgeitems=2):
+    """Print a different representation of object or ndarrays.
+
+    The expectation is that the array has nested objects or ndim is > 3:
+    edgeitems, threshold : integer
+        This is on a per sub array basis.
+    """
+    def _ht_(a, _e):
+        """Print 2d array."""
+        head = repr(a[:_e].tolist())[:-1]
+        tail = repr(a[-_e:].tolist())[1:]
+        return head, tail
+
+    _e = edgeitems
+    s = n_h.shape_finder(a)
+    u, cnts = np.unique(s[['shape', 'part']], return_counts=True)
+    s0 = stu(u)
+    N = np.arange(len(s0))
+    tb = " ... "
+    for cnt in N:
+        i, j = s0[cnt]
+        sub = a[i]
+        if sub.ndim == 2:
+            head, tail = _ht_(sub, _e)
+            print("\n({},{},0) {}{}{}".format(i, j, head, tb, tail))
+        else:
+            sub = sub[j]
+            if sub.ndim == 2:
+                head, tail = _ht_(sub, _e)
+                print("\n({},{},0) {}{}{}".format(i, j, head, tb, tail))
+            else:
+                print("\n({},{},.)".format(i, j))
+                for k, val in enumerate(sub):
+                    head, tail = _ht_(val, _e)
+                    ht = head + " ... " + tail
+                    print("     {} - {}".format(k, ht))  # val.tolist()))
     return
 
 
-def prn_Geo_shapes(self, ids=None):
+def prn_as_obj(arr, full=False):
+    """Print Geo or ndarray as an object array. Lists use _nested_lists_.
+
+    Parameters
+    ----------
+    arr : array-like
+        Geo or ndarray.  If nested lists are used, the ``_nested_lists_`` is
+        used.
+    full : boolean
+        If the input is a Geo array, then its structure is printed as well.
+
+    Requires
+    --------
+    ``prn_nested_lists`` for optional printing of nested lists.
+    """
+    if hasattr(arr, "IFT"):
+        arrs = arr.as_arrays()
+        # ids = np.unique(arr.IDs)
+    elif isinstance(arr, np.ndarray):
+        arrs = arr
+        # ids = np.arange(len(arrs))
+    else:
+        return prn_lists(arr)
+    #
+    # fmt = [repr(arr).replace("([", "\n"+" "*7) for arr in arrs]
+    fmt = [repr(arr) for arr in arrs]
+    if full and hasattr(arr, "IFT"):
+        arr.structure()
+    else:
+        print("\nArray structure by sub-array.")
+# =============================================================================
+#     fr_to = [["[", " "],
+#              ["]]", ""],
+#              ["]", ""],
+#              ["(", ""],
+#              [",\n", "\n"],
+#              [")", "\n"],
+#              [", dtype=object", ""]
+#              ]
+# =============================================================================
+    with np.printoptions(precision=2):
+        for i, z in enumerate(fmt):
+            print("{}...\n{}".format(i, z))
+# =============================================================================
+#         for fr, to in fr_to:
+#             z = z.replace(fr, to)
+#             z = z.rstrip()
+#         print("\n...{}\n{}".format(ids[i], z))
+# =============================================================================
+    return None
+
+
+def prn_Geo_shapes(arr, ids=None):
     """Print all shapes if ``ids=None``, otherwise, provide an id list."""
-    cases = self.IFT[:, 0]
+    cases = arr.IFT[:, 0]
     if ids is None:
-        ids = self.IFT[0]
+        ids = arr.IFT[0]
         w = np.isin(cases, cases)
     elif isinstance(ids, (list, tuple)):
         w = np.isin(cases, ids)
@@ -391,20 +482,23 @@ def prn_Geo_shapes(self, ids=None):
     if np.sum(w) == 0:
         print("\nRecord ID not found...\n")
         return None
-    rows = self.IFT[w]
-    hdr = "ID   : Shape ID by part\nring : outer 1, inner 0\n"
-    hdr += "ID  ring        x       y\n"
+    rows = arr.IFT[w]
+    hdr = "ID : Shape ID by part\nR  : ring, outer 1, inner 0\n" + \
+          "P  : part 1 or more\n"
+    hdr += " ID  R  P      x       y\n"
     for i, row in enumerate(rows):
-        sub = self[row[1]:row[2]]
-        s0 = "{: 3.0f} {: 3.0f}  {!s:}\n".format(row[0], row[3], sub[0])
+        sub = arr[row[1]:row[2]]
+        args = [row[0], row[3], row[4], sub[0]]
+        s0 = "{: 3.0f}{: 3.0f}{: 3.0f}  {!s:}\n".format(*args)
         s1 = ""
         for j in sub[1:]:
-            s1 += "{} {}\n".format(" "*8, j)
+            s1 += "{} {}\n".format(" " * 10, j)
         hdr += s0 + s1
     print(hdr)
+    return None
 
 
-def _svg(self, as_polygon=True):
+def _svg(arr, as_polygon=True):
     """Format and show a Geo array, np.ndarray or list structure in SVG format.
 
     Notes
@@ -422,49 +516,49 @@ def _svg(self, as_polygon=True):
     def svg_path(g_bits, scale_by, o_f_s):
         """Make the svg from a list of 2d arrays."""
         opacity, fill_color, stroke = o_f_s
-        pth = [" M {},{} " + "L {},{} "*(len(b) - 1) for b in g_bits]
+        pth = [" M {},{} " + "L {},{} " * (len(b) - 1) for b in g_bits]
         ln = [pth[i].format(*b.ravel()) for i, b in enumerate(g_bits)]
         pth = "".join(ln) + "z"
         s = ('<path fill-rule="evenodd" fill="{0}" stroke="{1}" '
              'stroke-width="{2}" opacity="{3}" d="{4}"/>'
              ).format(fill_color, stroke, 1.5 * scale_by, opacity, pth)
         return s
-    # ----
+    # --
     msg0 = "\nImport error..\n>>> from IPython.display import SVG\nfailed."
     msg1 = "A Geo array or ndarray (with ndim >=2) is required."
-    # ----
+    # --
     # Geo array, np.ndarray check
     try:
         from IPython.core.display import SVG  # 2020-07-02
     except ImportError:
         print(dedent(msg0))
         return None
-    # ---- checks for Geo or ndarray. Convert lists, tuples to np.ndarray
-    if isinstance(self, (list, tuple)):
+    # -- checks for Geo or ndarray. Convert lists, tuples to np.ndarray
+    if isinstance(arr, (list, tuple)):
         dt = "float"
-        leng = [len(i) for i in self]
+        leng = [len(i) for i in arr]
         if min(leng) != max(leng):
             dt = "O"
-        self = np.asarray(self, dtype=dt)
+        arr = np.asarray(arr, dtype=dt)
     # if ('Geo' in str(type(g))) & (issubclass(g.__class__, np.ndarray)):
-    if hasattr(self, "IFT"):
+    if hasattr(arr, "IFT"):
         GA = True
-        g_bits = self.bits
-        L, B = self.min(axis=0)
-        R, T = self.max(axis=0)
-    elif isinstance(self, np.ndarray):
+        g_bits = arr.bits
+        L, B = arr.min(axis=0)
+        R, T = arr.max(axis=0)
+    elif isinstance(arr, np.ndarray):
         GA = False
-        if self.ndim == 2:
-            g_bits = [self]
-            L, B = self.min(axis=0)
-            R, T = self.max(axis=0)
-        elif self.ndim == 3:
-            g_bits = [self[i] for i in range(self.shape[0])]
-            L, B = self.min(axis=(0, 1))
-            R, T = self.max(axis=(0, 1))
-        elif self.dtype.kind == 'O':
+        if arr.ndim == 2:
+            g_bits = [arr]
+            L, B = arr.min(axis=0)
+            R, T = arr.max(axis=0)
+        elif arr.ndim == 3:
+            g_bits = [arr[i] for i in range(arr.shape[0])]
+            L, B = arr.min(axis=(0, 1))
+            R, T = arr.max(axis=(0, 1))
+        elif arr.dtype.kind == 'O':
             g_bits = []
-            for i, b in enumerate(self):
+            for i, b in enumerate(arr):
                 b = np.array(b)
                 if b.ndim == 2:
                     g_bits.append(b)
@@ -480,18 +574,18 @@ def _svg(self, as_polygon=True):
     else:
         print(msg1)
         return None
-    # ----
+    # --
     # derive parameters
     if as_polygon:
         o_f_s = ["0.75", "red", "black"]  # opacity, fill_color, stroke color
     else:
         o_f_s = ["1.0", "none", "red"]
-    # ----
+    # --
     d_x, d_y = (R - L, T - B)
     hght = min([max([150., d_y]), 200])  # ---- height 150 to 200
-    width = int(d_x/d_y * hght)
+    width = int(d_x / d_y * hght)
     scale_by = max([d_x, d_y]) / max([width, hght])
-    # ----
+    # --
     # derive the geometry path
     pth_geom = svg_path(g_bits, scale_by, o_f_s)  # ---- svg path string
     # construct the final output
@@ -504,8 +598,8 @@ def _svg(self, as_polygon=True):
     f2 = '<g transform="{}">{}</g></svg>'.format(transform, pth_geom)
     s = hdr + f0 + f1 + f2
     if GA:  # Geo array display
-        self.SVG = s
-        return SVG(self.SVG)  # plot the representation
+        arr.SVG = s
+        return SVG(arr.SVG)  # plot the representation
     return SVG(s)  # np.ndarray display
 
 

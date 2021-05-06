@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# noqa: D205, D400
+# noqa: D205, D400, F403
 r"""
 ---------
 npg_table
@@ -14,7 +14,7 @@ Script :
 Author :
     Dan_Patterson@carleton.ca
 Modified :
-    2020-03-31
+    2021-05-02
 
 Purpose
 -------
@@ -84,10 +84,11 @@ import numpy.lib.recfunctions as rfn
 import npg_io
 import npg_arc_npg
 
+ft = {"bool": lambda x: repr(x.astype(np.int32)),
+      "float_kind": '{: 6.2f}'.format}
 np.set_printoptions(
-    edgeitems=10, linewidth=120, precision=3, suppress=True, threshold=200,
-    formatter={"bool": lambda x: repr(x.astype(np.int32)),
-               "float_kind": '{: 7.3f}'.format})
+    edgeitems=10, linewidth=120, precision=2, suppress=True, threshold=200,
+    formatter=ft)
 np.ma.masked_print_option.set_display("-")  # change to a single -
 
 script = sys.argv[0]  # print this should you need to locate the script
@@ -177,7 +178,10 @@ def struct2nd(a):
     uniform dtype (e.g "f8").  For example, coordinate values in the form
     ``dtype([("X", "<f8"), ("Y", "<f8")])`` maybe with a Z.
 
-    See ``structured_to_unstructured`` in np.lib.recfunctions and the imports.
+    See Also
+    --------
+    ``structured_to_unstructured`` in np.lib.recfunctions and the imports.
+    ``_view_as_struct_`` in `np_geom` as well
     """
     return a.view((a.dtype[0], len(a.dtype.names)))  # alternate to stu
 
@@ -300,7 +304,7 @@ def keep_fields_by_name(in_arr, names):
 
     Notes
     -----
-    simplified from ``recursively_fill_fields`` in
+    Simplified from ``recursively_fill_fields`` in
     `<https://github.com/numpy/numpy/blob/master/numpy/lib/recfunctions.py>`_.
     """
     newdtype = [(n, in_arr.dtype[n]) for n in names]
@@ -384,7 +388,7 @@ def merge_arrays(a, others):
 
 
 # ---- Crosstabulation tools -------------------------------------------------
-# ---- fancy print/string formatter for crosstabulation and pivot
+# -- fancy print/string formatter for crosstabulation and pivot
 def _prn(r, c, a, stat_name="Total"):
     """Fancy print formatting."""
     r = r.tolist()
@@ -394,7 +398,7 @@ def _prn(r, c, a, stat_name="Total"):
     r_sze = max(max([len(str(i)) for i in r]), 8)
     c_sze = [max(len(str(i)), 5) for i in c]
     f_0 = "{{!s:<{}}} ".format(r_sze)
-    f_1 = ("{{!s:>{}}} "*len(c)).format(*c_sze)
+    f_1 = ("{{!s:>{}}} " * len(c)).format(*c_sze)
     frmt = f_0 + f_1
     hdr = "Result" + "_" * (r_sze - 7)
     txt = [frmt.format(hdr, *c)]
@@ -550,7 +554,7 @@ def calc_stats(arr, axis=None, deci=4):
 
     >>> np.nansum(b, axis=0)   # by column
     >>> np.nansum(b, axis=1)   # by row
-    >>> c_nan = np.count_nonzero(~np.isnan(b), axis=0) count nan if needed
+    >>> c_nan = np.count_nonzero(~np.isnan(b), axis=0)  # count nan if needed
 
     [1, 0][True]  # ax = [1, 0][colwise]  colwise= True
     """
@@ -582,7 +586,7 @@ def calc_stats(arr, axis=None, deci=4):
     n_med = np.nanmedian(a, axis=ax)
     n_std = np.nanstd(a, axis=ax)
     n_var = np.nanvar(a, axis=ax)
-    s = [N, N-cnt, n_sum, n_min, n_max, n_mean, n_med, n_std, n_var]
+    s = [N, N - cnt, n_sum, n_min, n_max, n_mean, n_med, n_std, n_var]
     s = [np.around(i, deci) for i in s]
     return s
 
@@ -636,7 +640,7 @@ def col_stats(a, fields=None, deci=2, verbose=False):
     if isinstance(fields, str):
         fields = [fields]
     num_flds = _get_numeric_fields(a, fields)
-    # ---- made it thus far
+    # -- made it thus far
     if len(num_flds) == 0:
         num_flds = ["array"]
         s_lst = [calc_stats(a.ravel(), axis=None, deci=deci)]
@@ -653,7 +657,7 @@ def col_stats(a, fields=None, deci=2, verbose=False):
         fld = num_flds[i]
         z[fld] = s_lst[i]
     if verbose:
-        args = ["="*25, "Numeric fields"]
+        args = ["=" * 25, "Numeric fields"]
         print("\n{}\nStatistics for... a\n{!s:>32}".format(*args))
         npg_io.prn_tbl(z)
     return z
@@ -692,7 +696,7 @@ def group_stats(a, case_fld=None, num_flds=None, deci=2, verbose=False):
             sub = a[a[case_fld] == u]
             z = col_stats(sub, fields=num_flds, deci=deci)
             if verbose:
-                args = ["="*25, u, "Numeric fields"]
+                args = ["=" * 25, u, "Numeric fields"]
                 print("\n{}\nStatistics for... a[{}]\n{!s:>32}".format(*args))
                 npg_io.prn_tbl(z)
             results.append([u, z])
@@ -757,7 +761,7 @@ def find_a_in_b(a, b, fld_names=None):
     if a_names is not None:
         small = struct2nd(a)
     big = b[fld_names]
-    big = struct2nd(big)  # ---- call to struct2nd or `stu`
+    big = struct2nd(big)  # -- call to struct2nd or `stu`
     if a.ndim == 1:  # last slice, if  [:2] instead, it returns both indices
         indices = np.where((big == small).all(-1))[0]
     elif a.ndim == 2:
@@ -785,11 +789,12 @@ def find_in(a, col, what, where="in", any_case=True, pull="all"):
     extract : text or list
         - `all`,  extracts all records where the column case is found
         - `list`, extracts the records for only those fields in the list
+
     Example
     -------
     >>> find_text(a, col=`FULLNAME`, what=`ABBEY`, pull=a.dtype.names[:2])
     """
-    # ---- error checking section ----
+    # -- error checking section ----
     e0 = """
     Query error: You provided...
     dtype: {}  col: {} what: {}  where: {}  any_case: {}  extract: {}
@@ -813,7 +818,7 @@ def find_in(a, col, what, where="in", any_case=True, pull="all"):
         if sum(r) != len(r):
             print(err1.format(pull, names))
             return None
-    # ---- query section
+    # -- query section
     # convert column values and query to lowercase, if text, then query
     c = a[col]
     if c.dtype.kind in ("i", "f", "c"):
@@ -824,13 +829,13 @@ def find_in(a, col, what, where="in", any_case=True, pull="all"):
         what = what.lower()
     where = where.lower()[0]
     if where == "i":
-        q = np.char.find(c, what) >= 0   # ---- is in query ----
+        q = np.char.find(c, what) >= 0   # -- is in query ----
     elif where == "s":
-        q = np.char.startswith(c, what)  # ---- startswith query ----
+        q = np.char.startswith(c, what)  # -- startswith query ----
     elif where == "eq":
         q = np.char.equal(c, what)
     elif where == "en":
-        q = np.char.endswith(c, what)    # ---- endswith query ----
+        q = np.char.endswith(c, what)    # -- endswith query ----
     if q.sum() == 0:
         print("none found")
         return None
@@ -851,7 +856,7 @@ def split_sort_slice(a, split_fld=None, order_fld=None):
 
     See Also
     --------
-    Documentation is shown in `group_sort`
+    Documentation is shown in `group_sort`.
     """
     def _split_(a, fld):
         """Split unsorted array."""
@@ -905,7 +910,7 @@ def group_sort(a, group_fld, sort_fld=None, ascend=True, sort_name=None):
     Parameters
     ----------
     a : structured/recarray
-        Array must have field names to enable splitting on and sorting by
+        Array must have field names to enable splitting on and sorting by.
     group_fld : string or list/tuple
         The field/name in the dtype used to identify groupings of features.
     sort_fld : string
@@ -973,7 +978,7 @@ def n_smallest_vals(a, group_fld=None, val_fld=None, num=1):
 
 
 # ---- to organize-----------------------------------------------------------
-# ---- running count
+#
 def running_count(a, to_label=False):
     """Perform a running count on a 1D array.
 
@@ -1040,6 +1045,7 @@ def sequences(data, stepsize=0):
         Separation between the values.
     If stepsize=0, sequences of equal values will be searched.  If stepsize
     is 1, then sequences incrementing by 1 etcetera.
+
     Stepsize can be both positive or negative::
 
         >>> # check for incrementing sequence by 1's

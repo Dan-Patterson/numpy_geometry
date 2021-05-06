@@ -71,9 +71,9 @@ from matplotlib.collections import LineCollection
 # from matplotlib.markers import MarkerStyle
 
 np.set_printoptions(
-    edgeitems=10, linewidth=120, precision=3, suppress=True, threshold=200,
+    edgeitems=10, linewidth=120, precision=2, suppress=True, threshold=200,
     formatter={"bool": lambda x: repr(x.astype(np.int32)),
-               "float_kind": '{: 7.3f}'.format})
+               "float_kind": '{: 6.2f}'.format})
 np.ma.masked_print_option.set_display('-')
 
 script = sys.argv[0]
@@ -561,10 +561,10 @@ def _demo():
                   [5.3, 9.5], [5.5, 5.7], [6.1, 4.0], [6.5, 6.8],
                   [7.1, 7.6], [7.3, 2.0], [7.4, 1.0], [7.7, 9.6],
                   [8.5, 6.5], [9.0, 4.7], [9.6, 1.6], [9.7, 9.6]])
-    z = np.array([[0.4,  0.5], [1.2,  3.6], [1.9,  4.6], [2.9,  5.9],
-                  [1.2,  9.1], [5.3,  9.5], [7.7,  9.6], [9.7,  9.6],
-                  [9.0,  4.7], [9.6,  1.6], [7.4,  1.0], [4.3,  3.0],
-                  [0.4,  0.5]])
+    z = np.array([[0.4, 0.5], [1.2, 3.6], [1.9, 4.6], [2.9, 5.9],
+                  [1.2, 9.1], [5.3, 9.5], [7.7, 9.6], [9.7, 9.6],
+                  [9.0, 4.7], [9.6, 1.6], [7.4, 1.0], [4.3, 3.0],
+                  [0.4, 0.5]])
     # z = npg.concave(a, 3, True)
     plot_2d([z, a], [False, True], [True, False],
             title='Points and concave hull')

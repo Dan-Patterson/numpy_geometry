@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# noqa: D205, D400
+# noqa: D205, D400, F403
 r"""
 ------------------------------------------
   npGeo: Geo class, properties and methods
@@ -17,6 +17,7 @@ properties.
 # pylint: disable=W0105,W0201,W0212,W0221,W0612,W0621
 # pylint: disable=R0902,R0904,R0912,R0913,R0914,R0915
 
+from __future__ import annotations
 import sys
 from textwrap import indent, dedent, wrap
 import numpy as np
@@ -31,8 +32,7 @@ import npg_geom as geom
 import npg_helpers
 from npg_helpers import (
     _angles_3pnt_, _area_centroid_, _bit_area_, _bit_crossproduct_,
-    _bit_min_max_, _bit_length_, _rotate_, polyline_angles
-    )
+    _bit_min_max_, _bit_length_, _rotate_, polyline_angles)
 import npg_io
 import npg_prn
 import npg_min_circ as sc
@@ -44,8 +44,7 @@ from npgDocs import (
     bounding_circles_doc,
     extent_rectangles_doc, od_pairs_doc, pnt_on_poly_doc,
     sort_by_area_doc,
-    radial_sort_doc, sort_by_extent_doc
-    )  # shapes_doc, parts_doc
+    radial_sort_doc, sort_by_extent_doc)  # shapes_doc, parts_doc
 
 np.set_printoptions(
     edgeitems=10, linewidth=120, precision=2, suppress=True, threshold=200,
@@ -64,14 +63,16 @@ __all__ = [
     'Geo', 'is_Geo', 'roll_coords', 'check_geometry', 'array_IFT',
     'arrays_to_Geo', 'Geo_to_arrays', 'Geo_to_lists', '_fill_float_array',
     'dirr', 'reindex_shapes'
-    ]
+]
 
 
 # ----------------------------------------------------------------------------
 # ---- (1) ... Geo class, properties and methods ... -------------------------
 #
+
 class Geo(np.ndarray):
-    """Geo class.
+    """
+    Geo class.
 
     This class is based on the ndarray is created using ``npg.arrays_to_Geo``,
     ``npg.array_IFT`` and ``npg.roll_coords``. See ``npg.npg_arc_npg`` and
@@ -138,7 +139,8 @@ class Geo(np.ndarray):
         return self
 
     def __array_finalize__(self, src_arr):
-        """Finalize new object....
+        """
+        Finalize new object....
 
         This is where housecleaning takes place for explicit, view casting or
         new from template... ``src_arr`` is either None, any subclass of
@@ -468,7 +470,7 @@ class Geo(np.ndarray):
                 c0, c1 = case.squeeze()
                 xys.append(self.XY[c0:c1])
         if asGeo:
-            info = "Old_order" + (" {}"*len(ids)).format(*ids)
+            info = "Old_order" + (" {}" * len(ids)).format(*ids)
             if len(ids) == 1:  # cludge workaround for length 1 ids
                 arr = arrays_to_Geo(xys, kind=self.K, info=info)
                 arr.IFT[:, 0] = 0
@@ -548,7 +550,7 @@ class Geo(np.ndarray):
             gt0 = np.nonzero(w1)[0]       # account for discontinuous ids
             w1 = w1[gt0]
             ar = ar[gt0]
-            return w1/ar
+            return w1 / ar
         # --
         if self.K != 2:
             print("Polygons required.")
@@ -593,8 +595,8 @@ class Geo(np.ndarray):
     def extent_centers(self, splitter="shape"):
         """Return extent centers."""
         ext = self.extents(splitter)
-        xs = (ext[:, 0] + ext[:, 2])/2.
-        ys = (ext[:, 1] + ext[:, 3])/2.
+        xs = (ext[:, 0] + ext[:, 2]) / 2.
+        ys = (ext[:, 1] + ext[:, 3]) / 2.
         return np.concatenate((xs[:, None], ys[:, None]), axis=1)
 
     def extent_corner(self, corner='LB'):
@@ -973,8 +975,8 @@ class Geo(np.ndarray):
 
     def segment_polys(self, as_basic=True, shift_back=False, as_3d=False):
         """Call `polys_to_segments`.  See `od_pairs` also."""
-        return geom.polys_to_segments(
-                   self, as_basic=as_basic, to_orig=shift_back, as_3d=as_3d)
+        return geom.polys_to_segments(self, as_basic=as_basic,
+                                      to_orig=shift_back, as_3d=as_3d)
 
     def close_polylines(self, out_kind=1):
         """Produce closed-loop polylines (1) or polygons (2) from polylines.
@@ -1729,24 +1731,24 @@ def dirr(obj, colwise=False, cols=3, prn=True):
     else:
         a = dir(obj)
     w = max([len(i) for i in a])
-    frmt = (("{{!s:<{}}} ".format(w)))*cols
+    frmt = (("{{!s:<{}}} ".format(w))) * cols
     csze = len(a) / cols  # split it
     csze = int(csze) + (csze % 1 > 0)
     if colwise:
-        a_0 = [a[i: i+csze] for i in range(0, len(a), csze)]
+        a_0 = [a[i: i + csze] for i in range(0, len(a), csze)]
         a_0 = list(zip(*a_0, fillvalue=""))
     else:
-        a_0 = [a[i: i+cols] for i in range(0, len(a), cols)]
+        a_0 = [a[i: i + cols] for i in range(0, len(a), cols)]
     if hasattr(obj, '__module__'):
-        args = ["-"*70, obj.__module__, obj.__class__]
+        args = ["-" * 70, obj.__module__, obj.__class__]
     else:
-        args = ["-"*70, type(obj), "npg.dirr..."]
+        args = ["-" * 70, type(obj), "npg.dirr..."]
     txt_out = "\n{}\n| dir({}) ...\n|    {}\n-------".format(*args)
     cnt = 0
     for i in a_0:
         cnt += 1
         txt = "\n  ({:>03.0f})  ".format(cnt)
-        frmt = (("{{!s:<{}}} ".format(w)))*len(i)
+        frmt = (("{{!s:<{}}} ".format(w))) * len(i)
         txt += frmt.format(*i)
         txt_out += txt
     if prn:
@@ -1756,7 +1758,7 @@ def dirr(obj, colwise=False, cols=3, prn=True):
 
 
 def is_Geo(obj, verbose=False):
-    """Check the input to see if it is a Geo array.  Used by `roll_coords.
+    """Check the input to see if it is a Geo array.  Used by `roll_coords`.
 
     Notes
     -----
@@ -1843,14 +1845,14 @@ def reindex_shapes(a, prn=True, start=0, end=-1):
             Uniq_ID : unique points used to construct polygons
             See : new/old summary at the end
             """
-        print("{}\n{}".format(dedent(msg), '-'*24))
-        print(("{:>8}"*3).format(*z.dtype.names))
+        print("{}\n{}".format(dedent(msg), '-' * 24))
+        print(("{:>8}" * 3).format(*z.dtype.names))
         if end == -1:
             end = len(z)
         start, end = sorted((abs(start), abs(end)))
         end = min((len(z), end))
         for i in z[start: end]:
-            print(("{:>8}"*3).format(*i))
+            print(("{:>8}" * 3).format(*i))
         #
         print("\nNew   Old")
         for i in q:

@@ -8,6 +8,16 @@ npg_overlay
 Overlay tools. Working with two sets of geometries.  The functions are largely
 confined to polygon and polyline objects.
 
+**Main functions**::
+
+- intersect, intersections
+- dissolve
+- adjacent, adjacency_matrix
+- append
+- merge
+- union
+- crossing, crossings
+
 ----
 
 Script :
@@ -19,7 +29,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2021-01-25
+    2021-03-11
 
 Purpose
 -------
@@ -98,22 +108,15 @@ __all__ = [
     'merge_',
     'union_as_one',
     'line_crosses', 'in_out_crosses', 'crossings'
-    ]  # 'dissolve',
+]
 __helpers__ = ['_intersect_', '_adj_']
 
 __all__ = __helpers__ + __all__
 
+
 # ----------------------------------------------------------------------------
 # ---- (1) helpers/mini functions
 #
-# c0 = np.logical_and(yp[i] <= y, y < yp[j])
-# c1 = np.logical_and(yp[j] <= y, y < yp[i])
-# np.logical_or(c0, c1)
-# ((yp[j] <= y) && (y < yp[i]))) &&
-#             (x < (xp[j] - xp[i]) * (y - yp[i]) / (yp[j] - yp[i]) + xp[i]))
-#           c = !c;
-
-
 def _adj_(a, full=False):
     """Determine adjacency for a polygon Geo array's outer rings.
 
@@ -202,7 +205,7 @@ def _intersect_(p0, p1, p2, p3):
     return (True, np.array([x, y]))
 
 
-def pnt_segment_info(g):
+def pnt_segment_info(arr):
     """Return point segmentation information.
 
     Notes
@@ -213,9 +216,9 @@ def pnt_segment_info(g):
         the poly feature construction.  This information is used to determine
         where duplicates occur and to what features they belong.
     """
-    uni, idx, inv, cnts = np.unique(g, True, True, True, axis=0)
+    uni, idx, inv, cnts = np.unique(arr, True, True, True, axis=0)
     # index = sorted(idx)
-    p_ids = g.pnt_indices()  # get the point IDs, they will not be sorted
+    p_ids = arr.pnt_indices()  # get the point IDs, they will not be sorted
     out = []
     uni_cnts = np.unique(cnts).tolist()
     for i in uni_cnts:
@@ -233,7 +236,7 @@ def pnt_segment_info(g):
 #  and intersectors.
 #
 def p_ints_p(poly0, poly1):
-    """Intersect two polygons.  Used in clipping.
+    r"""Intersect two polygons.  Used in clipping.
 
     Parameters
     ----------
@@ -279,8 +282,8 @@ def p_ints_p(poly0, poly1):
     b_num = p10_x * p02[..., 1] - p10_y * p02[..., 0]
     #
     with np.errstate(all='ignore'):  # divide='ignore', invalid='ignore'):
-        u_a = a_num/d_nom
-        u_b = b_num/d_nom
+        u_a = a_num / d_nom
+        u_b = b_num / d_nom
         z0 = np.logical_and(u_a >= 0., u_a <= 1.)
         z1 = np.logical_and(u_b >= 0., u_b <= 1.)
         both = z0 & z1
@@ -670,18 +673,6 @@ def adjacency_matrix(a, prn=False):
         return None
     return z
 
-    """
-    https://stackoverflow.com/questions/14263284/create-non-intersecting
-    -polygon-passing-through-all-given-points/20623817#20623817
-
-    see the code there
-
-    find the left most and right-most points, sort those above the line into
-    A and B
-    sort the points above by ascending X, those below by decending X
-    use left=hand/right hand rule to order the points
-    """
-
 
 # ----------------------------------------------------------------------------
 # ---- (5) append geometry
@@ -873,7 +864,7 @@ def line_crosses(p0, p1, p2, p3, as_integers=False):
     a = (y0 - y2) * dc_x <= (x0 - x2) * dc_y
     b = (y1 - y2) * dc_x <= (x1 - x2) * dc_y
     if as_integers:
-        return a*1, b*1
+        return a * 1, b * 1
     return a, b
 
 
@@ -893,17 +884,17 @@ def in_out_crosses(*args):
 
     Requires
     --------
-    `_line_crosses_` method
+    `_line_crosses_` method.
 
     Returns
     -------
     -  2 both segment points are inside the clipping segment.
-    -  1 start point is inside
-    -  0 both points are outside
-    - -1 end point is inside
+    -  1 start point is inside.
+    -  0 both points are outside.
+    - -1 end point is inside.
 
     """
-    msg = "\nPass 2, 2-pnt lines or 4 points to the function\n"
+    msg = "\nPass 2, 2-pnt lines or 4 points to the function.\n"
     args = np.asarray(args)
     if np.size(args) == 8:
         if len(args) == 2:  # two lines
@@ -944,10 +935,7 @@ def crossings(geo, clipper):
     p3s = clipper[1:]
     n = len(p0s)
     m = len(p2s)
-#    in_ = []
-#    out_ = []
     crosses_ = []
-#    x_pnts = []
     for j in range(m):
         p2, p3 = p2s[j], p3s[j]
         for i in range(n):
@@ -1049,27 +1037,6 @@ def _line_crossing_(clip_, poly):
     z3 = np.where(w3 == 1, -2, 0)         # -2
     z = z0 + z1 + z2 + z3
     return z, a, b
-
-
-# def polygon_from_points(a):
-#     """Use the above to sort and merge into a polygon.
-
-#     References
-#     ----------
-#     `<https://stackoverflow.com/questions/14263284/create-non-intersecting
-#     -polygon-passing-through-all-given-points>`_.
-#     """
-#     line = left_right_pnts(a)
-#     side = line_side(a, line)
-#     a_a = a[side == -1]  # below
-#     a_b = a[side == 1]   # above
-#     a_c = a[side == 0]   # on
-#     a_bc = np.concatenate((a_b, a_c), axis=0)
-#     top = a_bc[np.argsort(uts(a_bc))]
-#     bottom = a_a[np.argsort(uts(a_a))[::-1]]
-#     poly = np.vstack((top, bottom))
-#     poly = np.concatenate((poly, np.atleast_2d(poly[0])), axis=0)
-#     return poly
 
 
 # ---- Final main section ----------------------------------------------------

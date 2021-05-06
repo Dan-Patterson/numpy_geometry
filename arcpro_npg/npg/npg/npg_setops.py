@@ -150,7 +150,7 @@ def _view_as_struct_(a, return_all=False):
     """
     shp = a.shape
     dt = a.dtype
-    a_view = a.view(dt.descr * shp[1])
+    a_view = a.view(dt.descr * shp[1])[..., 0]
     if return_all:
         return a_view, shp, dt
     return a_view
@@ -363,7 +363,7 @@ def nd_uniq(a, return_index=True,
     Parameters
     ----------
     a : Geo array or ndarray
-        For other array_like objects, see `unique` and `_unique1d` in:
+        For other array-like objects, see `unique` and `_unique1d` in:
 
     `<https://github.com/numpy/numpy/blob/master/numpy/lib/arraysetops.py>`_.
 

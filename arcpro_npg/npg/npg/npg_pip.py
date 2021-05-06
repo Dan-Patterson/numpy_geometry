@@ -191,12 +191,12 @@ def winding_num(pnts, poly):
         y = p[1]
         ys = poly[:, 1]
         for i in range(poly.shape[0]):
-            if ys[i-1] <= y:
+            if ys[i - 1] <= y:
                 if ys[i] > y:
-                    if _is_right_side(p, poly[i-1], poly[i]) > 0:
+                    if _is_right_side(p, poly[i - 1], poly[i]) > 0:
                         w += 1
             elif ys[i] <= y:
-                if _is_right_side(p, poly[i-1], poly[i]) < 0:
+                if _is_right_side(p, poly[i - 1], poly[i]) < 0:
                     w -= 1
         return w
     w = [cal_w(p, poly) for p in pnts]
@@ -298,7 +298,7 @@ def np_wn(pnts, poly, return_winding=False):
     diff_ = (x1 - x0) * y_y0 - (y1 - y0) * x_x0  # diff => einsum in original
     chk1 = (y_y0 >= 0.0)
     chk2 = np.less(y[:, None], y1)  # pnts[:, 1][:, None], poly[1:, 1])
-    chk3 = np.sign(diff_).astype(np.int)
+    chk3 = np.sign(diff_).astype(np.int32)
     pos = (chk1 & chk2 & (chk3 > 0)).sum(axis=1, dtype=int)
     neg = (~chk1 & ~chk2 & (chk3 < 0)).sum(axis=1, dtype=int)
     wn = pos - neg

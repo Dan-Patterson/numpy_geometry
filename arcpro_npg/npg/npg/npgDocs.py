@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2020-10-07
+    2021-05-02
 
 Purpose
 -------
@@ -47,15 +47,13 @@ np.set_printoptions(
 script = sys.argv[0]  # print this should you need to locate the script
 
 
-__all__ = ['npGeo_doc', 'Geo_hlp',
-           'shapes_doc', 'parts_doc',
-           'outer_rings_doc', 'inner_rings_doc',
-           'get_shapes_doc', 'is_in_doc',
-           'bounding_circles_doc', 'convex_hulls_doc', 'extent_rectangles_doc',
-           'od_pairs_doc', 'pnt_on_poly_doc', 'sort_by_area_doc',
-           'radial_sort_doc', 'sort_by_extent_doc',
-           'array_IFT_doc', 'dirr_doc'
-           ]
+__all__ = [
+    'npGeo_doc', 'Geo_hlp', 'shapes_doc', 'parts_doc', 'outer_rings_doc',
+    'inner_rings_doc', 'get_shapes_doc', 'is_in_doc', 'bounding_circles_doc',
+    'convex_hulls_doc', 'extent_rectangles_doc', 'od_pairs_doc',
+    'pnt_on_poly_doc', 'sort_by_area_doc', 'radial_sort_doc',
+    'sort_by_extent_doc', 'array_IFT_doc', 'dirr_doc'
+]
 
 author_date = r"""
 
@@ -140,7 +138,7 @@ geometry properties :
 **Comments**
 
 You can use `arrays_to_Geo` to produce the required 2D array from lists
-of array_like objects of the same dimension, or a single array.
+of array-like objects of the same dimension, or a single array.
 The IFT will be derived from breaks in the sequence resulting from nesting of
 lists and/or arrays.
 
@@ -252,7 +250,6 @@ All Geo arrays require the IFT property.
 
 """
 
-# ----------------------------------------------------------------------------
 # ---- (2) ... Geo class
 # --- Geo_hlp
 
@@ -268,9 +265,9 @@ Parameters
 
 Required
 
-arr : array_like
+arr : array-like
     A 2D array sequence of points with shape (N, 2).
-IFT : array_like
+IFT : array-like
     Defines, the I(d)F(rom)T(o) and other structural elements that are
     present in polyline or polygon geometry that `arr` represents.
     Shape (N, 6) required.
@@ -342,7 +339,7 @@ array([[ 1,  0,  5,  1,   1,  0],  # first shape, first part, outer ring
                      dtype=int64)
 """
 
-# --- shapes_doc
+# ---- (3) shapes_doc
 shapes_doc = r"""
 
 Returns
@@ -357,7 +354,7 @@ locations. Finally, slice the actual coordinates for each range.
 
 """
 
-# --- parts_doc
+# ---- (4) parts_doc
 parts_doc = r"""
 
 Returns
@@ -367,7 +364,7 @@ to get the first and last from-to points, then slice the XY
 coordinates.
 """
 
-# --- outer_rings
+# ---- (5) outer_rings
 outer_rings_doc = r"""
 
 Recalculate `from` and `to` indices if output is a Geo array.
@@ -378,7 +375,7 @@ A new Geo array with holes discarded.  The IFT is altered to adjust for the
 removed points. If there are not holes, `self.bits` is returned.
 """
 
-# --- inner_rings
+# ---- (6) inner_rings
 inner_rings_doc = r"""
 
 Reorder holes to outer rings if desired (`to_clockwise`).
@@ -390,7 +387,7 @@ Return a list of ndarrays or optionally a new Geo array.
 Use True for `to_clockwise` to convert holes to outer rings.
 """
 
-# --- get_shapes
+# ---- (7) get_shapes
 get_shapes_doc = r"""
 
 The original IDs are added to the `Info` property of the output array.
@@ -398,7 +395,7 @@ The point sequence is altered to reflect the new order.
 
 Parameters
 ----------
-ID_list : array_like
+ID_list : array-like
     A list, tuple or ndarray of ID values identifying which features
     to pull from the input.
 asGeo : Boolean
@@ -411,7 +408,7 @@ Notes
 >>> a.pull_shapes([1, 3, 5])  # get selected shapes
 """
 
-# --- is_in
+# ---- (8) is_in
 is_in_doc = r"""
 
 Parameters
@@ -425,7 +422,7 @@ values, indices : boolean
     either omits that particular return.
 """
 
-# --- convex_hull
+# ---- (9) convex_hull
 convex_hulls_doc = r"""
 
 Parameters
@@ -436,7 +433,7 @@ threshold : integer
     Points... less than threshold uses simple CH method, greater than,
     uses scipy.
 """
-# --- extent_rectangles
+# ---- (10) extent_rectangles
 extent_rectangles_doc = r"""
 
 Points are ordered clockwise from the bottom left, with the first and
@@ -448,7 +445,7 @@ See Also
 `aoi_extent` and `aoi_rectangles`
 """
 
-# --- bounding_circles
+# ---- (11) bounding_circles
 bounding_circles_doc = r"""
 
 Parameters
@@ -465,7 +462,7 @@ Returns
 Circle points and optionally, the circle center and radius.
 """
 
-# --- od_pairs
+# ---- (12) od_pairs
 od_pairs_doc = r"""
 
 Traversing around the perimeter of polygons, along polylines or
@@ -480,7 +477,7 @@ See Also
 `segment_polys` Geo method and `polys_to_segments` in npg_geom.
 """
 
-# --- pnt_on_poly
+# ---- (13) pnt_on_poly
 pnt_on_poly_doc = r"""
 
 Parameters
@@ -503,7 +500,7 @@ Emulates
 <https://pro.arcgis.com/en/pro-app/arcpy/classes/polyline.htm>`_.
 """
 
-# --- sort_by_area
+# ---- (14) sort_by_area
 sort_by_area_doc = r"""
 
 Parameters
@@ -516,7 +513,7 @@ just_indices : boolean
     array is not returned.
 """
 
-# --- radial_sort
+# ---- (15) radial_sort
 radial_sort_doc = r"""
 
 The features will be sorted so that their first coordinate is in the
@@ -544,7 +541,7 @@ References
 -messy-array-for-plotting>`_.
 """
 
-# --- sort_by_extent
+# ---- (16) sort_by_extent
 sort_by_extent_doc = r"""
 
 Parameters
@@ -594,8 +591,7 @@ References
 """
 
 
-# ----------------------------------------------------------------------------
-# ---- (3) ... array_IFT
+# ---- (17) ... array_IFT
 array_IFT_doc = r"""
 
 Parameters
@@ -628,8 +624,7 @@ Notes
 """
 
 
-# ----------------------------------------------------------------------------
-# ---- (4) ... dirr function
+# ---- (18) ... dirr function
 dirr_doc = r"""
 
 Source, ``arraytools.py_tools`` has a pure python equivalent.
@@ -654,27 +649,29 @@ See the `inspect` module for possible additions like `isfunction`,
 
 Example
 -------
->>> npg.dirr(sq)
+sample dir of a Geo array::
 
-----------------------------------------------------------------------
-| dir(npgeom) ...
-|    <class 'npgeom.Geo'>
--------
-  (001)  ... Geo class ...
-  (002)  Bit                       CW                        FT
-  (003)  Fr                        H                         IDs
-  (004)  IFT                       IFT_str                   IP
-  (005)  Info                      K                         LL
-  (006)  N                         PID                       SR
-  (007)  SVG                       To                        U
-  (008)  UR                        X                         XT
-  (009)  XY                        Y                         Z
-  (010)  __author__                __dict__                  __module__
-  (011)  __name__                  aoi_extent                aoi_rectangle
-  (012)  areas                     as_arrays                 as_lists
-  (013)  bit_IFT                   bit_ids                   bit_pnt_cnt
-  (014)  bit_seq                   bits                      boundary
-... snip
+    npg.dirr(sq)
+
+    ----------------------------------------------------------------------
+    | dir(npgeom) ...
+    |    <class 'npgeom.Geo'>
+    -------
+      (001)  ... Geo class ...
+      (002)  Bit                       CW                        FT
+      (003)  Fr                        H                         IDs
+      (004)  IFT                       IFT_str                   IP
+      (005)  Info                      K                         LL
+      (006)  N                         PID                       SR
+      (007)  SVG                       To                        U
+      (008)  UR                        X                         XT
+      (009)  XY                        Y                         Z
+      (010)  __author__                __dict__                  __module__
+      (011)  __name__                  aoi_extent                aoi_rectangle
+      (012)  areas                     as_arrays                 as_lists
+      (013)  bit_IFT                   bit_ids                   bit_pnt_cnt
+      (014)  bit_seq                   bits                      boundary
+    ... snip
 
 """
 

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# noqa: D205, D400
+# noqa: D205, D400, F403
 r"""
 -----------
 npg_helpers
@@ -87,8 +87,9 @@ __all__ = [
     'common_pnts', 'compare_geom', 'flat', 'interweave', 'keep_geom',
     'polyline_angles',
     'radial_sort', 'remove_geom', 'segment_angles', 'shape_finder',
-    'coerce2array', 'dist_angle_sort', 'sort_xy', 'stride_2d', 'reclass_ids'
-    ]
+    'coerce2array', 'dist_angle_sort', 'sort_xy', 'stride_2d', 'reclass_ids',
+    'uniq_1d'
+]
 
 __helpers__ = [
     'prn_tbl', '_angles_3pnt_', '_od_angles_dist_', '_area_centroid_',
@@ -97,7 +98,7 @@ __helpers__ = [
     '_in_LBRT_', '_in_extent_', '_is_ccw_', '_is_clockwise_', '_is_right_side',
     '_isin_2d_', '_pnts_in_extent_', '_rotate_', '_scale_', '_to_lists_',
     '_trans_rot_', '_translate_', '_perp_', 'cartesian_product'
-    ]  # ---- core bit functions
+]  # ---- core bit functions
 
 __all__ = __helpers__ + __all__
 
@@ -186,6 +187,14 @@ def _to_lists_(a, outer_only=True):
             return [i for i in a]
     else:  # a list already
         return a
+
+
+def uniq_1d(arr):
+    """Return mini 1D unique."""
+    mask = np.empty(arr.shape, dtype=np.bool_)
+    mask[:1] = True
+    mask[1:] = arr[1:] != arr[:-1]
+    return arr[mask]
 
 
 # ---------------------------------------------------------------------------
@@ -306,7 +315,7 @@ def _bit_area_(a):
     x1, y0 = (a.T)[:, :-1]
     e0 = np.einsum('...i,...i->...i', x0, y0)
     e1 = np.einsum('...i,...i->...i', x1, y1)
-    return np.sum((e0 - e1)*0.5)
+    return np.sum((e0 - e1) * 0.5)
 
 
 def _bit_crossproduct_(a, extras=False):
@@ -1166,7 +1175,7 @@ def _iterate_(N, n):
     """Return combinations for array lengths."""
     import itertools
     combos = itertools.combinations(np.arange(N), n)
-    return combos
+    return list(combos)
 
 
 # ===========================================================================

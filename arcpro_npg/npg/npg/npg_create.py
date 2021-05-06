@@ -315,8 +315,8 @@ def circle(radius=100, clockwise=True, theta=1, rot=0.0, scale=1,
         angles = np.deg2rad(np.arange(180.0, -180.0 - theta, step=-theta))
     else:
         angles = np.deg2rad(np.arange(-180.0, 180.0 + theta, step=theta))
-    x_s = radius*np.cos(angles)            # X values
-    y_s = radius*np.sin(angles) * scale    # Y values
+    x_s = radius * np.cos(angles)            # X values
+    y_s = radius * np.sin(angles) * scale    # Y values
     pnts = np.array([x_s, y_s]).T
     if rot != 0:
         rot_mat = rot_matrix(angle=rot)
@@ -339,8 +339,8 @@ def circle_mini(radius=1.0, theta=10.0, xc=0.0, yc=0.0):
 
     """
     angles = np.deg2rad(np.arange(180.0, -180.0 - theta, step=-theta))
-    x_s = radius*np.cos(angles) + xc    # X values
-    y_s = radius*np.sin(angles) + yc    # Y values
+    x_s = radius * np.cos(angles) + xc    # X values
+    y_s = radius * np.sin(angles) + yc    # Y values
     pnts = np.array([x_s, y_s]).T
     return pnts
 
@@ -429,7 +429,7 @@ def ellipse(x_radius=1.0, y_radius=1.0,
     theta : number
         Angle of densification of the shape around 360 degrees.
     """
-    angles = np.deg2rad(np.arange(180.0, -180.0-theta, step=-theta))
+    angles = np.deg2rad(np.arange(180.0, -180.0 - theta, step=-theta))
     x_s = x_radius * np.cos(angles) + xc    # X values
     y_s = y_radius * np.sin(angles) + yc    # Y values
     # pnts = np.array(list(zip(x_s, y_s)))  # the slow way
@@ -493,7 +493,7 @@ def rectangle(dx=1, dy=-1,
     a = [seed + [j * dx, i * dy]      # make the shapes
          for i in range(0, y_rows)      # cycle through the rows
          for j in range(0, x_cols)]     # cycle through the columns
-    a = np.asarray(a) + [orig_x, orig_y-dy]
+    a = np.asarray(a) + [orig_x, orig_y - dy]
     if asGeo:
         frmt = "dx {}, dy {}, x_cols {}, y_rows {}, LB ({},{})"
         txt = frmt.format(dx, dy, x_cols, y_rows, orig_x, orig_y)
@@ -517,7 +517,7 @@ def triangle(dx=1, dy=1,
     ----------
     See `rectangles` for shared parameter explanation.
     """
-    a, dx, b = dx/2.0, dx, dx*1.5
+    a, dx, b = dx / 2.0, dx, dx * 1.5
     # X, Y values for a unit triangle, point up and point down
     seedU = np.array([[0.0, 0.0], [a, dy], [dx, 0.0], [0.0, 0.0]])
     seedD = np.array([[a, dy], [b, dy], [dx, 0.0], [a, dy]])
@@ -578,7 +578,7 @@ def hex_pointy(dx=1, dy=1,
     X = np.cos(p_rad) * dx
     Y = np.sin(p_rad) * dy      # scaled hexagon about 0, 0
     seed = np.array(list(zip(X, Y)))
-    dx = dx * np.sqrt(3.)/2.0
+    dx = dx * np.sqrt(3.) / 2.0
     dy = dy * 1.5
     hexs = [seed + [dx * i * 2, 0] for i in range(0, x_cols)]
     m = len(hexs)
@@ -693,15 +693,15 @@ def pnt_from_dist_bearing(orig=(0, 0), bearings=None, dists=None, prn=False):
     data = np.vstack(stack).T
     N = len(names)
     if prn:  # ---- just print the results ----------------------------------
-        frmt = "Origin ({}, {})\n".format(*orig) + "{:>10s}"*N
+        frmt = "Origin ({}, {})\n".format(*orig) + "{:>10s}" * N
         print(frmt.format(*names))
-        frmt = "{: 10.2f}"*N
+        frmt = "{: 10.2f}" * N
         for i in data:
             print(frmt.format(*i))
         return data
     # ---- produce a structured array from the output -----------------------
     names = ", ".join(names)
-    kind = ["<f8"]*N
+    kind = ["<f8"] * N
     kind = ", ".join(kind)
     out = data.transpose()
     out = np.core.records.fromarrays(out, names=names, formats=kind)
@@ -853,7 +853,7 @@ def transect_lines(N=5, orig=None, dist=1, x_offset=0, y_offset=0,
     # ---- create the output array
     names = ['X_from', 'Y_from', 'X_to', 'Y_to']
     x_cols = len(names)
-    kind = ['<f8']*x_cols
+    kind = ['<f8'] * x_cols
     data = np.vstack([x_orig, y_orig, x_dest, y_dest]).T
     if as_ndarray:  # **** add this as a flag
         out = _array_struct_(data, fld_names=names, kinds=kind)
@@ -888,7 +888,7 @@ def spiral_archim(N, n, inward=False, clockwise=True):
     rnge = np.arange(0.0, N)
     if inward:
         rnge = rnge[::-1]
-    phi = rnge/n * np.pi
+    phi = rnge / n * np.pi
     xs = phi * np.cos(phi)
     ys = phi * np.sin(phi)
     if clockwise:
@@ -947,7 +947,7 @@ def spiral_sqr(ULx=-10, n_max=100):
             cont = False
         if n > n_max:           # bail option 2
             cont = False
-        n = n+1
+        n = n + 1
     coords = np.asarray([np.array([i[0], i[1]]) for i in v])[:-3]
     return coords
 
@@ -977,7 +977,7 @@ def spiral_ccw(A):
 
 def base_spiral(nrow, ncol):
     """Docstring."""
-    return spiral_ccw(np.arange(nrow*ncol).reshape(nrow, ncol))[::-1]
+    return spiral_ccw(np.arange(nrow * ncol).reshape(nrow, ncol))[::-1]
 
 
 def to_spiral(A):
@@ -1068,7 +1068,7 @@ def _test_data(plot=False):
          [7.7, 9.6], [8.5, 6.5], [9.0, 4.7], [9.6, 1.6], [9.7, 9.6]]
     )
     # rand_state = np.random.RandomState(123)
-    b = np.random.random(size=(100, 2))*10
+    b = np.random.random(size=(100, 2)) * 10
     h, e = np.histogramdd(b, [np.arange(11), np.arange(11)])
     r = rectangle(
         dx=1, dy=-1, x_cols=10, y_rows=10, orig_x=0, orig_y=10, kind=2,

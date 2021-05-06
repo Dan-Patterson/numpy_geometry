@@ -75,8 +75,7 @@ ft = {'bool': lambda x: repr(x.astype(np.int32)),
       'float_kind': '{: 6.2f}'.format}
 np.set_printoptions(
     edgeitems=10, linewidth=160, precision=2, suppress=True,
-    threshold=100, formatter=ft
-    )
+    threshold=100, formatter=ft)
 
 __all__ = ['dtype_info', 'load_geo', 'save_geo', 'load_txt', 'save_txt',
            'load_geojson', 'geojson_Geo']
@@ -347,8 +346,8 @@ def geojson_Geo(pth, kind=2, info=None, to_origin=False):
     """
     coords = load_geojson(pth)
     # a_2d, ift, extents = npGeo.array_IFT(coords)
-    return npGeo.arrays_to_Geo(
-               coords, kind=kind, info=info, to_origin=to_origin)
+    return npGeo.arrays_to_Geo(coords, kind=kind, info=info,
+                               to_origin=to_origin)
 
 
 # ===========================================================================

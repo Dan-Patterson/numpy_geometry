@@ -64,8 +64,8 @@ def circle_mini(radius=1.0, theta=10.0, xc=0.0, yc=0.0):
         Angle of densification of the shape around 360 degrees.
     """
     angles = np.deg2rad(np.arange(180.0, -180.0 - theta, step=-theta))
-    x_s = radius*np.cos(angles) + xc    # X values
-    y_s = radius*np.sin(angles) + yc    # Y values
+    x_s = radius * np.cos(angles) + xc    # X values
+    y_s = radius * np.sin(angles) + yc    # Y values
     pnts = np.array([x_s, y_s]).T
     return pnts
 
@@ -126,14 +126,14 @@ def small_circ(a):
     p0, p1, _ = farthest(a, check=False)
     cent = center(p0, p1)
     radius = distance(cent, p0)
-    check = np.sqrt(np.einsum('ij,ij->i', a-cent, a-cent)) <= radius
+    check = np.sqrt(np.einsum('ij,ij->i', a - cent, a - cent)) <= radius
     if not np.all(check):  # degenerate case found
         for i in range(1, N):
             ptP = a[i]
             if distance(cent, ptP) > radius:
                 prev = i - 1
                 cent, radius = sub_1(a, prev, ptP)
-    check = np.sqrt(np.einsum('ij,ij->i', a-cent, a-cent)) - radius
+    check = np.sqrt(np.einsum('ij,ij->i', a - cent, a - cent)) - radius
 #    pnts = a[np.isclose(check, 0.)]
     return cent[0], cent[1], radius  # , pnts
 
@@ -169,7 +169,7 @@ def sub_2(pnts, N, ptQ, ptP):
     radius = distance(cent, ptQ)
     ptO = np.array([0.0, 0.0])
     ptB = ptR - ptQ
-    c2 = (distance(ptR, ptO)**2 - distance(ptQ, ptO)**2)/2.0
+    c2 = (distance(ptR, ptO)**2 - distance(ptQ, ptO)**2) / 2.0
     for i in range(0, N + 1):
         ptP = pnts[i]
         if distance(ptP, cent) > radius:
@@ -180,7 +180,7 @@ def sub_2(pnts, N, ptQ, ptP):
                 ptA = ptQ - ptP
                 xDelta = ptA[0] * ptB[1] - (ptA[1] * ptB[0])
                 if abs(xDelta) >= 1.0e-06:  # 0.0:
-                    c1 = (distance(ptQ, ptO)**2 - (distance(ptP, ptO)**2))/2.0
+                    c1 = (distance(ptQ, ptO)**2 - (distance(ptP, ptO)**2)) / 2.
                     x = (ptB[1] * c1 - (ptA[1] * c2)) / xDelta
                     y = (ptA[0] * c2 - (ptB[0] * c1)) / xDelta
                     cent = [x, y]

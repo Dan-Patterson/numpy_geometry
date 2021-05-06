@@ -12,7 +12,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2020-06-27
+    2021-05-02
 
 Purpose
 -------
@@ -174,7 +174,6 @@ def run_deco(func):
         def some_func():
             ``do stuff``
             return None
-
     """
     from functools import wraps
 
@@ -220,7 +219,6 @@ def doc_func(func=None, verbose=True):
 
         file level
         - script = sys.argv[0]
-
     """
     def demo_func():
         """Demonstrate retrieving and documenting module and function info."""
@@ -238,7 +236,7 @@ def doc_func(func=None, verbose=True):
         return None
     script2 = sys.argv[0]  # a useful way to get a file's name
     lines, line_num = inspect.getsourcelines(func)
-    code = "".join(["{:4d}  {}".format(idx+line_num, line)
+    code = "".join(["{:4d}  {}".format(idx + line_num, line)
                     for idx, line in enumerate(lines)])
     nmes = ['args', 'varargs', 'varkw', 'defaults', 'kwonlyargs',
             'kwonlydefaults', 'annotations']
@@ -398,7 +396,7 @@ def get_module_info(obj, max_number=100, verbose=True):
         s = "\n({:2.0f}) : {}\n{}".format(counter, i[0], indent(txt, "    "))
         return s
     # ----
-    ln = "\n:{}:\n\n".format("-"*65)
+    ln = "\n:{}:\n\n".format("-" * 65)
     f1 = "{}Package: {}\nFile:    {}"
     import inspect
     from textwrap import indent, wrap
@@ -464,7 +462,7 @@ def find_def(defs, module_name):
     if not isinstance(defs, (list, tuple)):
         defs = [defs]
     for i in defs:
-        print("\n{}\n{}".format("="*20, i))
+        print("\n{}\n{}".format("=" * 20, i))
         np.lookfor(i, module_name)
 
 
@@ -562,7 +560,7 @@ def get_dir(path, ignore=['__init__', '__pycache__']):
      'C:/Git_Dan/arraytools/analysis',
      ... snip ...
      'C:/Git_Dan/arraytools/__pycache__']
-    >>> # ---- common path prefix
+    >>> # -- common path prefix
     >>> os.path.commonprefix(get_dir('C:/Git_Dan/arraytools'))
     'C:/Git_Dan/arraytools/'
     """
@@ -598,7 +596,7 @@ def folders(path, first=True, initial=0, prefix="",
     ``_get_dir`` See its docstring for an example of path common prefix.
     """
     if first:  # Detect outermost call, print a heading
-        print("-"*30 + "\n|.... Folder listing for ....|\n|--{}".format(path))
+        print("-" * 30 + "\n|.... Path listing for ....|\n|--{}".format(path))
         print("\n... content and sub folders ...")
         prefix = "|-"
         first = False
@@ -617,7 +615,7 @@ def folders(path, first=True, initial=0, prefix="",
             folders(fullname, first=False,
                     initial=initial, prefix=p,
                     ignore=ignore, max_num=max_num)
-    # ----
+    # ---
 
 
 def sub_folders(path, combine=False):
@@ -625,7 +623,7 @@ def sub_folders(path, combine=False):
     import pathlib
     print("Path...\n{}".format(path))
     if combine:
-        r = " "*len(path)
+        r = " " * len(path)
     else:
         r = ""
     f = "\n".join([(p._str).replace(path, r)
@@ -655,24 +653,24 @@ def dir_py(obj, colwise=False, cols=3, prn=True):
     from itertools import zip_longest as zl
     a = dir(obj)
     w = max([len(i) for i in a])
-    frmt = (("{{!s:<{}}} ".format(w)))*cols
+    frmt = (("{{!s:<{}}} ".format(w))) * cols
     csze = len(a) / cols  # split it
     csze = int(csze) + (csze % 1 > 0)
     if colwise:
-        a_0 = [a[i: i+csze] for i in range(0, len(a), csze)]
+        a_0 = [a[i: i + csze] for i in range(0, len(a), csze)]
         a_0 = list(zl(*a_0, fillvalue=""))
     else:
-        a_0 = [a[i: i+cols] for i in range(0, len(a), cols)]
+        a_0 = [a[i: i + cols] for i in range(0, len(a), cols)]
     if hasattr(obj, '__name__'):
-        args = ["-"*70, obj.__name__]
+        args = ["-" * 70, obj.__name__]
     else:
-        args = ["-"*70, type(obj)]
+        args = ["-" * 70, type(obj)]
     txt_out = "\n{}\n| dir_py({}) ...\n|\n-------".format(*args)
     cnt = 0
     for i in a_0:
         cnt += 1
         txt = "\n  ({:>03.0f})  ".format(cnt)
-        frmt = (("{{!s:<{}}} ".format(w)))*len(i)
+        frmt = (("{{!s:<{}}} ".format(w))) * len(i)
         txt += frmt.format(*i)
         txt_out += txt
     if prn:
