@@ -17,7 +17,7 @@ The main script controlling all tools in the toolbox is *tbx_tools.py* in this f
 
 ----
 
-Developed in ArcGIS Pro 2.7 - 2.6, python 3.7.9 and 3.6.x-3.6.10 and numpy 1.16.5-1.19.2.
+Developed in ArcGIS Pro 2.8 - 2.6, python 3.7.10 and 3.6.x-3.6.10 and numpy 1.16.5-1.20.2.
 
 These demo scripts and the toolbox show how numpy and arcpy can play nice together and generate geometries that are normally only available at the ArcGIS Pro Advanced level.  The tools are already provided to do this, but less attention is paid to the attributes.
 
@@ -34,8 +34,11 @@ a simple conversion of the geometry type, no fancy intersection and overlap stuf
 You get what you pay for, but the widest use is probably the simplest.
 
 ----
-## Last update : 2020-12-20 ##
+## Last update : 2021-06-04 ##
+Rewrites of many functions to optimize array concatenations.
+*npg_clip* is still being tested.  convex polygons pose no problems, but clipping that results in multipart geometries is still being investigated.
 
+## 2020-12-20 update ##
 This is not an exhaustive or definitive list of the toolbox functionality... consider it a sampling:
 
 <ins>**Dissolve Boundaries**</ins>
