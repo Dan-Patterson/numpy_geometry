@@ -14,7 +14,7 @@ Script :
 Author :
     Dan_Patterson@carleton.ca
 Modified :
-    2021-05-02
+    2021-05-29
 
 Purpose
 -------
@@ -81,8 +81,8 @@ import numpy.lib.recfunctions as rfn
 # from numpy.lib.recfunctions import unstructured_to_structured as uts
 # from numpy.lib.recfunctions import _keep_fields
 
-import npg_io
-import npg_arc_npg
+from npg import npg_io, npg_arc_npg
+# import npg_arc_npg
 
 ft = {"bool": lambda x: repr(x.astype(np.int32)),
       "float_kind": '{: 6.2f}'.format}

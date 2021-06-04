@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2021-02-26
+    2021-05-29
 
 Purpose
 -------
@@ -127,11 +127,11 @@ from numpy.lib.recfunctions import repack_fields
 from scipy.spatial import ConvexHull as CH
 from scipy.spatial import Delaunay
 
-import npGeo
-
-from npg_helpers import (_get_base_, _bit_area_, _bit_min_max_,
-                         _in_extent_, _angles_3pnt_)
-from npg_pip import np_wn
+# import npGeo
+from npg import (npGeo, npg_helpers, npg_pip)
+from npg.npg_helpers import (
+    _get_base_, _bit_area_, _bit_min_max_, _in_extent_, _angles_3pnt_)
+from npg.npg_pip import np_wn
 
 np.set_printoptions(
     edgeitems=10, linewidth=100, precision=2, suppress=True, threshold=200,
@@ -168,7 +168,7 @@ def _view_as_struct_(a, return_all=False):
     """Key function to get uniform 2d arrays to be viewed as structured arrays.
 
     A bit of trickery, but it works for all set-like functionality.
-    Use ``uts`` for more complicated dtypes.
+    Use `uts` for more complicated dtypes.
 
     Parameters
     ----------
@@ -196,7 +196,7 @@ def _view_as_struct_(a, return_all=False):
 # ---- (1) distance helpers
 #
 def _e_2d_(a, p):
-    """Array points, ``a``,  to point ``p``, distance.
+    """Array points, `a`,  to point `p`, distance.
 
     Use to determine distance of a point to a segment or segments.
     """
@@ -287,7 +287,7 @@ def _is_pnt_on_line_(start, end, xy, tolerance=0.0):
 
     Notes
     -----
-    ``tolerance`` is normally not needed unless you want to examine points
+    `tolerance` is normally not needed unless you want to examine points
     quite close to a segment.
     """
     #
@@ -393,7 +393,7 @@ def _closest_pnt_on_poly_(pnt, poly):
 
     Requires
     --------
-    ``_e_2d_`` is required
+    `_e_2d_` is required
 
     Returns
     -------
@@ -464,10 +464,10 @@ def find_closest(a, pnt):
 
     See Also
     --------
-    ``closest_pnt_on_poly`` is used for point on poly* features and includes
+    `closest_pnt_on_poly` is used for point on poly* features and includes
     any required projection onto their edges for the new point feature.
 
-    ``_pnt_on_segment_`` is similar but does point placement.
+    `_pnt_on_segment_` is similar but does point placement.
     """
     dist = _e_2d_(a, pnt)
     idx = np.argmin(dist)
@@ -598,7 +598,7 @@ def densify_by_factor(a, factor=2):
 
     Notes
     -----
-    The original construction of ``c`` rather than the zero's approach.
+    The original construction of `c` rather than the zero's approach.
 
     >>> c0 = c0.reshape(n, -1)
     >>> c1 = c1.reshape(n, -1)
@@ -632,7 +632,7 @@ def densify_by_distance(a, spacing):
     ... array([[0.,  . . . .   3., . .   3., . . . 0. ],
     ...        [0.,  . . . .   4., . .   0., . . . 0. ]])
 
-    >>> letter ``C`` and skinny ``C``
+    >>> letter `C` and skinny `C`
     >>> a = np.array([[ 0, 0], [ 0, 100], [100, 100], [100,  80],
                       [ 20,  80], [ 20, 20], [100, 20], [100, 0], [ 0, 0]])
     >>> b = np.array([[ 0., 0.], [ 0., 10.], [10., 10.], [10.,  8.],
@@ -957,7 +957,7 @@ def triangulate_pnts(pnts):
     z = np.zeros((len(simps), 4), dtype='int32')
     z[:, :3] = simps
     z[:, 3] = simps[:, 0]
-    z = z[:, ::-1]                               # reorder clockwise
+    z = z[:, ::-1]                    # reorder clockwise
     new_pnts = p[z] + avg
     # new_pnts = new_pnts.reshape(-1, 2)
     return new_pnts.tolist()
@@ -1071,10 +1071,10 @@ def pnts_in_pnts(pnts, geo, just_common=True):
     geo : ndarray or Geo array.
         Nx2 array of points.
     just_common : boolean
-        If ``just_common`` is True, only the points in both data sets are
+        If `just_common` is True, only the points in both data sets are
         returned.  If False, then the common and unique points are returned as
         two separate arrays.
-        If one of the two arrays is empty ``None`` will be returned for that
+        If one of the two arrays is empty `None` will be returned for that
         array.
 
     See Also

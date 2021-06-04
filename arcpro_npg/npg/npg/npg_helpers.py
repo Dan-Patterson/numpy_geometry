@@ -16,7 +16,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2021-03-08
+    2021-05-29
 
 Purpose
 -------
@@ -45,7 +45,7 @@ different-numpy-arrays>`_.
 
 Extras
 ------
-**Generating ``__all__`` and ``__helpers__``**
+**Generating `__all__` and `__helpers__`**
 
 >>> not_in = [
 ...     '__all__', '__builtins__', '__cached__', '__doc__', '__file__',
@@ -76,7 +76,7 @@ from numpy.lib.recfunctions import unstructured_to_structured as uts
 #     import npg
 
 # import npg_prn  # noqa
-from npg_prn import prn_tbl  # used by ``shape_finder``
+from npg.npg_prn import prn_tbl  # used by `shape_finder`
 
 script = sys.argv[0]  # print this should you need to locate the script
 
@@ -171,7 +171,7 @@ def _to_lists_(a, outer_only=True):
 
     See Also
     --------
-    ``Geo_to_lists``, ``Geo_to_arrays`` if you want to maintain the potentially
+    `Geo_to_lists`, `Geo_to_arrays` if you want to maintain the potentially
     nested structure of the geometry.
     """
     if hasattr(a, "IFT"):
@@ -217,7 +217,7 @@ def _angles_3pnt_(a, inside=True, in_deg=True):
 
     Notes
     -----
-    Sum of interior angles of a polygon with ``n`` edges::
+    Sum of interior angles of a polygon with `n` edges::
 
         (n − 2)π radians or (n − 2) × 180 degrees
         n = number of unique vertices
@@ -258,7 +258,7 @@ def _od_angles_dist_(arr, is_polygon=True):
     `is_polygon` is True, then the duplicated last point will be removed.
     """
     def _e_2d_(a, p):
-        """See npg_helpers ``_e_2d_``."""
+        """See npg_helpers `_e_2d_`."""
         diff = a - p[None, :]
         return np.sqrt(np.einsum('ij,ij->i', diff, diff))
 
@@ -624,7 +624,7 @@ def polyline_angles(a, fromNorth=False):
 def segment_angles(a, fromNorth=False):
     """Return segment angles for Geo, object or ndarrays.
 
-    It is assumed that ``a`` represents polygons or polylines.
+    It is assumed that `a` represents polygons or polylines.
 
     See Also
     --------
@@ -688,7 +688,7 @@ def compare_geom(arr, look_for, unique=True, invert=False, return_idx=False):
 
     Returns
     -------
-    The intersection or difference in both arrays, depending on ``invert``.
+    The intersection or difference in both arrays, depending on `invert`.
     The indices of where the objects were found
 
     >>> a = np.array([[ 5.,  5.], [ 6.,  6.], [10., 10.], [12., 12.]])
@@ -717,12 +717,12 @@ def compare_geom(arr, look_for, unique=True, invert=False, return_idx=False):
 
 
 def keep_geom(arr, look_for, **kwargs):
-    """Keep points in ``arr`` that match those in ``look_for``."""
+    """Keep points in `arr` that match those in `look_for`."""
     return compare_geom(arr, look_for, invert=False, return_idx=False)
 
 
 def remove_geom(arr, look_for, **kwargs):
-    """Remove points from ``arr`` that match those in ``look_for``."""
+    """Remove points from `arr` that match those in `look_for`."""
     return compare_geom(arr, look_for, unique=False,
                         invert=True, return_idx=False)
 
@@ -761,7 +761,7 @@ def dist_angle_sort(a, sort_point=None, close_poly=True):
     a : array-like
         The array to sort.
     sort_point : list
-        The [x, y] value of the sort origin.  If ``None``, then the minimum
+        The [x, y] value of the sort origin.  If `None`, then the minimum
         x,y value from the inputs is used.
 
     Useful for polygons.  First and last point equality is checked.
@@ -923,11 +923,11 @@ def shape_finder(arr, start=0, prn=False, structured=True):
 
     Requires
     --------
-    ``prn_tbl`` from npg_prn.
+    `prn_tbl` from npg_prn.
 
     Used by
     -------
-    ``npg_prn.prn_lists`` and ``npg_prn.prn_arrays``.
+    `npg_prn.prn_lists` and `npg_prn.prn_arrays`.
 
     Notes
     -----
@@ -1007,7 +1007,7 @@ def shape_finder(arr, start=0, prn=False, structured=True):
 
 
 def coerce2array(arr, start=0):
-    """Return arrays using the principles of ``shape_finder``.
+    """Return arrays using the principles of `shape_finder`.
 
     Parameters
     ----------

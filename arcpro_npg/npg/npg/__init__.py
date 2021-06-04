@@ -90,7 +90,11 @@ import sys
 import numpy as np
 
 # ---- import for npg
-
+import npg
+from . import (npgDocs, npGeo, npg_helpers, npg_pip, npg_geom, npg_clip,
+               npg_min_circ, npg_overlay, npg_analysis, npg_setops, npg_io,
+               npg_prn, npg_table, npg_create, npg_utils)
+"""
 import npgDocs
 import npGeo
 import npg_helpers
@@ -106,27 +110,27 @@ import npg_prn
 import npg_table
 import npg_create
 import npg_utils
+"""
 
-
-from npgDocs import (
+from . npgDocs import (
     npGeo_doc, Geo_hlp, array_IFT_doc, dirr_doc, shapes_doc, parts_doc,
     outer_rings_doc, inner_rings_doc, get_shapes_doc, sort_by_extent_doc,
     radial_sort_doc
 )
-from npGeo import *
-from npg_helpers import *
-from npg_pip import *
-from npg_geom import *
-from npg_clip import *
-from npg_min_circ import *
-from npg_overlay import *
-from npg_analysis import *
-from npg_setops import *
-from npg_io import *
-from npg_prn import *
-from npg_table import *
-from npg_create import *
-from npg_utils import *
+from . npGeo import *
+from . npg_helpers import *
+from . npg_pip import *
+from . npg_geom import *
+from . npg_clip import *
+from . npg_min_circ import *
+from . npg_overlay import *
+from . npg_analysis import *
+from . npg_setops import *
+from . npg_io import *
+from . npg_prn import *
+from . npg_table import *
+from . npg_create import *
+from . npg_utils import *
 
 # ---- docstring info for Geo and some methods
 
@@ -147,7 +151,7 @@ from npg_utils import *
 # ---- define __all__
 __all__ = [
     'npgDocs', 'npGeo', 'npg_io', 'npg_geom', 'npg_clip', 'npg_helpers',
-     'npg_overlay', 'npg_table', 'npg_create', 'npg_analysis', 'npg_utils',
+    'npg_overlay', 'npg_table', 'npg_create', 'npg_analysis', 'npg_utils',
     'npg_setops', 'npg_helpers', 'npg_min_circ'
 ]
 
@@ -155,29 +159,29 @@ __helpers__ = [
     'npGeo_doc', 'Geo_hlp', 'array_IFT_doc', 'dirr_doc', 'shapes_doc',
     'parts_doc', 'outer_rings_doc', 'inner_rings_doc', 'get_shapes_doc',
     'sort_by_extent_doc', 'radial_sort_doc'
-    ]
+]
 
-__all__.extend(npgDocs.__all__)
-__all__.extend(npGeo.__all__)
-__all__.extend(npg_io.__all__)
-__all__.extend(npg_geom.__all__)
-__all__.extend(npg_clip.__all__)
-__all__.extend(npg_prn.__all__)
-__all__.extend(npg_pip.__all__)
-__all__.extend(npg_helpers.__all__)
-__all__.extend(npg_table.__all__)
-__all__.extend(npg_create.__all__)
-__all__.extend(npg_analysis.__all__)
-__all__.extend(npg_overlay.__all__)
-__all__.extend(npg_setops.__all__)
+__all__.extend(npg.npgDocs.__all__)
+__all__.extend(npg.npGeo.__all__)
+__all__.extend(npg.npg_io.__all__)
+__all__.extend(npg.npg_geom.__all__)
+__all__.extend(npg.npg_clip.__all__)
+__all__.extend(npg.npg_prn.__all__)
+__all__.extend(npg.npg_pip.__all__)
+__all__.extend(npg.npg_helpers.__all__)
+__all__.extend(npg.npg_table.__all__)
+__all__.extend(npg.npg_create.__all__)
+__all__.extend(npg.npg_analysis.__all__)
+__all__.extend(npg.npg_overlay.__all__)
+__all__.extend(npg.npg_setops.__all__)
 # __all__.extend(npg_min_circ.__all__)
 __all__.sort()
 
-__helpers__.extend(npg_helpers.__helpers__)
-__helpers__.extend(npg_geom.__helpers__)
-__helpers__.extend(npg_clip.__helpers__)
-__helpers__.extend(npg_analysis.__helpers__)
-__helpers__.extend(npg_overlay.__helpers__)
+__helpers__.extend(npg.npg_helpers.__helpers__)
+__helpers__.extend(npg.npg_geom.__helpers__)
+__helpers__.extend(npg.npg_clip.__helpers__)
+__helpers__.extend(npg.npg_analysis.__helpers__)
+__helpers__.extend(npg.npg_overlay.__helpers__)
 __helpers__.sort()
 
 msg = """

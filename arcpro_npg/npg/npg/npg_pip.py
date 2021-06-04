@@ -17,7 +17,7 @@ Author :
 
     `<https://github.com/Dan-Patterson>`_.
 Modified :
-    2020-10-24
+    2021-05-29
 
 Purpose
 -------
@@ -43,8 +43,8 @@ purposes.  In such cases, the process is as follows::
 - Determine polygon extents for the Geo array `geo`.
 - Derive the unique points for the test points `pnts`.
 - Assign points to the appropriate extent.
-- run `crossing number/ray crossing` algorithm
-- deleting points as you go does not improve things.
+- Run `winding number` algorithm (or `crossing number` if so inclined)
+- Deleting points as you go does not improve things.
 
 How to remove points from an array, if found in an array.  In the example below
 `sub` is a subarray of `pnts`. The indices where they are equal is `w`.
@@ -147,8 +147,8 @@ def crossing_num(pnts, poly, line=True):
         x, y = pnt
         for i in range(N - 1):
             if line is True:
-                c0 = (ys[i] < y <= ys[i + 1])  # changed to <= <=
-                c1 = (ys[i] > y >= ys[i + 1])  # and >= >=
+                c0 = (ys[i] < y <= ys[i + 1])  # changed to < <=
+                c1 = (ys[i] > y >= ys[i + 1])  # and > >=
             else:
                 c0 = (ys[i] < y < ys[i + 1])
                 c1 = (ys[i] > y > ys[i + 1])
@@ -164,13 +164,13 @@ def crossing_num(pnts, poly, line=True):
     return inside[np.nonzero(is_in)]
 
 
-def winding_num(pnts, poly):
+def winding_num(pnts, poly, batch=False):
     """Point in polygon using winding numbers.
 
     Parameters
     ----------
     pnts : array
-        The (x, y) point pairs to be tested for inclusion.
+        This is simply an (x, y) point pair of the point in question.
     poly : array
         A clockwise oriented Nx2 array of points, with the first and last
         points being equal.
@@ -184,7 +184,24 @@ def winding_num(pnts, poly):
     >>> g_uni[np.nonzero(w)]
     array([[ 20.00,  1.00],
     ...    [ 21.00,  0.00]])
+
+    References
+    ----------
+    `<http://geomalgorithms.com/a03-_inclusion.html#wn_PnPoly()>`_.
     """
+    def _is_right_side(p, strt, end):
+        """Determine if a point (p) is `inside` a line segment (strt-->end).
+
+        See Also
+        --------
+        `line_crosses`, `in_out_crosses` in npg_helpers.
+        position = sign((Bx - Ax) * (Y - Ay) - (By - Ay) * (X - Ax))
+        negative for right of clockwise line, positive for left. So in essence,
+        the reverse of _is_left_side with the outcomes reversed ;)
+        """
+        x, y, x0, y0, x1, y1 = *p, *strt, *end
+        return (x1 - x0) * (y - y0) - (y1 - y0) * (x - x0)
+
     def cal_w(p, poly):
         """Do the calculation."""
         w = 0
@@ -199,8 +216,11 @@ def winding_num(pnts, poly):
                 if _is_right_side(p, poly[i - 1], poly[i]) < 0:
                     w -= 1
         return w
-    w = [cal_w(p, poly) for p in pnts]
-    return pnts[np.nonzero(w)]
+    if batch:
+        w = [cal_w(p, poly) for p in pnts]
+        return pnts[np.nonzero(w)], w
+    else:
+        return cal_w(pnts, poly)
 
 
 # ----------------------------------------------------------------------------

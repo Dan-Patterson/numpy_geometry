@@ -16,7 +16,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2021-03-10
+    2021-05-29
 
 Purpose
 -------
@@ -51,27 +51,28 @@ import numpy as np
 
 # -- optional numpy imports
 # from numpy.lib.recfunctions import structured_to_unstructured as stu
-from numpy.lib.recfunctions import unstructured_to_structured as uts
+# from numpy.lib.recfunctions import unstructured_to_structured as uts
 # from numpy.lib.recfunctions import repack_fields
 
 # if 'npg' not in list(locals().keys()):
 #     import npg
 # from npg_helpers import _to_lists_
-from npg_plots import plot_polygons
+from npg import npg_plots
+from npg.npg_plots import plot_polygons
 
 ft = {"bool": lambda x: repr(x.astype(np.int32)),
       "float_kind": '{: 6.2f}'.format}
 np.set_printoptions(
     edgeitems=10, linewidth=120, precision=2, suppress=True, threshold=200,
     formatter=ft
-    )
+)
 
 script = sys.argv[0]  # print this should you need to locate the script
 
-__all__ = ['common_extent', 'uniq_1d', 'c_in', 'poly_clip', 'winding_num']
-__helpers__ = [
-    '_onseg_', '_is_on_', '_side_', 'inouton', '_cut_', '_wn_clip_'
-    ]
+__all__ = ['common_extent', 'uniq_1d', 'uniq_2d', 'inouton', '_in_out_',
+           'poly_clip']
+__helpers__ = ['_onseg_', '_is_on_', '_side_', 'inouton', '_cut_',
+               '_wn_clip_']
 
 
 # ----------------------------------------------------------------------------
@@ -144,12 +145,12 @@ def _onseg_(poly, pnts, tol=1.0e-12):
 
     Requires
     --------
-    ``_collinear_`` and ``_within_``.  A default tolerance of 1.0e-12 to avoid
+    `_collinear_` and `_within_`.  A default tolerance of 1.0e-12 to avoid
     floating point issues.
 
     Returns
     -------
-    An array of the ids of the ``pnts`` versus ``poly`` segments.
+    An array of the ids of the `pnts` versus `poly` segments.
 
     Example
     -------
@@ -162,7 +163,7 @@ def _onseg_(poly, pnts, tol=1.0e-12):
     def _collinear_(a, b, pnts):
         """Return True if all points lie on the same line.
 
-        This is the same ``_side_`` check.
+        This is the same `_side_` check.
         >>> r = (x1 - x0) * (y[:, None] - y0) - (y1 - y0) * (x[:, None] - x0)
         """
         epsilon = tol
@@ -203,7 +204,7 @@ def _is_on_(a, b, pnt):
 
     See Also
     --------
-    ``_onseg_`` is the multi poly-pnt version.
+    `_onseg_` is the multi poly-pnt version.
     """
 
     def collinear(a, b, pnt):
@@ -216,9 +217,10 @@ def _is_on_(a, b, pnt):
         """Return true if `pnt` is between `a` and `b` (inclusive)."""
         return a <= pnt <= b or b <= pnt <= a
     # --
-    return (collinear(a, b, pnt)
-            and (within(a[0], pnt[0], b[0]) if a[0] != b[0] else
-                 within(a[1], pnt[1], b[1])))
+    chk0 = collinear(a, b, pnt)
+    chk1 = within(a[0], pnt[0], b[0])
+    chk2 = within(a[1], pnt[1], b[1])
+    return ((chk0 and chk1) if a[0] != b[0] else chk2)
 
 
 def _side_(pnts, poly):
@@ -257,6 +259,201 @@ def _side_(pnts, poly):
 
 
 # ---- (2) poly_clip
+
+def _ct_(poly, splitter):
+    """Return the result of a polygon split.
+
+    Parameters
+    ----------
+    splitter, geom : array_like
+        The geometry with `splitter` being a line or lines which cross the
+        segments of geom.
+
+        `geom` is a polygon feature.
+
+    Notes
+    -----
+    .. Note::
+        note to self... to clip polylines, just don't close the geometry
+
+    Split into chunks.
+
+    >>> spl = np.array([[ 0.0, 7.5], [10.0, 2.5]])
+    >>> sq = np. array([[ 0.0, 0.0], [ 0.0, 10.0], [10.0, 10.0],
+    ...                 [10.0, 0.0], [ 0.0,  0.0]])
+    >>> result = _c_(spl, sq)
+    >>> result
+    ... array([[ 0.0, 0.0], [ 0.0, 7.5], [10.0, 2.5],
+    ...        [10.0, 0.0], [ 0.0, 0.0]])
+
+    Reassemble a from-to array back to an N-2 array of coordinates. Also,
+    split, intersection points into pairs.
+
+    >>> coords = np.concatenate((r0[0, :2][None, :], r0[:, -2:]), axis=0)
+    >>> from_to = [o_i[i: i+2] for i in range(0, len(o_i), 2)]
+    """
+    vals = _wn_clip_(poly, splitter)
+    p_in, p_out, c_in, x_pnts, p_in_c, p_out_c, c_in_p, x_type, wn_, whr = vals
+    #
+    if x_pnts is None:
+        return None
+    in_polys = []
+    # out_polys = []
+    cnt = 0
+    visited = []
+    stepsize = 1  # pnt ids incrementing by 1
+    spl_whr = np.where(np.diff(p_in_c) != stepsize)[0] + 1
+    all_sequences = np.array_split(p_in_c, spl_whr)
+    sequences = [s for s in all_sequences if s.size > 1]
+    for i, ft in enumerate(x_type):  # clipper ids that cross poly
+        sub = []
+        f, t = ft
+        p0, p1 = cnt, cnt + 1
+        X_P = x_pnts[cnt]
+        visited.append(p0)
+        if (f == 0) and (t == 0):
+            if (p0 == p_in_c[:, None]).any():
+                sub.append(poly[p0])
+            if (p1 == p_in_c[:, None]).any():
+                sub.append(poly[p1])
+            sub.append(X_P)
+        elif (f == 0) and (t == -1):
+            sub.append(X_P)
+            sub.append(poly[p1])
+        elif (f == -1) and (t == 0):
+            sub.append(poly[p1])
+            sub.append(X_P)
+        elif (f == -1) and (t == -1):
+            if (p0 == p_in_c[:, None]).any():
+                sub.append(poly[p0])
+            if (p1 == p_in_c[:, None]).any():
+                sub.append(poly[p1])
+            # visited.extend([p0, p1])  # maybe just p1
+            # if np.isin(p0, visited, invert=True).any():
+            #     sub.extend([poly[p0], poly[p1]])
+        if np.sum(ft) != -2:
+            cnt += 1
+        if sub:
+            in_polys.append(sub)
+    return in_polys
+
+
+def _split_(poly, splitter):
+    """Return.
+
+    References
+    ----------
+    `<https://community.esri.com/t5/python-blog/patterns-sequences-occurrence
+    -and-position/ba-p/902504>`_.
+
+    Requires
+    --------
+    `_wn_clip_` does the work of getting the points in polygons and
+    intersection points.
+
+    Example
+    -------
+    The following is an attempt to find points that may appear before an
+    inclusion point. It uses sequences as given in the reference.::
+
+        >>> p_in_c = np.array([0, 1, 2, 5], dtype=int64)  # pnts in polygon ids
+        >>> stepsize = 1
+        >>> w = np.where(np.diff(p_in_c) != stepsize)[0] + 1
+        >>> sequences = np.split(p_in_c, w)
+        ... [array([0, 1, 2], dtype=int64), array([5], dtype=int64)]
+        >>> in_seq = np.nonzero([pl_ in i for i in sequences])[0]
+        ... array([0], dtype=int64)
+        >>> idx = sequences[in_seq[0]]
+        >>> to_add = inside[idx]
+        >>> to_add  # -- points in the clipping polygon in sequence
+        ... array([[  1.00,  11.50],
+        ...        [  2.50,  13.00],
+        ...        [  4.00,  12.50]])
+    """
+    # out_ = []
+    in_ = []
+    vals = _wn_clip_(poly, splitter)
+    p_in, p_out, c_in, x_pnts, p_in_c, p_out_c, c_in_p, x_type, wn_, whr = vals
+    # 120 µs ± 574 ns
+    if p_in_c.size == 0:  # -- no intersection -- bail.
+        return None, None
+    #
+    stepsize = 1  # pnt ids incrementing by 1
+    spl_whr = np.where(np.diff(p_in_c) != stepsize)[0] + 1
+    all_sequences = np.array_split(p_in_c, spl_whr)
+    sequences = [s for s in all_sequences if s.size > 1]
+    visited = []
+    # 13 µs ± 161 ns
+    for i, w in enumerate(whr):
+        cl_, pl_ = w
+        visited.append(pl_)
+        c_0, c_1 = splitter[cl_: cl_ + 2]
+        p_0, p_1 = poly[pl_: pl_ + 2]
+        bit1 = []
+        chk0 = pl_ in p_in_c        # poly pnt id in splitter
+        chk1 = pl_ + 1 in p_in_c    # next poly pnt in splitter
+        chk2 = cl_ in c_in_p        # splitter pnt in poly
+        chk3 = cl_ + 1 in c_in_p    # next splitter pnt in poly
+        #
+        if chk2:  # -- start split inside poly
+            bit1 = c_0
+        if chk3:  # -- end split inside poly
+            bit1 = c_1
+        #
+        # sequence check
+        in_seq = np.nonzero([pl_ in i for i in sequences])[0]  # trailing
+        in_seq2 = np.nonzero([pl_ + 1 in i for i in sequences])[0]  # leading
+        to_add = None
+        if in_seq.size > 0:
+            idx = sequences[in_seq[0]]
+            to_add = poly[idx]  # sequence of poly points inside splitter
+        elif in_seq2.size > 0:
+            idx = sequences[in_seq2[0]]
+            to_add = poly[idx]
+        #
+        if chk0 and ~chk1:  # -- inside, outside
+            if chk2:
+                in_seg = np.asarray([p_0, x_pnts[i], bit1])
+            else:
+                in_seg = np.asarray([p_0, x_pnts[i]])
+        elif ~chk0 and chk1:  # -- outside, inside
+            if chk2:
+                in_seg = np.asarray([bit1, x_pnts[i], p_1])
+            else:
+                in_seg = np.asarray([x_pnts[i], p_1])
+        elif ~chk0 and ~chk1:  # -- outside, outside
+            # in_seg = None  # *** may 6th altered doesn't work for b0, c0
+            in_seg = x_pnts[i][None, :]
+        elif (c_0 in p_in) and (c_1 in p_in):  # -- clip inside, inside
+            in_seg = np.asarray([c_0, c_1])
+        else:
+            # out_seg = np.concatenate((c_0[None, :], c_1[None, i]), axis=0)
+            print("no condition met")
+        # exit check
+        if to_add is not None:
+            if in_seq.size > 0:  # prepend sequential points
+                in_seg = np.vstack((to_add, in_seg))
+            else:                # append sequential points
+                in_seg = np.vstack((in_seg, to_add))
+        if in_seg is not None:
+            if pl_ == visited[0]:  # check to see if you are back to the start
+                in_.insert(visited.index(pl_), in_seg)
+            else:
+                in_.append(in_seg)
+    idx = np.argsort(whr[:, 1])
+    """
+    whr2 = whr[idx]  # sorted indices
+    x_x = x_pnts[idx]  # intersection points sorted
+    """
+    in_srted = [in_[i] for i in idx]
+    z = np.vstack(in_srted)
+    #
+    u, idx = uniq_2d(z, True)  # unique for 2D coordinates
+    # u, idx = np.unique(z, True, axis=0)
+    idxs = np.sort(idx)
+    final = z[idxs]  # ***** OR ****
+    return final, in_  # , in_srted  # z, idxs
+
 
 def inouton(pnts, poly, do_crossings=False):
     r"""Return polygon overlay results.  These are `in`, `out` or `on` points.
@@ -375,8 +572,8 @@ def inouton(pnts, poly, do_crossings=False):
     # intersections
     # --
     with np.errstate(all="ignore"):  # ignore all errors
-        u_a = a_num/denom
-        u_b = b_num/denom
+        u_a = a_num / denom
+        u_b = b_num / denom
         z0 = np.logical_and(u_a >= 0., u_a <= 1.)  # equal to `id_vals`
         z1 = np.logical_and(u_b >= 0., u_b <= 1.)
         both = z0 & z1
@@ -426,45 +623,7 @@ def _cut1_(pair_chunk, chunks, ps, sp, ft_p_shape, p0):
     return z_0, z_1, sp
 
 
-def _ct_(geom, splitter):
-    """Return the result of a polygon split."""
-    # ft_p = np.concatenate((geom[:-1], geom[1:]), axis=1)
-    ft_c = np.concatenate((splitter[:-1], splitter[1:]), axis=1)
-    args = inouton(geom, splitter)
-    x_type, whr, in_ids, out_ids, inside, outside, x_pnts, eq, wn_vals = args
-    #
-    if x_pnts is None:
-        return None
-    #
-    # splitter-geom segment pairs
-    #
-    in_polys = []
-    out_polys = []
-    #
-    # idx = np.argsort(whr[:, 1])
-    # whr =whr[idx]
-    cnt = 0
-    for i, ft in enumerate(x_type):  # clipper ids that cross poly
-        f, t = ft
-        p0, p1 = geom[i], geom[i + 1]
-        if sum(abs(ft)) == 1:
-            w = np.where(whr[:, 1] == i)[0]
-            print("i {} w {}".format(i, w))
-            x_sect = x_pnts[cnt]  # x_pnts[cnt]
-            ply = ft_c[w]
-            cnt += 1
-        if (f == 0) and (t == -1):
-            out_polys.append([x_sect, ply[:, :2]])
-            in_polys.append([ply[:, :2], x_sect])  # [p0, x_sect])
-        elif (f == -1) and (t == 0):
-            out_polys.append([ply[:, -2:], x_sect])
-            in_polys.append([x_sect, ply[:, -2:]])
-        elif (f == -1) and (t == -1):
-            in_polys.append([p0, p1])
-        elif (f == 0) and (t == 0):
-            out_polys.append([p0, p1])
-    return in_polys, out_polys
-
+# ---- working
 
 def _cut_1_(whr, ft_p, ft_c, x_pnts):
     """One line crossing."""
@@ -477,6 +636,7 @@ def _cut_1_(whr, ft_p, ft_c, x_pnts):
     in_p[0, :2] = x_pnts[1]
     in_p[-1, -2:] = x_pnts[0]
     in_ = np.vstack([in_c, in_p])
+    in_ = np.concatenate((in_[0, :2][None, :], in_[:, -2:]))
     #
     out_ = []
     polys = [in_, out_]
@@ -489,11 +649,11 @@ def _cut_(poly, splitter):
 
     Parameters
     ----------
-    splitter, geom : array_like
-        The geometry with ``splitter`` being a line or lines which cross the
-        segments of geom.
+    poly, splitter : array_like
+        The geometry with `splitter` being a line or lines which cross the
+        segments of poly.
 
-        ``geom`` is a polygon feature.
+        `poly` is a polygon feature.
 
     Notes
     -----
@@ -518,24 +678,11 @@ def _cut_(poly, splitter):
     """
     ft_p = np.concatenate((poly[:-1], poly[1:]), axis=1)
     ft_c = np.concatenate((splitter[:-1], splitter[1:]), axis=1)
-    # args = inouton(geom, splitter)
-    # x_type, whr, in_ids, out_ids, inside, outside, x_pnts, eq, wn_vals = args
-    # x_ings
     vals = _wn_clip_(poly, splitter)
     p_in, p_out, c_in, x_pnts, p_in_c, p_out_c, c_in_p, x_type, wn_, whr = vals
     if x_pnts is None:
         return None
-    #
-    # uni, idx, cnts = np.unique(whr[:, 0], True, return_counts=True)
-    # crossings = uni[cnts >= 1]  # clipper segments that cross poly segments
     crossings = uniq_1d(whr[:, 0])
-    #
-    # -- quickly finish with a single crossing
-    #
-    # if len(crossings) == 2:
-    #     polys, test = _cut_1_(whr, ft_p, ft_c, x_pnts)
-    #     return (polys, x_pnts, whr, inside, outside, test)
-    #
     # -- more than one splitter
     #
     polys = []
@@ -544,46 +691,46 @@ def _cut_(poly, splitter):
     sp = ft_c.copy()
     test = []
     added_ = []
-    s_min, s_max = np.sort(whr[:, 1])[[0, -1]]  # last segment check
-    Nseg = len(crossings)  # - 1
+    # s_min, s_max = np.sort(whr[:, 1])[[0, -1]]  # last segment check
+    Nseg = len(crossings) - 1
     for i, seg in enumerate(crossings):  # clipper ids that cross poly
         w = (whr[:, 0] == seg)
         spl_X_ply = whr[w]           # splitter crosses polygon `spl_X_ply`
         all_pairs = x_pnts[w]        # the intersection points on that segment
-        chunks = [spl_X_ply[i: i+2] for i in range(0, len(spl_X_ply), 2)]
-        pair_chunk = [all_pairs[i: i+2] for i in range(0, len(spl_X_ply), 2)]
+        chunks = [spl_X_ply[i: i + 2] for i in range(0, len(spl_X_ply), 2)]
+        pair_chunk = [all_pairs[i: i + 2] for i in range(0, len(spl_X_ply), 2)]
         sub = []
         #
         # last clipper only has 1 chunk
         if (len(chunks) == 1) and (len(chunks[0]) == 1):
             p0 = spl_X_ply[0]
-            z_0, z_1 = _cut_1_(whr, ft_p, ft_c, x_pnts)
-            # z_0, z_1, sp = _cut1_(pair_chunk, chunks, ps, sp, ft_p_shape, p0)
+            z_0, z_1 = _cut_1_(whr, ft_p, ft_c, x_pnts)  # z_0, z_1 = in, out
             ps = z_0.copy()
             sub.append([z_0, z_1])
-            polys.extend([z_0, z_1])
-        elif (i == Nseg) and (len(chunks) == 1):
-            p0 = spl_X_ply[0]
-            z_0, z_1 = _cut_1_(whr, ft_p, ft_c, x_pnts)
-            # z_0, z_1, sp = _cut1_(pair_chunk, chunks, ps, sp, ft_p_shape, p0)
-            ps = z_0.copy()
-            sub.append([z_0, z_1])
-            polys.extend([z_0, z_1])
+            polys += [z_0, z_1]  # .extend([z_0, z_1])
+# =============================================================================
+#         elif (i == Nseg) and (len(chunks) == 1):
+#             p0 = spl_X_ply[0]
+#             whr2 = spl_X_ply
+#             z_0, z_1 = _cut_1_(whr, ft_p, ft_c, x_pnts)
+#             ps = z_0.copy()
+#             sub.append([z_0, z_1])
+#             polys += [z_0, z_1]  # polys.extend([z_0, z_1])
+# =============================================================================
         else:
             # not last and/or has more than 1 chunk
             for j, clp_ply in enumerate(chunks):
                 pairs = pair_chunk[j]   # intersection pnt or pnts
                 diff = ps.shape[0] - ft_p_shape[0]  # ft_p.shape[0]
                 added_.append(diff)
-                # p0, p1 = clp_ply[:, 1] + diff
                 p0p1 = clp_ply[:, 1] + diff  # only works for intersection
                 if p0p1.size == 1:
                     p0 = p0p1[0]
                     p1 = p0 + 1
                 else:
                     p0, p1 = p0p1
-                if (p1 - p0) >= 2:  # remove extra rows
-                    sp = ps[p0: p1 + 1]            # but update sp first
+                if (p1 - p0) >= 2:         # remove extra rows
+                    sp = ps[p0: p1 + 1]    # but update sp first
                     ps = np.concatenate((ps[:p0 + 1], ps[p1:]))  # needed by E
                 else:
                     sp = ps[p0: p1 + 1]
@@ -594,7 +741,6 @@ def _cut_(poly, splitter):
                     p_next = 0
                 else:
                     p_next = p0 + 1
-                # print(pairs)
                 ps[p_next, :2] = pairs[1]
                 #
                 # -- assemble outside z0
@@ -610,124 +756,10 @@ def _cut_(poly, splitter):
                 sp_new = np.concatenate((pairs[1], pairs[0]))
                 z1 = np.concatenate((sp, sp_new[None, :]), axis=0)
                 z_1 = np.concatenate((z1[0, :2][None, :], z1[:, -2:]))
-                # print("{}\nz0\n{}\nz1\n{}".format(seg, z_0, z_1))
                 sub.append([z_0, z_1])
                 polys.extend([z_0, z_1])
         test.append(np.asarray(sub, dtype='O').squeeze())
-    return (polys, x_pnts, whr, p_in, p_out, test)  # inside, outside,
-
-
-def _split_(poly, splitter):
-    """Return.
-
-    References
-    ----------
-    `<https://community.esri.com/t5/python-blog/patterns-sequences-occurrence
-    -and-position/ba-p/902504>`_.
-
-    Requires
-    --------
-    `_wn_clip_` does the work of getting the points in polygons and
-    intersection points.
-
-    Example
-    -------
-    The following is an attempt to find points that may appear before an
-    inclusion point. It uses sequences as given in the reference.::
-
-        p_in_c = np.array([0, 1, 2, 5], dtype=int64)  # points in polygon ids
-        stepsize = 1
-        sequences = np.split(
-            p_in_c, np.where(np.diff(p_in_c) != stepsize)[0] + 1)
-        ...    [array([0, 1, 2], dtype=int64), array([5], dtype=int64)]
-        in_seq = np.nonzero([pl_ in i for i in sequences])[0]
-        ...    array([0], dtype=int64)
-        idx = sequences[in_seq[0]]
-        to_add = inside[idx]
-        to_add  # -- points in the clipping polygon in sequence
-        array([[  1.00,  11.50],
-        ...    [  2.50,  13.00],
-        ...    [  4.00,  12.50]])
-    """
-    # out_ = []
-    in_ = []
-    vals = _wn_clip_(poly, splitter)
-    p_in, p_out, c_in, x_pnts, p_in_c, p_out_c, c_in_p, x_type, wn_, whr = vals
-    if p_in_c.size == 0:  # -- no intersection -- bail.
-        return None, None
-    #
-    stepsize = 1  # pnt ids incrementing by 1
-    spl_whr = np.where(np.diff(p_in_c) != stepsize)[0] + 1
-    all_sequences = np.array_split(p_in_c, spl_whr)
-    sequences = [s for s in all_sequences if s.size > 1]
-    visited = []
-    for i, w in enumerate(whr):
-        cl_, pl_ = w
-        visited.append(pl_)
-        c_0, c_1 = splitter[cl_: cl_ + 2]
-        p_0, p_1 = poly[pl_: pl_ + 2]
-        bit1 = []
-        chk0 = pl_ in p_in_c        # poly pnt id in splitter
-        chk1 = pl_ in p_out_c       # outside
-        chk2 = pl_ + 1 in p_in_c    # next poly pnt in splitter
-        chk3 = pl_ + 1 in p_out_c   # next outside
-        chk4 = cl_ in c_in_p        # splitter pnt in poly
-        chk5 = cl_ + 1 in c_in_p    # next pnt
-        #
-        if chk4:  # -- start split inside poly
-            bit1 = c_0
-        if chk5:  # -- end split inside poly
-            bit1 = c_1
-        #
-        # sequence check
-        in_seq = np.nonzero([pl_ in i for i in sequences])[0]  # trailing
-        in_seq2 = np.nonzero([pl_ + 1 in i for i in sequences])[0]  # leading
-        to_add = None
-        if in_seq.size > 0:
-            idx = sequences[in_seq[0]]
-            to_add = poly[idx]  # sequence of poly points inside splitter
-        elif in_seq2.size > 0:
-            idx = sequences[in_seq2[0]]
-            to_add = poly[idx]
-        #
-        if chk0 and chk3:  # -- inside, outside
-            if chk4:
-                in_seg = np.asarray([p_0, x_pnts[i], bit1])
-            else:
-                in_seg = np.asarray([p_0, x_pnts[i]])
-        elif chk1 and chk2:  # -- outside, inside
-            if chk4:
-                in_seg = np.asarray([bit1, x_pnts[i], p_1])
-            else:
-                in_seg = np.asarray([x_pnts[i], p_1])
-        elif chk1 and chk3:  # -- outside, outside
-            # in_seg = None
-            in_seg = x_pnts[i][None, :]
-        elif (c_0 in p_in) and (c_1 in p_in):  # -- clip inside, inside
-            in_seg = np.asarray([c_0, c_1])
-        else:
-            # out_seg = np.concatenate((c_0[None, :], c_1[None, i]), axis=0)
-            print("no condition met")
-        # exit check
-        if to_add is not None:
-            if in_seq.size > 0:  # prepend sequential points
-                in_seg = np.vstack((to_add, in_seg))
-            else:                # append sequential points
-                in_seg = np.vstack((in_seg, to_add))
-        if in_seg is not None:
-            if pl_ == visited[0]:  # check to see if you are back to the start
-                in_.insert(visited.index(pl_), in_seg)
-            else:
-                in_.append(in_seg)
-    idx = np.argsort(whr[:, 1])
-    in_srted = [in_[i] for i in idx]
-    z = np.vstack(in_srted)
-    #
-    u, idx = uniq_2d(z, True)  # unique for 2D coordinates
-    # u, idx = np.unique(z, True, axis=0)
-    idxs = np.sort(idx)
-    final = z[idxs]  # ***** OR ****
-    return final  # , in_srted  # z, idxs
+    return polys, x_pnts, p_in, p_out, whr, test
 
 
 """
@@ -758,7 +790,7 @@ def _wn_clip_(pnts, poly, all_info=True):
     Parameters
     ----------
     pnts, poly : array_like
-        Geometries represent the points and polygons.  Points is assumed to be
+        Geometries represent the points and polygons.  `pnts` is assumed to be
         another polygon since clipping is being performed.
     all_info : boolean
         True, returns points in polygons, the in and out id values, the
@@ -806,8 +838,8 @@ def _wn_clip_(pnts, poly, all_info=True):
     def _xsect_(a_num, b_num, denom, x1_x0, y1_y0, x0, y0):
         """Return the intersection."""
         with np.errstate(all="ignore"):  # ignore all errors
-            u_a = a_num/denom
-            u_b = b_num/denom
+            u_a = a_num / denom
+            u_b = b_num / denom
             z0 = np.logical_and(u_a >= 0., u_a <= 1.)  # equal to `id_vals`
             z1 = np.logical_and(u_b >= 0., u_b <= 1.)
             both = z0 & z1
@@ -838,16 +870,16 @@ def _wn_clip_(pnts, poly, all_info=True):
     return vals
 
 
-def c_in(geom, splitter, keep_in=True):  # --- c_in with _cut_
-    """Return split parts.  Calls ``_cut_`` for all splitters.
+def _in_out_(poly, splitter, keep_in=True):  # --- c_in with _cut_
+    """Return split parts.  Calls `_cut_` for all splitters.
 
     Returns
     -------
     The split geometry is divided into two parts:  those inside and outside
     the clipping polygon.
 
-    - ``_cut_`` does the actual work of splitting and sorting.
-    - ``_wn_clip_`` does checking to ensure geometry are inside or outside.
+    - `_cut_` does the actual work of splitting and sorting.
+    - `_wn_clip_` does checking to ensure geometry are inside or outside.
     """
 
     def final_test(arr, x_in):
@@ -861,17 +893,17 @@ def c_in(geom, splitter, keep_in=True):  # --- c_in with _cut_
             is_in = True
         return is_in
 
-    vals = _cut_(geom, splitter)
-    if vals is None:
-        return None
-    polys, x_pnts, whr, inside, outside, test = vals
+    polys, x_pnts, inside, outside, whr = _cut_(poly, splitter)
+    # if vals is None:
+    #     return None
+    # polys, x_pnts, whr, inside, outside, test = vals
     if len(polys) == 0:
         return None
-    # x_out = np.vstack((x_pnts, outside))  # outside and intersection points
+    x_out = np.vstack((x_pnts, outside))  # outside and intersection points
     x_in = uniq_2d(np.vstack((x_pnts, inside)), False)
     # x_in = np.unique(np.vstack((x_pnts, inside)), axis=0)
     in_ = []
-    out_ = []
+    # out_ = []
     idx = np.nonzero([final_test(i, x_in) for i in polys])[0]
     in_ = [polys[i] for i in idx]
     # for i, inout in enumerate(polys):
@@ -889,7 +921,7 @@ def c_in(geom, splitter, keep_in=True):  # --- c_in with _cut_
     #                 in_.append(is_in)
     #             if is_out is not None:
     #                 out_.append(is_out)
-    return in_, out_
+    return in_  # , out_
 
     # vals = _cut_(splitter, geom)
     # if vals is None:
@@ -923,7 +955,7 @@ def poly_clip(clippers, polys, inside=True):
     Returns
     -------
     The shared_extent between the clipping and poly features.  The geometry
-    inside/outside depending on the ``inside`` boolean.
+    inside/outside depending on the `inside` boolean.
 
     Example
     -------
@@ -936,7 +968,7 @@ def poly_clip(clippers, polys, inside=True):
             shared, extent = common_extent(clp, poly)
             if shared:
                 shared_extent.append([i, j, extent])
-                inout = c_in(clp, poly, keep_in=inside)
+                inout = _in_out_(clp, poly, keep_in=inside)
                 if inout is None:
                     pass
                 in_, out_ = inout
@@ -949,65 +981,6 @@ def poly_clip(clippers, polys, inside=True):
     # remember that shared_extent and out2 should be sliced prior to plotting
     # ie. out2[0] is the result of clipping one polygon by one clipper
     return shared_extent, to_keep
-
-
-def winding_num(pnts, poly, batch=False):
-    """Point in polygon using winding numbers.
-
-    Parameters
-    ----------
-    pnts : array
-        This is simply an (x, y) point pair of the point in question.
-    poly : array
-        A clockwise oriented Nx2 array of points, with the first and last
-        points being equal.
-
-    Notes
-    -----
-    Until this can be implemented in a full array of points and full suite of
-    polygons, you have to test for all the points in each polygon.
-
-    >>> w = [winding_num(p, e1) for p in g_uni]
-    >>> g_uni[np.nonzero(w)]
-    array([[ 20.00,  1.00],
-    ...    [ 21.00,  0.00]])
-
-    References
-    ----------
-    `<http://geomalgorithms.com/a03-_inclusion.html#wn_PnPoly()>`_.
-    """
-    def _is_right_side(p, strt, end):
-        """Determine if a point (p) is `inside` a line segment (strt-->end).
-
-        See Also
-        --------
-        `line_crosses`, `in_out_crosses` in npg_helpers.
-        position = sign((Bx - Ax) * (Y - Ay) - (By - Ay) * (X - Ax))
-        negative for right of clockwise line, positive for left. So in essence,
-        the reverse of _is_left_side with the outcomes reversed ;)
-        """
-        x, y, x0, y0, x1, y1 = *p, *strt, *end
-        return (x1 - x0) * (y - y0) - (y1 - y0) * (x - x0)
-
-    def cal_w(p, poly):
-        """Do the calculation."""
-        w = 0
-        y = p[1]
-        ys = poly[:, 1]
-        for i in range(poly.shape[0]):
-            if ys[i-1] <= y:
-                if ys[i] > y:
-                    if _is_right_side(p, poly[i-1], poly[i]) > 0:
-                        w += 1
-            elif ys[i] <= y:
-                if _is_right_side(p, poly[i-1], poly[i]) < 0:
-                    w -= 1
-        return w
-    if batch:
-        w = [cal_w(p, poly) for p in pnts]
-        return pnts[np.nonzero(w)], w
-    else:
-        return cal_w(pnts, poly)
 
 
 # ---- Final main section ----------------------------------------------------

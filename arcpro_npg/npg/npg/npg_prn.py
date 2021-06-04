@@ -19,7 +19,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2021-05-04
+    2021-05-29
 
 Purpose
 -------
@@ -46,7 +46,8 @@ import numpy as np
 
 # import npGeo
 
-import npg_helpers as n_h
+from npg import npg_helpers as n_h
+# import npg_helpers as n_h
 # from npg_helpers import shape_finder
 
 # ---- Keep for now.

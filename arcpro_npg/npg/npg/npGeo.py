@@ -28,17 +28,21 @@ from numpy.lib.recfunctions import repack_fields
 # import warnings
 # warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning)
 
-import npg_geom as geom
-import npg_helpers
-from npg_helpers import (
+from npg import npg_geom as geom
+from npg import (npg_helpers, npg_io, npg_prn)
+from npg import npg_min_circ as sc
+
+# import npg_geom as geom
+# import npg_helpers
+from npg.npg_helpers import (
     _angles_3pnt_, _area_centroid_, _bit_area_, _bit_crossproduct_,
     _bit_min_max_, _bit_length_, _rotate_, polyline_angles)
-import npg_io
-import npg_prn
-import npg_min_circ as sc
+# import npg_io
+# import npg_prn
+# import npg_min_circ as sc
 
 
-from npgDocs import (
+from npg.npgDocs import (
     Geo_hlp, array_IFT_doc, dirr_doc, get_shapes_doc,
     inner_rings_doc, outer_rings_doc, is_in_doc, convex_hulls_doc,
     bounding_circles_doc,
@@ -74,9 +78,9 @@ class Geo(np.ndarray):
     """
     Geo class.
 
-    This class is based on the ndarray is created using ``npg.arrays_to_Geo``,
-    ``npg.array_IFT`` and ``npg.roll_coords``. See ``npg.npg_arc_npg`` and
-    ``npg.npg_io`` for methods to acquire the ndarrays needed from other data
+    This class is based on the ndarray is created using `npg.arrays_to_Geo`,
+    `npg.array_IFT` and `npg.roll_coords`. See `npg.npg_arc_npg` and
+    `npg.npg_io` for methods to acquire the ndarrays needed from other data
     sources.
     """
 
@@ -93,7 +97,7 @@ class Geo(np.ndarray):
                 Info="Geo array",
                 SR=None
                 ):
-        """See ``npgDocs`` for construction notes."""
+        """See `npgDocs` for construction notes."""
         arr = np.ascontiguousarray(arr)
         IFT = np.ascontiguousarray(IFT)
         if (arr.ndim != 2) or (IFT.ndim != 2):
@@ -143,7 +147,7 @@ class Geo(np.ndarray):
         Finalize new object....
 
         This is where housecleaning takes place for explicit, view casting or
-        new from template... ``src_arr`` is either None, any subclass of
+        new from template... `src_arr` is either None, any subclass of
         ndarray including our own (words from documentation) OR another
         instance of our own array.
         You can use the following with a dictionary instead of None:
@@ -208,7 +212,7 @@ class Geo(np.ndarray):
     # see also self.U, self.PID
     @property
     def shp_IFT(self):
-        """Shape IFT values.  ``shp_IFT == part_IFT`` for singlepart shapes."""
+        """Shape IFT values.  `shp_IFT == part_IFT` for singlepart shapes."""
         if self.is_multipart():  # multiparts check
             return self.part_IFT
         df = self.To - self.Fr
@@ -274,7 +278,7 @@ class Geo(np.ndarray):
     def bit_seq(self):
         """Return the bit sequence for each bit in a shape.
 
-        The sequence is numbered from zero to ``n``.  A shape can consist of a
+        The sequence is numbered from zero to `n`.  A shape can consist of a
         single bit or multiple bits consisting of outer rings and holes.
         """
         return self.Bit
@@ -457,7 +461,8 @@ class Geo(np.ndarray):
         if isinstance(ids, (int)):
             ids = [ids]
         ids = np.asarray(ids)
-        if not np.all([a in self.IDs for a in ids]):
+        # if not np.all([a in self.IDs for a in ids]):
+        if not (ids[:, None] == self.IDs).any(-1).all():
             print("Not all required IDs are in the list provided")
             return None
         xys = []
@@ -503,7 +508,7 @@ class Geo(np.ndarray):
         """Area for the sub arrays using einsum based area calculations.
 
         Uses `_bit_area_` to calculate the area.
-        The ``by_shape=True`` parameter returns the area for each shape. If
+        The `by_shape=True` parameter returns the area for each shape. If
         False, each bit area is returned.  Negative areas are holes.
         """
         if self.K != 2:
@@ -917,15 +922,13 @@ class Geo(np.ndarray):
 
     def multipart_to_singlepart(self, info=""):
         """Convert multipart shapes to singleparts.  Return a new Geo array."""
-        ift = np.copy(self.IFT)                  # copy! the IFT, don't reuse
-        data = self.XY                           # reuse the data
-        w = np.where(ift[:, -1] == 0)[0]
-        dif = np.diff(w)
-        seq = np.arange(len(w) - 1)
-        ids = np.repeat(seq, dif)
-        ids = np.concatenate((ids, [ids[-1] + 1]))
+        z = self.outer_rings()
+        data = z.XY
+        # z1 = self.holes_to_shape()
+        ift = z.IFT
+        ids = np.arange(ift.shape[0])
         ift[:, 0] = ids                          # reset the ids
-        ift[:, -2] = np.ones(len(ift))           # reset the part ids to 1
+        # ift[:, -2] = np.ones(len(ift))           # reset the part ids to 1
         return Geo(data, IFT=ift, Kind=self.K, Extent=self.XT, Info=info)
 
     def fr_to_pnts(self):
@@ -999,9 +1002,9 @@ class Geo(np.ndarray):
         """Densify poly features by a specified distance.
 
         Convert multipart to singlepart features during the process.
-        Calls `_pnts_on_line_` for Geo bits.
+        Calls `_add_pnts_on_line_` for Geo bits.
         """
-        polys = [geom._pnts_on_line_(a, spacing) for a in self.bits]
+        polys = [geom._add_pnts_on_line_(a, spacing) for a in self.bits]
         g, ift, extent = array_IFT(polys)
         return Geo(g, ift, self.K, self.XT, "Densify by distance")
 
@@ -1022,7 +1025,7 @@ class Geo(np.ndarray):
         Calls `_percent_along`.
         """
         bits = self.bits
-        polys = [geom._pnts_on_line_(a, spacing=percent, is_percent=True)
+        polys = [geom._add_pnts_on_line_(a, spacing=percent, is_percent=True)
                  for a in bits]
         polys = [a + self.LL for a in polys]
         g0, ift, extent = array_IFT(polys)
@@ -1366,12 +1369,12 @@ class Geo(np.ndarray):
         npg_prn.prn_tbl(self.IFT_str)
 
     def roll_shapes(self):
-        """Run ``roll_coords`` as a method."""
+        """Run `roll_coords` as a method."""
         return roll_coords(self)
 
     # ---- (9) print, display Geo
     def prn(self, ids=None):
-        """Print all shapes if ``ids=None``, otherwise, provide an id list."""
+        """Print all shapes if `ids=None`, otherwise, provide an id list."""
         npg_prn.prn_Geo_shapes(self, ids)
 
     def prn_obj(self, full=False):
@@ -1422,7 +1425,7 @@ def roll_coords(self):
 
 
 def array_IFT(in_arrays, shift_to_origin=False):
-    """Produce the Geo array.  Construction information in ``npgDocs``."""
+    """Produce the Geo array.  Construction information in `npgDocs`."""
     id_too = []
     a_2d = []
     if isinstance(in_arrays, (list, tuple)):
@@ -1498,7 +1501,7 @@ def arrays_to_Geo(in_arrays, kind=2, info=None, to_origin=False):
     ----------
     in_arrays : arrays/lists/tuples
         `in_arrays` can be created by adding existing 2D arrays to a list.
-        You can also convert poly features to arrays using ``poly2arrays``.
+        You can also convert poly features to arrays using `poly2arrays`.
     kind : integer
         Points (0), polylines (1) or polygons (2).
     info : text
@@ -1509,7 +1512,7 @@ def arrays_to_Geo(in_arrays, kind=2, info=None, to_origin=False):
 
     Requires
     --------
-    array_IFT
+    `array_IFT`
 
     Returns
     -------
@@ -1519,12 +1522,12 @@ def arrays_to_Geo(in_arrays, kind=2, info=None, to_origin=False):
 
     Notes
     -----
-    `a_2d` will usually be an object array from ``array_IFT``.
+    `a_2d` will usually be an object array from `array_IFT`.
     It needs to be recast to a `float` array with shape Nx2 to proceed.
 
     See Also
     --------
-    Use ``npg_arc_npg.fc_geometry`` to produce `Geo` objects directly from
+    Use `npg_arc_npg.fc_geometry` to produce `Geo` objects directly from
     arcgis pro featureclasses.
     """
     # -- call array_IFT
@@ -1762,7 +1765,7 @@ def is_Geo(obj, verbose=False):
 
     Notes
     -----
-    More simply, just use ``hasattr(obj, "IFT")`` since all Geo arrays have
+    More simply, just use `hasattr(obj, "IFT")` since all Geo arrays have
     this attribute.
     """
     if hasattr(obj, "IFT"):

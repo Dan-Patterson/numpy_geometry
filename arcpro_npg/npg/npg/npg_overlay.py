@@ -29,7 +29,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2021-03-11
+    2021-05-29
 
 Purpose
 -------
@@ -71,14 +71,15 @@ import sys
 # from textwrap import dedent
 import numpy as np
 
-if 'npg' not in list(locals().keys()):
-    import npg
+# if 'npg' not in list(locals().keys()):
+#     import npg
 # import npGeo
 # from npGeo import array_IFT, arrays_to_Geo, roll_coords
-from npg_pip import np_wn
+from npg import npGeo, npg_pip, npg_helpers
+from npg.npg_pip import np_wn
 # import npg_helpers
-from npg_helpers import (_to_lists_, _bit_check_, _in_LBRT_,
-                         remove_geom, radial_sort)
+from npg.npg_helpers import (_to_lists_, _bit_check_, _in_LBRT_,
+                             remove_geom, radial_sort)
 
 # -- optional imports
 # from numpy.lib.recfunctions import structured_to_unstructured as stu
@@ -568,8 +569,8 @@ def dissolve(a, asGeo=True):
         else:
             out = r
     if asGeo:
-        out = npg.arrays_to_Geo(out, 2, "dissolved", False)
-        out = npg.roll_coords(out)
+        out = npGeo.arrays_to_Geo(out, 2, "dissolved", False)
+        out = npGeo.roll_coords(out)
     return out  # , missed
 
 
@@ -709,7 +710,7 @@ def append_(this, to_this):
             print("\nGeo array `kind` is not the same,\n")
             return None
     else:
-        a_stack, IFT, extent = npg.array_IFT(this)
+        a_stack, IFT, extent = npGeo.array_IFT(this)
     last = to_this.IFT[-1, :]
     add_ = []
     for i, row in enumerate(IFT, 1):
@@ -720,7 +721,7 @@ def append_(this, to_this):
     xys = np.vstack((to_this.XY, a_stack))
     kind = to_this.K
     sr = to_this.SR
-    out = npg.Geo(xys, IFT=new_ift, Kind=kind, Extent=None, Info="", SR=sr)
+    out = npGeo.Geo(xys, IFT=new_ift, Kind=kind, Extent=None, Info="", SR=sr)
     return out
 
 
@@ -758,7 +759,7 @@ def merge_(this, to_this):
     a = this      # --- rename to simplify the input names
     b = to_this   # merge a to b, or this to_this
     if not hasattr(b, 'IFT'):
-        b = npg.arrays_to_Geo(b)
+        b = npGeo.arrays_to_Geo(b)
     b_XY = b.XY
     b_IFT = b.IFT
     if hasattr(this, 'IFT'):
@@ -771,7 +772,7 @@ def merge_(this, to_this):
         a = np.asarray(a)
         if a.ndim == 2:
             a = [a]
-        a_XY, a_IFT, extent = npg.array_IFT(a)
+        a_XY, a_IFT, extent = npGeo.array_IFT(a)
         a_XY = a_XY + extent[0]
     last = b.IFT[-1, :]
     add_ = []
@@ -783,7 +784,7 @@ def merge_(this, to_this):
     xys = np.vstack((b_XY, a_XY))
     kind = b.K
     sr = b.SR
-    out = npg.Geo(xys, IFT=new_ift, Kind=kind, Extent=None, Info="", SR=sr)
+    out = npGeo.Geo(xys, IFT=new_ift, Kind=kind, Extent=None, Info="", SR=sr)
     return out
 
 

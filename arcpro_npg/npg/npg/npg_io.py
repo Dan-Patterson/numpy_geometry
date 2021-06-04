@@ -21,7 +21,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2020-12-20
+    2021-05-29
 
 Purpose
 -------
@@ -54,7 +54,7 @@ import sys
 import json
 import numpy as np
 
-import npGeo
+from npg import npGeo
 
 # ---- Keep for now.
 # from numpy.lib.recfunctions import structured_to_unstructured as stu

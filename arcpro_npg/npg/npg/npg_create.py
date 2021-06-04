@@ -14,7 +14,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2021-03-07
+    2021-05-29
 
 Purpose
 -------
@@ -84,9 +84,9 @@ import sys
 # from functools import wraps
 import numpy as np
 
-import npGeo
-from npGeo import arrays_to_Geo
-from npg_plots import plot_mixed  # plot_2d, plot_polygons
+from npg import npGeo, npg_plots
+from npg.npGeo import arrays_to_Geo
+from npg.npg_plots import plot_mixed  # plot_2d, plot_polygons
 
 np.set_printoptions(
     edgeitems=10, linewidth=120, precision=3, suppress=True, threshold=200,

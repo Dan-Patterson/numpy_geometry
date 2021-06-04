@@ -12,7 +12,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2021-05-02
+    2021-05-29
 
 Purpose
 -------
@@ -103,9 +103,6 @@ import numpy as np
 # from numpy.lib.recfunctions import unstructured_to_structured as uts
 
 # warnings.simplefilter('ignore', FutureWarning)
-
-# from arcpytools import fc_info, tweet  #, frmt_rec, _col_format
-# import arcpy
 
 np.set_printoptions(
     edgeitems=10, linewidth=120, precision=3, suppress=True, threshold=200,
