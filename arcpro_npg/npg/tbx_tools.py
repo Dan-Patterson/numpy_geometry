@@ -7,11 +7,11 @@ tbx_tools
 **Toolbox tools for Free tools.**
 
 Script :
-    C:\Git_Dan\npgeom\Project_npg\tbx_tools.py
+    'C:/Git_Dan/npgeom/Project_npg/tbx_tools.py'
 Author :
     Dan_Patterson@carleton.ca
 Modified :
-    2020-12-20
+    2021-06-03
 
 Purpose
 -------
@@ -121,18 +121,26 @@ import numpy as np
 from numpy.lib.recfunctions import append_fields
 
 # from importlib import reload
-import npg
+# import npg
+
+from npg import npGeo, npg_arc_npg, npg_create, npg_overlay
 
 from npg.npGeo import arrays_to_Geo  # Geo
 from npg.npg_arc_npg import (get_SR, get_shape_K, fc_to_Geo, Geo_to_fc,
                              Geo_to_arc_shapes)
 from npg.npg_create import circle
-from npg.npg_overlay import dissolve
+from npg.npg_overlay import dissolve, merge_
+
+# from npg.npGeo import arrays_to_Geo  # Geo
+# from npg.npg_arc_npg import (get_SR, get_shape_K, fc_to_Geo, Geo_to_fc,
+#                              Geo_to_arc_shapes)
+# from npg.npg_create import circle
+# from npg.npg_overlay import dissolve
 
 from scipy.spatial import Voronoi  # Delaunay
 
 import arcgisscripting as ags
-from arcpy import (env, AddMessage, Exists, gp, ImportToolbox)
+from arcpy import env, AddMessage, Exists, gp, ImportToolbox
 from arcpy.management import (
     AddField, CopyFeatures, CreateFeatureclass, Delete, MakeFeatureLayer,
     MultipartToSinglepart, SelectLayerByLocation, XYToLine)
@@ -163,7 +171,7 @@ tool_list = [
     'Vertices to Points',
     'Extent Sort', 'Geometry Sort',
     'Area Sort', 'Length Sort',
-    'Densify by Distance', 'Densify by Percent', 'Fill Holes',
+    'Densify by Distance', 'Densify by Percent', 'Fill Holes', 'Keep Holes',
     'Rotate Features', 'Shift Features', 'Dissolve Boundaries',
     'Delaunay', 'Voronoi']
 
@@ -186,6 +194,16 @@ msg_mp_sp = """\
     Multipart shapes have been converted to singlepart, so view any data
     carried over during the extendtable join as representing those from
     the original data.  Recalculate values where appropriate.
+    ----
+    """
+
+msg_pgon_pline = """\
+    ----
+    Multipart shapes have been converted to singlepart.  Inner and outer rings
+    (holes) have been retained, but the holes have been appended to the end.
+
+    If the featureclass is not added to the map, refresh the gdb in Catalog and
+    add the result to the map.
     ----
     """
 
@@ -373,9 +391,9 @@ def freq(a, cls_flds, stat_fld):
 def circles(in_fc, gdb, name, out_kind):
     """Minimum area bounding circles.
 
-    Change `angle=2` to a smaller value for
-    denser points on circle perimeter.
-    `getSR`, `get_shape_K`  and `fc_geometry` are from npg_io.
+    Change `angle=2` to a smaller value for denser points on circle perimeter.
+
+    `getSR`, `get_shape_K` and `fc_geometry` are from `npg_io`.
     """
     info = "bounding circles"
     g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
@@ -421,7 +439,7 @@ def mabr(in_fc, gdb, name, out_kind):
 def f2pnts(in_fc):
     """Features to points.
 
-    `getSR`, `get_shape_K` and `fc_geometry` from `npg_io`
+    `getSR`, `get_shape_K` and `fc_geometry` are from `npg_io`.
     """
     info = "feature to points"
     g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
@@ -438,22 +456,27 @@ def f2pnts(in_fc):
 def pgon_to_pline(in_fc, gdb, name):
     """Polygon to polyline conversion.
 
-    Multipart shapes are converted to singlepart.
-    The singlepart geometry is used to produce the polylines.
+    Multipart shapes are converted to singlepart.  Holes are re-oriented and
+    appended to the end of the outer-rings. The combined geometry is used to
+    produce the polylines.
     """
     info = "pgon to pline"
     g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
-    g0 = g.segment_polys(as_basic=True, shift_back=False, as_3d=False)
-    x, y = g0.LL
-    g0 = g0.translate(dx=x, dy=y)
-    Geo_to_fc(g0, gdb, name, kind="POLYLINE", SR=SR)
-    # out = "{}/{}".format(gdb, name)
+    dx, dy = LL = g.LL
+    z = g.outer_rings()
+    z1 = g.holes_to_shape()
+    z2 = merge_(z1, z)
+    z2.XT = g.XT - LL
+    z2 = z2.translate(dx, dy)
+    z2.K = 1
+    out_kind = "Polyline"
+    _out_(z2, gdb, name, out_kind, SR)
     # if Exists(out):
     #     d = fc_data(in_fc)
     #     import time
     #     time.sleep(1.0)
     #     da.ExtendTable(out, 'OBJECTID', d, 'OID_', append_only=False)
-    tweet(dedent(msg_mp_sp))
+    tweet(dedent(msg_pgon_pline))
     return
 
 
@@ -475,7 +498,7 @@ def split_at_vertices(in_fc, out_fc):
 
 # vertices to points
 def p_uni_pnts(in_fc):
-    """Implement `_polys_to_unique_pnts_` in ``npg_helpers``."""
+    """Implement `_polys_to_unique_pnts_` in `npg_helpers`."""
     info = "unique points"
     g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
     out = g.polys_to_points(keep_order=True, as_structured=True)
@@ -581,6 +604,25 @@ def fill_holes(in_fc, gdb, name):
     return
 
 
+def keep_holes(in_fc, gdb, name):
+    """Fill holes in a featureclass.  See the Eliminate part tool."""
+    SR = get_SR(in_fc)
+    # tmp = MultipartToSinglepart(in_fc, r"memory\in_fc_temp")
+    g, oids, shp_kind, k, m, SR = _in_(in_fc, info="fill holes")  # in_fc = tmp
+    if g.is_multipart():
+        g = g.multipart_to_singlepart(info="")
+    i_rings = g.inner_rings(True)
+    out_kind = shp_kind
+    x, y = g.LL
+    i_rings = i_rings.translate(dx=x, dy=y)
+    _out_(i_rings, gdb, name, out_kind, SR)
+    # out = "{}/{}".format(gdb, name)
+    # if Exists(out):
+    #     import time
+    #     time.sleep(1.0)
+    #     d = fc_data(tmp)
+    #     da.ExtendTable(out, 'OBJECTID', d, 'OID@')
+    return
 def rotater(in_fc, gdb, name, as_group, angle, clockwise):
     """Rotate features separately or as a group."""
     SR = get_SR(in_fc)
@@ -613,7 +655,7 @@ def shifter(in_fc, gdb, name, dX, dY):
         g = g.multipart_to_singlepart(info="")
     out_kind = shp_kind
     x, y = g.LL
-    g0 = g.translate(dx=x+dX, dy=y+dY)
+    g0 = g.translate(x + dX, y + dY)
     _out_(g0, gdb, name, out_kind, SR)
     # out = "{}/{}".format(gdb, name)
     # if Exists(out):
@@ -665,7 +707,7 @@ def vor_poly(in_fc, gdb, name, out_kind):
     g, oids, shp_kind, k, m, SR = _in_(tmp, info="voronoi")
     out = []
     L, B, R, T = g.aoi_extent()  # full extent for infinity circle
-    xc, yc = np.array([(R - L)/2., (T - B)/2.])
+    xc, yc = np.array([(R - L) / 2., (T - B) / 2.])
     radius = max((R - L), (T - B)) * 10
     inf_circ = circle(radius, xc=xc, yc=yc)
     pnts = [np.vstack((g.XY, inf_circ))]
@@ -742,7 +784,11 @@ def pick_tool(tool, in_fc, out_fc, gdb, name):
         cls_flds = cls_flds.split(";")  # multiple to list, singleton a list
         if stat_fld in (None, 'NoneType', ""):
             stat_fld = None
-        a = ags.da.TableToNumPyArray(in_fc, "*")  # use the whole array
+        # use the whole array and skip nulls
+        if stat_fld is not None:
+            all_flds = cls_flds + [stat_fld]
+        a = ags.da.TableToNumPyArray(
+            in_fc, field_names=all_flds, skip_nulls=True)
         out = freq(a, cls_flds, stat_fld)         # do freq analysis
         if Exists(out_fc) and env.overwriteOutput:
             Delete(out_fc)
@@ -797,7 +843,9 @@ def pick_tool(tool, in_fc, out_fc, gdb, name):
         dens_fact(in_fc, gdb, name, dist)
     elif tool == 'Fill Holes':                   # ---- (4) fill holes
         fill_holes(in_fc, gdb, name)
-    elif tool == 'Rotate Features':              # ---- (5) rotate
+    elif tool == 'Keep Holes':                   # ---- (5) keep holes
+        keep_holes(in_fc, gdb, name)
+    elif tool == 'Rotate Features':              # ---- (6) rotate
         clockwise = False
         as_group = False
         rot_type = str(sys.argv[4])  # True: extent center. False: shape center
@@ -808,7 +856,7 @@ def pick_tool(tool, in_fc, out_fc, gdb, name):
         if clockwise.lower() == "true":
             clockwise = True
         rotater(in_fc, gdb, name, as_group, angle, clockwise)
-    elif tool == 'Shift Features':               # ---- (6) shift
+    elif tool == 'Shift Features':               # ---- (7) shift
         dX = float(sys.argv[4])
         dY = float(sys.argv[5])
         shifter(in_fc, gdb, name, dX=dX, dY=dY)
@@ -862,7 +910,7 @@ def _tool_(tools=tool_list):
     out_fc = sys.argv[3]
     tweet("out_fc  {}".format(out_fc))
     if out_fc not in (None, 'None'):
-        gdb, name = check_path(out_fc)               # ---- check the paths
+        gdb, name = check_path(out_fc)           # ---- check the paths
         if gdb is None:
             tweet(dedent(msg0))
             return None
