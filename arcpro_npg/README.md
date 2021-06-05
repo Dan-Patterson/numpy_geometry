@@ -12,8 +12,10 @@
 
 **New home base for Free Tools**
 
-The image to the right reflects the tools as they stand on 2020/12/20. 
-The main script controlling all tools in the toolbox is *tbx_tools.py* in this folder. 
+The image to the right reflects the tools as they stand on 2021/06/03.
+
+The */npg* folder contains the toolbox for ArcGIS Pro (2.8 although may work with 2.7).
+The main script controlling all tools in the toolbox is *tbx_tools.py* in the */npg* folder. 
 
 ----
 
