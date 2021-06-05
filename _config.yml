@@ -5,6 +5,9 @@ theme: jekyll-theme-dinky
 # theme: jekyll-theme-cayman
 show_downloads: true
 
+# Exclude
+exclude: [assets/css, Docs, images, arcpro_npg/images, arcpro_npg/npg/npg]
+
 # Name of website
 name: NumPy Geometry
 description: Working with geometry using numpy.
