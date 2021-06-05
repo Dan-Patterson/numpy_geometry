@@ -1,0 +1,23 @@
+# gitignore
+# temporary/working/backup files #
+*.bak
+.project
+
+# Compiled source examples from numpy#
+######################################
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.o.d
+*.py[ocd]
+*.so
+
+# Things specific to as project #
+#################################
+assets/css
+Docs
+images
+arcpro_npg/images
+arcpro_npg/npg/npg
