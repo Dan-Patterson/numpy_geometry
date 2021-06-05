@@ -1,6 +1,8 @@
 # gitignore
 # temporary/working/backup files #
 *.bak
+*.md
+*.yml
 .project
 
 # Compiled source examples from numpy#
