@@ -16,9 +16,11 @@ The image to the right reflects the tools as they stand on 2021/06/043.
 
 The */npg* folder contains 
 
-- **npg_tools.tbx** :  the toolbox for ArcGIS Pro (2.8 although may work with 2.7).
-- **tbx_tools.py**  :  the main script controlling all tools in the toolbox
-- **../npg**        :  the scripts folder which contains the modules imported by *tbx_tools*. 
+file, folder | purpose
+------------ | -------
+npg_tools.tbx |  the toolbox for ArcGIS Pro (2.8 although may work with 2.7).
+tbx_tools.py  |  the main script controlling all tools in the toolbox
+../npg        |  the scripts folder which contains the modules imported by *tbx_tools*. 
 
 ----
 
