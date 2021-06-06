@@ -12,21 +12,24 @@
 
 **New home base for Free Tools**
 
-The image to the right reflects the tools as they stand on 2021/06/043.
-
-The */npg* folder contains 
-
-file, folder | purpose
------------- | -------
-npg_tools.tbx |  the toolbox for ArcGIS Pro (2.8 although may work with 2.7).
-tbx_tools.py  |  the main script controlling all tools in the toolbox
-../npg        |  the scripts folder which contains the modules imported by *tbx_tools*. 
-
-----
-
 Developed in ArcGIS Pro 2.8 - 2.6, python 3.7.10 and 3.6.x-3.6.10 and numpy 1.16.5-1.20.2.
 
 These demo scripts and the toolbox show how numpy and arcpy can play nice together and generate geometries that are normally only available at the ArcGIS Pro Advanced level.  The tools are already provided to do this, but less attention is paid to the attributes.
+
+The image to the right reflects the tools as they stand on 2021/06/043.
+
+The */npg* folder contains the toolbox and scripts needed to run the tools in ArcGIS Pro.
+
+The basic structure is as follows:
+
+file, folder | purpose
+------------ | -------
+npg/npg_tools.tbx |  the toolbox for ArcGIS Pro (2.8 although may work with 2.7).
+npg/tbx_tools.py  |  the main script controlling all tools in the toolbox
+npg/npg           |  the scripts folder which contains the modules imported by *tbx_tools*. 
+
+
+
 
 Usually a spatial and/or attribute join enables one to bring the attributes from the input class to the output class.
 
