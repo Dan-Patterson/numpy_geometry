@@ -219,6 +219,6 @@ You can buffer:
 - buffer by increasing the area or perimeter (for polygons obviously).
  
 This is an example of the last which is based on the offset buffer, but using area as the parameter.
-<img src="final.png" align="right" width="400"/>
+<img src="buffer_final.png" align="right" width="300"/>
 
 So remember what goes into the buffer and that not all information that you would expect to see is shown in all geometry representations.
