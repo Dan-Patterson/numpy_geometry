@@ -21,9 +21,14 @@ So initially I thought I would just show the geometry created by buffering a sim
  
 But what about a buffer?  The outward corners have that circular appearance, maintaining the offset radius (aka the buffer size) from the line work.  One would expect teeny-tiny circular arcs to appear in the geometry representation.  At worse, perhaps an n-gon representation of the arc.
  
-Not so.  Here is a square green polygon being shown in Spyder with the arcpy's new svg display.  Pretty cool, but I like my numpy array version better (in red)
+<img src="square.png" align="right" width="200"/>
+Not so.  Here is a square green polygon being shown in Spyder with the arcpy's new svg display.
+
+Pretty cool, but I like my numpy array version better (in red)
+
+<img src="square1.png" align="right" width="200"/>
  
-PICTURE
+Here are the coordinates derived from arcpy's polygon array object.
 
 ```python
 p_0[0]
