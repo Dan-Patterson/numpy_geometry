@@ -69,6 +69,11 @@ Generally, I am only working with featureclasses stored in a file geodatabase.\
 There are tools to derive geometries from geojson format or other formats capable of generating array-like structures.
 
 ----
+## Blog posts ##
+* [Buffer mysteries](/Docs/blogs/buffer/buffer_mysteries.md)
+
+
+----
 **Some links**
 
 *2020*
