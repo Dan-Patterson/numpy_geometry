@@ -20,14 +20,19 @@ To the rescue... a little buffer, a selectorama, intersect, spatial join... what
 So initially I thought I would just show the geometry created by buffering a simple shape or two to show the point densification on the outward corners.  In the old days a buffer around a point was represented by a 36sided circle, if you like, an n-gon.  Pretty good if the buffer was small, but seriously lame when the buffer radius was very large.  Crrrrankout a buffer on a shapefile to see what I mean.  Many a line of code was written to approximate a true circle.  Now you can.
  
 But what about a buffer?  The outward corners have that circular appearance, maintaining the offset radius (aka the buffer size) from the line work.  One would expect teeny-tiny circular arcs to appear in the geometry representation.  At worse, perhaps an n-gon representation of the arc.
- 
-<img src="square.png" align="right" width="200"/>
-Not so.  Here is a square green polygon being shown in Spyder with the arcpy's new svg display.
+
+Not so.
+<img src="square.png" align="left" width="100"/>
+Here is a square green polygon being shown in Spyder with the arcpy's new svg display.
+<img src="square2.png" align="right" width="100"/>
 
 Pretty cool, but I like my numpy array version better (in red)
-
-<img src="square1.png" align="right" width="200"/>
  
+ 
+
+
+
+----
 Here are the coordinates derived from arcpy's polygon array object.
 
 ```python
@@ -167,14 +172,40 @@ print(arc)                   ID    degrees
  [20.8819423 , 10.47141085],  11
 
  ```
+
+<img src="buffer_geometry.png" align="right" width="300"/>
 SVG to the rescue!
+
 Huge swaths of coordinates for each corner. 
+
 Miraculously, they have appeared by some hidden magic that we are not made party to.
  
 
+
+
 So, What do the corners look like?
 
-As expected.  I created the rounded corners for the numpy-based Geo array.  In the example below, I plotted the SVG corner points and the Geo array points.  An angle of about 5 degrees (give or take) is used by both. Smooth enough and you can account for area calculations if you know number of outward buffer corners, the total angular passage and the number n-gon shape.  Or just use arcpy's Polygon methods to get the area.
+As expected.
+
+I created the rounded corners for the numpy-based Geo array.
+
+----
+
+
+
+In the example below, I plotted the SVG corner points and the Geo array points.
+<img src="buffer_geometry2.png" align="right" width="300"/>
+
+An angle of about 5 degrees (give or take) is used by both.
+
+Smooth enough and you can account for area calculations if you know number of outward buffer corners, the total angular passage and the number n-gon shape.
+
+
+
+
+
+Or just use arcpy's Polygon methods to get the area.
+
 
 ----
 
@@ -188,5 +219,6 @@ You can buffer:
 - buffer by increasing the area or perimeter (for polygons obviously).
  
 This is an example of the last which is based on the offset buffer, but using area as the parameter.
+<img src="final.png" align="right" width="400"/>
 
 So remember what goes into the buffer and that not all information that you would expect to see is shown in all geometry representations.
