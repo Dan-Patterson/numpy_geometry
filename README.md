@@ -70,7 +70,7 @@ There are tools to derive geometries from geojson format or other formats capabl
 
 ----
 
-See **geo_numeracy** for more examples of numpy geometry functions.
+See the **geonumeracy** repository for more examples of numpy geometry functions.
 
 ----
 **Some links**
