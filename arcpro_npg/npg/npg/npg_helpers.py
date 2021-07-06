@@ -16,7 +16,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2021-05-29
+    2021-06-07
 
 Purpose
 -------
@@ -114,7 +114,7 @@ def _get_base_(a):
 
 
 def _bit_check_(a, just_outer=False):
-    """Check for bits and convert if necessary.
+    r"""Check for bits and convert if necessary.
 
     Parameters
     ----------
@@ -195,6 +195,36 @@ def uniq_1d(arr):
     mask[:1] = True
     mask[1:] = arr[1:] != arr[:-1]
     return arr[mask]
+
+
+def uniq_2d(arr, return_sorted=False):  # *** keep but slower than unique
+    """Return mini `unique` for 2D coordinates.  Derived from np.unique."""
+
+    def _reshape_uniq_(uniq, dt, shp):
+        n = len(uniq)
+        uniq = uniq.view(dt)
+        uniq = uniq.reshape(n, *shp[1:])
+        uniq = np.moveaxis(uniq, 0, 0)
+        return uniq
+
+    shp = arr.shape
+    dt = arr.dtype
+    st_arr = arr.view(dt.descr * shp[1])
+    ar = st_arr.flatten()
+    if return_sorted:
+        perm = ar.argsort(kind='mergesort')
+        aux = ar[perm]
+    else:
+        ar.sort()
+        aux = ar
+    mask = np.empty(aux.shape, dtype=np.bool_)
+    mask[:1] = True
+    mask[1:] = aux[1:] != aux[:-1]
+    ret = aux[mask]
+    uniq = _reshape_uniq_(ret, dt, shp)
+    if return_sorted:  # return_index in unique
+        return uniq, perm[mask]
+    return uniq
 
 
 # ---------------------------------------------------------------------------
@@ -608,7 +638,7 @@ def polyline_angles(a, fromNorth=False):
     Parameters
     ----------
     a : array-like
-        A Geo array or a list of arrays representing the polyline shapes
+        A Geo array or a list of arrays representing the polyline shapes.
     """
     bits = _bit_check_(a, just_outer=False)
     out = []
@@ -1053,8 +1083,8 @@ def coerce2array(arr, start=0):
                 if chk2[0]:
                     out.append(np.asarray(arr[i], dtype='float').squeeze())
                 else:
-                    chk3 = _len_check_(arr[i])
-                    print("chk3 {}".format(chk3))
+                    # chk3 = _len_check_(arr[i])  # testing, keep for now
+                    # print("chk3 {}".format(chk3))
                     for ar in arr[i]:
                         sub.append(np.asarray(ar, dtype='float').squeeze())
                     dt1 = 'O' if len(sub) > 1 else 'float'

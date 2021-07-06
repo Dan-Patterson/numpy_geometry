@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2021-05-29
+    2021-06-11
 
 Purpose
 -------
@@ -128,7 +128,7 @@ from scipy.spatial import ConvexHull as CH
 from scipy.spatial import Delaunay
 
 # import npGeo
-from npg import (npGeo, npg_helpers, npg_pip)
+from npg import npGeo, npg_helpers, npg_pip
 from npg.npg_helpers import (
     _get_base_, _bit_area_, _bit_min_max_, _in_extent_, _angles_3pnt_)
 from npg.npg_pip import np_wn
@@ -1079,7 +1079,7 @@ def pnts_in_pnts(pnts, geo, just_common=True):
 
     See Also
     --------
-    `npGeo.pnts_in_Geo` for Geo arrays explicitly.
+    `npg_pip.pnts_in_Geo` for Geo arrays explicitly.
     """
     w = np.where((pnts == geo[:, None]).all(-1))[1]
     if len(w) > 0:

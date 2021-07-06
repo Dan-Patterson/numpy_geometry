@@ -19,7 +19,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2021-05-29
+    2021-06-30
 
 Purpose
 -------
@@ -149,6 +149,10 @@ def make_row_format(dim=3, cols=5, a_kind='f', deci=1,
 
     ``a_kind``, ``deci``, ``a_max`` and ``a_min`` allow you to specify a data
     type, number of decimals and maximum and minimum values to test formatting.
+
+    Requires
+    --------
+    ``col_hdr``
     """
     if a_kind not in NUMS:
         a_kind = 'f'
@@ -182,6 +186,11 @@ def prn_(a, deci=2, width=120, prefix=". . "):
         An np.ndarray with `ndim` 1 through 5 supported.
     others :
         self-evident
+
+    Requires
+    --------
+    - `from textwrap import indent`
+    - `make_row_format`, `col_hdr`
     """
     def _piece(sub, i, frmt, linewidth):
         """Piece together 3D chunks by row."""
@@ -201,7 +210,9 @@ def prn_(a, deci=2, width=120, prefix=". . "):
     out = "\n"
     linewidth = width
     if a.ndim <= 1:
-        return a
+        for i, arr in enumerate(a):
+            print("{} ...\n{}".format(i, arr))
+        return
     if a.ndim == 2:
         a = a.reshape((1,) + a.shape)
     # -- pull the 1st and 3rd dimension for 3D and 4D arrays
@@ -244,6 +255,10 @@ def prn_tbl(a, rows_m=20, names=None, deci=2, width=75):
         The number of decimal places to print for all floating point columns.
     width : int
         Print width in characters.
+
+    Requires
+    --------
+    `_ckw_`, `_col_format`
 
     See Also
     --------
@@ -307,6 +322,10 @@ def prn_geo(a, rows_m=100, names=None, deci=2, width=75):
         The number of decimal places to print for all floating point columns.
     width : int
         Print width in characters.
+
+    Requires
+    --------
+    `_ckw_`, `_col_format`
     """
     # --
     if names is None:
@@ -358,13 +377,17 @@ def prn_geo(a, rows_m=100, names=None, deci=2, width=75):
 def prn_lists(a, max_=None, prn_structure=False):
     """Print nested lists as string.
 
+    Requires
+    --------
+    ``npg.shape_finder``
+
     See Also
     --------
     ``npg_helpers.shape_finder`` to print or return the structure of the nested
     structure.
     """
     if prn_structure:
-        n_h.shape_finder(a, prn=True)
+        n_h.shape_finder(a, prn=True)  # see npg_helpers
     if max_ is None:
         max_ = 70
     for i, v in enumerate(a):
@@ -385,6 +408,11 @@ def prn_arrays(a, edgeitems=2):
     The expectation is that the array has nested objects or ndim is > 3:
     edgeitems, threshold : integer
         This is on a per sub array basis.
+
+    Note
+    ----
+    `npGeo.prn_arr(self)` is a shortcut to this.  The Geo array is converted to
+    a list of arrays using `geo.as_arrays()`, then passed to here.
     """
     def _ht_(a, _e):
         """Print 2d array."""
@@ -392,6 +420,8 @@ def prn_arrays(a, edgeitems=2):
         tail = repr(a[-_e:].tolist())[1:]
         return head, tail
 
+    if a.ndim == 2:
+        return a
     _e = edgeitems
     s = n_h.shape_finder(a)
     u, cnts = np.unique(s[['shape', 'part']], return_counts=True)

@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2021-05-29
+    2021-06-08
 
 Purpose
 -------
@@ -404,8 +404,9 @@ asGeo : Boolean
 
 Notes
 -----
->>> a.pull_shapes(np.arange(3:8))  # get shapes over a range of values
->>> a.pull_shapes([1, 3, 5])  # get selected shapes
+>>> a.get_shapes(2)               # get shape with an ID of 2
+>>> a.get_shapes(np.arange(3:8))  # get shapes over a range of ID values
+>>> a.get_shapes([1, 3, 5])       # get selected shapes
 """
 
 # ---- (8) is_in

@@ -415,7 +415,7 @@ def _as_pivot(a):
     flds = list(a.dtype.names)
     r = np.unique(a[flds[0]])
     c = np.unique(a[flds[1]])
-    z = np.zeros((len(r) + 1, len(c) + 1), dtype=np.float)
+    z = np.zeros((len(r) + 1, len(c) + 1), dtype=np.float64)
     rc = [[(np.where(r == i[0])[0]).item(),
            (np.where(c == i[1])[0]).item()] for i in a]
     for i in range(len(a)):

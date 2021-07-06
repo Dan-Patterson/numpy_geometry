@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# noqa: E401, D205, D400, F401, F403
+# noqa: E401, E402, D205, D400, F401, F403
 # pylint: disable=C0410
 r"""
 npg  NumPy Geometry
@@ -19,7 +19,7 @@ Author :
 - Dan_Patterson@carleton.ca
 - https://github.com/Dan-Patterson
 
-Modified : 2021-05-02
+Modified : 2021-06-10
     Creation date during 2019 as part of ``arraytools``.
 
 Purpose

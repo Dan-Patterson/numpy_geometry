@@ -12,11 +12,11 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2021-05-29
+    2021-06-12
 
 Purpose
 -------
-Tools for working with numpy arrays.  From arraytools.utils.
+Tools for working with numpy arrays.  Originally from arraytools.utils.
 
 Useage
 ------
@@ -28,7 +28,7 @@ Useage
 Retrieve function information::
 
     get_func(func, line_nums=True, verbose=True)
-    print(art.get_func(art.main))
+    print(npg.get_func(art.main))
 
     Function: .... main ....
     Line number... 1334
@@ -496,8 +496,8 @@ def _utils_help_():
     """
     _hf = """
     :-------------------------------------------------------------------:
-    : ---- arrtools functions  (loaded as 'art') ----
-    : ---- from utils.py
+    : ---- npg functions  (loaded as 'npg') ----
+    : ---- from npg_utils.py
     (1)  doc_func(func=None)
          documenting code using inspect
     (2)  get_func(obj, line_nums=True, verbose=True)
