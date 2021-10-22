@@ -206,11 +206,13 @@ def save_geo(g, f_name, folder):
 
 
 def load_txt(name="arr.txt", data_type=None):
-    """Read a structured/recarray created by save_txt.
+    r"""Read a structured/recarray created by save_txt.
 
     Parameters
     ----------
-    dtype : data type
+    name : text
+        Raw-encoding path to *.csv.  eg.  r'C:\Data\csv\SampleData.csv'
+    data type : dtype
         If `None`, it allows the structure to be read from the array.
     delimiter : string
         Use a comma delimiter by default.
@@ -219,13 +221,38 @@ def load_txt(name="arr.txt", data_type=None):
     names : boolean
         If `True`, the first row contains the field names.
     encoding :
-        Set to None to use system default.
+        Set to None to use system default or utf-8
     see np.genfromtxt for all `args` and `kwargs`.
 
+    Example
+    -------
+
+    sample csv ::
+
+        "IDs","Float_vals","Text_vals","Int_vals","Int_as_text","Lead_int"
+        1,2.98,a,38,38,0038
+        2,9.99,b,74,74,0074
+        3,1.23,c,35,35,0035
+        4,3.45,d,9,9,0009
+        5,4.56,e,10,10,0010
+
+    >>> dt = np.dtype([('IDs', 'i8'), ('Float_vals', 'f8'),
+    ...                ('Text_vals', 'U5'), ('Int_vals', 'i8'),
+    ...                 ('Int_as_text', 'U8'), ('Lead_int', 'U8')])
+    >>> a = np.genfromtxt(tbl, dtype=dt, delimiter=",", names=True,
+    ...                   autostrip=True, encoding='utf-8')
+    array([(1,   2.98, 'a', 38, '38', '0038'),
+           (2,   9.99, 'b', 74, '74', '0074'),
+           (3,   1.23, 'c', 35, '35', '0035'),
+           (4,   3.45, 'd',  9, '9', '0009'),
+           (5,   4.56, 'e', 10, '10', '0010')],
+          dtype=[('IDs', '<i8'), ('Float_vals', '<f8'),
+                 ('Text_vals', '<U5'), ('Int_vals', '<i8'),
+                 ('Int_as_text', '<U8'), ('Lead_int', '<U8')])
     """
     a = np.genfromtxt(
         name, dtype=data_type, delimiter=", ", names=True, autostrip=True,
-        encoding=None)  # ,skip_header=1)
+        encoding=None)
     return a
 
 

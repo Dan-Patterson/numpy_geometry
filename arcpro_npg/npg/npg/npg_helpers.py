@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+# pylint: disable=C0103,C0302,C0415
+# pylint: disable=E1101,E1121
+# pylint: disable=W0105,W0201,W0212,W0221,W0611,W0612,W0621
+# pylint: disable=R0902,R0904,R0912,R0913,R0914,R0915
 # noqa: D205, D400, F403
 r"""
 -----------
@@ -16,7 +20,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2021-06-07
+    2021-09-03
 
 Purpose
 -------
@@ -84,7 +88,7 @@ nums = 'efdgFDGbBhHiIlLqQpP'
 
 # -- See script header
 __all__ = [
-    'common_pnts', 'compare_geom', 'flat', 'interweave', 'keep_geom',
+    'a_eq_b', 'common_pnts', 'compare_geom', 'flat', 'interweave', 'keep_geom',
     'polyline_angles',
     'radial_sort', 'remove_geom', 'segment_angles', 'shape_finder',
     'coerce2array', 'dist_angle_sort', 'sort_xy', 'stride_2d', 'reclass_ids',
@@ -95,9 +99,9 @@ __helpers__ = [
     'prn_tbl', '_angles_3pnt_', '_od_angles_dist_', '_area_centroid_',
     '_bit_area_', '_bit_check_', '_bit_crossproduct_', '_bit_length_',
     '_bit_min_max_', '_bit_segment_angles_', '_from_to_pnts_', '_get_base_',
-    '_in_LBRT_', '_in_extent_', '_is_ccw_', '_is_clockwise_', '_is_right_side',
-    '_isin_2d_', '_pnts_in_extent_', '_rotate_', '_scale_', '_to_lists_',
-    '_trans_rot_', '_translate_', '_perp_', 'cartesian_product'
+    '_in_LBRT_', '_in_extent_', '_is_clockwise_', '_is_ccw_', '_is_convex_',
+    '_is_right_side', '_isin_2d_', '_pnts_in_extent_', '_rotate_', '_scale_',
+    '_to_lists_', '_trans_rot_', '_translate_', '_perp_', 'cartesian_product'
 ]  # ---- core bit functions
 
 __all__ = __helpers__ + __all__
@@ -184,7 +188,7 @@ def _to_lists_(a, outer_only=True):
         elif a.ndim == 2:
             return [a]
         elif a.ndim == 3:
-            return [i for i in a]
+            return list(a)
     else:  # a list already
         return a
 
@@ -193,8 +197,9 @@ def uniq_1d(arr):
     """Return mini 1D unique."""
     mask = np.empty(arr.shape, dtype=np.bool_)
     mask[:1] = True
-    mask[1:] = arr[1:] != arr[:-1]
-    return arr[mask]
+    a_copy = np.sort(arr)
+    mask[1:] = a_copy[1:] != a_copy[:-1]
+    return a_copy[mask]
 
 
 def uniq_2d(arr, return_sorted=False):  # *** keep but slower than unique
@@ -225,6 +230,36 @@ def uniq_2d(arr, return_sorted=False):  # *** keep but slower than unique
     if return_sorted:  # return_index in unique
         return uniq, perm[mask]
     return uniq
+
+
+def a_eq_b(a, b, atol=1.0e-8, rtol=1.0e-5, return_pnts=False):
+    r"""Return indices of, or points where two point arrays are equal.
+
+    Parameters
+    ----------
+    a, b : 2d arrays
+        No error checking so ensure that a and b are 2d, but their shape need
+        not be the same.
+
+    Notes
+    -----
+    Modified from `np.isclose`, stripping out the nan and ma checks.
+    Adjust atol and rtol appropriately.
+
+    >>> np.nonzero(_a_eq_b_(a, b))[0]
+
+    One could use::
+
+    >>> np.equal(A, B).all(1).nonzero()[0]
+    >>> np.where((a[:, None] == b).all(-1).any(1))[0]
+
+    If you aren't worried about floating-point issues in equality checks.
+    """
+    b = b[:, None]
+    w = np.less_equal(np.abs(a - b), atol + rtol * abs(b)).all(-1).any(0)
+    if return_pnts:
+        return a[w]
+    return w
 
 
 # ---------------------------------------------------------------------------
@@ -486,6 +521,12 @@ def _is_clockwise_(a):
 def _is_ccw_(a):
     """Counterclockwise."""
     return 0 if _bit_area_(a) > 0. else 1
+
+
+def _is_convex_(a):
+    """Return whether a polygon is convex"""
+    check = _bit_crossproduct_(a)  # cross product
+    return np.all(check > 0)
 
 
 def _isin_2d_(a, b, as_integer=False):

@@ -426,7 +426,7 @@ def plot_polygons(arr, outline=True, random_colors=False):
     def _line(p, plt):  # , arrow=True):  # , color, marker, linewdth):
         """Connect the points."""
         X, Y = p[:, 0], p[:, 1]
-        plt.plot(X, Y, color='black', linestyle='solid', linewidth=2)
+        plt.plot(X, Y, color='black', linestyle='solid', linewidth=1)
     # --
     if hasattr(arr, 'IFT'):
         cw = arr.CW
@@ -451,10 +451,10 @@ def plot_polygons(arr, outline=True, random_colors=False):
         if outline:   # _line(shape, plt)  # alternate, see line for options
             if random_colors:
                 plt.fill(*zip(*shape), fill='none', facecolor='none',
-                         edgecolor=colors_[i], linewidth=3)
+                         edgecolor=colors_[i], linewidth=2)
             else:
                 plt.fill(*zip(*shape), fill='none', facecolor='none',
-                         edgecolor='black', linewidth=3)
+                         edgecolor='black', linewidth=2)
         else:
             if hasattr(arr, 'IFT'):
                 if cw[i] == 0:

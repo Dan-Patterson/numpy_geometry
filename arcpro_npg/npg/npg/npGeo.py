@@ -14,10 +14,9 @@ properties.
 """
 # pylint: disable=C0103,C0302,C0415
 # pylint: disable=E1101,E1121
-# pylint: disable=W0105,W0201,W0212,W0221,W0612,W0621
+# pylint: disable=W0105,W0201,W0212,W0221,W0611,W0612,W0621
 # pylint: disable=R0902,R0904,R0912,R0913,R0914,R0915
 
-from __future__ import annotations
 import sys
 from textwrap import indent, dedent, wrap
 import numpy as np
@@ -74,13 +73,12 @@ __all__ = [
 #
 
 class Geo(np.ndarray):
-    """
-    Geo class.
+    """Geo class.
 
-    This class is based on the ndarray is created using `npg.arrays_to_Geo`,
-    `npg.array_IFT` and `npg.roll_coords`. See `npg.npg_arc_npg` and
-    `npg.npg_io` for methods to acquire the ndarrays needed from other data
-    sources.
+    This class is based on NumPy's ndarrays.  They are created using
+    `npg.arrays_to_Geo`, `npg.array_IFT` and `npg.roll_coords`.
+    See `npg.npg_arc_npg` and `npg.npg_io` for methods to acquire the ndarrays
+    needed from other data sources.
     """
 
     __name__ = "npGeo"
@@ -195,7 +193,7 @@ class Geo(np.ndarray):
     def info(self):
         """Convert an IFT array to full information.
 
-        Only the first 50 records maximum will be printed. To see the data
+        Only the first 50 records (maximum) will be printed. To see the data
         structure, and/or more records use the `prn_geo` method.
         """
         info_ = self.IFT_str[:50]
@@ -321,7 +319,7 @@ class Geo(np.ndarray):
     def shp_pnt_cnt(self):
         """Points in each shape.  Columns: shape, points."""
         df = self.To - self.Fr
-        cnt = np.bincount(self.IDs, df)[1:]
+        cnt = np.bincount(self.IDs, weights=df)[1:]
         gt0 = np.nonzero(cnt)[0]         # -- discontinuous ids
         out = np.zeros((self.N, 2), dtype=np.int32)
         out[:, 0] = self.U
