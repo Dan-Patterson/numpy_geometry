@@ -75,6 +75,14 @@ See the **geonumeracy** repository for more examples of numpy geometry functions
 ----
 **Some links**
 
+*2021*
+
+- [NumPy and Arcpy play nice](https://community.esri.com/t5/python-blog/numpy-and-arcpy-play-nice/ba-p/1119719)
+- [What's in that module?](https://community.esri.com/t5/python-blog/what-s-in-that-module/ba-p/1111083)
+- [Arcpy Dependencies](https://community.esri.com/t5/python-blog/arcpy-dependencies/ba-p/1089485)
+- [Group, split and reclass using numpy, python and arcpy](https://community.esri.com/t5/python-blog/group-split-and-reclass-using-numpy-python-and/ba-p/1084357)
+- [Documenting Python Code](https://community.esri.com/t5/python-blog/documenting-python-code/ba-p/1075535)
+
 *2020*
 
 - [Dissolve Boundaries](https://community.esri.com/t5/python-blog/dissolve-boundaries/ba-p/1011337)
