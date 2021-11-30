@@ -77,6 +77,7 @@ See the **geonumeracy** repository for more examples of numpy geometry functions
 
 *2021*
 
+- [NumPy and Arcpy play nice: part 2](https://community.esri.com/t5/python-blog/numpy-and-arcpy-play-nice-part-2/ba-p/1120621)
 - [NumPy and Arcpy play nice](https://community.esri.com/t5/python-blog/numpy-and-arcpy-play-nice/ba-p/1119719)
 - [What's in that module?](https://community.esri.com/t5/python-blog/what-s-in-that-module/ba-p/1111083)
 - [Arcpy Dependencies](https://community.esri.com/t5/python-blog/arcpy-dependencies/ba-p/1089485)
