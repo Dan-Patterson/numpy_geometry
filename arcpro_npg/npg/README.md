@@ -1,5 +1,9 @@
 # Working with npg
 
+**NOTE**
+
+I am in the process of updating to the 2.9 toolbox format.  Wait until I am done if you are using ArcGIS Pro 2.9.
+
 **Tools and the Toolbox**
 
 The toolbox ( ``npg_tools.tbx`` ) and the script ( ``tbx_tools.py`` ) in this folder, plus the contents of the ``npg`` folder are used to define the Geo class and provide the ability work with geometry.
