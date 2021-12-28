@@ -205,7 +205,7 @@ def save_geo(g, f_name, folder):
     return
 
 
-def load_txt(name="arr.txt", data_type=None):
+def load_txt(name="arr.txt", names=None, data_type=None):
     r"""Read a structured/recarray created by save_txt.
 
     Parameters
@@ -250,13 +250,15 @@ def load_txt(name="arr.txt", data_type=None):
                  ('Text_vals', '<U5'), ('Int_vals', '<i8'),
                  ('Int_as_text', '<U8'), ('Lead_int', '<U8')])
     """
+    if names is not None:
+        names = names
     a = np.genfromtxt(
-        name, dtype=data_type, delimiter=", ", names=True, autostrip=True,
+        name, dtype=data_type, delimiter=",", names=names, autostrip=True,
         encoding=None)
     return a
 
 
-def save_txt(a, name="arr.txt", sep=", ", dt_hdr=True):
+def save_txt(a, name="arr.txt", sep=",", dt_hdr=True):
     """Save a NumPy structured/recarray to text.
 
     Parameters
@@ -271,8 +273,10 @@ def save_txt(a, name="arr.txt", sep=", ", dt_hdr=True):
         If True, add dtype names to the header of the file.
 
     """
-    a_names = ", ".join(a.dtype.names)
-    hdr = ["", a_names][dt_hdr]  # use "" or names from input array
+    hdr = ""
+    if a.dtype.names is not None:
+        a_names = ", ".join(a.dtype.names)
+        hdr = ["", a_names][dt_hdr]  # use "" or names from input array
     s = np.array(a.tolist(), dtype=np.unicode_)
     widths = [max([len(i) for i in s[:, j]])
               for j in range(s.shape[1])]

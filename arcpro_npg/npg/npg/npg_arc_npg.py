@@ -275,13 +275,15 @@ def fc_to_Geo(in_fc, geom_kind=2, minX=0, minY=0, sp_ref=None, info=""):
     id_vals = oids[indx]
     indx = np.concatenate((indx, [a.shape[0]]))
     #
-    # -- (3) Construct the IFT data using `id_fr_to` to carry the load.
+    # -- (3) Just return points and extent for point data
+
+    # -- (4) Construct the IFT data using `id_fr_to` to carry the load.
     IFT_ = np.asarray(id_fr_to(xy, oids))
     cols = IFT_.shape[0]
     IFT = np.full((cols, 6), -1, dtype=np.int32)
     IFT[:, :3] = IFT_
     #
-    # -- (4) clockwise check for polygon parts to identify outer/inner rings
+    # -- (5) clockwise check for polygon parts to identify outer/inner rings
     if kind == 2:  # polygons
         xy_arr = stu(xy)   # View the data as an unstructured array
         cl_wise = np.array([_cw_(xy_arr[i[1]:i[2]]) for i in IFT_])
@@ -289,7 +291,7 @@ def fc_to_Geo(in_fc, geom_kind=2, minX=0, minY=0, sp_ref=None, info=""):
         cl_wise = np.full_like(oids, -1)
     IFT[:, 3] = cl_wise
     #
-    # -- (5) construct part_ids and pnt_nums
+    # -- (6) construct part_ids and pnt_nums
     if kind == 2:
         parts = [np.cumsum(IFT[:, 3][IFT[:, 0] == i]) for i in id_vals]
         part_ids = np.concatenate(parts)
@@ -304,7 +306,7 @@ def fc_to_Geo(in_fc, geom_kind=2, minX=0, minY=0, sp_ref=None, info=""):
     IFT[:, 4] = part_ids
     IFT[:, 5] = pnt_nums
     #
-    # -- (6) Create the output array... as easy as ``a`` to ``z``
+    # -- (7) Create the output array... as easy as ``a`` to ``z``
     z = Geo(xy_arr, IFT, kind, Extent=extent, Info="test", SR=sp_ref)
     out = copy.deepcopy(z)
     return out
@@ -576,7 +578,7 @@ def fc_data(in_fc, include_oid=True, int_null=-999):
 
 
 # Featureclass table attribute data
-def tbl_data(in_tbl):
+def tbl_data(in_tbl, int_null=-999):
     """Pull all editable attributes from a featureclass tables.
 
     During the process, <null> values are changed to an appropriate type.
@@ -592,7 +594,8 @@ def tbl_data(in_tbl):
     `OID_`, `X_cent`, `Y_cent`, where the latter two are the centroid values.
     """
     flds = ['OID@']
-    null_dict, fld_names = make_nulls(in_tbl, include_oid=True, int_null=-999)
+    null_dict, fld_names = make_nulls(in_tbl, include_oid=True,
+                                      int_null=int_null)
     if flds not in fld_names:
         new_names = out_flds = fld_names
     if fld_names[0] == 'OID@':

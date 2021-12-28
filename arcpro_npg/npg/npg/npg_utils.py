@@ -143,14 +143,14 @@ def time_deco(func):  # timing originally
 
     @wraps(func)
     def wrapper(*args, **kwargs):
-        t_0 = time.perf_counter()        # start time
-        result = func(*args, **kwargs)   # ... run the function ...
-        t_1 = time.perf_counter()        # end time
+        t_0 = time.perf_counter() * 1000  # start time
+        result = func(*args, **kwargs)    # ... run the function ...
+        t_1 = time.perf_counter() * 1000  # end time
         dt = t_1 - t_0
         print("\nTiming function for... {}".format(func.__name__))
         if result is None:
             result = 0
-        print("  Time: {: <8.2e}s for {:,} objects".format(dt, result))
+        print("  Time: {: <8.3f}ms for {:,} objects".format(dt, len(result)))
         return result                    # return the result of the function
         # return dt                      # return delta time
     return wrapper

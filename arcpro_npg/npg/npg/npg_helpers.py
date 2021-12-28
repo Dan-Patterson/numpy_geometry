@@ -241,6 +241,11 @@ def a_eq_b(a, b, atol=1.0e-8, rtol=1.0e-5, return_pnts=False):
         No error checking so ensure that a and b are 2d, but their shape need
         not be the same.
 
+    Returns
+    -------
+    Points found to be equal or the indices of where they are equal and
+    whether any points are equal.
+
     Notes
     -----
     Modified from `np.isclose`, stripping out the nan and ma checks.
@@ -255,11 +260,16 @@ def a_eq_b(a, b, atol=1.0e-8, rtol=1.0e-5, return_pnts=False):
 
     If you aren't worried about floating-point issues in equality checks.
     """
-    b = b[:, None]
-    w = np.less_equal(np.abs(a - b), atol + rtol * abs(b)).all(-1).any(0)
+    a = np.atleast_2d(a)
+    b = np.atleast_2d(b)
+    if b.size > 2:
+        b = b[:, None]
+    w = np.less_equal(np.abs(a - b), atol + rtol * abs(b)).all(-1)
+    if w.ndim > 1:
+        w = w.any(0).squeeze()
     if return_pnts:
         return a[w]
-    return w
+    return w.squeeze()
 
 
 # ---------------------------------------------------------------------------
@@ -801,7 +811,7 @@ def remove_geom(arr, look_for, **kwargs):
 # ---------------------------------------------------------------------------
 # ---- (6) sort coordinates
 #
-def sort_xy(a, x_ascending=True, y_ascending=True):
+def sort_xy(a, x_ascending=True, y_ascending=True, return_order=True):
     """Sort points by coordinates.
 
     Parameters
@@ -816,12 +826,16 @@ def sort_xy(a, x_ascending=True, y_ascending=True):
     y_s = a[:, 1]
     if x_ascending:
         if y_ascending:
-            return a[np.lexsort((y_s, x_s))]
-        return a[np.lexsort((-y_s, x_s))]
+            order = np.lexsort((y_s, x_s))
+            return a[order], order
+        order = np.lexsort((-y_s, x_s))
+        return a[order], order
     if y_ascending:
         if x_ascending:
-            return a[np.lexsort((x_s, y_s))]
-        return a[np.lexsort((-x_s, y_s))]
+            order = np.lexsort((x_s, y_s))
+            return a[order], order
+        order = np.lexsort((-x_s, y_s))
+        return a[order], order
 
 
 def dist_angle_sort(a, sort_point=None, close_poly=True):

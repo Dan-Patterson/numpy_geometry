@@ -19,7 +19,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2021-06-11
+    2021-23-11
 
 Purpose
 -------
@@ -77,7 +77,7 @@ See comment by Serge Tolstov in:
 <https://community.esri.com/thread/244587-check-geometry-fails-in-shared
 -origin-edge-case>`_.
 
-**Clipping,intersection references**
+**Clipping, intersection references**
 
 `Sutherland-Hodgman polygon clipping
 <https://rosettacode.org/wiki/Sutherland-Hodgman_polygon_clipping>`_.

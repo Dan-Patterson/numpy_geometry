@@ -1533,7 +1533,7 @@ def arrays_to_Geo(in_arrays, kind=2, info=None, to_origin=False):
 
     Returns
     -------
-    A `Geo` class object based on a 2D np.ndarray (a_2d) with an array of
+    A `Geo` class object, based on a 2D np.ndarray (a_2d), and an array of
     indices (IFT) delineating geometry from-to points for each shape and its
     parts.
 
@@ -1565,7 +1565,8 @@ def arrays_to_Geo(in_arrays, kind=2, info=None, to_origin=False):
             fix_prt = [np.cumsum(g.CW[g.IDs == i]) for i in g.U]
             z0[:, 4] = np.concatenate(fix_prt)
             w = np.where(z0[:, 3] == 1)[0]
-            w = np.concatenate((np.where(z0[:, 3] == 1)[0], [z0.shape[-1]]))
+            # note, below changed z0.shape[-1] to z0.shape[0]
+            w = np.concatenate((np.where(z0[:, 3] == 1)[0], [z0.shape[0]]))
             dif = w[1:] - w[:-1]
             if len(dif) > 1:  # *** added
                 fix_seq = np.concatenate([np.arange(i) for i in dif])

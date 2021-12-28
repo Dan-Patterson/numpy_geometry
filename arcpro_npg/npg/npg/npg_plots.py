@@ -64,7 +64,7 @@ import numpy as np
 # import npg_create
 # import npg
 
-# import matplotlib
+import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 # import matplotlib.lines as lines
@@ -187,9 +187,9 @@ def scatter_params(plt, fig, ax, title="Title", ax_lbls=None):
     ax.ticklabel_format(style='sci', axis='both', useOffset=False)
     ax.xaxis.label_position = 'bottom'
     ax.yaxis.label_position = 'left'
-    plt.xlabel(x_label, fontdict=font1, labelpad=12, size=14)
-    plt.ylabel(y_label, fontdict=font1, labelpad=12, size=14)
-    plt.title(title + "\n", loc='center', fontdict=font1, size=20)
+    plt.xlabel(x_label, fontdict=font1, labelpad=12, size=12)
+    plt.ylabel(y_label, fontdict=font1, labelpad=12, size=12)
+    plt.title(title + "\n", loc='center', fontdict=font1, size=18)
     # plt.tight_layout(pad=0.2, h_pad=0.1, w_pad=0.1)
     plt.grid(True)
     return
@@ -219,7 +219,7 @@ def plot_mixed(data, title="Title", invert_y=False, ax_lbls=None):
         """
         lbl = np.arange(len(pnts))
         for label, xpt, ypt in zip(lbl[:], pnts[:, 0], pnts[:, 1]):
-            plt.annotate(label, xy=(xpt, ypt), xytext=(2, 2), size=14,
+            plt.annotate(label, xy=(xpt, ypt), xytext=(2, 2), size=10,
                          textcoords='offset points', ha='left', va='bottom')
 
     def _line(p, plt):  # , arrow=True):  # , color, marker, linewdth):
@@ -246,12 +246,12 @@ def plot_mixed(data, title="Title", invert_y=False, ax_lbls=None):
             _label_pnts(pnts, plt)
         elif kind == 2:
             cmap = plt.cm.get_cmap('hsv', len(pnts))
-            for j, p in enumerate(pnts):
-                clr = cmap(j)  # clr=np.random.random(3,)  # clr = "b"
-                clr = 'None'
-                _line(p, plt)  # color, marker, linewdth=2)
-                plt.fill(*zip(*p), facecolor=clr)
-                _scatter(p, plt, color, marker)
+            # for j, p in enumerate(pnts):
+            clr = cmap(i)  # clr=np.random.random(3,)  # clr = "b"
+            clr = 'None'
+            _line(pnts, plt)  # color, marker, linewdth=2)
+            #plt.fill(*zip(*p), facecolor=clr)
+            _scatter(pnts, plt, color, marker)
     plt.show()
 
 
@@ -327,7 +327,7 @@ def plot_2d(pnts, label_pnts=False, connect=False,
         """
         lbl = np.arange(len(pnts))
         for label, xpt, ypt in zip(lbl[:], pnts[:, 0], pnts[:, 1]):
-            plt.annotate(label, xy=(xpt, ypt), xytext=(2, 2), size=14,
+            plt.annotate(label, xy=(xpt, ypt), xytext=(2, 2), size=12,
                          textcoords='offset points', ha='left', va='bottom')
 
     # ---- main plotting routine
@@ -459,6 +459,8 @@ def plot_polygons(arr, outline=True, random_colors=False):
             if hasattr(arr, 'IFT'):
                 if cw[i] == 0:
                     clr = "w"
+                else:
+                    clr = colors_[i]
             else:
                 clr = colors_[i]  # clr=np.random.random(3,)  # clr = "b"
             plt.fill(*zip(*shape), facecolor=clr)
