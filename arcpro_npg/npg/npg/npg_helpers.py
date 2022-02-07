@@ -827,15 +827,16 @@ def sort_xy(a, x_ascending=True, y_ascending=True, return_order=True):
     if x_ascending:
         if y_ascending:
             order = np.lexsort((y_s, x_s))
-            return a[order], order
-        order = np.lexsort((-y_s, x_s))
-        return a[order], order
-    if y_ascending:
-        if x_ascending:
-            order = np.lexsort((x_s, y_s))
-            return a[order], order
-        order = np.lexsort((-x_s, y_s))
-        return a[order], order
+        else:
+            order = np.lexsort((-y_s, x_s))
+    elif not x_ascending:
+        if y_ascending:
+            order = np.lexsort((y_s, -x_s))
+        else:
+            order = np.lexsort((-y_s, -x_s))
+    if return_order:
+        return order
+    return a[order]
 
 
 def dist_angle_sort(a, sort_point=None, close_poly=True):

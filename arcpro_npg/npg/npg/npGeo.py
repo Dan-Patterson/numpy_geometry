@@ -534,7 +534,7 @@ class Geo(np.ndarray):
         return bit_lengs
 
     def centers(self, by_shape=True):
-        """Return the center of a shape's outer ring points."""
+        """Return the center of outer ring points."""
         if by_shape:
             shps = self.shapes
             if self.K == 2:
@@ -1104,7 +1104,7 @@ class Geo(np.ndarray):
         """Return the common segments in poly features.
 
         The result is an array of  from-to pairs of points.  ft, tf pairs are
-        evaluated to denote common and duplicates.
+        evaluated to denote common segments or duplicates.
 
         Parameters
         ----------

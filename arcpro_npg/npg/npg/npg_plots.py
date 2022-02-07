@@ -248,9 +248,9 @@ def plot_mixed(data, title="Title", invert_y=False, ax_lbls=None):
             cmap = plt.cm.get_cmap('hsv', len(pnts))
             # for j, p in enumerate(pnts):
             clr = cmap(i)  # clr=np.random.random(3,)  # clr = "b"
-            clr = 'None'
+            # clr = 'None'
             _line(pnts, plt)  # color, marker, linewdth=2)
-            #plt.fill(*zip(*p), facecolor=clr)
+            # plt.fill(*zip(*p), facecolor=clr)
             _scatter(pnts, plt, color, marker)
     plt.show()
 
@@ -402,15 +402,16 @@ def plot_3d(a):
     plt.show()
 
 
-def plot_polygons(arr, outline=True, random_colors=False):
+def plot_polygons(arr, outline=True, vertices=True,
+                  labels=True, random_colors=True):
     """Plot Geo array poly boundaries.
 
     Parameters
     ----------
     arr : ndarray or Geo array
-        If the arrays is a Geo array, it will convert it to `arr.bits`.
+        If the array is a Geo array, it will be converted to `arr.bits`.
     outline : boolean
-        True, returns the outline of the polygon.  False, fills the polygon
+        True, returns the outline of the polygon.  False, fills the polygon.
 
     References
     ----------
@@ -418,7 +419,7 @@ def plot_polygons(arr, outline=True, random_colors=False):
 
     Example
     -------
-    use hexs to demonstrate::
+    Use hexs to demonstrate::
 
         h = npg.npg_create.hex_flat(dx=1, dy=1, x_cols=5, y_rows=3,
                                     orig_x=0, orig_y=0, kind=2, asGeo=True)
@@ -427,6 +428,23 @@ def plot_polygons(arr, outline=True, random_colors=False):
         """Connect the points."""
         X, Y = p[:, 0], p[:, 1]
         plt.plot(X, Y, color='black', linestyle='solid', linewidth=1)
+
+    def _label_pnts(pnts, plt):
+        """Label the points.
+
+        Note: to skips the last label for polygons, use
+        zip(lbl[:-1], pnts[:-1, 0], pnts[:-1, 1])
+        """
+        lbl = np.arange(len(pnts))
+        for label, xpt, ypt in zip(lbl[:], pnts[:, 0], pnts[:, 1]):
+            plt.annotate(label, xy=(xpt, ypt), xytext=(2, 2),
+                         size=8, textcoords='offset points',
+                         ha='left', va='bottom')
+
+    def _scatter(p, plt, size, color, marker):
+        """Do the actual point plotting. Change `s` to increase marker size."""
+        X, Y = p[:, 0], p[:, 1]
+        plt.scatter(X, Y, s=50, c=color, linewidths=None, marker=marker)
     # --
     if hasattr(arr, 'IFT'):
         cw = arr.CW
@@ -438,11 +456,16 @@ def plot_polygons(arr, outline=True, random_colors=False):
             shapes = arr
     elif isinstance(arr, (list, tuple)):
         shapes = arr
+
+    font1 = {'family': 'sans-serif',
+             'weight': 'bold', 'size': 12} #  'color': 'black',
     fig, ax = plt.subplots(1, 1)
     fig.set_figheight = 8
     fig.set_figwidth = 8
     fig.dpi = 200
     plt.tight_layout(pad=0.2, h_pad=0.1, w_pad=0.1)
+    plt.grid(False)
+    plt.rc('font', **font1)
     ax.set_aspect('equal', adjustable='box')
     # cmap = plt.cm.get_cmap(plt.cm.viridis, 143)  # default colormap
     colors_ = ['black', 'blue', 'green', 'red', 'darkgrey', 'magenta',
@@ -465,6 +488,10 @@ def plot_polygons(arr, outline=True, random_colors=False):
                 clr = colors_[i]  # clr=np.random.random(3,)  # clr = "b"
             plt.fill(*zip(*shape), facecolor=clr)
     # --
+        if vertices:
+            _scatter(shape[:-1], plt, size=50, color=colors_[i], marker=".")
+        if labels:
+            _label_pnts(shape[:-1], plt)
     plt.show()
     return plt
 
