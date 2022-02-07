@@ -12,11 +12,11 @@
 
 **New home base for Free Tools**
 
-Developed in ArcGIS Pro 2.8 - 2.6, python 3.7.10 and 3.6.x-3.6.10 and numpy 1.16.5-1.20.2.
+Developed in ArcGIS Pro 2.9 - 2.6, python 3.7.10 and 3.6.x-3.6.10 and numpy 1.16.5-1.20.2.
 
 These demo scripts and the toolbox show how numpy and arcpy can play nice together and generate geometries that are normally only available at the ArcGIS Pro Advanced level.  The tools are already provided to do this, but less attention is paid to the attributes.
 
-The image to the right reflects the tools as they stand on 2021/06/043.
+The image to the right reflects the tools as they stand on 2022/02/07.
 
 The */npg* folder contains the toolbox and scripts needed to run the tools in ArcGIS Pro.
 
@@ -44,6 +44,9 @@ a simple conversion of the geometry type, no fancy intersection and overlap stuf
 You get what you pay for, but the widest use is probably the simplest.
 
 ----
+## Last update : 2022-02-07 ##
+Fixed some errors...(I hope).
+
 ## Last update : 2021-06-04 ##
 Rewrites of many functions to optimize array concatenations.
 *npg_clip* is still being tested.  convex polygons pose no problems, but clipping that results in multipart geometries is still being investigated.
