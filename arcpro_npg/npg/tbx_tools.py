@@ -11,7 +11,7 @@ Script :
 Author :
     Dan_Patterson@carleton.ca
 Modified :
-    2021-06-03
+    2022-02-07
 
 Purpose
 -------
@@ -123,11 +123,11 @@ from numpy.lib.recfunctions import append_fields
 # from importlib import reload
 # import npg
 
-from npg import npGeo, npg_arc_npg, npg_create, npg_overlay
+# from npg import npGeo, npg_arc_npg, npg_create, npg_overlay
 
 from npg.npGeo import arrays_to_Geo  # Geo
 from npg.npg_arc_npg import (get_SR, get_shape_K, fc_to_Geo, Geo_to_fc,
-                             Geo_to_arc_shapes)
+                             Geo_to_arc_shapes, fc_data)
 from npg.npg_create import circle
 from npg.npg_overlay import dissolve, merge_
 
@@ -140,7 +140,7 @@ from npg.npg_overlay import dissolve, merge_
 from scipy.spatial import Voronoi  # Delaunay
 
 import arcgisscripting as ags
-from arcpy import env, AddMessage, Exists, gp, ImportToolbox
+from arcpy import da, env, AddMessage, Exists  # ImportToolbox, gp
 from arcpy.management import (
     AddField, CopyFeatures, CreateFeatureclass, Delete, MakeFeatureLayer,
     MultipartToSinglepart, SelectLayerByLocation, XYToLine)
@@ -177,35 +177,35 @@ tool_list = [
 
 # ===========================================================================
 # ---- def section: def code blocks go here ---------------------------------
-msg0 = """\
-    ----
-    Either you failed to specify the geodatabase location and filename properly
-    or you had flotsam, including spaces, in the path, like...\n
-    ...  {}\n
-    Create a safe path and try again...\n
-    `Filenames and paths in Python`
-    <https://community.esri.com/blogs/dan_patterson/2016/08/14/filenames-and
-    -file-paths-in-python>`_.
-    ----
-    """
+msg0 = """
+----
+Either you failed to specify the geodatabase location and filename properly
+or you had flotsam, including spaces, in the path, like...\n
+...  {}\n
+Create a safe path and try again...\n
+`Filenames and paths in Python`
+<https://community.esri.com/blogs/dan_patterson/2016/08/14/filenames-and
+-file-paths-in-python>`_.
+----
+"""
 
-msg_mp_sp = """\
-    ----
-    Multipart shapes have been converted to singlepart, so view any data
-    carried over during the extendtable join as representing those from
-    the original data.  Recalculate values where appropriate.
-    ----
-    """
+msg_mp_sp = """
+----
+Multipart shapes have been converted to singlepart, so view any data
+carried over during the extendtable join as representing those from
+the original data.  Recalculate values where appropriate.
+----
+"""
 
-msg_pgon_pline = """\
-    ----
-    Multipart shapes have been converted to singlepart.  Inner and outer rings
-    (holes) have been retained, but the holes have been appended to the end.
+msg_pgon_pline = """
+----
+Multipart shapes have been converted to singlepart.  Inner and outer rings
+(holes) have been retained, but the holes have been appended to the end.
 
-    If the featureclass is not added to the map, refresh the gdb in Catalog and
-    add the result to the map.
-    ----
-    """
+If the featureclass is not added to the map, refresh the gdb in Catalog and
+add the result to the map.
+----
+"""
 
 
 def tweet(msg):
@@ -299,6 +299,17 @@ def _out_(shps, gdb, name, out_kind, SR):
        Spatial reference object name or kind.
     """
     Geo_to_fc(shps, gdb=gdb, name=name, kind=out_kind, SR=SR)
+
+
+def _extend_table_(shps, gdb, name, in_fc):
+    """Return."""
+    out = gdb + "\\" + name
+    if Exists(out):
+        d = fc_data(in_fc)
+        import time
+        time.sleep(1.0)
+        da.ExtendTable(out, 'OBJECTID', d, 'OID_', append_only=False)
+    return
 
 
 def temp_fc(geo, name, kind, SR):
@@ -608,7 +619,7 @@ def keep_holes(in_fc, gdb, name):
     """Fill holes in a featureclass.  See the Eliminate part tool."""
     SR = get_SR(in_fc)
     # tmp = MultipartToSinglepart(in_fc, r"memory\in_fc_temp")
-    g, oids, shp_kind, k, m, SR = _in_(in_fc, info="fill holes")  # in_fc = tmp
+    g, oids, shp_kind, k, m, SR = _in_(in_fc, info="keep holes")  # in_fc = tmp
     if g.is_multipart():
         g = g.multipart_to_singlepart(info="")
     i_rings = g.inner_rings(True)
@@ -623,10 +634,11 @@ def keep_holes(in_fc, gdb, name):
     #     d = fc_data(tmp)
     #     da.ExtendTable(out, 'OBJECTID', d, 'OID@')
     return
+
+
 def rotater(in_fc, gdb, name, as_group, angle, clockwise):
     """Rotate features separately or as a group."""
     SR = get_SR(in_fc)
-    # tmp = MultipartToSinglepart(in_fc, r"memory\in_fc_temp")  # in_fc = tmp
     g, oids, shp_kind, k, m, SR = _in_(in_fc, info="rotate features")
     if g.is_multipart():
         g = g.multipart_to_singlepart(info="")
@@ -742,22 +754,22 @@ def vor_poly(in_fc, gdb, name, out_kind):
 # tbx = pth + "/npGeom.tbx"
 # tbx = ImportToolbox(tbx)
 
-f0 = """\
-    -------------------
-    Source script... {}
-    Using :
-        tool   : {}
-        input  : {}
-        output : {}
-    -------------------
-    """
+f0 = """
+-------------------
+Source script... {}
+Using :
+    tool   : {}
+    input  : {}
+    output : {}
+-------------------
+"""
 
-f1 = """\
-    ------------------
-    Sorting      : {}
-    Using fields : {}
-    Output field : {}
-    -----------------
+f1 = """
+------------------
+Sorting      : {}
+Using fields : {}
+Output field : {}
+-----------------
 """
 
 
