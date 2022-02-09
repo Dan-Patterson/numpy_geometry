@@ -613,7 +613,7 @@ def _svg(arr, as_polygon=True):
         o_f_s = ["1.0", "none", "red"]
     # --
     d_x, d_y = (R - L, T - B)
-    hght = min([max([150., d_y]), 200])  # ---- height 150 to 200
+    hght = min([max([225., d_y]), 300])  # ---- height 150-200, or 225-300
     width = int(d_x / d_y * hght)
     scale_by = max([d_x, d_y]) / max([width, hght])
     # --

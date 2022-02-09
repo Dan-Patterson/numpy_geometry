@@ -16,7 +16,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2021-05-29
+    2022-02-07
 
 Purpose
 -------
@@ -278,7 +278,10 @@ def fc_to_Geo(in_fc, geom_kind=2, minX=0, minY=0, sp_ref=None, info=""):
     # -- (3) Just return points and extent for point data
 
     # -- (4) Construct the IFT data using `id_fr_to` to carry the load.
-    IFT_ = np.asarray(id_fr_to(xy, oids))
+    if kind == 2:
+        IFT_ = np.asarray(id_fr_to(xy, oids))
+    elif kind == 1:
+        IFT_ = np.vstack((id_vals, indx[:-1], indx[1:])).T
     cols = IFT_.shape[0]
     IFT = np.full((cols, 6), -1, dtype=np.int32)
     IFT[:, :3] = IFT_
@@ -288,7 +291,8 @@ def fc_to_Geo(in_fc, geom_kind=2, minX=0, minY=0, sp_ref=None, info=""):
         xy_arr = stu(xy)   # View the data as an unstructured array
         cl_wise = np.array([_cw_(xy_arr[i[1]:i[2]]) for i in IFT_])
     else:  # not relevant for polylines or points
-        cl_wise = np.full_like(oids, -1)
+        xy_arr = stu(xy)
+        cl_wise = np.full(IFT.shape[0], 1)   # np.full_like(oids, -1)
     IFT[:, 3] = cl_wise
     #
     # -- (6) construct part_ids and pnt_nums
@@ -300,9 +304,15 @@ def fc_to_Geo(in_fc, geom_kind=2, minX=0, minY=0, sp_ref=None, info=""):
         pnt_nums = np.zeros(IFT.shape[0], dtype=np.int32)
         for (i, j) in ar0:  # now provide the point numbers per part per shape
             pnt_nums[i:j] = np.arange((j - i))  # smooth!!!
-    else:
-        part_ids = np.ones_like(oids)
-        pnt_nums = np.ones_like(oids)
+    elif kind == 1:  # single part polylines assumed
+        part_ids = np.full(IFT.shape[0], 1)
+        pnt_nums = np.full(IFT.shape[0], 1)
+        ar = np.where(IFT[:, 3] == 1)[0]
+        ar0 = np.stack((ar[:-1], ar[1:])).T
+        pnt_nums = np.zeros(IFT.shape[0], dtype=np.int32)
+        for (i, j) in ar0:  # now provide the point numbers per part per shape
+            pnt_nums[i:j] = np.arange((j - i))  # smooth!!!
+    #
     IFT[:, 4] = part_ids
     IFT[:, 5] = pnt_nums
     #
@@ -569,11 +579,16 @@ def fc_data(in_fc, include_oid=True, int_null=-999):
     flds = ["Shape", "SHAPE@", "SHAPE@X", "SHAPE@Y", "SHAPE@Z",
             "SHAPE@XY", "SHAPE@TRUECENTROID", "SHAPE@JSON",
             "SHAPE@AREA", "SHAPE@LENGTH"]  # "OID@"
-    new_names = [[i, i.replace("@", "__")][i in flds] for i in fld_names]
-    a = FeatureClassToNumPyArray(
+    new_names = []
+    if fld_names is not None:
+        new_names = [[i, i.replace("@", "__")][i in flds] for i in fld_names]
+    else:
+        fld_names = "*"
+    a = TableToNumPyArray(
         in_fc, fld_names, skip_nulls=False, null_value=null_dict
     )
-    a.dtype.names = new_names
+    if new_names:
+        a.dtype.names = new_names
     return np.asarray(a)
 
 
@@ -942,5 +957,5 @@ def fc_dissolve(in_fc, poly_type="polygon"):
 # ---- main section
 if __name__ == "__main__":
     """optional location for parameters"""
-    in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\Polygons"
-    in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\Polygons2"
+    # in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\Polygons"
+    # in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\Polygons2"

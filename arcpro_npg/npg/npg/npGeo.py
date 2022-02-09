@@ -1122,7 +1122,7 @@ class Geo(np.ndarray):
             return None
         h_0 = uts(fr_to)
         names = h_0.dtype.names
-        h_1 = h_0[list(names[2:4] + names[:2])]  # x_to, y_to and x_fr, y_fr
+        h_1 = h_0[list(names[2:4] + names[:2])]  # x_to, y_to and x_fr, y_frr
         idx = np.isin(h_0, h_1)
         common = h_0[idx]
         common = uniq_1d(common)  # replace np.unique(common) sorts output
@@ -1478,6 +1478,8 @@ def array_IFT(in_arrays, shift_to_origin=False):
             sub = []
             p = p.squeeze()
             b_id = 0
+            if len(p) < 3:
+                continue  # bust out only 3 or fewer points
             if len(p.shape) == 2:
                 id_too.append([cnt, b_id, len(p)])
                 sub.append(np.asarray(p))
