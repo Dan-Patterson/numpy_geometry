@@ -88,11 +88,11 @@ nums = 'efdgFDGbBhHiIlLqQpP'
 
 # -- See script header
 __all__ = [
-    'a_eq_b', 'common_pnts', 'compare_geom', 'flat', 'interweave', 'keep_geom',
-    'polyline_angles',
-    'radial_sort', 'remove_geom', 'segment_angles', 'shape_finder',
-    'coerce2array', 'dist_angle_sort', 'sort_xy', 'stride_2d', 'reclass_ids',
-    'uniq_1d'
+    'a_eq_b', 'cartesian_product', 'coerce2array', 'common_pnts',
+    'compare_geom', 'dist_angle_sort', 'flat', 'interweave', 'keep_geom',
+    'polyline_angles', 'project_pnt_to_line', 'radial_sort', 'remove_geom',
+    'segment_angles', 'shape_finder', 'sort_xy', 'stride_2d', 'reclass_ids',
+    'uniq_1d', 'uniq_2d'
 ]
 
 __helpers__ = [
@@ -101,7 +101,7 @@ __helpers__ = [
     '_bit_min_max_', '_bit_segment_angles_', '_from_to_pnts_', '_get_base_',
     '_in_LBRT_', '_in_extent_', '_is_clockwise_', '_is_ccw_', '_is_convex_',
     '_is_right_side', '_isin_2d_', '_pnts_in_extent_', '_rotate_', '_scale_',
-    '_to_lists_', '_trans_rot_', '_translate_', '_perp_', 'cartesian_product'
+    '_to_lists_', '_trans_rot_', '_translate_', '_perp_'
 ]  # ---- core bit functions
 
 __all__ = __helpers__ + __all__
