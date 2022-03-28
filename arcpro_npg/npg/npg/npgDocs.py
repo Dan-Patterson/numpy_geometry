@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# noqa: D205, D400
+# noqa: D205, D400, E501
 r"""
 -----------
 npgDocs.py
@@ -18,11 +18,11 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2021-10-21
+    2022-03-28
 
 Purpose
 -------
-Documentation strings.  These docstrings are assigned in the __init__.py file.
+Documentation strings.  These docstrings are assigned in the npGeo.py file.
 
 """
 # pycodestyle D205 gets rid of that one blank line thing
@@ -36,7 +36,6 @@ import sys
 # from textwrap import dedent
 import numpy as np
 
-# noqa: E501
 ft = {"bool": lambda x: repr(x.astype(np.int32)),
       "float_kind": '{: 0.2f}'.format}
 np.set_printoptions(
@@ -69,7 +68,7 @@ Author :
 def _update_docstring(obj, doc):
     """Update/expand a docstring.
 
-    Based on _add_docstring in function_base.py
+    Based on _add_docstring in NumPy core function_base.py
     """
     try:
         obj.__doc__ = doc

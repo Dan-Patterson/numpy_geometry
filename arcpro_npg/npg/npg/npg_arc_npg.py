@@ -660,7 +660,7 @@ def fc2na(in_fc):
 
 # ---- (7) Geo or ndarrays to poly features
 #
-def array_poly(arr, p_type=None, sr=None, IFT=None):
+def array_poly(arrs, p_type=None, sr=None, IFT=None):
     """Assemble poly features from Geo or ndarrays.
 
     Used by `geometry_fc` or it can be used separately.
@@ -682,23 +682,11 @@ def array_poly(arr, p_type=None, sr=None, IFT=None):
     features can be multipart with or without interior rings.
 
     Outer rings are ordered clockwise, inner rings (holes) are ordered
-    counterclockwise.  For polylines, there is no concept of order.
-    Splitting is modelled after _nan_split_(arr).
+    counterclockwise.
     """
     def _arr_poly_(arr, SR, as_type):
         """Slice the array where nan values appear, splitting them off."""
-        subs = []
-        s = np.isnan(arr[:, 0])
-        if np.any(s):
-            w = np.where(s)[0]
-            ss = np.split(arr, w)
-            subs = [ss[0]]
-            subs.extend(i[1:] for i in ss[1:])
-        else:
-            subs.append(arr)
-        aa = []
-        for sub in subs:
-            aa.append([Point(*pairs) for pairs in sub])
+        aa = [Point(*pairs) for pairs in arr]
         if as_type.upper() == 'POLYGON':
             poly = Polygon(Array(aa), SR)
         elif as_type.upper() == 'POLYLINE':
@@ -706,14 +694,18 @@ def array_poly(arr, p_type=None, sr=None, IFT=None):
         return poly
     # --
     polys = []
-    if hasattr(arr, "IFT"):
-        from_to = arr.IFT[:, 1:3]
-        arr = [arr.XY[f:t] for f, t in from_to]  # --- _poly_pieces_ chunks
-    for a in arr:
+    if hasattr(arrs, "IFT"):
+        from_to = arrs.IFT[:, 1:3]
+        arrs = [arrs.XY[f:t] for f, t in from_to]  # --- _poly_pieces_ chunks
+    elif isinstance(arrs, np.ndarray):
+        if len(arrs.shape) == 2:
+            arrs = [arrs]
+        elif arrs.dtype == 'O':
+            arrs = arrs
+    for a in arrs:
         p = _arr_poly_(a, sr, p_type)
         polys.append(p)
-    out = list(zip(polys))  # , ids))
-    return out
+    return polys
 
 
 def geometry_fc(a, IFT, p_type=None, gdb=None, fname=None, sr=None):

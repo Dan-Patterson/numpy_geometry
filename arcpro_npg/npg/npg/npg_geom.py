@@ -1142,10 +1142,14 @@ def bin_pnts(pnts, x_bins=None, y_bins=None):
     aggregate-points.htm>`_.
     """
     if x_bins is None:
-        x_bins = (pnts[:, 0].max() - pnts[:, 0].min()) / 10
+        mn_ = pnts[:, 0].min()
+        mx_ = pnts[:, 0].max()
+        x_bins = np.arange(mn_, mx_, (mx_ - mn_) / 10.)
     if y_bins is None:
-        y_bins = (pnts[:, 0].max() - pnts[:, 0].min()) / 10
-    h = np.histogramdd(pnts, [x_bins, y_bins])
+        mn_ = pnts[:, 1].min()
+        mx_ = pnts[:, 1].max()
+        y_bins = np.arange(mn_, mx_, (mx_ - mn_) / 10.)
+    h = np.histogram2d(pnts[:, 0], pnts[:, 1], [x_bins, y_bins])
     return h
 
 

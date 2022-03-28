@@ -433,7 +433,7 @@ def plot_polygons(arr, outline=True, vertices=True,
         """Label the points.
 
         Note: to skips the last label for polygons, use
-        zip(lbl[:-1], pnts[:-1, 0], pnts[:-1, 1])
+        zip(lbl[:-1], pnts[:-1, 0], pnts[:-1, 1])  **
         """
         lbl = np.arange(len(pnts))
         for label, xpt, ypt in zip(lbl[:], pnts[:, 0], pnts[:, 1]):
@@ -458,7 +458,7 @@ def plot_polygons(arr, outline=True, vertices=True,
         shapes = arr
 
     font1 = {'family': 'sans-serif',
-             'weight': 'bold', 'size': 12} #  'color': 'black',
+             'weight': 'bold', 'size': 12}  # 'color': 'black',
     fig, ax = plt.subplots(1, 1)
     fig.set_figheight = 8
     fig.set_figwidth = 8

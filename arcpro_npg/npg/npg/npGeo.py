@@ -24,9 +24,6 @@ import numpy as np
 from numpy.lib.recfunctions import unstructured_to_structured as uts
 from numpy.lib.recfunctions import repack_fields
 
-# import warnings
-# warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning)
-
 from npg import npg_geom as geom
 from npg import (npg_helpers, npg_io, npg_prn)  # npg_create)
 from npg import npg_min_circ as sc
@@ -39,12 +36,12 @@ from npg.npg_helpers import (
 
 
 from npg.npgDocs import (
-    Geo_hlp, array_IFT_doc, dirr_doc, get_shapes_doc,
+    Geo_hlp, array_IFT_doc, dirr_doc, shapes_doc, parts_doc, get_shapes_doc,
     inner_rings_doc, outer_rings_doc, is_in_doc, convex_hulls_doc,
     bounding_circles_doc,
     extent_rectangles_doc, od_pairs_doc, pnt_on_poly_doc,
     sort_by_area_doc,
-    radial_sort_doc, sort_by_extent_doc)  # shapes_doc, parts_doc
+    radial_sort_doc, sort_by_extent_doc)  #
 
 np.set_printoptions(
     edgeitems=10, linewidth=120, precision=2, suppress=True, threshold=200,
@@ -383,6 +380,14 @@ class Geo(np.ndarray):
     # splitter : b, p, s
     #     Split by (b)it, (p)art (s)hape.
     #
+    def all_shapes(self):
+        """Return the shapes."""
+        return self.shapes
+
+    def all_parts(self):
+        """Return the shapes."""
+        return self.parts
+
     def outer_rings(self, asGeo=True):
         """Get the first bit of multipart shapes and/or shapes with holes."""
         if np.any(self.CW == 0):
@@ -509,7 +514,7 @@ class Geo(np.ndarray):
     def areas(self, by_shape=True):
         """Area for the sub arrays using einsum based area calculations.
 
-        Uses `_bit_area_` to calculate the area.
+        Uses `npg_helpers._bit_area_` to calculate the area.
         The `by_shape=True` parameter returns the area for each shape. If
         False, each bit area is returned.  Negative areas are holes.
         """
@@ -577,7 +582,7 @@ class Geo(np.ndarray):
         areas = np.asarray(areas)
         xs = weighted(centr[:, 0], ids, areas)
         ys = weighted(centr[:, 1], ids, areas)
-        return np.asarray(list(zip(xs, ys)))
+        return np.concatenate((xs[:, None], ys[:, None]), axis=1)
 
     # ----  ---------------------------
     # ---- (3) extents and extent shapes
@@ -736,7 +741,7 @@ class Geo(np.ndarray):
         return arr
 
     def is_in(self, pnts, reverse_check=False, values=True, indices=True):
-        """Return pnts that are in the Geo array."""
+        """Return pnts, indices that are in the Geo array or the reverse."""
         if reverse_check:
             lead = pnts
             check = (pnts[:, None] == self.XY).all(-1).any(-1)
@@ -1904,6 +1909,8 @@ def dirr(obj, colwise=False, cols=3, prn=True):
 
 array_IFT.__doc__ += array_IFT_doc
 dirr.__doc__ += dirr_doc
+Geo.all_shapes.__doc__ += shapes_doc
+Geo.all_parts.__doc__ += parts_doc
 Geo.get_shapes.__doc__ += get_shapes_doc
 Geo.inner_rings.__doc__ += inner_rings_doc
 Geo.outer_rings.__doc__ += outer_rings_doc

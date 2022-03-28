@@ -388,8 +388,8 @@ def _bit_area_(a):
     a = _get_base_(a)
     x0, y1 = (a.T)[:, 1:]
     x1, y0 = (a.T)[:, :-1]
-    e0 = np.einsum('...i,...i->...i', x0, y0)
-    e1 = np.einsum('...i,...i->...i', x1, y1)
+    e0 = np.einsum('...i,...i->...i', x0, y0)  # e0 = x0 * y0
+    e1 = np.einsum('...i,...i->...i', x1, y1)  # e1 = x1 * y1
     return np.sum((e0 - e1) * 0.5)
 
 
