@@ -165,6 +165,7 @@ __all__ = __helpers__ + __all__
 
 # ===========================================================================
 # ---- general helpers
+#
 def _view_as_struct_(a, return_all=False):
     """Key function to get uniform 2d arrays to be viewed as structured arrays.
 

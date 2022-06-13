@@ -76,9 +76,8 @@ def _is_pnt_on_line_(start, end, xy, tolerance=1.0e-12):
     line_leng = dist(start, end)
     if tolerance == 0.0:
         return dist(start, xy) + dist(end, xy) == line_leng
-    else:
-        d = (dist(start, xy) + dist(end, xy)) - line_leng
-        return -tolerance <= d <= tolerance
+    d = (dist(start, xy) + dist(end, xy)) - line_leng
+    return -tolerance <= d <= tolerance
 
 
 def _roll_(ar, num=1):
@@ -117,7 +116,7 @@ def roll_arrays(arrs):
     # --
     if not isinstance(arrs, (list, tuple)):
         print("List/tuple of arrays required.")
-        return
+        return None
     out = []
     for ar in arrs:
         num = _LL_(ar)
@@ -276,7 +275,7 @@ def _wn_clip_(pnts, poly, all_info=True):
         a_1 = y3_y2 * x0_x2
         b_0 = y0_y2 * x1_x0
         b_1 = y1_y0 * x0_x2
-        a_num = a_0 - a_1
+        a_num = a_0 - a_1  # signed distance
         b_num = b_0 - b_1
         #
         # pnts in poly
@@ -584,18 +583,18 @@ def split_seq(seq, last, prn=False):  # sec_last
             print("\n A 1D ndarray required.")
         return [seq.tolist()]
     if seq[0] == 0 and last == seq[-1]:
-        tmp = seq[1:]
+        tmp = np.concatenate((seq[1:], [last + 1]))
         whr = np.nonzero(np.abs(tmp[1:] - tmp[:-1]) != 1)[0]
         if whr.size > 0:
             z = [s.tolist() for s in np.array_split(tmp, whr + 1)]
             lst = z.pop()
             z.insert(0, lst)
             return z
-    else:
-        whr = np.nonzero(np.abs(seq[1:] - seq[:-1]) != 1)[0]
-        if whr.size > 0:
-            return [s.tolist() for s in np.array_split(seq, whr + 1)]
-    return [seq.tolist()]
+        return tmp.tolist()  # move first to end
+    whr = np.nonzero(np.abs(seq[1:] - seq[:-1]) != 1)[0]
+    if whr.size > 0:
+        return [s.tolist() for s in np.array_split(seq, whr + 1)]
+    return seq.tolist()
 
 
 def p_type(ply, eqX, eqOther, inOther):
@@ -674,22 +673,7 @@ def clip(poly, clp):
     #
     Notes
     -----
-    Sample data::
 
-        t0 = np.array([[0., 0], [0., 2], [8., 2], [8., 0.], [0., 0]])
-        t01 = np.array([[1., 0], [1., 2], [3., 2], [8., 2], [8., 0.], [0., 0]])
-        t1 = np.array([[0., 0], [0., 2], [1., 2.], [8., 2], [8., 0.], [0., 0]])
-        t2 = np.array([[0., 0], [0., 2], [2., 2.], [8., 2], [8., 0.], [0., 0]])
-        t3 = np.array([[0., 0], [0., 2], [4., 2.], [8., 2], [8., 0.], [0., 0]])
-        t4 = np.array([[0., 0], [0., 2], [4., 2.], [6., 2], [8., 2],
-                       [8., 0.], [0., 0]])
-        s0 = np.array([[1., 1.], [2., 2.], [5., 2.], [6., 1.]])
-        s00 = np.array([[1., 1.], [2., 2.], [5., 2.], [6., 1.], [1., 1.]])
-        s01 = np.array([[1., 1.], [3., 3.], [4., 3.], [6., 1.], [1., 1.]])
-        s02 = np.array([[1., 1.], [3., 3.], [3.5, 1.5], [4., 3.], [6., 1.],
-                        [1., 1.]])
-        s03 = np.array([[1., 1.], [2., 2], [3., 3.], [3.5, 1.5], [4., 3.],
-                        [6., 1.], [1., 1.]])  # dupl x on line
     """
     # --
     if hasattr(poly, "IFT"):
@@ -772,7 +756,7 @@ def clip(poly, clp):
             _out_ = _to_add_(xC, sub_, p_seen, c_seen, tot_)
             p_seen, c_seen, tot_ = _out_
             #
-            # print(f"{cnt} {x0}, {x1}  {xC}")
+            print(f"{cnt} {x0}, {x1}  {xC}")
             # --
             break
         #
@@ -799,7 +783,8 @@ def clip(poly, clp):
                 p_seen.extend(bf_p)
                 if p_st_en in bf_p or p_last in bf_p:
                     p_seen.extend([0])
-                sub_.extend(poly[bf_p])
+                bf_p = [i for i in bf_p if i < poly.shape[0]]
+                sub_.extend(poly[bf_p])  # ** had to fix above Mar 4 2022
         # --
         # -- subsequent crossings
         elif cnt > 0:
@@ -845,9 +830,9 @@ def clip(poly, clp):
                     btw_p = []
             else:
                 p_seen.extend(btw_p)  # B0,a has 1 value
-        # print(f"{cnt} {x0}, {x1}  {xC}")
-        # print(f"  bfc:bfp {bf_c}  {bf_p}\n  btc:btp {btw_c}  {btw_p}")
-        # print(f"{cnt} {x0}, {x1}  {c0c1_}{p0p1_}")
+        print(f"{cnt} {x0}, {x1}  {xC}")
+        print(f"  bfc:bfp {bf_c}  {bf_p}\n  btc:btp {btw_c}  {btw_p}")
+        print(f"{cnt} {x0}, {x1}  {c0c1_}{p0p1_}")
         # -------- '0 0' prep --------------------------------------------
         if c0c1_ == '0 0':
             # -- Both pnts out but cross poly and poly pnts may be inside.

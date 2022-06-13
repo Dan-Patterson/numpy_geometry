@@ -534,7 +534,7 @@ def _is_ccw_(a):
 
 
 def _is_convex_(a):
-    """Return whether a polygon is convex"""
+    """Return whether a polygon is convex."""
     check = _bit_crossproduct_(a)  # cross product
     return np.all(check > 0)
 
