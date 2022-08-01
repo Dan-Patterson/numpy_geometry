@@ -12,7 +12,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2021-06-12
+    2022-07-26
 
 Purpose
 -------
@@ -97,6 +97,7 @@ dir(r)
 
 import sys
 import os
+from pathlib import Path
 from textwrap import dedent, indent, wrap
 # import warnings
 import numpy as np
@@ -545,36 +546,45 @@ def doc_deco(func, doc):
 
 
 # ---- (5) folder tree -------------------------------------------------------
-# `folders` requires `get_dir`
+# `folders` requires `get_dirs`
 #
-def get_dir(path, ignore=['__init__', '__pycache__']):
+def get_dirs(pth, ignore=['__pycache__']):
     """Get the directory list from a path, excluding geodatabase folders.
 
-    Used by.. folders
+    Parameters
+    ----------
+    pth : string
+        The path string being examined.
+    ignore : list
+        Folders to ignore.
 
-    >>> get_dir('C:/Git_Dan/arraytools')
-    ['C:/Git_Dan/arraytools/.spyproject',
-     'C:/Git_Dan/arraytools/analysis',
-     ... snip ...
-     'C:/Git_Dan/arraytools/__pycache__']
-    >>> # -- common path prefix
-    >>> os.path.commonprefix(get_dir('C:/Git_Dan/arraytools'))
-    'C:/Git_Dan/arraytools/'
+    Returns
+    -------
+    The folders in the specified `pth`.
+
+    Notes
+    -----
+    Used by.. folders.
+
+    >>> get_dir('C:/arcpro_npg/npg')
+    ['C:/arcpro_npg/npg/.pylint.d', 'C:/arcpro_npg/npg/data',
+     'C:/arcpro_npg/npg/docs', 'C:/arcpro_npg/npg/Extra_scripts',
+     'C:/arcpro_npg/npg/images', 'C:/arcpro_npg/npg/npg_2022',
+     'C:/arcpro_npg/npg/Project_npg', 'C:/arcpro_npg/npg/tests']
+
+    References
+    ----------
+    Correspondence to tools in the os module:
+        `<https://docs.python.org/3/library/pathlib.html>`_.
+
     """
-    if os.path.isfile(path):
-        path = os.path.dirname(path)
-    p = os.path.normpath(path)
-    full = []
-    try:
-        for val in os.listdir(p):
-            if val not in ignore:
-                v = os.path.join(p, val)
-                full.append(v)
-    except OSError:
-        pass
-    # full = [os.path.join(p, v) for v in os.listdir(p)]
-    dirlist = [val for val in full if os.path.isdir(val)]
-    return dirlist
+    pth = Path(pth)
+    if pth.is_file():
+        pth = pth.parent  # os.path.dirname(pth)
+    p = pth.resolve()  # os.path.normpath(pth)
+    dirs = [x.as_posix() for x in p.iterdir()
+            if x.is_dir() and x.stem not in ignore]
+    return dirs
 
 
 def folders(path, first=True, initial=0, prefix="",
@@ -599,7 +609,7 @@ def folders(path, first=True, initial=0, prefix="",
         first = False
         initial = len(path)
         cprev = path
-    dirlist = get_dir(path, ignore)
+    dirlist = get_dirs(path, ignore)
     for d in dirlist:
         fullname = os.path.join(path, d)  # Turn name into full pathname
         if os.path.isdir(fullname):       # If a directory, recurse.

@@ -14,7 +14,7 @@ Script :
 Author :
     Dan_Patterson@carleton.ca
 Modified :
-    2021-05-29
+    2022-07-26
 
 Purpose
 -------
@@ -81,8 +81,8 @@ import numpy.lib.recfunctions as rfn
 # from numpy.lib.recfunctions import unstructured_to_structured as uts
 # from numpy.lib.recfunctions import _keep_fields
 
-from npg import npg_io
-if 'arcpy' in list(locals().keys()):
+from npg import npg_prn
+if 'arcpy' not in list(locals().keys()):
     from npg import npg_arc_npg
 
 ft = {"bool": lambda x: repr(x.astype(np.int32)),
@@ -457,13 +457,14 @@ def crosstab_tbl(in_tbl, flds=None, as_pivot=True):
     Requires
     --------
     `npg_arc_npg` needs to be imported first.
+
     Notes
     -----
     None or <null> values in tables are converted to proper nodata values
     depending on the field type.  This is handled by the call to fc_data which
     uses make_nulls to do the work.
     """
-    a = npg_arc_npg.fc_data(in_tbl)  # uncomment 
+    a = npg_arc_npg.fc_data(in_tbl)  # uncomment
     if flds is None:
         flds = list(a.dtype.names)
     uni, cnts = np.unique(a[flds], return_counts=True)
@@ -663,7 +664,7 @@ def col_stats(a, fields=None, deci=2, verbose=False):
     if verbose:
         args = ["=" * 25, "Numeric fields"]
         print("\n{}\nStatistics for... a\n{!s:>32}".format(*args))
-        npg_io.prn_tbl(z)
+        npg_prn.prn_tbl(z)
     return z
 
 
@@ -702,7 +703,7 @@ def group_stats(a, case_fld=None, num_flds=None, deci=2, verbose=False):
             if verbose:
                 args = ["=" * 25, u, "Numeric fields"]
                 print("\n{}\nStatistics for... a[{}]\n{!s:>32}".format(*args))
-                npg_io.prn_tbl(z)
+                npg_prn.prn_tbl(z)
             results.append([u, z])
         else:
             print("\nToo few cases... ({}) for a[{}]...".format(counts[i], u))

@@ -194,8 +194,13 @@ class Geo(np.ndarray):
         structure, and/or more records use the `prn_geo` method.
         """
         info_ = self.IFT_str[:50]
-        frmt = """{}\nExtents :\n  LL {}\n  UR {} \nShapes :{:>6.0f}
-        Parts  :{:>6.0f} \nPoints :{:>6.0f}\nSp Ref : {}\n"""
+        frmt = """
+        {}\nExtents :\n  LL {}\n  UR {}
+        Shapes :{:>6.0f}
+        Parts  :{:>6.0f}
+        Points :{:>6.0f}
+        \nSp Ref : {}\n
+        """
         args = ["-" * 14, self.LL, self.UR, len(self.U), info_.shape[0],
                 info_['To_pnt'][-1], self.SR]
         print(dedent(frmt).format(*args))

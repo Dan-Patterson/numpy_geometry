@@ -21,7 +21,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2022-04-24
+    2022-06-25
 
 Purpose
 -------
@@ -295,7 +295,7 @@ def split_arr(poly, line, keep_right=True):
     out_, in_ = [], []
     P = np.copy(poly)
     L = np.copy(line)
-    for cnt, pair in enumerate(x0x1[:-1]):
+    for cnt, pair in enumerate(x0x1):  # [:-1]):
         if Ni == 0:
             p_o = list(ids.difference(set(p_in)))
         elif cnt <= Ni:
@@ -315,7 +315,22 @@ def split_arr(poly, line, keep_right=True):
 
 
 def wv(poly, line):
-    """Return."""
+    """Return polygon parts split by a polyline.
+
+    Parameters
+    ----------
+    poly : array-like
+        Single-part polygons are required.  Holes are not addressed.
+    line : array-like
+        The line can be a pair of points or a polyline.  Multipart polylines
+        (not spatially connected) are not addressed.
+
+    Returns
+    -------
+    Polygon parts.  Two or more parts are returned.
+    Subsequent treatment can address whether the polygons should be considered
+    a multipart polygon or new polygons that share a common origin.
+    """
     def sort_on_line(ln_pnts, x_pnts):
         """Order intersection points on a straight line, from the start."""
         p = np.concatenate((ln_pnts, x_pnts), axis=0)
