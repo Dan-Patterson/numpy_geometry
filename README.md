@@ -75,6 +75,10 @@ See the **geonumeracy** repository for more examples of numpy geometry functions
 ----
 **Some links**
 
+*2022*
+
+- [Raster Generalization Functions](https://community.esri.com/t5/python-blog/raster-generalization-functions/ba-p/1180857)
+
 *2021*
 
 - [Sharing ArcGIS Pro Packages : hidden gems](https://community.esri.com/t5/python-blog/sharing-packages-but-you-can-t-see-inside/ba-p/1124521)
