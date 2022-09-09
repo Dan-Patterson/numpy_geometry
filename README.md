@@ -77,6 +77,7 @@ See the **geonumeracy** repository for more examples of numpy geometry functions
 
 *2022*
 
+- [What is arcgisscripting](https://community.esri.com/t5/python-blog/what-is-arcgisscripting/ba-p/1210998)
 - [Raster Generalization Functions](https://community.esri.com/t5/python-blog/raster-generalization-functions/ba-p/1180857)
 
 *2021*
