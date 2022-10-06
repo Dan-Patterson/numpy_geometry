@@ -4,10 +4,10 @@
 
 <!--- This is a comment -->
 <!--- https://dan-patterson.github.io/numpy_geometry/ -->
-<!--- <a href="url"><img src="https://github.com/Dan-Patterson/numpy_geometry/blob/master/images/Voronoi2.png" align="center" height="auto" width="300" ></a> -->
+<!--- <a href="url"><img src="https://github.com/Dan-Patterson/numpy_geometry/blob/master/images/Voronoi2.png" align="center" height="auto" width="400" ></a> -->
 <!--- ![](images/Voronoi2.png) -->
 <!--- The line below is a relative reference.  Make sure that the subdir doesn't begin with a / -->
-<img src="images/FreeTools.png" align="right" width="300"/>
+<img src="images/FreeTools.png" align="right" width="500"/>
 <!--- arcpro_npg/images/FreeTools.png -->
 
 **New home base for Free Tools**
@@ -20,6 +20,14 @@ The image to the right reflects the tools as they stand on 2022/02/07.
 
 The */npg* folder contains the toolbox and scripts needed to run the tools in ArcGIS Pro.
 
+
+
+
+
+
+
+
+----
 The basic structure is as follows:
 
 file, folder | purpose
