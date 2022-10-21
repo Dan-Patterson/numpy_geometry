@@ -45,7 +45,7 @@ npg.dirr(g)
   (019)  dupl_pnts                      extent_centers                 extent_corner                  
   (020)  extent_pnts                    extent_rectangles              extents                        
   (021)  fill_holes                     first_bit                      first_part                     
-  (022)  fr_to_pnts                     geo_info                       geom_check                     
+  (022)  fr_to_pnts                     geo_props                      geom_check                     
   (023)  get_shapes                     holes_to_shape                 info                           
   (024)  inner_IFT                      inner_rings                    is_clockwise                   
   (025)  is_convex                      is_in                          is_multipart                   
@@ -62,73 +62,74 @@ npg.dirr(g)
   (036)  segment_pnt_ids                segment_polys                  shapes                         
   (037)  shift                          shp_IFT                        shp_ids                        
   (038)  shp_part_cnt                   shp_pnt_cnt                    shp_pnt_ids                    
-  (039)  sort_by_area                   sort_by_extent                 sort_by_length                 
-  (040)  sort_coords                    split_by                       structure                      
-  (041)  svg                            to_segments                    translate                      
-  (042)  triangulate                    uniq_pnts                      unique_segments                
-  (043)  xy_id                          
-Functions from modules...                                
-  (044)                                 
-npg_geom ...                                             
-  (045)                                 CH                             Delaunay                       
-  (046)  _add_pnts_on_line_             _angles_3pnt_                  _bit_area_                     
-  (047)  _bit_min_max_                  _ch_                           _ch_scipy_                     
-  (048)  _ch_simple_                    _closest_pnt_on_poly_          _dist_along_                   
-  (049)  _e_2d_                         _get_base_                     _in_extent_                    
-  (050)  _is_pnt_on_line_               _percent_along_                _pnt_on_segment_               
-  (051)  bin_pnts                       common_extent                  densify_by_distance            
-  (052)  densify_by_factor              eucl_dist                      extent_to_poly                 
-  (053)  find_closest                   in_hole_check                  mabr                           
-  (054)  npGeo                          np_wn                          offset_buffer                  
-  (055)  pnts_in_pnts                   pnts_on_poly                   pnts_to_extent                 
-  (056)  polys_to_segments              polys_to_unique_pnts           repack_fields                  
-  (057)  scale_by_area                  script                         segments_to_polys              
-  (058)  simplify_lines                 stu                            triangulate_pnts               
-  (059)  uts                            
-npg_geom  helpers ...                                    
-  (060)                                 _add_pnts_on_line_             _angles_3pnt_                  
-  (061)  _bit_area_                     _bit_min_max_                  _ch_                           
-  (062)  _ch_scipy_                     _ch_simple_                    _closest_pnt_on_poly_          
-  (063)  _dist_along_                   _e_2d_                         _get_base_                     
-  (064)  _in_extent_                    _is_pnt_on_line_               _percent_along_                
-  (065)  _pnt_on_segment_               
-npg_helpers ...                                          
-  (066)                                 _angles_3pnt_                  _area_centroid_                
-  (067)  _bit_area_                     _bit_check_                    _bit_crossproduct_             
-  (068)  _bit_length_                   _bit_min_max_                  _bit_segment_angles_           
-  (069)  _from_to_pnts_                 _get_base_                     _in_LBRT_                      
-  (070)  _in_extent_                    _is_ccw_                       _is_clockwise_                 
-  (071)  _is_convex_                    _is_right_side                 _isin_2d_                      
-  (072)  _od_angles_dist_               _perp_                         _pnts_in_extent_               
-  (073)  _rotate_                       _scale_                        _to_lists_                     
-  (074)  _trans_rot_                    _translate_                    a_eq_b                         
-  (075)  cartesian_product              coerce2array                   common_pnts                    
-  (076)  compare_geom                   dist_angle_sort                flat                           
-  (077)  interweave                     keep_geom                      polyline_angles                
-  (078)  prn_tbl                        project_pnt_to_line            radial_sort                    
-  (079)  reclass_ids                    remove_geom                    segment_angles                 
-  (080)  shape_finder                   sort_xy                        stride_2d                      
-  (081)  uniq_1d                        uniq_2d                        
-npg_helpers helpers ...   
-  (082)                                                                _angles_3pnt_                  
-  (083)  _area_centroid_                _bit_area_                     _bit_check_                    
-  (084)  _bit_crossproduct_             _bit_length_                   _bit_min_max_                  
-  (085)  _bit_segment_angles_           _from_to_pnts_                 _get_base_                     
-  (086)  _in_LBRT_                      _in_extent_                    _is_ccw_                       
-  (087)  _is_clockwise_                 _is_convex_                    _is_right_side                 
-  (088)  _isin_2d_                      _od_angles_dist_               _perp_                         
-  (089)  _pnts_in_extent_               _rotate_                       _scale_                        
-  (090)  _to_lists_                     _trans_rot_                    _translate_                    
-  (091)  prn_tbl                        
-I/O ...                                                  
-  (092)                                 dtype_info                     geojson_Geo                    
-  (093)  load_geo                       load_geojson                   load_txt                       
-  (094)  save_geo                       save_txt                       
-prn ...                   
-  (095)                                                                _svg                           
-  (096)  prn_                           prn_Geo_shapes                 prn_arrays                     
-  (097)  prn_as_obj                     prn_geo                        prn_lists                      
-  (098)  prn_q                          prn_tbl      
+  (039)  singleton_pnts                 sort_by_area                   sort_by_extent                 
+  (040)  sort_by_length                 sort_coords                    split_by                       
+  (041)  structure                      svg                            to_segments                    
+  (042)  translate                      triangulate                    uniq_pnts                      
+  (043)  unique_segments                xy_id                          
+Functions from modules... 
+  (044)                                                                
+npg_geom ...              
+  (045)                                                                CH                             
+  (046)  Delaunay                       _add_pnts_on_line_             _angles_3pnt_                  
+  (047)  _bit_area_                     _bit_min_max_                  _ch_                           
+  (048)  _ch_scipy_                     _ch_simple_                    _closest_pnt_on_poly_          
+  (049)  _dist_along_                   _e_2d_                         _get_base_                     
+  (050)  _in_extent_                    _is_pnt_on_line_               _percent_along_                
+  (051)  _pnt_on_segment_               bin_pnts                       common_extent                  
+  (052)  densify_by_distance            densify_by_factor              eucl_dist                      
+  (053)  extent_to_poly                 find_closest                   in_hole_check                  
+  (054)  mabr                           npGeo                          np_wn                          
+  (055)  offset_buffer                  pnts_in_pnts                   pnts_on_poly                   
+  (056)  pnts_to_extent                 polys_to_segments              polys_to_unique_pnts           
+  (057)  repack_fields                  scale_by_area                  script                         
+  (058)  segments_to_polys              simplify_lines                 stu                            
+  (059)  triangulate_pnts               uts                            
+npg_geom  helpers ...     
+  (060)                                                                _add_pnts_on_line_             
+  (061)  _angles_3pnt_                  _bit_area_                     _bit_min_max_                  
+  (062)  _ch_                           _ch_scipy_                     _ch_simple_                    
+  (063)  _closest_pnt_on_poly_          _dist_along_                   _e_2d_                         
+  (064)  _get_base_                     _in_extent_                    _is_pnt_on_line_               
+  (065)  _percent_along_                _pnt_on_segment_               
+npg_helpers ...           
+  (066)                                                                _angles_3pnt_                  
+  (067)  _area_centroid_                _bit_area_                     _bit_check_                    
+  (068)  _bit_crossproduct_             _bit_length_                   _bit_min_max_                  
+  (069)  _bit_segment_angles_           _from_to_pnts_                 _get_base_                     
+  (070)  _in_LBRT_                      _in_extent_                    _is_ccw_                       
+  (071)  _is_clockwise_                 _is_convex_                    _is_right_side                 
+  (072)  _isin_2d_                      _od_angles_dist_               _perp_                         
+  (073)  _pnts_in_extent_               _rotate_                       _scale_                        
+  (074)  _to_lists_                     _trans_rot_                    _translate_                    
+  (075)  a_eq_b                         cartesian_product              coerce2array                   
+  (076)  common_pnts                    compare_geom                   dist_angle_sort                
+  (077)  flat                           interweave                     keep_geom                      
+  (078)  polyline_angles                prn_tbl                        project_pnt_to_line            
+  (079)  radial_sort                    reclass_ids                    remove_geom                    
+  (080)  segment_angles                 shape_finder                   sort_xy                        
+  (081)  stride_2d                      uniq_1d                        uniq_2d                        
+  (082)  
+npg_helpers helpers ...                                                                 
+  (083)  _angles_3pnt_                  _area_centroid_                _bit_area_                     
+  (084)  _bit_check_                    _bit_crossproduct_             _bit_length_                   
+  (085)  _bit_min_max_                  _bit_segment_angles_           _from_to_pnts_                 
+  (086)  _get_base_                     _in_LBRT_                      _in_extent_                    
+  (087)  _is_ccw_                       _is_clockwise_                 _is_convex_                    
+  (088)  _is_right_side                 _isin_2d_                      _od_angles_dist_               
+  (089)  _perp_                         _pnts_in_extent_               _rotate_                       
+  (090)  _scale_                        _to_lists_                     _trans_rot_                    
+  (091)  _translate_                    prn_tbl                        
+I/O ...                   
+  (092)                                                                dtype_info                     
+  (093)  geojson_Geo                    load_geo                       load_geojson                   
+  (094)  load_txt                       save_geo                       save_txt                       
+  (095)  
+prn ...                                                                                 
+  (096)  _svg                           prn_                           prn_Geo_shapes                 
+  (097)  prn_arrays                     prn_as_obj                     prn_geo                        
+  (098)  prn_lists                      prn_q                          prn_tbl                        
+ 
   
 ```
 
