@@ -234,9 +234,15 @@ IFT = npzfiles['IFT']
 ## np_create.py
 
 
-<a href="url"><img src="../images/npGeo.png" align="right" height="auto" width="450" ></a>
+<a href="url"><img src="../images/npg_create.png" align="right" height="auto" width="150" ></a>
 
 The functions here allow you to create geometry of various shapes.
+
+Many of the functions can be used for spatial tiling.  These would include rectangles, triangles and two variants of hexagons.
+
+Circle-based functions (arc, arc sector, circle, ellipse) are also included since they are used in a variety of other functions (eg. triangulation)
+
+
 
 
 ----
