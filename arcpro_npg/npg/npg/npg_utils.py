@@ -267,7 +267,7 @@ def doc_func(func=None, verbose=True):
         return out
 
 
-# ----------------------------------------------------------------------
+# -----------------------------------------------------------------------
 # ---- (2) get_func .... code section ----
 def get_func(func, line_nums=True, output=False):
     """Get function information (ie. for a def).
@@ -359,6 +359,8 @@ def get_module_info(obj, max_number=100, verbose=True):
         The imported object.  It must be either a whole module or a script
         that you imported.  Import it. It is easier if it is in the same
         folder as the script running this function.
+    max_number : integer
+        The maximum number of methods to list if there are a large number.
     verbose : boolean
         True, prints the output.  False, returns the string.
 

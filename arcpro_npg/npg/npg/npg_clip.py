@@ -39,6 +39,7 @@ import numpy as np
 # from numpy.lib.recfunctions import repack_fields
 
 import npg
+from npg.npg_geom import common_extent
 from npg import npg_plots
 from npg.npg_plots import plot_polygons
 # from npg.npg_utils import time_deco
@@ -52,51 +53,16 @@ np.set_printoptions(
 
 script = sys.argv[0]  # print this should you need to locate the script
 
-__all__ = ['clip', 'common_extent', 'roll_arrays', 'split_seq']
-__helpers__ = ['_concat_', '_is_pnt_on_line_']
-__all__ = __helpers__ + __all__
+__all__ = ['clip', 'roll_arrays', 'split_seq']
+__helpers__ = ['_concat_']
+# __all__ = __helpers__ + __all__
 
 
 # ---- (1) general helpers
 #
-def _is_pnt_on_line_(start, end, xy, tolerance=1.0e-12):
-    """Perform a distance check of whether a point is on a line.
-
-    eps = 2**-52 = 2.220446049250313e-16
-    np.finfo(float).eps = 2.220446049250313e-16
-    np.finfo(float)
-    finfo(resolution=1e-15, min=-1.7976931348623157e+308,
-          max=1.7976931348623157e+308, dtype=float64)
-    """
-    #
-    def dist(a, b):
-        """Add math.sqrt() for actual distance."""
-        return np.sqrt((b[0] - a[0])**2 + (b[1] - a[1])**2)
-    #
-    line_leng = dist(start, end)
-    if tolerance == 0.0:
-        return dist(start, xy) + dist(end, xy) == line_leng
-    d = (dist(start, xy) + dist(end, xy)) - line_leng
-    return -tolerance <= d <= tolerance
-
-
 def _roll_(ar, num=1):
     """Roll coordinates by `num` rows so that row `num` is in position 0."""
     return np.concatenate((ar[num:-1], ar[:num], [ar[num]]), axis=0)
-
-
-def common_extent(a, b):
-    """Return the extent overlap for two polygons as L, B, R, T or None."""
-    ext0 = np.concatenate((np.min(a, axis=0), np.max(a, axis=0)))
-    ext1 = np.concatenate((np.min(b, axis=0), np.max(b, axis=0)))
-    es = np.concatenate((ext0[None, :], ext1[None, :]), axis=0)
-    maxs = np.max(es, axis=0)
-    mins = np.min(es, axis=0)
-    L, B = maxs[:2]
-    R, T = mins[2:]
-    if (L <= R) and (B <= T):
-        return (True, np.array([L, B, R, T]))  # (x1, y1, x2, y2)
-    return (False, None)
 
 
 def roll_arrays(arrs):
@@ -124,67 +90,13 @@ def roll_arrays(arrs):
     return out
 
 
-def uniq_1d(arr):
+def _uniq_1d_(arr):
     """Return mini 1D unique for sorted values."""
     arr.sort()
     mask = np.empty(arr.shape, dtype=np.bool_)
     mask[:1] = True
     mask[1:] = arr[1:] != arr[:-1]
     return arr[mask]
-
-
-def uniq_2d(arr, return_sorted=False):
-    """Return mini `unique` for 2D coordinates.  Derived from np.unique.
-
-    Notes
-    -----
-    For returning in the original order this is equivalent to::
-
-        u, idx = np.unique(x_pnts, return_index=True, axis=0)
-        x_pnts[np.sort(idx)]
-    """
-    def _reshape_uniq_(uniq, dt, shp):
-        n = len(uniq)
-        uniq = uniq.view(dt)
-        uniq = uniq.reshape(n, *shp[1:])
-        uniq = np.moveaxis(uniq, 0, 0)
-        return uniq
-
-    arr = np.asarray(arr)
-    shp = arr.shape
-    dt = arr.dtype
-    st_arr = arr.view(dt.descr * shp[1])
-    ar = st_arr.flatten()
-    if return_sorted:
-        perm = ar.argsort(kind='mergesort')
-        aux = ar[perm]
-    else:
-        # ar.sort(kind='mergesort')  # removed
-        aux = ar
-    mask = np.empty(aux.shape, dtype=np.bool_)
-    mask[:1] = True
-    mask[1:] = aux[1:] != aux[:-1]
-    ret = aux[mask]
-    uniq = _reshape_uniq_(ret, dt, shp)
-    if return_sorted:  # return_index in unique
-        return uniq, perm[mask]
-    return uniq
-
-
-def to_struct(whr, x_pnts, as_view=True):
-    """Return structured array for intersections.
-
-    Use z.reshape(z.shape[0], 1) to view in column format.
-    """
-    dt = [("p_seg", "i8"), ("c_seg", "i8"), ("x", "f8"), ("y", "f8")]
-    z = np.empty((whr.shape[0],), dtype=dt)
-    z["p_seg"] = whr[:, 0]
-    z["c_seg"] = whr[:, 1]
-    z["x"] = x_pnts[:, 0]
-    z["y"] = x_pnts[:, 1]
-    if as_view:
-        return z.reshape(z.shape[0], 1)
-    return z
 
 
 def reverse_whr(whr, x_pnts, return_pnts=True):
@@ -455,7 +367,7 @@ def nodes(p_in_c, c_in_p, clp, poly, x_pnts):
     -----
     Forming a dictionary for cp_eq, cs_eq, px_eq::
 
-        kys = uniq_1d(px_eq[:, 0]).tolist()  # [ 0,  2,  3,  4, 12]
+        kys = _uniq_1d_(px_eq[:, 0]).tolist()  # [ 0,  2,  3,  4, 12]
         dc = {}  # -- dictionary
         dc[0] = px_eq[px_eq[:, 0] == 0][:,1].tolist()
         for k in kys:
@@ -496,19 +408,19 @@ def nodes(p_in_c, c_in_p, clp, poly, x_pnts):
     # p_out_c = []  # not used anymore
     c_eq_p, p_eq_c = np.nonzero((poly == clp[:, None]).all(-1))
     if c_eq_p.size > 0:
-        c_eq_p = uniq_1d(c_eq_p)
-        p_eq_c = uniq_1d(p_eq_c)
+        c_eq_p = _uniq_1d_(c_eq_p)
+        p_eq_c = _uniq_1d_(p_eq_c)
     p_eq_x, x_eq_p = np.nonzero((x_pnts == poly[:, None]).all(-1))
     if p_eq_x.size > 0:
-        p_eq_x = uniq_1d(p_eq_x)
+        p_eq_x = _uniq_1d_(p_eq_x)
     c_eq_x, x_eq_c = np.nonzero((x_pnts == clp[:, None]).all(-1))
     if c_eq_x.size > 0:
-        c_eq_x = uniq_1d(c_eq_x)
+        c_eq_x = _uniq_1d_(c_eq_x)
     if p_eq_c.size > 0 or p_eq_x.size > 0:  # p_in_c + (c_eq_p, p_eq_x)
         p_in_c = np.unique(np.concatenate((p_in_c, p_eq_c, p_eq_x)))
     # -- (2) clp, poly point equal
     if c_eq_p.size > 0 or c_eq_x.size > 0:  # c_in_p + (p_eq_c, c_eq_x)
-        c_in_p = uniq_1d(np.concatenate((c_in_p, c_eq_p, c_eq_x)))
+        c_in_p = _uniq_1d_(np.concatenate((c_in_p, c_eq_p, c_eq_x)))
     args = (p_in_c, c_in_p, c_eq_p, c_eq_x, p_eq_c, p_eq_x)
     # cp_eq, cx_eq, px_eq)  simplified output
     out = [i.tolist() if isinstance(i, np.ndarray) else i for i in args]
@@ -1191,9 +1103,9 @@ def poly_clip(clippers, polys):
         polys = [polys]
     for i, clp in enumerate(clippers):
         for j, poly in enumerate(polys):
-            shared, extent = common_extent(poly, clp)
+            extent = common_extent(poly, clp)  # either an extent or `None`
             shared_extent.append([i, j, extent])
-            if shared:
+            if extent:
                 in_ = clip(poly, clp)
                 if in_ is not None:
                     if len(in_) > 3:

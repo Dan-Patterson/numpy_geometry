@@ -14,7 +14,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2021-05-29
+    2022-11-09
 
 Purpose
 -------
@@ -84,9 +84,11 @@ import sys
 # from functools import wraps
 import numpy as np
 
-from npg import npGeo, npg_plots
+from npg import npg_plots
 from npg.npGeo import arrays_to_Geo
-from npg.npg_plots import plot_mixed  # plot_2d, plot_polygons
+from npg_helpers import _to_lists_
+from npg.npg_overlay import merge_
+from npg.npg_plots import plot_mixed, plot_polygons  # plot_2d, 
 
 np.set_printoptions(
     edgeitems=10, linewidth=120, precision=3, suppress=True, threshold=200,
@@ -166,7 +168,7 @@ def code_grid(x_cols=1, y_rows=1,
           for j in range(1, 27)]
     z = [1, 0][zero_based]
     rc = [1, 0][zero_based]
-    c = ["{}{:02.0f}".format(UC[c], r)  # pull in the column heading
+    c = ["{}{:02.0f}".format(UC[c], r)    # pull in the column heading
          for r in range(z, y_rows + rc)   # label in the row letter
          for c in range(x_cols)]          # label in the row number
     c = np.asarray(c)
@@ -215,52 +217,67 @@ def rot_matrix(angle=0, nm_3=False):
 # ---- arc_sector, convex hull, circle ellipse, hexagons, rectangles,
 #      triangle, xy-grid --
 #
-def arc_(radius=100, start=0, stop=1, step=0.1, xc=0.0, yc=0.0, asGeo=True):
+def arc_(radius=10,
+         start=0, stop=1, step=0.5,
+         xc=0.0, yc=0.0,
+         to_origin=True,
+         asGeo=True,
+         kind=2):
     """Create an arc from a specified radius, centre and start/stop angles.
 
     Parameters
     ----------
     radius : number
-        cirle radius from which the arc is obtained
+        Cirle radius from which the arc is obtained.
     start, stop, step : numbers
-        angles in degrees
+        Angles in degrees.
     xc, yc : number
-        center coordinates in projected units
-    as_list : boolean
-        False, returns an array.  True yields a list
+        Center coordinates in projected units.
+    to_origin : boolean
+        Include the center as the first and last point to form a closed-loop
+        polyline or polygon.
+    asGeo : boolean
+        True, returns an array.  False yields an ndarray.
+    kind : integer
+        Either 1 (polylines) or 2 (polygons).
 
     Returns
     -------
       Points on the arc as an array
 
     >>> # arc from 0 to 90 in 5 degree increments with radius 2 at (0, 0)
-    >>> a0 = arc_(radius=2, start=0, stop=90, step=5, xc=0.0, yc=0.0)
+    >>> a0 = arc_(radius=2, start=0, stop=90, step=5, xc=0.0, yc=0.0, True)
     """
-    start, stop = sorted([start, stop])
+    # start, stop = sorted([start, stop])
     angle = np.deg2rad(np.arange(start, stop, step))
+    cent_ = np.array([[xc, yc]])
     x_s = radius * np.cos(angle)         # X values
     y_s = radius * np.sin(angle)         # Y values
-    pnts = np.array([x_s, y_s]).T + [xc, yc]
+    pnts = np.array([x_s, y_s]).T + cent_
+    if to_origin:
+        pnts = np.concatenate((cent_, pnts, cent_))
     if asGeo:
-        return arrays_to_Geo(pnts, kind=2)
+        k = kind if kind in [1, 2] else 2
+        return arrays_to_Geo(pnts, kind=k)
     return pnts
 
 
-def arc_sector(outer=10, inner=9, start=1, stop=6, step=0.1, asGeo=True):
+def arc_sector(outer=10, inner=9, start=1, stop=6, step=0.5,
+               asGeo=True, kind=2):
     """Form an arc sector bounded by a distance specified by two radii.
 
     Parameters
     ----------
     outer : number
-        outer radius of the arc sector
+        Outer radius of the arc sector.
     inner : number
-        inner radius
+        Inner radius.
     start : number
-        start angle of the arc
+        Start angle of the arc.
     stop : number
-        end angle of the arc
+        End angle of the arc.
     step : number
-        the angle densification step
+        The angle densification step.
 
     Requires
     --------
@@ -270,18 +287,19 @@ def arc_sector(outer=10, inner=9, start=1, stop=6, step=0.1, asGeo=True):
     s_s = [start, stop]
     s_s.sort()
     start, stop = s_s
-    top = arc_(outer, start, stop, step, 0.0, 0.0)
+    top = arc_(outer, start, stop, step, 0.0, 0.0, False)  # don't draw origin
     top = top[::-1]
-    bott = arc_(inner, start, stop, step, 0.0, 0.0)
+    bott = arc_(inner, start, stop, step, 0.0, 0.0, False)  # don't draw origin
     close = top[0]
     pnts = np.concatenate((top, bott, [close]), axis=0)
     if asGeo:
-        return arrays_to_Geo(pnts, kind=2)
+        k = kind if kind in [1, 2] else 2
+        return arrays_to_Geo(pnts, kind=k)
     return pnts
 
 
 def circle(radius=100, clockwise=True, theta=1, rot=0.0, scale=1,
-           xc=0.0, yc=0.0, asGeo=True):
+           xc=0.0, yc=0.0, asGeo=True, kind=2):
     """Produce a circle/ellipse depending on parameters.
 
     Parameters
@@ -323,7 +341,8 @@ def circle(radius=100, clockwise=True, theta=1, rot=0.0, scale=1,
         pnts = (np.dot(rot_mat, pnts.T)).T
     pnts = pnts + [xc, yc]
     if asGeo:
-        return arrays_to_Geo(pnts, kind=2)
+        k = kind if kind in [1, 2] else 2
+        return arrays_to_Geo(pnts, kind=k)
     return pnts
 
 
@@ -347,7 +366,7 @@ def circle_mini(radius=1.0, theta=10.0, xc=0.0, yc=0.0):
 
 def circle_ring(outer=100, inner=0, theta=10, rot=0, scale=1,
                 xc=0.0, yc=0.0,
-                asGeo=True):
+                asGeo=True, kind=2):
     """Create a multi-ring buffer around a center point (xc, yc).
 
     Parameters
@@ -360,6 +379,10 @@ def circle_ring(outer=100, inner=0, theta=10, rot=0, scale=1,
         Rotation angle, used for non-circles.
     scale : number
         Used to scale the y-coordinates.
+
+    Returns
+    -------
+    A `Geo` array or an object array is returned.
 
     Notes
     -----
@@ -374,15 +397,16 @@ def circle_ring(outer=100, inner=0, theta=10, rot=0, scale=1,
     - etc
     """
     top = circle(outer, clockwise=True, theta=theta, rot=rot, scale=scale,
-                 xc=xc, yc=yc)
+                 xc=xc, yc=yc, asGeo=False)
     if inner == 0.0:
-        return top
-    bott = circle(inner, clockwise=False, theta=theta, rot=rot, scale=scale,
-                  xc=xc, yc=yc)
-
-    pnts = np.concatenate((top, bott), axis=0)
+        pnts = top
+    else:
+        bott = circle(inner, clockwise=False, theta=theta, rot=rot,
+                      scale=scale, xc=xc, yc=yc, asGeo=False)
+        pnts = np.asarray([top, bott], dtype='O')  # a list of list of arrays
     if asGeo:
-        return arrays_to_Geo(pnts, kind=2)
+        k = kind if kind in [1, 2] else 2
+        return arrays_to_Geo(pnts, kind=k)
     return pnts
 
 
@@ -394,6 +418,62 @@ def circ_3pa(arr):
     p, q, r = arr
     cx, cy, radius = circ_3p(p, q, r)
     return cx, cy, radius
+
+
+def circle_sectors(radius=10,
+                   start=0, stop=45,
+                   increment=5,
+                   fromNorth=True,
+                   xc=0.0, yc=0.0,
+                   to_origin=True,
+                   asGeo=True,
+                   kind=2):
+    """Return circle sectors based on the following parameters.
+
+    Parameters
+    ----------
+    radius : number
+        Radius of the arc sector.
+    start : number
+        Start angle of the arcs.
+    stop : number
+        End angle of the arcs.
+    increment : number
+        The angle of each sector between start and start.
+    fromNorth : boolean
+        True for angles representing azimuths (0-360 from North).
+    xc, yc : numbers
+        Origin point.
+    to_origin : boolean
+        Center each arc on the xc, yc point.
+    asGeo : boolean
+        The result type.  True for `geo` array.  False for list of lists.
+    kind : number
+        2 for polygons, 1 for polylines.
+
+    Returns
+    -------
+    A `geo` array or a list of lists of sector points as a polygon or polyline.
+    """
+    steps = np.arange(start, stop + increment, increment, dtype=float)
+    if fromNorth:
+        steps = np.mod(-steps + 90., 360.)
+    pairs = np.empty((steps.shape[0]-1, 2))
+    pairs[:, 0] = steps[:-1]
+    pairs[:, 1] = steps[1:]
+    out_ = []
+    dx = -1. if fromNorth else 1.
+    for p in pairs:
+        f, t = p
+        sub = arc_(radius=radius,
+                   start=f, stop=t+dx, step=dx,
+                   xc=xc, yc=yc,
+                   to_origin=True, asGeo=True, kind=kind)
+        out_.append(sub)
+    if asGeo:
+        return arrays_to_Geo(out_, kind=kind, info="sectors",
+                             to_origin=to_origin)
+    return out_
 
 
 def circ_3p(p, q, r):
@@ -418,8 +498,7 @@ def circ_3p(p, q, r):
 def ellipse(x_radius=1.0, y_radius=1.0,
             theta=10.,
             xc=0.0, yc=0.0,
-            kind=2,
-            asGeo=True):
+            asGeo=True, kind=2):
     """Produce an ellipse depending on parameters.
 
     Parameters
@@ -441,11 +520,72 @@ def ellipse(x_radius=1.0, y_radius=1.0,
             pnts = [pnts]
         frmt = "x_rad {}, y_rad {}, theta {}, x_c {}, y_c {}"
         txt = frmt.format(x_radius, y_radius, theta, xc, yc)
-        return arrays_to_Geo(pnts, kind=2, info=txt)
+        k = kind if kind in [1, 2] else 2
+        return arrays_to_Geo(pnts, kind=k, info=txt)
     return pnts
 
 
-# ---- rectangles/squares, triangles, hexagons -------------------------------
+# ---- hexagons --------------------------------------------------------------
+#
+def hex_flat(dx=1, dy=1,
+             x_cols=1, y_rows=1,
+             orig_x=0, orig_y=0,
+             asGeo=True, kind=2):
+    """Generate the points for the flat-headed hexagon.
+
+    Parameters
+    ----------
+    See `rectangles` for shared parameter explanation.
+    """
+    f_rad = np.deg2rad([180., 120., 60., 0., -60., -120., -180.])
+    X = np.cos(f_rad) * dy
+    Y = np.sin(f_rad) * dy            # scaled hexagon about 0, 0
+    seed = np.array(list(zip(X, Y)))  # array of coordinates
+    dx = dx * 1.5
+    dy = dy * np.sqrt(3.) / 2.0
+    hexs = [seed + [dx * i, dy * (i % 2)] for i in range(0, x_cols)]
+    m = len(hexs)
+    for j in range(1, y_rows):  # create the other rows
+        hexs += [hexs[h] + [0, dy * 2 * j] for h in range(m)]
+    hexs = np.asarray(hexs) + [orig_x, orig_y - dy]
+    if asGeo:
+        frmt = "dx {}, dy {}, x_cols {}, y_rows {}, LB ({},{})"
+        txt = frmt.format(dx, dy, x_cols, y_rows, orig_x, orig_y)
+        k = kind if kind in [1, 2] else 2
+        return arrays_to_Geo(hexs, kind=k, info=txt)
+    return hexs
+
+
+def hex_pointy(dx=1, dy=1,
+               x_cols=1, y_rows=1,
+               orig_x=0, orig_y=0,
+               asGeo=True, kind=2):
+    """Create pointy hexagons. Also called ``traverse hexagons``.
+
+    Parameters
+    ----------
+    See `rectangles` for shared parameter explanation.
+    """
+    p_rad = np.deg2rad([150., 90, 30., -30., -90., -150., 150.])
+    X = np.cos(p_rad) * dx
+    Y = np.sin(p_rad) * dy      # scaled hexagon about 0, 0
+    seed = np.array(list(zip(X, Y)))
+    dx = dx * np.sqrt(3.) / 2.0
+    dy = dy * 1.5
+    hexs = [seed + [dx * i * 2, 0] for i in range(0, x_cols)]
+    m = len(hexs)
+    for j in range(1, y_rows):  # create the other rows
+        hexs += [hexs[h] + [dx * (j % 2), dy * j] for h in range(m)]
+    hexs = np.asarray(hexs) + [orig_x, orig_y - dy]
+    if asGeo:
+        frmt = "dx {}, dy {}, x_cols {}, y_rows {}, LB ({},{})"
+        txt = frmt.format(dx, dy, x_cols, y_rows, orig_x, orig_y)
+        k = kind if kind in [1, 2] else 2
+        return arrays_to_Geo(hexs, kind=k, info=txt)
+    return hexs
+
+
+# ---- rectangles/squares, triangles -----------------------------------------
 #
 # The following all share the same parameter list.
 # x = cos(2kπ/n),y = sin(2kπ/n),k=1,2,3⋯n where ``n`` is the number of sides.
@@ -453,8 +593,7 @@ def ellipse(x_radius=1.0, y_radius=1.0,
 def rectangle(dx=1, dy=-1,
               x_cols=1, y_rows=1,
               orig_x=0, orig_y=1,
-              kind=2,
-              asGeo=True):
+              asGeo=True, kind=2):
     """Create a point array to represent a series of rectangles or squares.
 
     Parameters
@@ -470,7 +609,7 @@ def rectangle(dx=1, dy=-1,
         The defaults produce a clockwise, closed-loop geometry, beginning and
         ending in the upper left.
     kind, asGeo :
-        These relate to Geo arrays
+        These relate to Geo arrays.
 
     Example
     -------
@@ -497,15 +636,15 @@ def rectangle(dx=1, dy=-1,
     if asGeo:
         frmt = "dx {}, dy {}, x_cols {}, y_rows {}, LB ({},{})"
         txt = frmt.format(dx, dy, x_cols, y_rows, orig_x, orig_y)
-        return arrays_to_Geo(a, kind=2, info=txt)
+        k = kind if kind in [1, 2] else 2
+        return arrays_to_Geo(a, kind=k, info=txt)
     return a
 
 
 def triangle(dx=1, dy=1,
              x_cols=1, y_rows=1,
              orig_x=0, orig_y=1,
-             kind=2,
-             asGeo=True):
+             asGeo=True, kind=2):
     """Create a row of meshed triangles.
 
     The triangles are essentially bisected squares and not equalateral.
@@ -525,70 +664,15 @@ def triangle(dx=1, dy=1,
     a = [seed + [j * dx, i * dy]       # make the shapes
          for i in range(0, y_rows)       # cycle through the rows
          for j in range(0, x_cols)]      # cycle through the columns
-    a = np.asarray(a)
+    a = np.asarray(a) + [orig_x, orig_y - dy]
     s1, s2, s3, s4 = a.shape
     a = a.reshape(s1 * s2, s3, s4)
     if asGeo:
         frmt = "dx {}, dy {}, x_cols {}, y_rows {}, LB ({},{})"
         txt = frmt.format(dx, dy, x_cols, y_rows, orig_x, orig_y)
-        return arrays_to_Geo(a, kind=2, info=txt)
+        k = kind if kind in [1, 2] else 2
+        return arrays_to_Geo(a, kind=k, info=txt)
     return a
-
-
-def hex_flat(dx=1, dy=1,
-             x_cols=1, y_rows=1,
-             orig_x=0, orig_y=0,
-             kind=2,
-             asGeo=True):
-    """Generate the points for the flat-headed hexagon.
-
-    Parameters
-    ----------
-    See `rectangles` for shared parameter explanation.
-    """
-    f_rad = np.deg2rad([180., 120., 60., 0., -60., -120., -180.])
-    X = np.cos(f_rad) * dy
-    Y = np.sin(f_rad) * dy            # scaled hexagon about 0, 0
-    seed = np.array(list(zip(X, Y)))  # array of coordinates
-    dx = dx * 1.5
-    dy = dy * np.sqrt(3.) / 2.0
-    hexs = [seed + [dx * i, dy * (i % 2)] for i in range(0, x_cols)]
-    m = len(hexs)
-    for j in range(1, y_rows):  # create the other rows
-        hexs += [hexs[h] + [0, dy * 2 * j] for h in range(m)]
-    if asGeo:
-        frmt = "dx {}, dy {}, x_cols {}, y_rows {}, LB ({},{})"
-        txt = frmt.format(dx, dy, x_cols, y_rows, orig_x, orig_y)
-        return arrays_to_Geo(hexs, kind=2, info=txt)
-    return hexs
-
-
-def hex_pointy(dx=1, dy=1,
-               x_cols=1, y_rows=1,
-               orig_x=0, orig_y=0,
-               kind=2,
-               asGeo=True):
-    """Create pointy hexagons. Also called ``traverse hexagons``.
-
-    Parameters
-    ----------
-    See `rectangles` for shared parameter explanation.
-    """
-    p_rad = np.deg2rad([150., 90, 30., -30., -90., -150., 150.])
-    X = np.cos(p_rad) * dx
-    Y = np.sin(p_rad) * dy      # scaled hexagon about 0, 0
-    seed = np.array(list(zip(X, Y)))
-    dx = dx * np.sqrt(3.) / 2.0
-    dy = dy * 1.5
-    hexs = [seed + [dx * i * 2, 0] for i in range(0, x_cols)]
-    m = len(hexs)
-    for j in range(1, y_rows):  # create the other rows
-        hexs += [hexs[h] + [dx * (j % 2), dy * j] for h in range(m)]
-    if asGeo:
-        frmt = "dx {}, dy {}, x_cols {}, y_rows {}, LB ({},{})"
-        txt = frmt.format(dx, dy, x_cols, y_rows, orig_x, orig_y)
-        return arrays_to_Geo(hexs, kind=2, info=txt)
-    return hexs
 
 
 # ---- others ---------------------------------------------------------------
@@ -863,6 +947,54 @@ def transect_lines(N=5, orig=None, dist=1, x_offset=0, y_offset=0,
     return out, data
 
 
+def buffer_rings(steps=[0, 1, 2], theta=5):
+    """Create buffer rings around a point.
+
+    Parameters
+    ----------
+    steps : list, array-like
+        The distance values from the center of the rings.  Include the `0` in
+        the steps to include a ring from the center to the next increment.
+        Exclude the `0` value to produce a hole around the center.
+    theta : float
+        Angles to define circle steps.  10 yields a 36 point circle
+
+    Requires
+    --------
+    `circle_ring`
+    Use the above to create rings with missing bands.
+
+    Notes
+    -----
+    Angles to use for different buffer types::
+
+    - theta          sides
+    - 1-10 circle    360 to 36 `ngon`
+    - 120  triangle  3
+    - 90   square    4
+    - 72   pentagon  5
+    - 60   hexagon   6
+    - 45   octagon   8
+    - etc
+    """
+    steps = np.asarray(steps, dtype=float)
+    n = steps.shape[0] - 1
+    if n < 2:
+        print("At least 2 steps needed.")
+        return None
+    fr_to = np.concatenate((steps[:-1, None], steps[1:, None]), axis=1)
+    results = []
+    for ft in fr_to:
+        fr_, to_ = ft
+        ar = circle_ring(outer=to_, inner=fr_, theta=theta, rot=0, scale=1,
+                         xc=0.0, yc=0.0, asGeo=False, kind=2)
+        tmp = _to_lists_(ar, False)
+        results.append(tmp)
+    return arrays_to_Geo(results)
+
+
+# ---- spirals ----------------------------------------------------------------
+#
 def spiral_archim(N, n, inward=False, clockwise=True):
     """Create an Archimedes spiral in the range 0 to N points with 'n' steps.
 
@@ -959,7 +1091,7 @@ def spiral_cw(A):
     """Docstring."""
     A = np.array(A)
     out = []
-    while(A.size):
+    while (A.size):
         out.append(A[0])        # take first row
         A = A[1:].T[::-1]       # cut off first row and rotate counterclockwise
     return np.concatenate(out)
@@ -969,7 +1101,7 @@ def spiral_ccw(A):
     """Docstring."""
     A = np.array(A)
     out = []
-    while(A.size):
+    while (A.size):
         out.append(A[0][::-1])    # first row reversed
         A = A[1:][::-1].T         # cut off first row and rotate clockwise
     return np.concatenate(out)
@@ -997,7 +1129,7 @@ def from_spiral(A):
 
 
 def repeat(seed=None, corner=[0, 0], x_cols=1, y_rows=1, angle=0):
-    """Create the array of pnts to pass to arcpy .
+    """Create the array of pnts to pass to arcpy.
 
     Numpy magic is used to produce a fishnet of the desired in_shp.
 

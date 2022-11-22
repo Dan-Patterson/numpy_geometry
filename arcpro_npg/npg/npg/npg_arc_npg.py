@@ -376,7 +376,7 @@ def Geo_to_arc_shapes(geo, as_singlepart=True):
         Properties of the Geo array are used to derive the remaining
         parameters.
     as_singlepart : boolean
-        True, turns multipart shapes into singlepart.  False retains the
+        True, turns multipart shapes into singlepart.  False, retains the
         multipart nature.  Holes remain preserved.
 
     Notes
@@ -386,7 +386,7 @@ def Geo_to_arc_shapes(geo, as_singlepart=True):
         Geo array.
 
     - `Geo_to_arc_shapes` is called by `Geo_to_fc`.
-    - `arr2poly` in the function, does the actual poly construction
+    - `arr2poly` in the function, does the actual poly construction.
 
     Example
     -------
@@ -463,7 +463,7 @@ def Geo_to_fc(geo, gdb=None, name=None, kind=None, SR=None):
         for row in polys:
             cur.insertRow(row)
     CopyFeatures("tmp", out_name)
-    return
+    return None
 
 
 def view_poly(geo, id_num=1, view_as=2):
@@ -491,7 +491,7 @@ def view_poly(geo, id_num=1, view_as=2):
     if id_num not in (geo.IDs):
         msg = "Id ... {} ... not found.\n Use geo.IDs to see their values"
         print(msg.format(id_num))
-        return
+        return None
     shp = geo.get_shapes(id_num)
     z = [Array([Point(*i) for i in b]) for b in shp.bits]
     if view_as == 2:
@@ -508,7 +508,7 @@ def view_poly(geo, id_num=1, view_as=2):
 # ============================================================================
 # ---- (6) attribute data
 # Change FC <null> to a useful nodata value
-def make_nulls(in_fc, include_oid=True, int_null=-999):
+def make_nulls(in_fc, include_oid=True, include_editable=True, int_null=-999):
     """Return null values for a list of fields objects.
 
     This excludes objectid and geometry related fields.
@@ -522,6 +522,8 @@ def make_nulls(in_fc, include_oid=True, int_null=-999):
         Include the `object id` field to denote unique records and geometry
         in featureclasses or geodatabase tables.  This is recommended, if you
         wish to join attributes back to geometry.
+    include_editable : boolean
+        Include `editable fields` but not the `geometry` field.  eg Shape_Area
     int_null : integer
         A default to use for integer nulls since there is no ``nan`` equivalent
         Other options include
@@ -548,8 +550,11 @@ def make_nulls(in_fc, include_oid=True, int_null=-999):
         print("Only Featureclasses and tables are supported")
         return None, None
     in_flds = desc['fields']
-    good = [f for f in in_flds if f.editable and f.type != 'Geometry']
-    # good = [f for f in in_flds if f.type != 'Geometry']
+    if include_editable:
+        good = [f for f in in_flds if f.type not in ['OID', 'Geometry']]
+    else:
+        good = [f for f in in_flds if f.editable and f.type != 'Geometry']
+    #
     fld_dict = {f.name: f.type for f in good}
     fld_names = list(fld_dict.keys())
     null_dict = {f: nulls[fld_dict[f]] for f in fld_names}
@@ -615,7 +620,7 @@ def tbl_data(in_tbl, int_null=-999):
         new_names = out_flds = fld_names
     if fld_names[0] == 'OID@':
         out_flds = flds + fld_names[1:]
-        new_names = ['OID_', 'X_cent', 'Y_cent'] + out_flds[3:]
+        new_names = ['OID_'] + out_flds[1:]  # 'X_c', 'Y_c'] + out_flds[3:]
     a = TableToNumPyArray(
         in_tbl, out_flds, skip_nulls=False, null_value=null_dict
     )
@@ -656,6 +661,43 @@ def fc2na(in_fc):
     a['Y'] = np.round(y - m[1], 3)
     xy = stu(a)
     return oids, a, xy
+
+
+def attr_to_npz(fc_name, out_name):
+    r"""Save the attributes associated with a geo array.
+
+    Parameters
+    ----------
+    fc_name : text
+        The complete featureclass name in the geodatabase to save.
+    out_name : text
+        The full path, filename and extension for the output `*.npz`.
+    array_name : text
+        The name to assign to the output array.  Use `raw` format.
+
+        >>> out_name = r"C:\arcpro_npg\data\ontario_attr.npz"
+
+    Returns
+    -------
+        Saves the structured array containing the attribute data, the field
+        names and type of the data.
+
+    Example
+    -------
+    >>> f_name = "C:/arcpro_npg/data/ontario_attr.npz"
+    >>> attr_to_npz(f_name, "data")
+
+    See Also
+    --------
+    `npg_io.load_geo_attr` retrieves the array information from the .npz file.
+    """
+    #
+    # Run tbl_data and make_nulls to create the attribute array
+    a = tbl_data(fc_name, int_null=-999)
+    b = a.dtype.names
+    out_name = out_name.replace("\\", "/")
+    np.savez(out_name, arr=a, fields=b)
+    print("\nGeo array saved to ... {} ...".format(out_name))
 
 
 # ---- (7) Geo or ndarrays to poly features
@@ -746,7 +788,7 @@ def geometry_fc(a, IFT, p_type=None, gdb=None, fname=None, sr=None):
         for row in out:
             cur.insertRow(row)
     CopyFeatures(fname, name)
-    return
+    return None
 
 
 # ============================================================================

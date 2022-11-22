@@ -192,7 +192,7 @@ def scatter_params(plt, fig, ax, title="Title", ax_lbls=None):
     plt.title(title + "\n", loc='center', fontdict=font1, size=18)
     # plt.tight_layout(pad=0.2, h_pad=0.1, w_pad=0.1)
     plt.grid(True)
-    return
+    return None
 
 
 # ---- (2) plot types
@@ -230,7 +230,7 @@ def plot_mixed(data, title="Title", invert_y=False, ax_lbls=None):
     def _scatter(p, plt, color, marker):
         """Do the actual point plotting. Change `s` to increase marker size."""
         X, Y = p[:, 0], p[:, 1]
-        plt.scatter(X, Y, s=50, c=color, linewidths=None, marker=marker)
+        plt.scatter(X, Y, s=25, c=color, linewidths=None, marker=marker)
 
     # ---- main plotting routine
     fig, ax = plt.subplots(1, 1)
@@ -246,12 +246,12 @@ def plot_mixed(data, title="Title", invert_y=False, ax_lbls=None):
             _label_pnts(pnts, plt)
         elif kind == 2:
             cmap = plt.cm.get_cmap('hsv', len(pnts))
-            # for j, p in enumerate(pnts):
-            clr = cmap(i)  # clr=np.random.random(3,)  # clr = "b"
-            # clr = 'None'
-            _line(pnts, plt)  # color, marker, linewdth=2)
-            # plt.fill(*zip(*p), facecolor=clr)
-            _scatter(pnts, plt, color, marker)
+            for j, p in enumerate(pnts):
+                clr = cmap(j)  # clr=np.random.random(3,)  # clr = "b"
+                # clr = 'None'
+                _line(p, plt)  # color, marker, linewdth=2)
+                # plt.fill(*zip(*p), facecolor=clr)
+                _scatter(p, plt, color, marker)
     plt.show()
 
 
@@ -447,7 +447,7 @@ def plot_polygons(arr, outline=True, vertices=True,
         plt.scatter(X, Y, s=50, c=color, linewidths=None, marker=marker)
     # --
     if hasattr(arr, 'IFT'):
-        cw = arr.CW
+        cw = arr.CL
         shapes = arr.bits
     elif isinstance(arr, np.ndarray):
         if len(arr.shape) == 2:
@@ -481,7 +481,7 @@ def plot_polygons(arr, outline=True, vertices=True,
         else:
             if hasattr(arr, 'IFT'):
                 if cw[i] == 0:
-                    clr = "w"
+                    clr = "grey"
                 else:
                     clr = colors_[i]
             else:
@@ -601,7 +601,7 @@ def _demo():
     #         title='Points no closer than... test',
     #         invert_y=False, ax_lbls=None
     #         )
-    return
+    return None
 
 
 # ---------------------------------------------------------------------

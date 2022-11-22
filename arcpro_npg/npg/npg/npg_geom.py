@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# pylint: disable=C0103, C0410, R0913, R0914, R0915, W0611, W0612
 # noqa: D205, D400, F403
 r"""
 ----------------------------------
@@ -19,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2021-23-11
+    2022-10-13
 
 Purpose
 -------
@@ -46,7 +45,7 @@ determined to be to the right of every segment', that"::
     - rings can be self-tangent,
     - rings can not overlap.
 
-(3) How to flatten a searchcursor to points and/or None
+(3) How to flatten a searchcursor to points and/or None.
 
 >>> in_fc = "C:/Git_Dan/npgeom/npgeom.gdb/Polygons"
 >>> SR = npg.getSR(in_fc)
@@ -129,7 +128,7 @@ from scipy.spatial import ConvexHull as CH
 from scipy.spatial import Delaunay
 
 # import npGeo
-from npg import npGeo, npg_helpers, npg_pip
+from npg import npGeo, npg_helpers, npg_pip  # noqa
 from npg.npg_helpers import (
     _get_base_, _bit_area_, _bit_min_max_, _in_extent_, _angles_3pnt_)
 from npg.npg_pip import np_wn
@@ -160,7 +159,7 @@ __helpers__ = [
     '_closest_pnt_on_poly_', '_pnt_on_segment_', '_add_pnts_on_line_'
 ]
 
-__all__ = __helpers__ + __all__
+# __all__ = __helpers__ + __all__
 
 
 # ===========================================================================
@@ -287,10 +286,22 @@ def _percent_along_(a, percent=0):
 def _is_pnt_on_line_(start, end, xy, tolerance=0.0):
     """Perform a distance check of whether a point is on a line.
 
+    Parameters
+    ----------
+    start, end, xy : points, array-like
+    tolerance : float
+        Acceptable distance from the line.
+
     Notes
     -----
     `tolerance` is normally not needed unless you want to examine points
     quite close to a segment.
+
+    eps = 2**-52 = 2.220446049250313e-16
+    np.finfo(float).eps = 2.220446049250313e-16
+    np.finfo(float)
+    finfo(resolution=1e-15, min=-1.7976931348623157e+308,
+          max=1.7976931348623157e+308, dtype=float64)
     """
     #
     def dist(a, b):
@@ -299,13 +310,9 @@ def _is_pnt_on_line_(start, end, xy, tolerance=0.0):
     #
     line_leng = dist(start, end)
     if tolerance == 0.0:
-        d = dist(start, xy) + dist(end, xy) == line_leng
-    else:
-        d = (dist(start, xy) + dist(end, xy)) - line_leng
-        d = -tolerance <= d <= tolerance
-    if d:
-        return True
-    return False
+        return dist(start, xy) + dist(end, xy) == line_leng
+    d = (dist(start, xy) + dist(end, xy)) - line_leng
+    return -tolerance <= d <= tolerance
 
 
 def _add_pnts_on_line_(a, spacing=1, is_percent=False):  # densify by distance
@@ -549,7 +556,7 @@ def common_extent(a, b):
     b = _get_base_(b)
     ext0 = np.concatenate((np.min(a, axis=0), np.max(a, axis=0)))
     ext1 = np.concatenate((np.min(b, axis=0), np.max(b, axis=0)))
-    es = np.vstack((ext0, ext1))
+    es = np.concatenate((ext0[None, :], ext1[None, :]), axis=0)
     maxs = np.max(es, axis=0)
     mins = np.min(es, axis=0)
     L, B = maxs[:2]
@@ -779,7 +786,7 @@ def offset_buffer(poly, buff_dist=1, keep_holes=False, asGeo=False):
     def _buffer_Geo_(poly, buff_dist, keep_holes):
         """Move the Geo array buffering separately."""
         arr = poly.bits
-        cw = poly.CW
+        cw = poly.CL
         final = []
         for i, a in enumerate(arr):
             if cw[i] == 0 and keep_holes:
@@ -954,7 +961,7 @@ def triangulate_pnts(pnts):
     p = pnts - avg
     tri = Delaunay(p)
     simps = tri.simplices
-    # -- indices holder, fill with indices, repeat first and roll CW
+    # -- indices holder, fill with indices, repeat first and roll CL
     # translate the points back
     z = np.zeros((len(simps), 4), dtype='int32')
     z[:, :3] = simps
@@ -1156,7 +1163,7 @@ def bin_pnts(pnts, x_bins=None, y_bins=None):
 
 def in_hole_check(pnts, geo):
     """Check if points are in a hole."""
-    w = np.where(geo.CW == 0)[0]
+    w = np.where(geo.CL == 0)[0]
     holes = geo.bits[w]
     out = []
     for h in holes:

@@ -1,8 +1,4 @@
 # -*- coding: utf-8 -*-
-# pylint: disable=C0103,C0302,C0415
-# pylint: disable=E1101,E1121
-# pylint: disable=W0105,W0201,W0212,W0221,W0611,W0612,W0621
-# pylint: disable=R0902,R0904,R0912,R0913,R0914,R0915
 # noqa: D205, D400, F403
 r"""
 -----------
@@ -20,7 +16,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2021-09-03
+    2022-10-16
 
 Purpose
 -------
@@ -98,13 +94,14 @@ __all__ = [
 __helpers__ = [
     'prn_tbl', '_angles_3pnt_', '_od_angles_dist_', '_area_centroid_',
     '_bit_area_', '_bit_check_', '_bit_crossproduct_', '_bit_length_',
-    '_bit_min_max_', '_bit_segment_angles_', '_from_to_pnts_', '_get_base_',
-    '_in_LBRT_', '_in_extent_', '_is_clockwise_', '_is_ccw_', '_is_convex_',
-    '_is_right_side', '_isin_2d_', '_pnts_in_extent_', '_rotate_', '_scale_',
-    '_to_lists_', '_trans_rot_', '_translate_', '_perp_'
+    '_bit_min_max_', '_bit_segment_angles_', '_from_north_', '_from_to_pnts_',
+    '_get_base_', '_in_LBRT_', '_in_extent_', '_is_clockwise_', '_is_ccw_',
+    '_is_convex_', '_is_right_side', '_isin_2d_', '_pnts_in_extent_',
+    '_rotate_', '_scale_', '_to_lists_', '_trans_rot_', '_translate_',
+    '_perp_'
 ]  # ---- core bit functions
 
-__all__ = __helpers__ + __all__
+# __all__ = __helpers__ + __all__
 
 
 # ---------------------------------------------------------------------------
@@ -194,7 +191,7 @@ def _to_lists_(a, outer_only=True):
 
 
 def uniq_1d(arr):
-    """Return mini 1D unique."""
+    """Return mini `unique` 1D."""
     mask = np.empty(arr.shape, dtype=np.bool_)
     mask[:1] = True
     a_copy = np.sort(arr)
@@ -203,8 +200,15 @@ def uniq_1d(arr):
 
 
 def uniq_2d(arr, return_sorted=False):  # *** keep but slower than unique
-    """Return mini `unique` for 2D coordinates.  Derived from np.unique."""
+    """Return mini `unique` for 2D coordinates.  Derived from np.unique.
 
+    Notes
+    -----
+    For returning in the original order this is equivalent to::
+
+        u, idx = np.unique(x_pnts, return_index=True, axis=0)
+        x_pnts[np.sort(idx)]
+    """
     def _reshape_uniq_(uniq, dt, shp):
         n = len(uniq)
         uniq = uniq.view(dt)
@@ -219,8 +223,7 @@ def uniq_2d(arr, return_sorted=False):  # *** keep but slower than unique
     if return_sorted:
         perm = ar.argsort(kind='mergesort')
         aux = ar[perm]
-    else:
-        ar.sort()
+    else:  # removed ar.sort()
         aux = ar
     mask = np.empty(aux.shape, dtype=np.bool_)
     mask[:1] = True
@@ -428,6 +431,46 @@ def _bit_segment_angles_(a, fromNorth=False):
     if fromNorth:
         ang = np.mod((450.0 - ang), 360.)
     return ang
+
+
+def _from_north_(angles):
+    """Convert x-axis based angles to North-based, ergo clockwise.
+
+    Parameters
+    ----------
+    angles : numbers, array-like
+        x-axis based angles are counterclockwise ranging from -180 to 180 with
+        0 E, 90 N, +/-180 W and -90 S
+
+    See Also
+    --------
+    `_from_xaxis_` for discussion.
+    """
+    return np.mod((450.0 - angles), 360.)
+
+
+def _from_xaxis_(angles):
+    """Convert North referenced angles to x-axis based angles.
+
+    Parameters
+    ----------
+    angles : numbers, array-like
+        North-based angles, clockwise 0 to 360 degrees.
+
+    Returns
+    -------
+    Angles relative to the x-axis (-180 - 180) which are counterclockwise.
+
+    Example::
+
+        >>> a = np.arange(180., -180 - 45, -45, float)
+        >>> a
+        >>> array([ 180., 135., 90., 45., 0., -45., -90., -135., -180.])
+        >>> b = (-a + 90.) % 360.
+        >>> b
+        >>> array([ 270., 315., 0., 45., 90., 135., 180., 225., 270.])
+    """
+    return np.mod(-angles + 90., 360.)
 
 
 def _rotate_(a, R, as_group):
@@ -664,7 +707,7 @@ def _pnts_in_extent_(pnts, extent=None, return_index=False):
     msg = "\nExtent in error... 2x2 array required not:\n{}\n"
     if extent is None:
         print(msg.format(extent))
-        return
+        return None
     shp = np.asarray(extent).shape
     if shp == (2, 2):
         LB, RT = extent
@@ -673,7 +716,7 @@ def _pnts_in_extent_(pnts, extent=None, return_index=False):
         LB, RT = np.min(extent, axis=0), np.max(extent, axis=0)
     else:
         print(msg.format(extent))
-        return
+        return None
     idx = np.all(np.logical_and(LB < pnts, pnts <= RT), axis=1)
     if return_index:
         return idx.base
@@ -1086,7 +1129,7 @@ def shape_finder(arr, start=0, prn=False, structured=True):
             out[nme] = info[:, i]
         if prn:
             prn_tbl(out)
-            return
+            return None
         return out
     else:
         return info

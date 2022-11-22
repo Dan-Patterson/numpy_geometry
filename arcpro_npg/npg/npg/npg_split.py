@@ -40,8 +40,8 @@ from line_side
 
 import sys
 import numpy as np
-from npg import npg_plots
-from npg.npg_plots import plot_polygons
+from npg import npg_plots  # noqa
+from npg.npg_plots import plot_polygons  # noqa
 
 ft = {"bool": lambda x: repr(x.astype(np.int32)),
       "float_kind": '{: 6.2f}'.format}

@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# flake8 --per-file-ignores="__init__.py:F401
 # noqa: E401, E402, D205, D400, F401, F403
 # pylint: disable=C0410
 r"""
@@ -12,14 +13,14 @@ Normal usage:
     >>> import npg
 
 Script :
-    npg.__init__.py.
+    __init__.py.
 
 Author :
     Dan Patterson
 - Dan_Patterson@carleton.ca
 - https://github.com/Dan-Patterson
 
-Modified : 2021-06-10
+Modified : 2022-09-12
     Creation date during 2019 as part of ``arraytools``.
 
 Purpose
@@ -90,16 +91,34 @@ import sys
 import numpy as np
 
 # ---- import for npg
-import npg
+# import npg
+
+from . import npgDocs, npGeo, npg_helpers, npg_geom
+from . import npg_clip, npg_min_circ, npg_overlay, npg_analysis
+from . import npg_setops, npg_io, npg_table, npg_create, npg_utils
+from . import npg_pip, npg_prn  # noqa
+
+from . npGeo import *  # noqa
+from . npg_helpers import *  # noqa
+from . npg_geom import *  # noqa
+
+"""
+from npGeo import (
+    Geo,
+    roll_coords, array_IFT, arrays_to_Geo,
+    Geo_to_arrays, Geo_to_lists, _fill_float_array,
+    is_Geo, reindex_shapes, check_geometry,
+    dirr
+)
+"""
+# import npg_helpers
+# import npg_geom
+# import npgDocs
+"""
 from . import (npgDocs, npGeo, npg_helpers, npg_pip, npg_geom, npg_clip,
                npg_min_circ, npg_overlay, npg_analysis, npg_setops, npg_io,
-               npg_prn, npg_table, npg_create, npg_utils)
-"""
-import npgDocs
-import npGeo
-import npg_helpers
-import npg_pip
-import npg_geom
+               npg_prn, npg_table, npg_create, npg_utils)  # pyflakes.ignore
+
 import npg_clip
 import npg_min_circ
 import npg_overlay
@@ -110,42 +129,30 @@ import npg_prn
 import npg_table
 import npg_create
 import npg_utils
-"""
 
 from . npgDocs import (
     npGeo_doc, Geo_hlp, array_IFT_doc, dirr_doc, shapes_doc, parts_doc,
     outer_rings_doc, inner_rings_doc, get_shapes_doc, sort_by_extent_doc,
     radial_sort_doc
-)
-from . npGeo import *
-from . npg_helpers import *
-from . npg_pip import *
-from . npg_geom import *
-from . npg_clip import *
-from . npg_min_circ import *
-from . npg_overlay import *
-from . npg_analysis import *
-from . npg_setops import *
-from . npg_io import *
-from . npg_prn import *
-from . npg_table import *
-from . npg_create import *
-from . npg_utils import *
+)  # pyflakes.ignore
+"""
+
+# from . npGeo import *
+# from . npg_helpers import *
+# from . npg_pip import *
+# from . npg_geom import *
+# from . npg_clip import *
+# from . npg_min_circ import *
+# from . npg_overlay import *
+# from . npg_analysis import *
+# from . npg_setops import *
+# from . npg_io import *
+# from . npg_prn import *
+# from . npg_table import *
+# from . npg_create import *
+# from . npg_utils import *
 
 # ---- docstring info for Geo and some methods
-
-# npGeo.__doc__ += npGeo_doc
-# npGeo.Geo.__doc__ += Geo_hlp
-# npGeo.array_IFT.__doc__ += array_IFT_doc
-# npGeo.dirr.__doc__ += dirr_doc
-
-# npGeo.Geo.shapes.__doc__ += shapes_doc
-# npGeo.Geo.parts.__doc__ += parts_doc
-# npGeo.Geo.outer_rings.__doc__ += outer_rings_doc
-# npGeo.Geo.inner_rings.__doc__ += inner_rings_doc
-# npGeo.Geo.get_shapes.__doc__ += get_shapes_doc
-# npGeo.Geo.radial_sort.__doc__ += radial_sort_doc
-# npGeo.Geo.sort_by_extent.__doc__ += sort_by_extent_doc
 
 
 # ---- define __all__
@@ -161,29 +168,32 @@ __helpers__ = [
     'sort_by_extent_doc', 'radial_sort_doc'
 ]
 
-__all__.extend(npg.npgDocs.__all__)
-__all__.extend(npg.npGeo.__all__)
-__all__.extend(npg.npg_io.__all__)
-__all__.extend(npg.npg_geom.__all__)
-__all__.extend(npg.npg_clip.__all__)
-__all__.extend(npg.npg_prn.__all__)
-__all__.extend(npg.npg_pip.__all__)
-__all__.extend(npg.npg_helpers.__all__)
-__all__.extend(npg.npg_table.__all__)
-__all__.extend(npg.npg_create.__all__)
-__all__.extend(npg.npg_analysis.__all__)
-__all__.extend(npg.npg_overlay.__all__)
-__all__.extend(npg.npg_setops.__all__)
-# __all__.extend(npg_min_circ.__all__)
+__all__.extend(npgDocs.__all__)
+__all__.extend(npGeo.__all__)
+__all__.extend(npg_geom.__all__)
+__all__.extend(npg_helpers.__all__)
 __all__.sort()
 
-__helpers__.extend(npg.npg_helpers.__helpers__)
-__helpers__.extend(npg.npg_geom.__helpers__)
-__helpers__.extend(npg.npg_clip.__helpers__)
-__helpers__.extend(npg.npg_analysis.__helpers__)
-__helpers__.extend(npg.npg_overlay.__helpers__)
+__helpers__.extend(npg_helpers.__helpers__)
+__helpers__.extend(npg_geom.__helpers__)
 __helpers__.sort()
 
+"""
+__all__.extend(npg.npg_io.__all__)
+__all__.extend(npg_clip.__all__)
+__all__.extend(npg_prn.__all__)
+__all__.extend(npg_pip.__all__)
+__all__.extend(npg_table.__all__)
+__all__.extend(npg_create.__all__)
+__all__.extend(npg_analysis.__all__)
+__all__.extend(npg_overlay.__all__)
+__all__.extend(npg_setops.__all__)
+# __all__.extend(npg_min_circ.__all__)
+__helpers__.extend(npg_clip.__helpers__)
+__helpers__.extend(npg_analysis.__helpers__)
+__helpers__.extend(npg_overlay.__helpers__)
+
+"""
 msg = """
 ----------------------------------------------
 ---- ... (n)um(p)y (g)eometry ... npg ... ----
@@ -203,6 +213,7 @@ Modules not imported by default...
 
 ----------------------------------------------
 """
+
 pth = __path__[0]
 print(msg.format(pth, sys.version, sys.exec_prefix, np.__version__))
 del pth

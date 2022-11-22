@@ -29,7 +29,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2021-05-29
+    2022-09-21
 
 Purpose
 -------
@@ -75,7 +75,7 @@ import numpy as np
 #     import npg
 # import npGeo
 # from npGeo import array_IFT, arrays_to_Geo, roll_coords
-from npg import npGeo, npg_pip, npg_helpers
+from npg import npGeo
 from npg.npg_pip import np_wn
 # import npg_helpers
 from npg.npg_helpers import (_to_lists_, _bit_check_, _in_LBRT_,
@@ -653,7 +653,7 @@ def adjacency_matrix(a, prn=False):
         return arr
     #
     rings = _bit_check_(a, just_outer=True)  # get the outer rings
-    ids = a.IDs[a.CW == 1]                   # and their associated ID values
+    ids = a.IDs[a.CL == 1]                   # and their associated ID values
     n = len(rings)
     N = np.arange(n)
     z = np.full((n, n), -1)
@@ -668,7 +668,9 @@ def adjacency_matrix(a, prn=False):
     if np.sum(ids - N) > 0:
         z = recl(z, ids)  # reclass the initial values using the actual ids
     if prn:
-        out = "\n".join(["{} : {}".format(i, row[row != -1])
+        print("Adjacency matrix\n  n : poly ids\n" + "-"*14)
+        row_frmt = "{:>3.0f} : {!s:<15}"
+        out = "\n".join([row_frmt.format(i, row[row != -1])
                          for i, row in enumerate(z)])
         print(out)
         return None
@@ -904,7 +906,7 @@ def in_out_crosses(*args):
             p0, p1, p2, p3 = args
         else:
             print(msg)
-            return
+            return None
     else:
         print(msg)
         return None

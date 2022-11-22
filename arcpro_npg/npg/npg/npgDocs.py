@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2022-03-28
+    2022-10-16
 
 Purpose
 -------
@@ -144,10 +144,10 @@ lists and/or arrays.
 >>> import npgeom as npg
 >>> g = npg.Geo(a, IFT)
 >>> g.__dict__.keys()
-... dict_keys(['IFT', 'K', 'Info', 'IDs', 'Fr', 'To', 'CW', 'PID', 'Bit', 'FT',
+... dict_keys(['IFT', 'K', 'Info', 'IDs', 'Fr', 'To', 'CL', 'PID', 'Bit', 'FT',
 ...            'IP', 'N', 'U', 'SR', 'X', 'Y', 'XY', 'LL', 'UR', 'Z', 'hlp'])
 >>> sorted(g.__dict__.keys())
-... ['Bit', 'CW', 'FT', 'Fr', 'IDs', 'IFT', 'IP', 'Info', 'K', 'LL', 'N',
+... ['Bit', 'CL', 'FT', 'Fr', 'IDs', 'IFT', 'IP', 'Info', 'K', 'LL', 'N',
 ...  'PID','SR', 'To', 'U', 'UR', 'X', 'XY', 'Y', 'Z', 'hlp']
 
 ----
@@ -284,7 +284,7 @@ Fr : IFT[:, 1]
     The ``from`` point in the point sequence.
 To : IFT[:, 2]
     The ``to`` point in the point sequence.
-CW : IFT[:, 3]
+CL : IFT[:, 3]
     A value of ``1`` for exterior rings, ``0`` for interior/holes.
 PID : IFT[:, 4]
     Part ids sequence by shape.  A singlepart shape will have one (1) part.
@@ -322,7 +322,7 @@ A featureclass with 3 shapes. The first two are multipart shapes with holes.
 (dtype('float64'), (62, 2))
 
 >>> arr.IFT  # ---- annotated ----
-#      IDs, Fr, To, CW, PID, Bit
+#      IDs, Fr, To, CL, PID, Bit
 array([[ 1,  0,  5,  1,   1,  0],  # first shape, first part, outer ring
        [ 1,  5, 10,  0,   1,  1],  # hole 1
        [ 1, 10, 14,  0,   1,  2],  # hole 2
@@ -651,14 +651,14 @@ Example
 -------
 sample dir of a Geo array::
 
-    npg.dirr(sq)
+    npg.dirr(sq2)
 
     ----------------------------------------------------------------------
-    | dir(npgeom) ...
-    |    <class 'npgeom.Geo'>
+    | dir(sq2) ...
+    |    <class 'npg.Geo'>
     -------
       (001)  ... Geo class ...
-      (002)  Bit                       CW                        FT
+      (002)  Bit                       CL                        FT
       (003)  Fr                        H                         IDs
       (004)  IFT                       IFT_str                   IP
       (005)  Info                      K                         LL

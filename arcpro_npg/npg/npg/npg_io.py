@@ -21,12 +21,16 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2021-05-29
+    2022-11-17
 
 Purpose
 -------
 Tools for working with point and poly features as an array class.
 Requires npGeo to implement the array geometry class.
+
+Note
+----
+See `npg_arc_npg.py` for bringing and saving attribute data.
 
 See Also
 --------
@@ -40,7 +44,7 @@ npGeo :
 
 Example
 -------
-see : r"C:\Git_Dan\npgeom\docs\json_conversion_notes.txt"
+see : r"C:\arcpro_npg\npg\docs\json_conversion_notes.txt"
 
 `Subclassing ndarrays
 <https://docs.scipy.org/doc/numpy/user/basics.subclassing.html>`_.
@@ -113,7 +117,7 @@ def dtype_info(a, as_string=False):
     return names, formats
 
 
-def load_geo(f_name, suppress_extras=True):
+def load_geo(f_name, suppress_extras=False):
     """Load a well formed `npy` file representing a structured array.
 
     Unpack an npz file containing a Geo array.
@@ -177,6 +181,53 @@ def load_geo(f_name, suppress_extras=True):
     return geo, arrs, names
 
 
+def load_geo_attr(f_name):
+    """Load the attributes in an npy file associated with a geo array.
+
+    Parameters
+    ----------
+    f_name : text
+        The complete filename path and extension.
+
+    Returns
+    -------
+        names : the list of array names.
+        arrs  : the arrays themselves `arr` and `fields`.
+            The two arrays are the:
+                - attribute data
+                - field names and data type.
+
+    Example
+    -------
+    >>> f_name = "C:/arcpro_npg/data/ontario_attr.npz"
+    >>> names, arrs = load_geo_attr(f_name)
+    >>> names  # ['arr', 'fields']
+    >>> arr = arrs[names[0]]
+    >>> fields = arrs[names[1]]
+
+    See Also
+    --------
+    `npg_arc_npg.attr_to_npz` which is used to create the .npz file.
+    """
+    arrs = np.load(f_name)
+    names = arrs.files  # array names
+    frmt0 = "\nLoading attributes from...  {}\n\nArrays include...{}"
+    print(frmt0.format(f_name, names))
+    frmt1 = "({}) name : {}\n"
+    for i, name in enumerate(names):
+        print(frmt1.format(i, name))
+    msg = """
+    To use :
+    >>> n0, n1 = names
+    >>> n0, n1
+    ... ('arr', 'fields')
+    >>> arr = arrs[n0]
+    >>> flds = arrs[n1]
+    """
+    print(msg)
+    return names, arrs
+
+
 def save_geo(g, f_name, folder):
     """Save an array as an npz file.
 
@@ -202,7 +253,6 @@ def save_geo(g, f_name, folder):
     out_name = "{}/{}.npz".format(folder, f_name)
     np.savez(out_name, g=g, ift=IFT, kind=K, extents=XT, spatial_ref=SR)
     print("\nGeo array saved to ... {} ...".format(out_name))
-    return
 
 
 def load_txt(name="arr.txt", names=None, data_type=None):
