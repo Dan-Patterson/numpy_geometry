@@ -1,7 +1,8 @@
 # Scripts
 ----
+**Last update: 2022-11-22**
 
-**This is way out of date**
+**Slowly updating**
 I will update the documentation as soon as I can.
 
 The following scripts are listed in this folder and the documentation guide
@@ -12,6 +13,7 @@ The following scripts are listed in this folder and the documentation guide
 4. npGeo.py
 5. npg_helpers.py
 6. smallest_circle.py
+7. npg_create.py
 
 Links to other documentation will be provided as appropriate
 
@@ -21,7 +23,7 @@ Links to other documentation will be provided as appropriate
 
 <a href="url"><img src="../images/npg_io.png" align="right" height="auto" width="150" ></a>
 
-Some useful functions to access and document featureclass information
+Some useful functions to access and document featureclass information.
 
 **dtype_info(a, as_string=False)**
 
@@ -85,6 +87,25 @@ Arrays include...['g', 'ift', 'kind', 'extents', 'spatial_ref']
   descr. : [('', '<U19')]
 ```
 
+**load_geo_attr(f_name)**
+
+    Load the attributes in an npy file associated with a geo array.
+    Returns
+    -------
+        names : the list of array names.
+        arrs  : the arrays themselves `arr` and `fields`.
+            The two arrays are the:
+                - attribute data
+                - field names and data type.
+
+    Example
+    -------
+    >>> f_name = "C:/arcpro_npg/data/ontario_attr.npz"
+    >>> names, arrs = load_geo_attr(f_name)
+    >>> names  # ['arr', 'fields']
+    >>> arr = arrs[names[0]]
+    >>> fields = arrs[names[1]]
+
 **save_geo(g, f_name, folder)**
 
     Save an array as an npz file.
@@ -100,14 +121,12 @@ If you wish to modify this, modify save_txt as well.
 
 **Others**
 
-    The remainder of the functions deal with formatting attribute data and printing.
-
+    There are functionsto work with geojson files as well.
 
 ```python
 
 npg.npg_io
-'_ckw_', '_col_format', 'col_hdr', 'dtype_info', 'geojson_Geo', 'gms', 'load_geo', 'load_geojson',
- 'load_txt', 'make_row_format', 'prn_', 'prn_geo', 'prn_q', 'prn_tbl', 'save_geo', 'save_txt
+[... 'dtype_info', 'geojson_Geo', 'load_geo', 'load_geo_attr', 'load_geojson', 'load_txt', 'save_geo', 'save_txt']
 ```
 ----
 ## npg_arc_npg
@@ -209,6 +228,16 @@ npzfiles.files                               # ---- will show ==> ['s2', 'IFT']
 s2 = npzfiles['s2']                          # ---- slice the arrays by name from the npz file to get each array
 IFT = npzfiles['IFT']
 ```
+
+
+----
+## np_create.py
+
+
+<a href="url"><img src="../images/npGeo.png" align="right" height="auto" width="450" ></a>
+
+The functions here allow you to create geometry of various shapes.
+
 
 ----
 OLD
