@@ -248,7 +248,8 @@ Circle-based functions (arc, arc sector, circle, ellipse) are also included sinc
 
 <a href="url"><img src="../images/extent_to_poly02.png" align="left" height="auto" width="300" ></a>  
 
-</br>
+<br clear="all">
+
 
 ----
 ## OLD
