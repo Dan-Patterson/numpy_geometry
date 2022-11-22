@@ -242,12 +242,13 @@ Many of the functions can be used for spatial tiling.  These would include recta
 
 Circle-based functions (arc, arc sector, circle, ellipse) are also included since they are used in a variety of other functions (eg. triangulation)
 
-<a href="url"><img src="../images/circles.png" align="left" height="auto" width="300" ></a>
+<a href="url"><img src="../images/circles.png" align="left" height="auto" width="300" ></a>  
 
-<a href="url"><img src="../images/hexagons.png" align="left" height="auto" width="300" ></a>
+<a href="url"><img src="../images/hexagons.png" align="left" height="auto" width="300" ></a>  
 
-<a href="url"><img src="../images/extent_to_poly02.png" align="left" height="auto" width="300" ></a>
+<a href="url"><img src="../images/extent_to_poly02.png" align="left" height="auto" width="300" ></a>  
 
+</br>
 
 ----
 ## OLD
