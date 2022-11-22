@@ -53,6 +53,8 @@ If you have polyline geometry that you know will create well-formed polygons, si
 <a href="url"><img src="../images/npGeo_conversion_tools.png" align="center" height="auto" width="200" ></a>
 
 
+
+
 ----
 
 (4) **Sort Geometry**
