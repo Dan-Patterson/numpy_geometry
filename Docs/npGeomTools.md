@@ -55,6 +55,8 @@ If you have polyline geometry that you know will create well-formed polygons, si
 
 
 
+
+
 ----
 
 (4) **Sort Geometry**
