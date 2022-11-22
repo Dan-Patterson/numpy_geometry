@@ -2,7 +2,7 @@
 
 **NOTE**
 
-I am in the process of updating to the 2.9 toolbox format.  Wait until I am done if you are using ArcGIS Pro 2.9.
+I am in the process of updating to the 3.x toolbox format.  Wait until I am done if you are using ArcGIS Pro 2.9.
 
 **Tools and the Toolbox**
 
