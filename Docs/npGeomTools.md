@@ -11,11 +11,7 @@ The *Geo* array, based on a numpy array, is used along with *arcpy* functions to
 
 The tools here are the most recent version of those provided in *FreeTools*
 
-
-
-
-
-
+<br clear="all">
 
 
 (1) **Attribute tools**
@@ -48,16 +44,12 @@ The reciprocal function was not implemented because I didn't want to provide a w
 
 If you have polyline geometry that you know will create well-formed polygons, simply change `K`.
 
-
 <a href="url"><img src="../images/containers.png" align="left" height="auto" width="200" ></a>
 <a href="url"><img src="../images/npGeo_conversion_tools.png" align="center" height="auto" width="200" ></a>
 
 
-
-
-
-
-----
+<br clear="all">
+<br>
 
 (4) **Sort Geometry**
 
