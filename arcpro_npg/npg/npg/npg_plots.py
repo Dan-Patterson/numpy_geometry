@@ -18,7 +18,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2021-05-29
+    2022-11-27
 
 Purpose
 -------
@@ -408,8 +408,9 @@ def plot_polygons(arr, outline=True, vertices=True,
 
     Parameters
     ----------
-    arr : ndarray or Geo array
-        If the array is a Geo array, it will be converted to `arr.bits`.
+    arr : ndarray or Geo array or list of arrays
+        If the array is a Geo array, it will be converted to `arr.bits`.  A
+        list of arrays can be provided
     outline : boolean
         True, returns the outline of the polygon.  False, fills the polygon.
 
@@ -429,7 +430,7 @@ def plot_polygons(arr, outline=True, vertices=True,
         X, Y = p[:, 0], p[:, 1]
         plt.plot(X, Y, color='black', linestyle='solid', linewidth=1)
 
-    def _label_pnts(pnts, plt):
+    def _label_pnts(pnts, plt, color_='black', offx=2, offy=2):
         """Label the points.
 
         Note: to skips the last label for polygons, use
@@ -437,7 +438,8 @@ def plot_polygons(arr, outline=True, vertices=True,
         """
         lbl = np.arange(len(pnts))
         for label, xpt, ypt in zip(lbl[:], pnts[:, 0], pnts[:, 1]):
-            plt.annotate(label, xy=(xpt, ypt), xytext=(2, 2),
+            plt.annotate(label, color=color_, xy=(xpt, ypt),
+                         xytext=(offx, offy),
                          size=8, textcoords='offset points',
                          ha='left', va='bottom')
 
@@ -470,6 +472,9 @@ def plot_polygons(arr, outline=True, vertices=True,
     # cmap = plt.cm.get_cmap(plt.cm.viridis, 143)  # default colormap
     colors_ = ['black', 'blue', 'green', 'red', 'darkgrey', 'magenta',
                'darkblue', 'darkred', 'darkgreen', 'grey'] * 2
+    lbl_off = [[-8, 2], [4, 2], [4, -8], [-8, -8],
+               [-2, 2], [2, 2], [2, -2], [-2, -2]] * 2
+    # color_choice = ['black', 'red', 'green', 'blue']
     for i, shape in enumerate(shapes):
         if outline:   # _line(shape, plt)  # alternate, see line for options
             if random_colors:
@@ -491,7 +496,9 @@ def plot_polygons(arr, outline=True, vertices=True,
         if vertices:
             _scatter(shape[:-1], plt, size=50, color=colors_[i], marker=".")
         if labels:
-            _label_pnts(shape[:-1], plt)
+            ox, oy = lbl_off[i]  # offset point labels
+            _label_pnts(shape[:-1], plt, color_=colors_[i],
+                        offx=ox, offy=oy)
     plt.show()
     return plt
 
