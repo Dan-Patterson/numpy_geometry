@@ -40,13 +40,15 @@ import numpy as np
 
 import npg  # noqa
 from npg.npg_geom import common_extent
+from npg.npg_helpers import del_seq_dups
 from npg import npg_plots  # noqa
 from npg.npg_plots import plot_polygons  # noqa
 # from npg.npg_utils import time_deco
+
 ft = {"bool": lambda x: repr(x.astype(np.int32)),
       "float_kind": '{: 6.2f}'.format}
 np.set_printoptions(
-    edgeitems=10, linewidth=120, precision=3, suppress=True, threshold=200,
+    edgeitems=10, linewidth=120, precision=3, suppress=True, threshold=300,
     formatter=ft
 )
 
@@ -59,26 +61,6 @@ __helpers__ = ['_concat_']
 
 # ---- (1) general helpers
 #
-def _remove_sequential_duplicates_(arr, poly=True):
-    """Remove sequential duplicates in a Nx2 array.
-
-    Notes
-    -----
-    This may work in some situations::
-
-        w_ = np.nonzero(np.sum(arr[:-1] - arr[1:], axis=1))[0]
-
-    but an equality check is safer and faster
-    """
-    w_ = np.nonzero((arr[:-1] != arr[1:]).any(-1))[0]
-    tmp = arr[w_]
-    if poly:
-        if (tmp[0] != tmp[-1]).all(-1):
-            arr = np.concatenate((tmp, tmp[0, None]), axis=0)
-            return arr
-    return tmp
-
-
 def _roll_(ar, num=1):
     """Roll coordinates by `num` rows so that row `num` is in position 0."""
     return np.concatenate((ar[num:-1], ar[:num], [ar[num]]), axis=0)
@@ -93,18 +75,21 @@ def roll_arrays(arrs):
     points as close to the lower-left of the ring extent as possible.
     """
     # --
-    def _LL_(arr):
-        """Return the closest point to the lower left of the polygon."""
-        LL = np.min(arr, axis=0)
-        idx = (np.abs(arr - LL)).argmin(axis=0)
-        return idx[0]
+    def _closest_to_LL_(a, p, sqrd_=True):
+        """Return point distance closest to the `lower-left, LL`."""
+        diff = a - p[None, :]
+        if sqrd_:
+            return np.einsum('ij,ij->i', diff, diff)
+        return np.sqrt(np.einsum('ij,ij->i', diff, diff))
     # --
     if not isinstance(arrs, (list, tuple)):
         print("List/tuple of arrays required.")
         return None
     out = []
     for ar in arrs:
-        num = _LL_(ar)
+        LL = np.min(ar, axis=0)
+        dist = _closest_to_LL_(ar, LL, sqrd_=True)
+        num = np.argmin(dist)
         out.append(np.concatenate((ar[num:-1], ar[:num], [ar[num]]), axis=0))
     return out
 
@@ -447,10 +432,10 @@ def node_type(p_in_c, c_in_p, clp, poly, x_pnts):
     c_eq_p = sorted(list(set(c_eq_p))) if len(c_eq_p) > 0 else []
     p_eq_c = sorted(list(set(p_eq_c))) if len(p_eq_c) > 0 else []
     # -- check poly/x_pnts equality
-    p_eq_x, x_eq_p = np.nonzero((x_pnts == poly[:, None]).all(-1))
+    p_eq_x, _ = np.nonzero((x_pnts == poly[:, None]).all(-1))
     p_eq_x = sorted(list(set(p_eq_x))) if len(p_eq_x) > 0 else []
     # -- check clp/x_pnts equality
-    c_eq_x, x_eq_c = np.nonzero((x_pnts == clp[:, None]).all(-1))
+    c_eq_x, _ = np.nonzero((x_pnts == clp[:, None]).all(-1))
     c_eq_x = sorted(list(set(c_eq_x))) if len(c_eq_x) > 0 else []
     #
     # -- build the output
@@ -630,12 +615,15 @@ def _order_pnts_(whr_on, x_pnts_on, poly, clp):
     crossings = np.array_split(x_pnts_on, split_idx_)  # split the crossings
     # -- sort by distance
     out_ = []
-    for i, cr in enumerate(crossings):
-        z0 = ft_c[i, :2]  # first point
-        sub = [_dist_(z0, c) for c in cr]
-        new_idx = np.argsort(sub)
-        new_pnts = cr[new_idx]
-        out_.extend(new_pnts)
+    for i, cr in enumerate(crossings):  # -- if more that 1 crossing point
+        if len(cr) > 1:
+            z0 = ft_c[i, :2]  # first point
+            sub = [_dist_(z0, c) for c in cr]
+            new_idx = np.argsort(sub)
+            new_pnts = cr[new_idx]
+            out_.extend(new_pnts)
+        else:
+            out_.extend(cr)
     return np.asarray(out_)
 
 
@@ -721,8 +709,6 @@ def clip(poly, clp):
     -  `_wn_clip_`, `node_type`, `_x_mkr_`
     - `_concat_`, `_dist_`, `_a_eq_b_`, `_before_chk_`, `_btw_chk_`, `_to_add_`
 
-    - Fixes **** p_out_c, c_out_p not used so commented out.
-
     # -- `run a bail_chk_` ... doesn't work b0,E because all points are in
     # if nP == len(p_in_c):  # but all of b0 is retained instead of the E shape
     #     print("...poly completely within clp...")
@@ -746,9 +732,9 @@ def clip(poly, clp):
     poly, clp = roll_arrays([poly, clp])  # roll the arrays to orient to LL
     #
     # -- quick bail 1
-    bail = _a_eq_b_(poly, clp).all()
-    if bail:
-        print("\nInput polygons are equal.\n")
+    # bail = _a_eq_b_(poly, clp).all()
+    # if bail:
+    #    print("\nInput polygons are equal.\n")
     #    return  # -- uncomment when done
     nC = clp.shape[0]
     nP = poly.shape[0]
@@ -760,18 +746,17 @@ def clip(poly, clp):
     x_pnts, pInc, cInp, x_type, whr = vals  # wn_
     #
     # -- quick bail 2
-    if len(x_pnts) == 0:
-        print("No intersection between `poly` and `clp`.")
+    # if len(x_pnts) == 0:
+    #     print("No intersection between `poly` and `clp`.")
     #     return  # -- uncomment when done
     #
     # -- derive the unique intersection points and get their first found index.
-    uni, idx, cnts = np.unique(x_pnts, return_index=True,
-                               return_counts=True, axis=0)
-    if (cnts > 1).any():
-        print("\nDuplicate intersection points.\n")
+    uni, idx, cnts = np.unique(
+        x_pnts, return_index=True, return_counts=True, axis=0)
+    if (cnts > 1).any():  # print("\nDuplicate intersection points.\n")
         idx_srt = np.sort(idx)       # get the original order
         x_pnts_on = x_pnts[idx_srt]
-        whr_on = whr[idx_srt]        # whr cr,ossings in that order
+        whr_on = whr[idx_srt]        # whr crossings in that order
     else:
         x_pnts_on = x_pnts
         whr_on = whr
@@ -783,12 +768,12 @@ def clip(poly, clp):
     p_in_c, c_in_p, c_eq_p, c_eq_x, p_eq_c, p_eq_x = args
     #
     # -- quick bail 3
-    if len(p_in_c) == poly.shape[0]:
-        print("\nAll `poly` points are within the `clp` polygon.\n")
-    if len(c_in_p) == clp.shape[0]:
-        print("\nAll `clp` points are within the `poly` polygon.\n")
+    # if len(p_in_c) == poly.shape[0]:
+    #    print("\nAll `poly` points are within the `clp` polygon.\n")
+    # if len(c_in_p) == clp.shape[0]:
+    #    print("\nAll `clp` points are within the `poly` polygon.\n")
     #     return  # -- uncomment when done
-        # -- `_order_pnts_` : order intersection points on clip lines
+    # -- `_order_pnts_` : order intersection points on clip lines
     #    `_x_mkr_`      : produce `xChk` array and intersection pairs
     # ** doesn't work in all cases, check order as well later
     x_pnts_on = _order_pnts_(whr_on, x_pnts_on, poly, clp)
@@ -803,9 +788,9 @@ def clip(poly, clp):
     # -- determine the sequences of poly in clp and clp in poly.  The sequences
     #    are split at breaks and if there are points `in` the other, then
     #    they should equal p
-    if len(p_in_c) > 1:
+    if p_in_c:  # at least 1 poly pnt in clp
         Np_seq, p_seq = split_seq(p_in_c, p_last)  # p_last  ??? or p_st_en
-    if len(c_in_p) > 1:
+    if c_in_p:  # at least 1 clp pnt in poly
         Nc_seq, c_seq = split_seq(c_in_p, c_last)
     # --
     fr_col = xChk[:, 2]  # check for multiple crossings using poly-from col
@@ -815,7 +800,7 @@ def clip(poly, clp):
         c0_to, c1_to, p0_to, p1_to = xC[:4] + 1
         c0_in, c1_in, p0_in, p1_in = np.asarray(xC[-4:], bool)
         in_case = "{} {} {} {}".format(*np.asarray(xC[-4:]))
-        x0, x1 = x0x1[cnt]  # -- intersection points for the segment pair
+        x0, x1 = x0x1[cnt]           # -- segment pair intersection points
         diff_C, diff_P = dC_dP[cnt]  # difference in indices
         bf_c, btw_c = [], []         # Initial values for `before`, `between`
         bf_p, btw_p = [], []         # for both poly and clp
@@ -824,7 +809,7 @@ def clip(poly, clp):
         sub_ = []
         #
         seq_p = [] if cnt + 1 > Np_seq else p_seq[cnt]  # poly pnt sequences
-        seq_c = [] if cnt + 1 > Nc_seq else c_seq[cnt]  # clp pnt sequences
+        # seq_c = [] if cnt + 1 > Nc_seq else c_seq[cnt]  # clp pnt sequences
         #
         # -- multi-crossing check along poly segments
         multi_cross = np.count_nonzero(fr_col == p0_fr)  # count p0_fr vals
@@ -850,7 +835,7 @@ def clip(poly, clp):
             _out_ = _to_add_(xC, sub_, p_seen, c_seen, tot_)
             p_seen, c_seen, tot_ = _out_
             #
-            print(f"{cnt} {x0}, {x1}  xC {xC}")
+            # print(f"{cnt} {x0}, {x1}  xC {xC}")
             # --
             break  # break out
         #
@@ -860,9 +845,9 @@ def clip(poly, clp):
         if cnt == 0:
             # -- before_c `bf_c`
             if c0_in or diff_C == 0:
-                if c0_fr == 0 and c_last in c_in_p:  # clip fr==0, check prev
-                    bf_c = [c_last, 0]
-                    # c_seen.extend(bf_c)
+                if c0_fr == 0:  # -- last and first must be in c_in_p
+                    if c0_fr in c_in_p and c_last in c_in_p:
+                        bf_c = [c_last, 0]
                 else:
                     bf_c = _f0f1_(c0_fr, c1_fr, c_last, c_st_en,
                                   c_in_p, c_eq_x, c_seen)
@@ -875,10 +860,10 @@ def clip(poly, clp):
                     bf_p = []
                 elif p0_fr == 0 and p_last in p_in_c:
                     bf_p = [p_last, 0]
-                else:
+                else:  # -- could be a duplicate start/end point eg. 0, 4
                     bf_p = _f0f1_(p0_fr, p1_fr, p_last, p_st_en,
                                   p_in_c, p_eq_x, p_seen)
-            if bf_p and p0_fr > 0:  # repeat for poly points before point 0
+            if bf_p:  # repeat for poly points before point 0
                 sub_.extend(poly[bf_p])  # ** had to fix above Mar 4 2022
                 p_seen.extend(bf_p)
         # --
@@ -940,13 +925,18 @@ def clip(poly, clp):
         print(f"  c0c1_, p0p1_:   {c0c1_} {p0p1_}")
         print(f"  bfc:bfp {bf_c}  {bf_p}\n  btc:btp {btw_c}  {btw_p}")
         print(f"  sub :  {sub_}\n")
+        #
         # -------- '0 0' prep --------------------------------------------
         if c0c1_ == '0 0':
             # -- Clip points are out and cross poly.  Poly pnts may be inside.
             #  Order points on clipping line.
-            ln_pnts = clp[[c0_fr, c0_to]]
-            cross_pnts = x0x1[cnt]
-            _, x0, x1, _ = _sort_on_line_(ln_pnts, cross_pnts)
+            x0, x1 = x0x1[cnt]
+            if diff_C != 0:
+                if c0_fr + 1 in c_in_p:
+                    sub_.append(clp[c0_fr + 1])
+            else:
+                ln_pnts = clp[[c0_fr, c0_to]]
+                _, x0, x1, _ = _sort_on_line_(ln_pnts, [x0, x1])
             # -----------------------------------
             # -- poly checks
             # --
@@ -958,21 +948,13 @@ def clip(poly, clp):
                         sub_.extend([x0, x1])
                 else:  # -- distance check, needed p02, c01
                     sub_.extend([x0, x1])
-                    #
-                    # below shouldn't be needed because of _sort_on_line
-                    # chk0 = _dist_(clp[c0_fr], x0)
-                    # chk1 = _dist_(clp[c0_fr], x1)
-                    # if chk0 < chk1:
-                    #     sub_.extend([x0, x1])
-                    # else:
-                    #     sub_.extend([x1, x0])
                 if p1_to in p_in_c and cnt != 0:
                     sub_.extend([poly[p1_to]])
                 if c1_to in c_in_p:
                     sub_.extend([clp[c1_to]])  # c1,b3 add last clp
             # --
             elif p0p1_ == '0 1':                           # 0,  0,  0,  1
-                if p0_fr < p1_fr:  # -- isn't this always the case
+                if p0_fr < p1_fr:  # -- this isn't always the case
                     sub_.extend([x0, x1])
                 else:
                     sub_.extend([x1, x0])
@@ -981,6 +963,8 @@ def clip(poly, clp):
             # --
             elif p0p1_ == '1 0':                           # 0,  0,  1,  0
                 if (p0_fr < p1_fr) or (p1_fr in p_in_c):
+                    if btw_p:  # may have been set to [] when bf_p btw_p equal
+                        sub_.extend(poly[btw_p])
                     sub_.extend([x0, x1])
                 else:
                     sub_.extend([x1, x0])
@@ -1013,7 +997,7 @@ def clip(poly, clp):
             elif p0p1_ == '1 0':   # example b0,c1         # 0,  1,  1,  0
                 if p0_fr < p1_fr:  # b4,c1  p1_to is > p0_fr & p1_fr
                     if p0_to not in btw_p and p1_to not in btw_p:  # edgy1,ecl
-                        if len(btw_p) > 0:
+                        if btw_p:
                             sub_.extend(poly[btw_p])
                     sub_.append(x1)
                 else:
@@ -1033,11 +1017,8 @@ def clip(poly, clp):
                 if c1_fr in c_in_p and c1_fr not in c_seen:
                     sub_.extend([clp[c1_fr]])
                 sub_.append(x1)
-                tmp = p1_fr  # -- needed for cases where p0, p1 are equal
                 if diff_P == 0 and p0_to in c_in_p:  # diff_P == 0
-                    tmp = p0_to
-                    sub_.extend([poly[tmp]])
-                    p_seen.extend([tmp])
+                    sub_.extend([poly[p0_to]])
         #
         # -------- '1 0' prep --------------------------------------------
         elif c0c1_ == '1 0':  # c0, b0  header is the reverse of '0 1'
@@ -1118,10 +1099,8 @@ def clip(poly, clp):
                 # -- close
                 if p1_to in p_in_c and p1_to not in p_eq_x:
                     sub_.extend([poly[p1_to]])
-                p_seen.extend([p1_to])
                 if (c1_to in c_in_p) and (c1_to not in c_eq_x):
                     sub_.extend([clp[c1_to]])
-                c_seen.extend([c1_to])
                 # finally
                 sub_.append(x1)  # -- or add here in case the above are before
         #
@@ -1134,7 +1113,10 @@ def clip(poly, clp):
                 cross_pnts = x0x1[cnt]
                 _, x0, x1, _ = _sort_on_line_(ln_pnts, cross_pnts)
                 #
+                if p0_fr in p_in_c:  # -- may be before clip point like in
+                    sub_.append(poly[p0_fr])  # pl, cl step 3
                 sub_.append(x0)
+                p_seen.append(p0_fr)
             elif (diff_C == 1) and (c0_to in c_eq_x):  # added E,b0 second line
                 sub_.append(x0)  # probably c0_to is an intersection point
             elif diff_C >= 1 and len(btw_c) >= 1:  # >= 1 and btw_c has some
@@ -1164,8 +1146,22 @@ def clip(poly, clp):
                     sub_ = []
                     break  # "unsupported segment, reset sub_ for 1 1 0 0"
             # --
+            elif p0p1_ == '0 1':                           # 1,  1,  0,  1
+                if p0_fr <= p1_fr:
+                    if p1_fr in p_in_c:
+                        sub_.append(poly[p1_fr])  # E b0 2nd loop
+                    to_add = [i for i in btw_p if i not in p_seen]
+                    if to_add:  # btw_p could be 1 or more points
+                        sub_.extend(poly[btw_p])
+                        p_seen.extend(to_add)
+                    sub_.append(x1)  # add x1, not other points in between
+                else:
+                    sub_.append(x1)
+            # --
             elif p0p1_ == '1 0':                           # 1,  1,  1,  0
                 # add points between p0_fr and p1_fr
+                if p0_fr in p_in_c and p0_fr not in p_seen:
+                    sub_.append(poly[p0_fr])
                 if btw_p or diff_P > 1:
                     sub_.append(x1)
                     to_add = [i for i in btw_p if i in p_in_c
@@ -1183,18 +1179,6 @@ def clip(poly, clp):
                     sub_.extend([poly[p1_to]])
                 p_seen.extend([p1_to])  # **** added for edgy1 3rd clip
             # --
-            elif p0p1_ == '0 1':                           # 1,  1,  0,  1
-                if p0_fr <= p1_fr:
-                    if p1_fr in p_eq_x:
-                        sub_.append(poly[p1_fr])  # E b0 2nd loop
-                    to_add = [i for i in btw_p if i not in p_seen]
-                    if to_add:  # btw_p could be 1 or more points
-                        sub_.extend(poly[btw_p])
-                        p_seen.extend(to_add)
-                    sub_.append(x1)  # add x1, not other points in between
-                else:
-                    sub_.append(x1)
-            # --
             elif p0p1_ == '1 1':                           # 1,  1,  1,  1
                 if p0_fr in p_in_c:
                     sub_.append(poly[p0_fr])
@@ -1207,9 +1191,6 @@ def clip(poly, clp):
                 # check to make sure that p1_to != x1
                 if p1_to in p_in_c and not (poly[p1_to] == x1).any():
                     sub_.extend([poly[p1_to]])
-                    p_seen.extend([p1_to])
-                # if diff_P > 0:
-                #     p_seen.extend([i for i in range(p0_fr, p1_to)])
         # ----
         # -- Assemble for the output
         p_seen.extend([p0_fr, p1_fr])
@@ -1225,7 +1206,7 @@ def clip(poly, clp):
     # -- clean up the outputs
     if (new_[0] != new_[-1]).any():
         new_ = np.concatenate((new_, new_[0][None, :]), axis=0)
-    new_ = _remove_sequential_duplicates_(new_, poly=True)
+    new_ = del_seq_dups(new_, poly=True)
     return new_, tot_, xChk, x0x1, p_in_c, c_in_p
     # new_, tot_, xChk, x0x1, p_in_c, c_in_p = clip(
     # plot_polygons([s00, t00, t01, t02, t03])
@@ -1249,19 +1230,22 @@ def assemble(poly, clp):
 
         `_sort_on_line_` is the full version.
         """
+        if len(p) == 2:  # -- only start and end point
+            return p
         dxdy = np.abs(p[0] - p[1:])
-        order = np.argsort(dxdy[:, 0])
         if dxdy.sum(axis=0)[0] == 0:  # -- vertical line check
             order = np.argsort(dxdy[:, 1])  # sort ascending on y-values
+        else:
+            order = np.argsort(dxdy[:, 0])
         p[1:] = p[1:][order]
         return p
 
     def _chk_(poly, clp, x_pnts, whr):
         """Return input arrays with intersections added to their lines."""
         p_ = np.concatenate((poly[:-1], poly[1:]), axis=1).reshape(-1, 2, 2)
-        p_ = [i for i in p_]
+        p_ = list(p_)  # [i for i in p_]
         c_ = np.concatenate((clp[:-1], clp[1:]), axis=1).reshape(-1, 2, 2)
-        c_ = [i for i in c_]
+        c_ = list(c_)  # [i for i in c_]
         for cnt, cp in enumerate(whr):
             cl, pl = cp
             x = x_pnts[cnt][None, :]
@@ -1269,20 +1253,43 @@ def assemble(poly, clp):
             p_[pl] = np.concatenate((p_[pl], x), axis=0)
         # --
         for cnt, p in enumerate(p_):
-            p_[cnt] = _srt_pnts_(p)
+            if len(p) > 2:
+                p_[cnt] = _srt_pnts_(p)
         for cnt, c in enumerate(c_):
-            c_[cnt] = _srt_pnts_(c)
+            if len(c) > 2:
+                c_[cnt] = _srt_pnts_(c)
         return p_, c_
 
-    def _rem_dups_(arr, poly=True):
-        """Remove sequential duplicates in a Nx2 array."""
-        w_ = np.nonzero((arr[:-1] != arr[1:]).any(-1))[0]
-        tmp = arr[w_]
-        if poly:
-            if not (tmp[0] != tmp[-1]).all(-1):
-                arr = np.concatenate((tmp, tmp[0, None]), axis=0)
-                return arr
-        return tmp
+    def _chk2_(poly, clp, x_pnts, whr):
+        """Variant of above. but it isn't faster, maybe.
+
+        https://stackoverflow.com/questions/53423924/why-is-python-
+        in-much-faster-than-np-isin
+        """
+        p_ = np.concatenate((poly[:-1], poly[1:]), axis=1).reshape(-1, 2, 2)
+        p_ = list(p_)  # [i for i in p_]
+        c_ = np.concatenate((clp[:-1], clp[1:]), axis=1).reshape(-1, 2, 2)
+        c_ = list(c_)  # [i for i in c_]
+        for cnt, cp in enumerate(whr):
+            cl, pl = cp
+            x = x_pnts[cnt]
+            chk0 = (x == c_[cl]).all(-1).any(-1)  # correct but slow
+            chk1 = (x == p_[pl]).all(-1).any(-1)  # correct but slow
+            # chk0 = c_[cl].__contains__(x)
+            # chk1 = p_[pl].__contains__(x)
+            # chk0 = x in c_[cl]  # c_[cl].__contains__(x)
+            # chk1 = x in p_[pl]  # p_[pl].__contains__(x)
+            if not chk0:
+                c_[cl] = np.concatenate((c_[cl], x[None, :]), axis=0)
+            if not chk1:
+                p_[pl] = np.concatenate((p_[pl], x[None, :]), axis=0)
+        for cnt, p in enumerate(p_):
+            if len(p) > 2:
+                p_[cnt] = _srt_pnts_(p)
+        for cnt, c in enumerate(c_):
+            if len(c) > 2:
+                c_[cnt] = _srt_pnts_(c)
+        return p_, c_
 
     # -- main
     if hasattr(poly, "IFT"):
@@ -1291,93 +1298,82 @@ def assemble(poly, clp):
         clp = clp.XY
     # -- roll towards LL.  `_wn_clp_` gets pnts inside, on, outside each other
     poly, clp = roll_arrays([poly, clp])
+    # pN = poly.shape[0] - 1
+    # cN = clp.shape[0] - 1
     vals = _wn_clip_(poly, clp, all_info=True)
     x_pnts, pInc, cInp, x_type, whr = vals
+    # -- remove duplicate start/end index
+    # pInc = [i for i in pInc if i != poly.shape[0] -1]
+    # cInp = [i for i in pInc if i != clp.shape[0] -1]
     args = node_type(pInc, cInp, clp, poly, x_pnts)
     p_in_c, c_in_p, c_eq_p, c_eq_x, p_eq_c, p_eq_x = args
     # --
     pl_new, cl_new = _chk_(poly, clp, x_pnts, whr)
-    pl_new = _rem_dups_(np.concatenate((pl_new), axis=0), poly=True)
-    cl_new = _rem_dups_(np.concatenate((cl_new), axis=0), poly=True)
+    # -- [len(i) for i in pl_new]  # get the lengths of the intersection bits
+    pl_new = del_seq_dups(np.concatenate((pl_new), axis=0), poly=True)
+    cl_new = del_seq_dups(np.concatenate((cl_new), axis=0), poly=True)
     # --
     # --build the index array
     max_shp = np.max([i[0] for i in
                       [poly.shape, pl_new.shape, clp.shape, cl_new.shape]])
-    idxs = np.full((max_shp, 4), fill_value=-1, dtype='int')
+    idxs = np.full((max_shp, 7), fill_value=-1, dtype='int')
     idxs[:, 0] = np.arange(0, max_shp, 1)
     clpl_eq = np.argwhere((pl_new == cl_new[:, None]).all(-1))
-    # clpl_eq = np.argwhere((cl_new == pl_new[:, None]).all(-1))
     #
-    # -- ids, clp, poly is the order
-    # -- add where they are equal
+    # -- ids, clp, poly is that order
+    # -- add where they are equal, to determine which are in or out
     i0, i1 = clpl_eq.T
     idxs[i0, 1:3] = clpl_eq  # -- idxs array now includes ids of intersections
     # --
+    # -- construct the columns and find and extract indices
+    # headers : ids, clpl_eq, plcl_eq, c_in_p_new, p_in_c_new, wc0, wc1
     cl_oldnew = np.argwhere((cl_new == clp[:, None]).all(-1))
-    c_in_p_new = cl_oldnew[np.isin(cl_oldnew[:, 0], c_in_p)]
-    for o_n in c_in_p_new:
-        idxs[o_n[1]][1] = o_n[1]
-    whr0 = np.nonzero(idxs[:, 1] != -1)[0]
-    cl_final = cl_new[whr0]
-    # --
+    if c_in_p:
+        c_in_p_new = np.in1d(cl_oldnew[:, 0], c_in_p).nonzero()[0]
+    # c_in_p_new = cl_oldnew[c_in_p, 1]
+    idxs[c_in_p_new, 3] = c_in_p_new
+    whr0 = idxs[:, 1][idxs[:, 1] != -1]
+    whr0a = idxs[:, 3][idxs[:, 3] != -1]
+    wc0 = sorted(list(set(np.concatenate((whr0, whr0a)))))
+    # -- these have to be sorted
     pl_oldnew = np.argwhere((pl_new == poly[:, None]).all(-1))
-    p_in_c_new = pl_oldnew[np.isin(pl_oldnew[:, 0], p_in_c)]
-    for o_n in p_in_c_new:
-        idxs[o_n[1]][2] = o_n[1]
-    whr1 = np.nonzero(idxs[:, 2] != -1)[0]
-    # whr1 = idxs[np.nonzero(idxs[:, 2] != -1)[0], 2].ravel()  # -- last col
-    # whr1 = np.asarray(list(set(whr1).union(p_in_c)))
-    pl_final = pl_new[whr1]
-    return cl_final, pl_final
-
-    # bld = np.full((max_shp, 5), fill_value=np.nan, dtype='float')
-    # bld[:, 0] = np.arange(0, max_shp, 1.)
-
-    # plcl_eq = np.argwhere((cl_new == pl_new[:, None]).all(-1))
-    # q, r = clpl_eq.T
-    # # r, _ = plcl_eq.T
-    # bld[q, 1:3] = cl_new[q]
-    # bld[r, 3:5] = pl_new[r]
-
-    # bld[:pl_new.shape[0], 1:3] = pl_new
-    # bld[:cl_new.shape[0], 3:5] = cl_new
-    # clpl_whr = np.argwhere((bld[:, 1:3] == bld[:, 3:5][:, None]).all(-1))
-    # plcl_whr = np.argwhere((bld[:, 3:5] == bld[:, 1:3][:, None]).all(-1))
-    # cl_oldnew = np.argwhere((bld[:, 3:5] == clp[:, None]).all(-1))
-    # pl_oldnew = np.argwhere((bld[:, 1:3] == poly[:, None]).all(-1))
-    # cl_new[clpl_whr[:, 0]]
-    # pl_new[plcl_whr[:, 0]]
-    # cl_oldnew find c_in_p there
-    # pl_oldnew find p_in_c there as well
-    # return bld, pl_new, cl_new, clpl_whr, plcl_whr, cl_oldnew, pl_oldnew
-
-
-""" Still testing
-bld2 = np.full((bld.shape[0], 9), np.nan)
-in0 = poly[p_in_c]
-in1 = clp[c_in_p]
-in0_idx = np.argwhere((bld[:, 1:3] == in0[:, None]).all(-1))
-in1_idx = np.argwhere((bld[:, 3:5] == in1[:, None]).all(-1))
-in2_idx = np.argwhere((bld[:, 1:3] == x_pnts[:, None]).all(-1))
-in3_idx = np.argwhere((bld[:, 3:5] == x_pnts[:, None]).all(-1))
-bld2[:, 0] = np.arange(0, bld.shape[0])
-for i, o_n in enumerate(in0_idx):  # -- add p_in_c
-    bld2[o_n[1], 1:3] = bld[o_n[1], 1:3]
-for i, o_n in enumerate(in1_idx):  # -- add c_in_p
-    bld2[o_n[1], 3:5] = bld[o_n[1], 3:5]
-for i, o_n in enumerate(clpl_whr):
-    bld2[o_n[0], 5:7] = cl_new[o_n[0]]
-
-
-for i, o_n in enumerate(clpl_whr):
-    bld2[o_n[0],7:9] = pl_new[o_n[1]]
-
-for i, o_n in enumerate(in2_idx):  # -- add clp equals x_pnts
-    bld2[o_n[1], 5:7] = bld[o_n[1], 1:3]
-for i, o_n in enumerate(in3_idx):
-    bld2[o_n[1], 7:9] = bld[o_n[1], 3:5]
-
-"""
+    # p_in_c_new = pl_oldnew[p_in_c, 1]
+    p_in_c_new = np.in1d(pl_oldnew[:, 0], p_in_c).nonzero()[0]
+    idxs[p_in_c_new, 4] = p_in_c_new
+    whr1 = idxs[:, 2][idxs[:, 2] != -1]   # eg. np.where(idxs[:, 2] != -1)[0]
+    whr1a = idxs[:, 4][idxs[:, 4] != -1]  # eg. np.where(idxs[:, 4] != -1)[0]
+    wc1 = sorted(list(set(np.concatenate((whr1, whr1a)))))
+    # -- ready to piece together
+    idxs[wc0, 5] = wc0  # -- clp in/on
+    idxs[wc1, 6] = wc1  # -- poly in/on
+    cl_final = cl_new[wc0]  # -- not done yet, but close need to add p_in_c
+    pl_final = pl_new[wc1]
+    #
+    # new_shared = np.argwhere((pl_new == cl_new[:, None]).all(-1))
+    # final_shared = np.argwhere((pl_final == cl_final[:, None]).all(-1))
+    # diffs = final_shared[1:] - final_shared[:-1]  # -- sequential differences
+    # rows = final_shared.tolist()
+    # out = [rows[0]]
+    # for cnt, row in enumerate(rows[1:]):
+    #     prev = rows[cnt]
+    #     d0, d1 = diffs[cnt]
+    #     if d0 == 1 and (d1 == 1):  # or cnt == 0):
+    #         vals = [row]
+    #     elif d0 > 1 and d1 == 1:
+    #         vals = [[i, -9] for i in range(prev[0] + 1, row[0] + 1)]
+    #     elif d0 == 1 and d1 > 1:
+    #         vals = [[-9, i] for i in range(prev[1] + 1, row[1] + 1)]
+    #     out.extend(vals)
+    #     # print("{} : {} {}, {} {}: {}".format(cnt, prev, row, d0, d1, vals))
+    # ps = []
+    # for i in out:
+    #     if i[0] != -9:
+    #         ps.append(cl_final[i[0]])
+    #     else:
+    #         ps.append(pl_final[i[1]])
+    # ps = np.asarray(ps)
+    # splts = np.array_split(new_shared, brks0 + 1, 0)
+    return cl_new, pl_new  # cl_final, pl_final, ps
 
 
 # ---- (4) multi shape version  ** not final
@@ -1502,5 +1498,5 @@ if __name__ == "__main__":
     """optional location for parameters"""
     print("\nRunning... {}\n".format(script))
 
-    z0 = r"C:\Arc_projects\Test_29\Test_29.gdb\clp"
-    z1 = r"C:\Arc_projects\Test_29\Test_29.gdb\poly"
+    # z0 = r"C:\Arc_projects\Test_29\Test_29.gdb\clp"
+    # z1 = r"C:\Arc_projects\Test_29\Test_29.gdb\poly"

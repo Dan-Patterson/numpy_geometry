@@ -42,6 +42,9 @@ References
 <https://stackoverflow.com/questions/51352527/check-for-identical-rows-in-
 different-numpy-arrays>`_.
 
+`Dealing with Duplicates blog in 2023
+<https://community.esri.com/t5/python-blog/dealing-with-duplicates/ba-p/
+1258351>`_.
 
 Extras
 ------
@@ -85,10 +88,10 @@ nums = 'efdgFDGbBhHiIlLqQpP'
 # -- See script header
 __all__ = [
     'a_eq_b', 'cartesian_product', 'coerce2array', 'common_pnts',
-    'compare_geom', 'dist_angle_sort', 'flat', 'interweave', 'keep_geom',
-    'polyline_angles', 'project_pnt_to_line', 'radial_sort', 'remove_geom',
-    'segment_angles', 'shape_finder', 'sort_xy', 'stride_2d', 'reclass_ids',
-    'uniq_1d', 'uniq_2d'
+    'compare_geom', 'del_seq_dups', 'dist_angle_sort', 'flat', 'interweave',
+    'keep_geom', 'polyline_angles', 'project_pnt_to_line', 'radial_sort',
+    'remove_geom', 'segment_angles', 'shape_finder', 'sort_xy', 'stride_2d',
+    'reclass_ids', 'uniq_1d', 'uniq_2d'
 ]
 
 __helpers__ = [
@@ -208,6 +211,12 @@ def uniq_2d(arr, return_sorted=False):  # *** keep but slower than unique
 
         u, idx = np.unique(x_pnts, return_index=True, axis=0)
         x_pnts[np.sort(idx)]
+
+    References
+    ----------
+    `NumPy unique
+    <https://github.com/numpy/numpy/blob/v1.24.0/numpy/lib/
+    arraysetops.py#L138-L320>`_.
     """
     def _reshape_uniq_(uniq, dt, shp):
         n = len(uniq)
@@ -845,6 +854,50 @@ def keep_geom(arr, look_for, **kwargs):
     return compare_geom(arr, look_for, invert=False, return_idx=False)
 
 
+def del_seq_dups(arr, poly=True):
+    """Remove sequential duplicates in a Nx2 array of points.
+
+    Parameters
+    ----------
+    arr : array_like
+        An Nx2 of point coordinates.
+    poly : boolean
+        True if the points originate from a polygon boundary, False otherwise.
+
+    Notes
+    -----
+    This largely based on numpy.arraysetops functions `unique` and `_unique1d`.
+    See the reference link in the script header.
+
+    The method entails viewing the 2d array as a structured 1d array, then
+    checking whether sequential values are equal.  In np.unique, the values
+    are initially sorted to determine overall uniqueness, not sequential
+    uniqueness.
+
+    See Also
+    --------
+    `uniq_2d` above, which can be used in situations where you genuine
+    uniqueness is desired.
+    """
+    # -- like np.unique but not sorted
+    shp_in, dt_in = arr.shape, arr.dtype
+    # ar = np.ascontiguousarray(ar)
+    dt = [('f{i}'.format(i=i), dt_in) for i in range(arr.shape[1])]
+    tmp = arr.view(dt).squeeze()  # -- view data and reshape to (N,)
+    # -- mask and check for sequential equality.
+    mask = np.empty((shp_in[0],), np.bool_)
+    mask[0] = True
+    mask[1:] = tmp[:-1] != tmp[1:]
+    # wh_ = np.nonzero(mask)[0]
+    # sub_arrays = np.array_split(arr, wh_[wh_ > 0])
+    tmp = arr[mask]  # -- slice the original array sequentially unique points
+    if poly:  # -- polygon source check
+        if (tmp[0] != tmp[-1]).all(-1):
+            arr = np.concatenate((tmp, tmp[0, None]), axis=0)
+            return arr
+    return tmp
+
+
 def remove_geom(arr, look_for, **kwargs):
     """Remove points from `arr` that match those in `look_for`."""
     return compare_geom(arr, look_for, unique=False,
@@ -1311,5 +1364,5 @@ def _iterate_(N, n):
 # ---- ==== main section
 if __name__ == "__main__":
     """optional location for parameters"""
-    in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\Polygons"
-    in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\Polygons2"
+    # in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\Polygons"
+    # in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\Polygons2"

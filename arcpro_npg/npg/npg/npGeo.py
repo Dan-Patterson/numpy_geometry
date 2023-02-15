@@ -201,7 +201,7 @@ class Geo(np.ndarray):
         \nSp Ref : {}\n
         """
         args = ["-" * 14, self.LL, self.UR, len(self.U), self.IFT.shape[0],
-                info_['To_pnt'][-1], self.SR]
+                self.IFT[-1, 2], self.SR]
         print(dedent(frmt).format(*args))
         npg_prn.prn_tbl(info_)
 
@@ -214,7 +214,7 @@ class Geo(np.ndarray):
         OID_    : self.Id   shape id
         Fr_pnt  : self.Fr   from point id
         To_pnt  : self.To   to point id for a shape
-        CL      : self.CL   K=2 outer (1) inner (0): K=1closed(1) open (0)
+        CL      : self.CL   K=2 outer (1) inner (0): K=1 closed(1) open (0)
         Part_ID : self.PID  part id for each shape
         Bit_ID  : self.Bit  sequence order of each part in a shape
         ----
@@ -1456,11 +1456,12 @@ def roll_coords(self):
     `roll_shapes` implements this as a Geo method.
     """
     # --
-    def _LL_(arr):
-        """Return the closest point to the lower left of the polygon."""
-        LL = np.min(arr, axis=0)
-        idx = (np.abs(arr - LL)).argmin(axis=0)
-        return idx[0]
+    def _closest_to_LL_(a, p, sqrd_=True):
+        """Return point distance closest to the `lower-left, LL`."""
+        diff = a - p[None, :]
+        if sqrd_:
+            return np.einsum('ij,ij->i', diff, diff)
+        return np.sqrt(np.einsum('ij,ij->i', diff, diff))
     # --
     msg = "\nPolygon Geo array required for `npg.roll_coords`...\n"
     if is_Geo(self) and self.K != 2:
@@ -1471,12 +1472,42 @@ def roll_coords(self):
     extent = self.XT  # aoi_extent().reshape(2, 2)
     SR = self.SR
     for ar in self.bits:
-        num = _LL_(ar)
+        LL = np.min(ar, axis=0)
+        dist = _closest_to_LL_(ar, LL, sqrd_=True)
+        num = np.argmin(dist)
         arrs.append(np.concatenate((ar[num:-1], ar[:num], [ar[num]]), axis=0))
     g = np.concatenate(arrs, axis=0)
     g = Geo(g, self.IFT, self.K, extent, "rolled", None)
     g.SR = SR
     return g
+
+
+def roll_arrays(arrs):
+    """Roll point coordinates to a new starting position.
+
+    Notes
+    -----
+    Rolls the coordinates of the Geo array or ndarray to put the start/end
+    points as close to the lower-left of the ring extent as possible.
+    """
+    # --
+    def _closest_to_LL_(a, p, sqrd_=True):
+        """Return point distance closest to the `lower-left, LL`."""
+        diff = a - p[None, :]
+        if sqrd_:
+            return np.einsum('ij,ij->i', diff, diff)
+        return np.sqrt(np.einsum('ij,ij->i', diff, diff))
+    # --
+    if not isinstance(arrs, (list, tuple)):
+        print("List/tuple of arrays required.")
+        return None
+    out = []
+    for ar in arrs:
+        LL = np.min(ar, axis=0)
+        dist = _closest_to_LL_(ar, LL, sqrd_=True)
+        num = np.argmin(dist)
+        out.append(np.concatenate((ar[num:-1], ar[:num], [ar[num]]), axis=0))
+    return out
 
 
 def array_IFT(in_arrays, shift_to_origin=False):
@@ -1848,7 +1879,7 @@ def reindex_shapes(a, prn=True, start=0, end=-1):
     start : integer
         Start number in the sequence.
     end : integer
-        End number in the sequence.  A value of -1, prints to the end
+        End number in the sequence.  A value of -1, prints to the end.
 
     Returns
     -------

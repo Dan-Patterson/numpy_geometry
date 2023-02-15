@@ -153,10 +153,10 @@ __all__ = [
 ]
 
 __helpers__ = [
-    '_angles_3pnt_', '_bit_area_', '_bit_min_max_', '_ch_',
-    '_ch_scipy_', '_ch_simple_', '_dist_along_', '_e_2d_', '_get_base_',
-    '_in_extent_', '_is_pnt_on_line_', '_percent_along_',
-    '_closest_pnt_on_poly_', '_pnt_on_segment_', '_add_pnts_on_line_'
+    '_add_pnts_on_line_', '_angles_3pnt_', '_bit_area_', '_bit_min_max_',
+    '_ch_', '_ch_scipy_', '_ch_simple_', '_closest_pnt_on_poly_',
+    '_dist_along_', '_e_2d_', '_get_base_', '_in_extent_', '_is_pnt_on_line_',
+    '_percent_along_', '_pnt_on_segment_'
 ]
 
 # __all__ = __helpers__ + __all__
