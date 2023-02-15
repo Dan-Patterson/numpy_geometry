@@ -75,6 +75,10 @@ See the **geonumeracy** repository for more examples of numpy geometry functions
 ----
 **Some links**
 
+*2023*
+
+- [Fun with data duplicates](https://community.esri.com/t5/python-blog/dealing-with-duplicates/ba-p/1258351)
+
 *2022*
 
 - [The *.atbx toolbox](https://community.esri.com/t5/python-blog/the-atbx-toolbox/ba-p/1234953/jump-to/first-unread-message)
