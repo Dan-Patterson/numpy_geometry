@@ -94,7 +94,7 @@ import numpy as np
 # import npg
 
 from . import npgDocs, npGeo, npg_helpers, npg_geom
-from . import npg_clip, npg_min_circ, npg_overlay, npg_analysis
+from . import npg_boolean, npg_min_circ, npg_overlay, npg_analysis
 from . import npg_setops, npg_io, npg_table, npg_create, npg_utils
 from . import npg_pip, npg_prn  # noqa
 
@@ -115,11 +115,11 @@ from npGeo import (
 # import npg_geom
 # import npgDocs
 """
-from . import (npgDocs, npGeo, npg_helpers, npg_pip, npg_geom, npg_clip,
+from . import (npgDocs, npGeo, npg_helpers, npg_pip, npg_geom, npg_boolean,
                npg_min_circ, npg_overlay, npg_analysis, npg_setops, npg_io,
                npg_prn, npg_table, npg_create, npg_utils)  # pyflakes.ignore
 
-import npg_clip
+import npg_boolean
 import npg_min_circ
 import npg_overlay
 import npg_analysis
@@ -141,7 +141,7 @@ from . npgDocs import (
 # from . npg_helpers import *
 # from . npg_pip import *
 # from . npg_geom import *
-# from . npg_clip import *
+# from . npg_boolean import *
 # from . npg_min_circ import *
 # from . npg_overlay import *
 # from . npg_analysis import *
@@ -157,7 +157,7 @@ from . npgDocs import (
 
 # ---- define __all__
 __all__ = [
-    'npgDocs', 'npGeo', 'npg_io', 'npg_geom', 'npg_clip', 'npg_helpers',
+    'npgDocs', 'npGeo', 'npg_io', 'npg_geom', 'npg_boolean', 'npg_helpers',
     'npg_overlay', 'npg_table', 'npg_create', 'npg_analysis', 'npg_utils',
     'npg_setops', 'npg_helpers', 'npg_min_circ'
 ]
@@ -172,15 +172,17 @@ __all__.extend(npgDocs.__all__)
 __all__.extend(npGeo.__all__)
 __all__.extend(npg_geom.__all__)
 __all__.extend(npg_helpers.__all__)
+__all__.extend(npg_boolean.__all__)
 __all__.sort()
 
 __helpers__.extend(npg_helpers.__helpers__)
 __helpers__.extend(npg_geom.__helpers__)
+__helpers__.extend(npg_boolean.__helpers__)
 __helpers__.sort()
 
 """
 __all__.extend(npg.npg_io.__all__)
-__all__.extend(npg_clip.__all__)
+__all__.extend(npg_boolean.__all__)
 __all__.extend(npg_prn.__all__)
 __all__.extend(npg_pip.__all__)
 __all__.extend(npg_table.__all__)
@@ -189,7 +191,7 @@ __all__.extend(npg_analysis.__all__)
 __all__.extend(npg_overlay.__all__)
 __all__.extend(npg_setops.__all__)
 # __all__.extend(npg_min_circ.__all__)
-__helpers__.extend(npg_clip.__helpers__)
+__helpers__.extend(npg_boolean.__helpers__)
 __helpers__.extend(npg_analysis.__helpers__)
 __helpers__.extend(npg_overlay.__helpers__)
 
