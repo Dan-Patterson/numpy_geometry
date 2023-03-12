@@ -79,6 +79,8 @@ See the **geonumeracy** repository for more examples of numpy geometry functions
 
 - [Fun with structured arrays](https://community.esri.com/t5/python-blog/fun-with-structured-arrays/ba-p/1258790)
 - [Fun with data duplicates](https://community.esri.com/t5/python-blog/dealing-with-duplicates/ba-p/1258351)
+- [Fun with clipping ... part 1](https://community.esri.com/t5/python-blog/fun-with-clipping-part-1/ba-p/1265826)
+- [Simplity your poly* geometry ... part 2](https://community.esri.com/t5/python-blog/simplify-your-poly-geometry-part-2/ba-p/1266873)
 
 *2022*
 
