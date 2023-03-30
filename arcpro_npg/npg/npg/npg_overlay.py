@@ -58,6 +58,8 @@ Web link
 `<https://pro.arcgis.com/en/pro-app/tool-reference/geoanalytics-desktop
 /dissolve-boundaries.htm>`_.
 
+`<https://stackoverflow.com/questions/26782038/how-to-eliminate-the-extra
+-minus-sign-when-rounding-negative-numbers-towards-zer>`_.
 """
 
 # pycodestyle D205 gets rid of that one blank line thing
@@ -503,17 +505,30 @@ def dissolve(a, asGeo=True):
             return (a[:, None] == b).all(-1).any(-1)
 
         idx01 = _find_(b0, b1)
+        idx10 = _find_(b1, b0)
         if idx01.sum() == 0:
             return None
         if idx01[0] == 1:  # you can't split between the first and last pnt.
             b0, b1 = b1, b0
             idx01 = _find_(b0, b1)
         dump = b0[idx01]
+        # dump1 = b1[idx10]
         sp0 = np.nonzero(idx01)[0]
         sp1 = np.any(np.isin(b1, dump, invert=True), axis=1)
         z0 = np.array_split(b0, sp0[1:])
-        z1 = b1[sp1]
-        return np.concatenate((z0[0], z1, z0[-1]), axis=0)
+        # direction check
+        # if not (dump[0] == dump1[0]).all(-1):
+        #     sp1 = np.nonzero(~idx10)[0][::-1]
+        sp1 = np.nonzero(sp1)[0]
+        if sp1[0] + 1 == sp1[1]:  # added the chunk section 2023-03-12
+            print("split equal {}".format(sp1))
+            chunk = b1[sp1]
+        else:
+            sp2 = np.nonzero(idx10)[0]
+            print("split not equal {} using sp2 {}".format(sp1, sp2))
+            chunks = np.array_split(b1, sp2[1:])
+            chunk = np.concatenate(chunks[::-1])
+        return np.concatenate((z0[0], chunk, z0[-1]), axis=0)
 
     def _combine_(r, shps):
         """Combine the shapes."""
@@ -522,7 +537,7 @@ def dissolve(a, asGeo=True):
         for i, shp in enumerate(shps):
             adj = _adjacent_(r, shp[1:-1])  # shp[1:-1])
             if adj:
-                new = _cycle_(r, shp[:-1])  # shp[:-1])  ** today
+                new = _cycle_(r, shp[:-1])  # or shp)
                 r = new
                 processed = True
             else:
@@ -544,6 +559,11 @@ def dissolve(a, asGeo=True):
     a = a.roll_shapes()
     a.IFT[:, 0] = np.arange(len(a.IFT))
     out = []
+    # -- try sorting by  y coordinate rather than id, doesn't work
+    # cent = a.centers()
+    # s_ort = np.argsort(cent[:, 1])  # sort by y
+    # shps = a.get_shapes(s_ort, False)
+    # -- original, uncomment below
     ids = a.IDs
     shps = a.get_shapes(ids, False)
     r = shps[0]
@@ -668,7 +688,7 @@ def adjacency_matrix(a, prn=False):
     if np.sum(ids - N) > 0:
         z = recl(z, ids)  # reclass the initial values using the actual ids
     if prn:
-        print("Adjacency matrix\n  n : poly ids\n" + "-"*14)
+        print("Adjacency matrix\n  n : poly ids\n" + "-" * 14)
         row_frmt = "{:>3.0f} : {!s:<15}"
         out = "\n".join([row_frmt.format(i, row[row != -1])
                          for i, row in enumerate(z)])
@@ -986,8 +1006,10 @@ def line_side(pnts, line=None):
 
     Notes
     -----
-    Above the line is left, below the line is right.  A-B is the line, x, y is
-    a point.  This is vectorized by numpy
+    - Above the line (+ve) is left.
+    - Below the line is right (-ve).
+    - Zero (0) is on the line.
+    A-B is the line.    X,Y is the point.  This is vectorized by numpy using.
 
     >>> sign((Bx - Ax) * (Y - Ay) - (By - Ay) * (X - Ax))
     """
@@ -998,7 +1020,7 @@ def line_side(pnts, line=None):
     BAx, BAy = line[1] - line[0]
     XAx = pnts[:, 0] - A[0]
     YAy = pnts[:, 1] - A[1]
-    return np.sign(BAx * YAy - BAy * XAx).astype('int')
+    return np.sign(np.int32((BAx * YAy - BAy * XAx) + 0.0))  # -- ref 2
 
 
 def _line_crossing_(clip_, poly):

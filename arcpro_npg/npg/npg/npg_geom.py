@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2022-10-13
+    2023-02-16
 
 Purpose
 -------
@@ -146,16 +146,16 @@ __all__ = [
     'CH', 'Delaunay', 'bin_pnts', 'common_extent', 'densify_by_distance',
     'densify_by_factor', 'eucl_dist', 'extent_to_poly',
     'find_closest', 'in_hole_check', 'mabr', 'npGeo', 'np_wn',
-    'offset_buffer', 'pnts_in_pnts', 'pnts_on_poly', 'pnts_to_extent',
-    'polys_to_segments', 'polys_to_unique_pnts', 'repack_fields',
-    'scale_by_area', 'script', 'segments_to_polys', 'simplify_lines', 'stu',
-    'triangulate_pnts', 'uts'
+    'offset_buffer', 'on_line_chk', 'pnts_in_pnts', 'pnts_on_poly',
+    'pnts_to_extent', 'polys_to_segments', 'polys_to_unique_pnts',
+    'scale_by_area', 'simplify', 'segments_to_polys', 'simplify_lines',
+    'triangulate_pnts'
 ]
 
 __helpers__ = [
-    '_add_pnts_on_line_', '_angles_3pnt_', '_bit_area_', '_bit_min_max_',
+    '_add_pnts_on_line_', '_bit_min_max_',
     '_ch_', '_ch_scipy_', '_ch_simple_', '_closest_pnt_on_poly_',
-    '_dist_along_', '_e_2d_', '_get_base_', '_in_extent_', '_is_pnt_on_line_',
+    '_dist_along_', '_e_2d_', '_is_pnt_on_line_',
     '_percent_along_', '_pnt_on_segment_'
 ]
 
@@ -304,14 +304,17 @@ def _is_pnt_on_line_(start, end, xy, tolerance=0.0):
           max=1.7976931348623157e+308, dtype=float64)
     """
     #
-    def dist(a, b):
+    def sq_dist(a, b):
         """Add math.sqrt() for actual distance."""
-        return np.sqrt((b[0] - a[0])**2 + (b[1] - a[1])**2)
+        return (b[0] - a[0])**2 + (b[1] - a[1])**2
     #
-    line_leng = dist(start, end)
+    dl = sq_dist(start, end)  # -- line distance
+    ds = sq_dist(start, xy)   # -- distance to start from pnt `xy`
+    de = sq_dist(end, xy)     # -- distance to end from pnt `xy`
+    d0, d1, d2 = np.sqrt([ds, de, dl])  # -- return the sqrt values
     if tolerance == 0.0:
-        return dist(start, xy) + dist(end, xy) == line_leng
-    d = (dist(start, xy) + dist(end, xy)) - line_leng
+        return d0 + d1 == d2
+    d = (d0 + d1) - d2
     return -tolerance <= d <= tolerance
 
 
@@ -468,6 +471,50 @@ def _closest_pnt_on_poly_(pnt, poly):
     return r
 
 
+def on_line_chk(start, end, xy, tolerance=1.0e-12):
+    """Perform a distance check of whether a point is on a line.
+
+    Parameters
+    ----------
+    start, end, xy : array_like
+        The x,y values for the points.
+    tolerance : number
+        Acceptable distance tolerance to account for floating point issues.
+
+    Returns
+    -------
+    A boolean indicating whether the x,y point is on the line and a list of
+    values as follows::
+        [xy] : if start or end equals xy
+        [start, xy, d0] : `xy` is closest to `start` with a distance `d0`.
+        [xy, end, d1] : `xy` is closest to `end` with a distance of `d1`.
+        [] : the empty list is returned when `xy` is not on the line.
+
+    See Also
+    --------
+    `npg_geom.is_pnt_on_line` can be used if just a boolean check is required.
+    """
+    #
+    def dist(a, b):
+        """Actual distance."""
+        return np.sqrt((b[0] - a[0])**2 + (b[1] - a[1])**2)
+    #
+    # boolean checks for start, end xy equality
+    if (start == xy).all():
+        return True, [xy]
+    if (end == xy).all():
+        return True, [xy]
+    line_leng = dist(start, end)
+    d0, d1 = dist(start, xy), dist(end, xy)
+    d = (d0 + d1) - line_leng
+    chk = -tolerance <= d <= tolerance
+    if chk:  # -- xy is on line
+        if d0 <= d1:  # -- closest to start
+            return chk, [start, xy, d0]
+        return chk, [xy, end, d1]  # -- closest to end
+    return chk, []  # -- not on line
+
+
 def find_closest(a, pnt):
     """Find the closest point within a Geo array, its index and distance.
 
@@ -593,7 +640,7 @@ def extent_to_poly(extent, kind=2):
 
 
 # ----------------------------------------------------------------------------
-# ---- (3) densification
+# ---- (3) densify/simplify
 #
 def densify_by_factor(a, factor=2):
     """Densify a 2D array using np.interp.
@@ -662,6 +709,19 @@ def densify_by_distance(a, spacing):
     -along-a-line-joining-set-of-points/51514725>`_.
     """
     return _add_pnts_on_line_(a, spacing)
+
+
+def simplify(arr, tol=1e-6):
+    """Remove redundant points on a poly perimeter."""
+    x1, y1 = arr[:-2].T
+    x2, y2 = arr[1:-1].T
+    x3, y3 = arr[2:].T
+    result = x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2)
+    whr = np.nonzero(np.abs(result) >= tol)[0]
+    whr = np.nonzero(result)[0]
+    bits = arr[1:-1][whr]
+    keep = np.concatenate((arr[0, None], bits, arr[-1, None]), axis=0)
+    return keep
 
 
 # ----------------------------------------------------------------------------
@@ -1171,6 +1231,24 @@ def in_hole_check(pnts, geo):
         if inside.size > 0:
             out.append([h, inside])
     return out
+
+
+def _quad_(line):
+    """Return the quadrant a vector lies in.
+
+    >>> q = _quad_(line)
+    >>> if q in [2, 3]:
+    >>>     line = line[::-1]
+    """
+    x_, y_ = np.sign(np.diff(line[[0, -1]], axis=0))[0]
+    if x_ >= 0:  # right
+        if y_ >= 0:  # upper
+            return 1
+        return 4
+    elif x_ < 0:  # left
+        if y_ >= 0:  # upper
+            return 2
+        return 3
 
 
 # ===========================================================================

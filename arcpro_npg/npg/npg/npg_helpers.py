@@ -835,11 +835,21 @@ def compare_geom(arr, look_for, unique=True, invert=False, return_idx=False):
     if sum(result) == 0:
         return None
     if invert:
-        result = ~result
-    idx = np.where(result)[0]
-    out = arr[result]
+        keep = ~result
+        idx = np.where(keep)[0]
+        w = np.nonzero((idx[1:] - idx[:-1] > 1))[0] + 1
+        bits = np.array_split(idx, w)
+        if 0 == bits[0][0]:
+            tmp = arr[np.concatenate(bits[::-1])]
+        else:
+            tmp = arr[np.concatenate(bits)]
+    else:
+        idx = np.where(result)[0]
+        tmp = arr[result]
     if unique:
-        out = np.unique(out, axis=0)
+        out, ids = np.unique(tmp, return_index=True, axis=0)
+        idx = sorted(ids)
+        out = tmp[idx]
     if return_idx:
         return out, idx
     return out
@@ -908,11 +918,10 @@ def multi_check(arr):
     start/end vertex, this may represent the presence of a multipart shape.
     In a `Geo` array, this really isnt necessary.
     """
-    uni, idx, cnt = np.unique(
-        arr, return_index=True, return_counts=True, axis=0
-        )
+    uni, idx, cnt = np.unique(arr, return_index=True, return_counts=True,
+                              axis=0)
     chk = uni[cnt > 1]
-    whr = np.nonzero(cnt > 1)[0]
+    # whr = np.nonzero(cnt > 1)[0]
     if len(chk) == 1:
         val = chk[1]
         result = (arr[:, None] == val).all(-1).any(-1)
@@ -922,13 +931,13 @@ def multi_check(arr):
                  np.concatenate((bits[1], np.atleast_2d(bits[1][0])), axis=0)]
         # -- assert idxs only contains 2 ids for this to work
     elif len(chk) > 2:
-        vals = chk[1:]
-        np.array_split(arr, idxs)
-        result = (arr[:, None] == val).all(-1).any(-1)
-        idxs = np.nonzero(result)[0] + 1
+        result = (arr[:, None] == chk).all(-1).any(-1)
+        idxs = np.nonzero(result)[0]
         bits = np.array_split(arr, idxs.tolist())
-#        parts = [np.concatenate((bits[0], bits[-1]), axis=0),
-#                 np.concatenate((bits[1], np.atleast_2d(bits[1][0])), axis=0)]
+        parts = []
+        for i in range(1, len(bits), 2):
+            sub = np.concatenate((bits[i], bits[i + 1]), axis=0)
+            parts.append(sub)
         return parts
 
 
