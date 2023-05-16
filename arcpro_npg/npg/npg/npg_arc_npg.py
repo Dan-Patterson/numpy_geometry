@@ -16,7 +16,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2022-02-07
+    2022-11-23
 
 Purpose
 -------
@@ -50,6 +50,15 @@ Using da.SearchCursor to project data::
     array([(-76.56,  45.14), (-76.56,  45.14),
            (-76.56,  45.14), (-76.56,  45.14)],
           dtype=[('SHAPE@X', '<f8'), ('SHAPE@Y', '<f8')])
+
+Convert point array to point featureclass::
+
+    # pl_n is a Nx2 numpy array
+    pl_ns = npg.npg_geom._view_as_struct_(pl_n + [300000, 5000000])
+    SR = r'NAD 1983 CSRS MTM  9'
+    fc = r"C:\arcpro_npg\Project_npg\npgeom.gdb\edgy1_allpnts"
+    NumPyArrayToFeatureClass(pl_ns, fc, ["f0", "f1"], SR)
+
 
 References
 ----------
@@ -229,7 +238,7 @@ def fc_to_Geo(in_fc, geom_kind=2, minX=0, minY=0, sp_ref=None, info=""):
     -----
     The `arcpy.da.Describe` method takes a substantial amount of time.
     >>> %timeit Describe(fc2)
-    ... 355 ms ± 17.4 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+    >>> 355 ms ± 17.4 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
     """
     def _area_part_(a):
         """Mini e_area, used by areas and centroids."""
@@ -342,7 +351,7 @@ def id_fr_to(a, oids):
     val = 0
     idx = []
     key = 0
-    while (val < sze):
+    while val < sze:
         w = np.where(a == a[val])[0]  # fast even with large arrays
         n = len(w)
         sub = [val]
@@ -454,7 +463,7 @@ def Geo_to_fc(geo, gdb=None, name=None, kind=None, SR=None):
     polys = Geo_to_arc_shapes(geo, as_singlepart=True)
     out_name = gdb.replace("\\", "/") + "/" + name
     wkspace = env.workspace = 'memory'  # legacy is in_memory
-    tmp_name = "{}\\{}".format(wkspace, "tmp")
+    tmp_name = r"memory\tmp"  # r"{}\{}".format(wkspace, "tmp")
     if Exists(tmp_name):
         Delete(tmp_name)
     CreateFeatureclass(wkspace, "tmp", kind, spatial_reference=SR)

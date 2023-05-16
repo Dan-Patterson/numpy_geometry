@@ -74,7 +74,6 @@ class Geo(np.ndarray):
     `npg.arrays_to_Geo`, `npg.array_IFT` and `npg.roll_coords`.
     See `npg.npg_arc_npg` and `npg.npg_io` for methods to acquire the ndarrays
     needed from other data sources.
-
     """
 
     __name__ = "npGeo"
@@ -198,7 +197,7 @@ class Geo(np.ndarray):
         Shapes :{:>6.0f}
         Parts  :{:>6.0f}
         Points :{:>6.0f}
-        \nSp Ref : {}\n
+        \nSp Ref : {}
         """
         args = ["-" * 14, self.LL, self.UR, len(self.U), self.IFT.shape[0],
                 self.IFT[-1, 2], self.SR]
@@ -592,6 +591,10 @@ class Geo(np.ndarray):
             b_ids = self.bit_ids
             return np.bincount(b_ids, weights=bit_lengs)[self.U]
         return bit_lengs
+
+    def perimeters(self, by_shape=True):
+        """Polyline lengths or polygon perimeter. Calls `lengths`."""
+        return self.lengths(by_shape=True)
 
     def centers(self, by_shape=True):
         """Return the center of outer ring points."""
@@ -1048,8 +1051,8 @@ class Geo(np.ndarray):
 
     def segment_polys(self, as_basic=True, shift_back=False, as_3d=False):
         """Call `polys_to_segments`.  See `od_pairs` also."""
-        return geom.polys_to_segments(
-                   self, as_basic=as_basic, to_orig=shift_back, as_3d=as_3d)
+        return geom.polys_to_segments(self, as_basic=as_basic,
+                                      to_orig=shift_back, as_3d=as_3d)
 
     def close_polylines(self, out_kind=1):
         """Produce closed-loop polylines (1) or polygons (2) from polylines.
@@ -1088,7 +1091,7 @@ class Geo(np.ndarray):
         g, ift, extent = array_IFT(polys)
         return Geo(g, ift, self.K, self.XT, "Densify by distance")
 
-    def densify_by_percent(self, percent=50):
+    def densify_by_percent(self, percent=50, shift_back=True):
         """Densify poly features by a percentage for each segment.
 
         Converts multipart to singlepart features during the process.
@@ -1097,7 +1100,8 @@ class Geo(np.ndarray):
         bits = self.bits
         polys = [geom._add_pnts_on_line_(a, spacing=percent, is_percent=True)
                  for a in bits]
-        polys = [a + self.LL for a in polys]
+        if shift_back:
+            polys = [a + self.LL for a in polys]
         g0, ift, extent = array_IFT(polys)
         return Geo(g0, ift, self.K, self.XT, "Densify by percent")
 
@@ -1182,7 +1186,7 @@ class Geo(np.ndarray):
                                     for b in bts], axis=0)
         if fr_to is None:
             return None
-        h_0 = uts(fr_to)
+        h_0 = uts(fr_to)  # view as structured array to facilitate unique test
         names = h_0.dtype.names
         h_1 = h_0[list(names[2:4] + names[:2])]  # x_to, y_to and x_fr, y_frr
         idx = np.isin(h_0, h_1)
@@ -1456,7 +1460,7 @@ def roll_coords(self):
     `roll_shapes` implements this as a Geo method.
     """
     # --
-    def _closest_to_LL_(a, p, sqrd_=True):
+    def _closest_to_LL_(a, p, sqrd_=False):
         """Return point distance closest to the `lower-left, LL`."""
         diff = a - p[None, :]
         if sqrd_:
@@ -1485,13 +1489,20 @@ def roll_coords(self):
 def roll_arrays(arrs):
     """Roll point coordinates to a new starting position.
 
+    Parameters
+    ----------
+    arrs : list of arrays or a single array
+
     Notes
     -----
     Rolls the coordinates of the Geo array or ndarray to put the start/end
     points as close to the lower-left of the ring extent as possible.
+
+    If a single array is passed, a single array is returned otherwise a list
+    of arrays.
     """
     # --
-    def _closest_to_LL_(a, p, sqrd_=True):
+    def _closest_to_LL_(a, p, sqrd_=False):
         """Return point distance closest to the `lower-left, LL`."""
         diff = a - p[None, :]
         if sqrd_:
@@ -1499,14 +1510,15 @@ def roll_arrays(arrs):
         return np.sqrt(np.einsum('ij,ij->i', diff, diff))
     # --
     if not isinstance(arrs, (list, tuple)):
-        print("List/tuple of arrays required.")
-        return None
+        arrs = [arrs]
     out = []
     for ar in arrs:
         LL = np.min(ar, axis=0)
-        dist = _closest_to_LL_(ar, LL, sqrd_=True)
+        dist = _closest_to_LL_(ar, LL, sqrd_=False)
         num = np.argmin(dist)
         out.append(np.concatenate((ar[num:-1], ar[:num], [ar[num]]), axis=0))
+    if len(out) == 1:
+        return out[0]
     return out
 
 
@@ -1514,8 +1526,8 @@ def array_IFT(in_arrays, shift_to_origin=False):
     """Produce the Geo array.  Construction information in `npgDocs`."""
     id_too = []
     a_2d = []
-    if isinstance(in_arrays, (list, tuple)):
-        in_arrays = np.asarray(in_arrays, dtype='O').squeeze()
+    if isinstance(in_arrays, (list, tuple)):  # next line, for single multipart
+        in_arrays = np.asarray(in_arrays, dtype='O')  # .squeeze() removed
     if isinstance(in_arrays, np.ndarray):
         if in_arrays.ndim == 2 or len(in_arrays) == 1:
             in_arrays = [in_arrays]
@@ -1805,9 +1817,9 @@ def remove_seq_dupl(g, asGeo=True):
             out.append(out2)
         else:
             out.append(dup_idx(c, poly))
-    # ret = [dup_idx(i, poly) for i in g.bits]
     if asGeo:
-        ret = arrays_to_Geo(out, g.K, info='cleaned', to_origin=False)
+        return arrays_to_Geo(out, g.K, info='cleaned', to_origin=False)
+    ret = [dup_idx(i, poly) for i in g.bits]
     return ret
 
 
