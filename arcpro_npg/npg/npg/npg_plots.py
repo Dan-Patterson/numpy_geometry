@@ -473,7 +473,7 @@ def plot_polygons(arr, outline=True, vertices=True,
     colors_ = ['black', 'blue', 'green', 'red', 'darkgrey', 'magenta',
                'darkblue', 'darkred', 'darkgreen', 'grey'] * 2
     lbl_off = [[-8, 2], [4, 2], [4, -8], [-8, -8],
-               [-2, 2], [2, 2], [2, -2], [-2, -2]] * 2
+               [-2, 2], [2, 2], [2, -2], [-2, -2]] * 3
     # color_choice = ['black', 'red', 'green', 'blue']
     for i, shape in enumerate(shapes):
         if outline:   # _line(shape, plt)  # alternate, see line for options

@@ -116,6 +116,44 @@ def erase_poly(poly, clp, as_geo=True):
                     bits.append(pl_n[vals])
         return bits
 
+    def last_chk2(_n, _p, _c, _seen, _outside, _inside):
+        """Last ditch check in case j_p and j_c are separated by a segment.
+
+        Parameters
+        ----------
+        inputs::
+
+        - _n, _p, _c, _seen, _outside, _inside
+        - pl_n, j_p, j_c, p_seen, p_outside, p_inside
+        - cl_n, i_p, i_c, c_seen, c_outside, c_inside
+        """
+        out_bits = []
+        in_bits = []
+        v_seen = []
+        N = _n.shape[0] - 1
+        for i in [_p, _c]:
+            for cnt, out_ in enumerate(_outside):
+                if i in out_:  # and N not in out_:
+                    vals = _outside.pop(cnt)  # [cnt]
+                    out_bits.append(_n[vals])
+                    v_seen.extend(vals)
+            for cnt, in_ in enumerate(_inside):
+                if i in in_:
+                    vals = _inside.pop(cnt)  # [cnt]
+                    in_bits.append(_n[vals])
+                    v_seen.extend(vals)
+        return out_bits, in_bits, v_seen
+
+    def on_pairs(col):
+        """Return sequential ids from the intersections not in or out."""
+        segs = []
+        for cn, v in enumerate(col[1:], 0):
+            prev = col[cn]
+            dff = v - prev
+            if dff == 1:
+                segs.append([prev, v])
+        return segs
+
     # -- Returns the intersections, the rolled input polygons, the new polygons
     #    and how the points in both relate to one another.
     result = add_intersections(poly, clp,
@@ -129,26 +167,25 @@ def erase_poly(poly, clp, as_geo=True):
     # Get the intersections, new polys, points inside and outside and
     # x_pnt ids from `add_intersections`.  Swap the order of the last.
     w0 = np.argsort(id_plcl[:, 1])  # get the order and temporarily sort
+    # -- cut lines, where one crosses the other
     onConP = id_plcl[:, [1, 0]][w0]  # slice to rearrange the columns
-    # --
-    # z0 = [i[0] for i in c_in if len(c_in) > 0]
-    # z1 = [i[0] for i in p_in if len(p_in) > 0]
-    # col0 = np.isin(onConP[:, 0], z0)
-    # col1 = np.isin(onConP[:, 1], z1)
-    # c0c1 = np.vstack((col0, col1)).astype('int').T
-    # newOn = np.concatenate((onConP, c0c1), axis=1)
-    # --
-    #  Determine preceeding points to first clip.
-    out = []  # p_seen, c_seen = [], [], []
-    prev = onConP[0]  # -- set the first `previous` for enumerate
+    # -- two point cut lines, which cross the other polygon
+    p_cut = on_pairs(id_plcl[:, 0])  # use id_plcl col 0 to save a sort
+    c_cut = on_pairs(onConP[:, 0])   # use onConP col 0 since it is now sorted
+    # -- cut lines that are more than two points and and are either inside or
+    #    outside the other polygon
     p_outside = copy.deepcopy(p_out)
     p_inside = copy.deepcopy(p_in)
     c_outside = copy.deepcopy(c_out)
     c_inside = copy.deepcopy(c_in)
+    #
+    #  Determine preceeding points to first clip.
+    out = []  # p_seen, c_seen = [], [], []
+    prev = onConP[0]  # -- set the first `previous` for enumerate
     p_seen, c_seen = [], []
     in_segs = []  # collect `clipping` segments to use for clip.
     kind_ = []  # -1 symmetrical diff, 0 erase, 1 clip, 2 hole
-    for cnt, p in enumerate(onConP[1:], 1):  # enumerate fromonConP[1:]
+    for cnt, p in enumerate(onConP[1:4], 1):  # enumerate fromonConP[1:]
         i_c, j_c = p       # current ids, this is an intersection point
         i_p, j_p = prev    # previous ids
         d0, d1 = p - prev  # differences in ids
@@ -166,14 +203,13 @@ def erase_poly(poly, clp, as_geo=True):
             chk3 = set([j_p, j_c]).issubset(set(p_inside[0]))
         # d0, d1, chk0, chk1, chk2, chk3
         # --
-        # -- Note: d0 should never be < 0 since you are followin clp sequence
-        if d0 == 0:
-            if i_c == 0 and cnt <= 2:  # prevent unwanted additions if
-                out.append(cl_n[i_c])  # already added, unless i_c is first, 0
-        # --
-        # -- Note: d0 clp ids are sequential and are on the densified clp line
-        elif d0 == 1:  # eg. 1, 2
+        # -- d0 clp ids are sequential and are on the densified clp line
+        # -- d0 should never be <= 0 since you are following clp sequence
+        #
+        # -- When d0 == 1, this is a shared edge between the two polygons
+        if d0 == 1:  # this is a `cutting` segment traversing the other polygon
             sub0 = cl_n[[i_p, i_c]]
+            in_segs.append(sub0)
             # --
             if d1 < 0:  # not common, but accounted for (eg. E, d0_ polys)
                 a0_, b0_ = sorted([j_p, j_c])
@@ -181,9 +217,11 @@ def erase_poly(poly, clp, as_geo=True):
                 if len(bits) > 0:
                     sub = np.concatenate((bits, bits[0][None, :]), axis=0)
                     kind_.append(-1)
+                if j_p in p_seen:  # or [j_p - 1, j_p] in p_on
+                    sub = np.concatenate((sub0, pl_n[[j_p - 1, j_p]]), axis=0)
+                # -- could add clip bit here
             # --
             elif d1 == 1:  # unexpected, but accounted for
-                in_segs.append(sub0)
                 sub = []
             # --
             elif d1 > 1:  # poly inside and outside check
@@ -197,12 +235,41 @@ def erase_poly(poly, clp, as_geo=True):
                     in_segs.append(sub1)
                     sub = np.concatenate((sub0, sub1[::-1]), axis=0)
                     kind_.append(-1)
-                if not chk2 and not chk3:
-                    bits = last_chk(j_p, j_c, p_seen, p_outside)
-                if isinstance(bits, list) and len(bits) > 0:
-                    sub = np.concatenate(bits, axis=0)
-                else:
-                    sub = sub
+                if not chk2 and not chk3:  # poly pnts inside and out
+                    # sub1 = last_chk(j_p, j_c, p_seen, p_outside)
+                    returned = last_chk2(pl_n, j_p, j_c,
+                                         p_seen, p_outside, p_inside)
+                    out_bits, in_bits, v_seen = returned
+                    pp = pl_n[j_p][None, :]  # previous point
+                    n0, n1 = len(out_bits), len(in_bits)
+                    if n0 > 1:  # -- construct first outside bits
+                        bt = np.concatenate(out_bits, axis=0)
+                        sub1 = np.concatenate((bt, pp), axis=0)
+                        out.append(sub1)
+                        kind_.append(-1)
+                    elif n0 == 1:
+                        sub1 = np.concatenate((bits[0][0], pp), axis=0)
+                        out.append(sub1)
+                        kind_.append(-1)
+                    if n1 > 1:  # -- inside bits
+                        bt = np.concatenate(in_bits, axis=0)
+                        sub1 = np.concatenate((bt, pp), axis=0)
+                        out.append(sub1)
+                        kind_.append(1)
+                    elif n1 == 1:
+                        sub1 = np.concatenate((pp, in_bits[0], pp), axis=0)
+                        out.append(sub1)
+                        kind_.append(1)
+                    #
+                    # in_segs.append(sub0)
+                    p_seen.extend(v_seen)
+                # --
+                # do an outside check for the last poly point being inside
+                # if j_c in p_inside[0]:
+                #     in_bits = pl_n[p_inside.pop(0)]
+                #     sub0 = np.concatenate((sub0, in_bits), axis=0)
+                #     kind_.append(1)
+                #     out.append(sub0)  # -- extra append
         # --
         # -- Note: clip can be inside or outside
         elif d0 > 1:
@@ -251,8 +318,8 @@ def erase_poly(poly, clp, as_geo=True):
                     sub = np.concatenate((sub0, sub1), axis=0)
         if len(sub) > 0:
             out.append(sub)
-        else:
-            kind_ = kind_[:-1]  # no sub, hence drop last `kind_` assignment
+        # else:
+        #     kind_ = kind_[:-1]  # no sub, hence drop last `kind_` assignment
         #
         prev = p
         p_seen.append(j_c)
@@ -269,7 +336,7 @@ def erase_poly(poly, clp, as_geo=True):
     if as_geo:
         return npg.arrays_to_Geo(final, kind=2, info=None, to_origin=False)
     # return final, [out, subs, dups, pl_n, cl_n, xtras]
-    return out
+    return final, clp_poly, erase_poly, symm_poly
 
 
 # preP, preC = prePC_out(i0_, i1_, cN, j0_, j1_, pN)  # changed 2023-03-15
