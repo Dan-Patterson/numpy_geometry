@@ -82,7 +82,6 @@ See the **geonumeracy** repository for more examples of numpy geometry functions
 - [Fun with clipping ... part 1](https://community.esri.com/t5/python-blog/fun-with-clipping-part-1/ba-p/1265826)
 - [Simplify your poly* geometry ... part 2](https://community.esri.com/t5/python-blog/simplify-your-poly-geometry-part-2/ba-p/1266873)
 - [I don't feel like scrolling through the folders](https://community.esri.com/t5/python-blog/i-don-t-feel-like-scrolling-through-the-folders/ba-p/1270687)
-- [Spyder 5.4.3 and ArcGIS Pro 3.1 ](https://community.esri.com/t5/python-blog/spyder-5-4-3-and-pro-3-1/ba-p/1305985)
 
 *2022*
 
