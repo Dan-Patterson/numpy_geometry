@@ -125,7 +125,7 @@ def axis_mins_maxs(pnts):
     return pnts, x_min, y_min, x_max, y_max
 
 
-def _get_cmap_(plt, n, name='hsv'):
+def _get_cmap_(plt, name='hsv'):
     """Return a color map associated with the size of the data.
 
     Notes
@@ -138,7 +138,8 @@ def _get_cmap_(plt, n, name='hsv'):
     `<https://stackoverflow.com/questions/14720331/how-to-generate-
     random-colors-in-matplotlib>`_.
     """
-    return plt.cm.get_cmap(name, n)
+    # return plt.cm.get_cmap(name, n)  # deprecated
+    return matplotlib.colormaps.get_cmap('hsv')
 
 
 def subplts(plots=1, by_col=True, max_rc=4):
@@ -245,7 +246,8 @@ def plot_mixed(data, title="Title", invert_y=False, ax_lbls=None):
             _scatter(pnts, plt, color='black', marker='s')
             _label_pnts(pnts, plt)
         elif kind == 2:
-            cmap = plt.cm.get_cmap('hsv', len(pnts))
+            # cmap = plt.cm.get_cmap('hsv', len(pnts))
+            cmap = matplotlib.colormaps['hsv']
             for j, p in enumerate(pnts):
                 clr = cmap(j)  # clr=np.random.random(3,)  # clr = "b"
                 # clr = 'None'
@@ -471,9 +473,9 @@ def plot_polygons(arr, outline=True, vertices=True,
     ax.set_aspect('equal', adjustable='box')
     # cmap = plt.cm.get_cmap(plt.cm.viridis, 143)  # default colormap
     colors_ = ['black', 'blue', 'green', 'red', 'darkgrey', 'magenta',
-               'darkblue', 'darkred', 'darkgreen', 'grey'] * 2
+               'darkblue', 'darkred', 'darkgreen', 'grey'] * 10
     lbl_off = [[-8, 2], [4, 2], [4, -8], [-8, -8],
-               [-2, 2], [2, 2], [2, -2], [-2, -2]] * 3
+               [-2, 2], [2, 2], [2, -2], [-2, -2]] * 10
     # color_choice = ['black', 'red', 'green', 'blue']
     for i, shape in enumerate(shapes):
         if outline:   # _line(shape, plt)  # alternate, see line for options

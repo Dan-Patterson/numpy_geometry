@@ -315,8 +315,8 @@ def np_wn(pnts, poly, return_winding=False):
     x, y = pnts.T         # point coordinates
     y_y0 = y[:, None] - y0
     x_x0 = x[:, None] - x0
-    diff_ = (x1 - x0) * y_y0 - (y1 - y0) * x_x0  # diff => einsum in original
-    chk1 = (y_y0 >= 0.0)
+    diff_ = ((x1 - x0) * y_y0 - (y1 - y0) * x_x0) + 0.0  # einsum originally
+    chk1 = (y_y0 >= 0.0)  # -- note this affects top point inclusion! try >
     chk2 = np.less(y[:, None], y1)  # pnts[:, 1][:, None], poly[1:, 1])
     chk3 = np.sign(diff_).astype(np.int32)
     pos = (chk1 & chk2 & (chk3 > 0)).sum(axis=1, dtype=int)

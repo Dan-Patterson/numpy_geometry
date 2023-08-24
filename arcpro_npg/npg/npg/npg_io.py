@@ -21,7 +21,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2022-11-17
+    2023-08-23
 
 Purpose
 -------
@@ -35,16 +35,16 @@ See `npg_arc_npg.py` for bringing and saving attribute data.
 See Also
 --------
 __init__ :
-    The ``.../npgeom/__init__.py`` script has further information on arcpy
+    The ``.../npg/__init__.py`` script has further information on arcpy
     related functionality.
 npGeo :
     A fuller description of the Geo class, its methods and properties is given
-    ``.../npgeom/npGeo``.  This script focuses on getting arcpy or geojson
+    ``.../npg/npGeo``.  This script focuses on getting arcpy or geojson
     geometry into numpy arrays.
 
 Example
 -------
-see : r"C:\arcpro_npg\npg\docs\json_conversion_notes.txt"
+see : "C:/arcpro_npg/npg/docs/json_conversion_notes.txt"
 
 `Subclassing ndarrays
 <https://docs.scipy.org/doc/numpy/user/basics.subclassing.html>`_.
@@ -120,7 +120,7 @@ def dtype_info(a, as_string=False):
 def load_geo(f_name, suppress_extras=False):
     """Load a well formed `npy` file representing a structured array.
 
-    Unpack an npz file containing a Geo array.
+    Unpack an `npz` file containing a Geo array.
 
     Parameters
     ----------
@@ -144,10 +144,25 @@ def load_geo(f_name, suppress_extras=False):
 
     Example
     -------
-    >>> f_name = "C:/Git_Dan/npgeom/data/g_arr.npz"
+    >>> f_name = "C:/arcpro_npg/data/g_arr.npz"
     >>> geo, arrs, names = npg.load_geo(f_name)
+    >>> geo
+    Geo([[ 10.00,  10.00],
+         [ 10.00,   0.00],
+         [  1.50,   1.50],
+          ...,
+         [ 10.00,  10.00],
+         [ 15.00,  18.00],
+         [ 14.00,  10.00]])
+    >>> arrs
+    NpzFile 'C:/arcpro_npg/data/g_arr.npz' with keys:
+        g, ift, kind, extents, spatial_ref
+    >>> arrs['extents']  # same array of bounding rectangle extents
+    array([[ 300000.00,  5000000.00],
+           [ 300025.00,  5000018.00]])
     >>> arr_names = arrs.files  # returns the list of array names inside
-    arr0 = arrs[0]
+    ['g', 'ift', 'kind', 'extents', 'spatial_ref']
+
     An array or arrays. The description, field names and their size of each
     are returned.
 
@@ -261,7 +276,7 @@ def load_txt(name="arr.txt", names=None, data_type=None):
     Parameters
     ----------
     name : text
-        Raw-encoding path to *.csv.  eg.  r'C:\Data\csv\SampleData.csv'
+        Raw-encoding path to *.csv.  eg.  'C:/Data/csv/SampleData.csv'
     data type : dtype
         If `None`, it allows the structure to be read from the array.
     delimiter : string
@@ -441,19 +456,4 @@ r"""
 'C:/arcpro_npg/npg/data/sq.json'
 'C:/arcpro_npg/npg/data/sq.geojson'
 'C:/arcpro_npg/npg/data/g.npz'
-"""
-
-"""
-lists to dictionary
-
-list1 =  [('84116', 1750),('84116', 1774),('84116', 1783),('84116',1792)]
-list2 = [('84116', 1783),('84116', 1792),('84116', 1847),('84116', 1852),
-         ('84116', 1853)]
-Lst12 = list1 + list2
-dt = [('Keys', 'U8'), ('Vals', '<i4')]
-arr = np.asarray((list1 + list2), dtype=dt)
-a0 =np.unique(arr)
-k = np.unique(arr['Keys'])
-{i : a0['Vals'][a0['Keys'] == i].tolist() for i in k}
-
 """

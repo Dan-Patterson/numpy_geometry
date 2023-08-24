@@ -94,13 +94,15 @@ import numpy as np
 # import npg
 
 from . import npgDocs, npGeo, npg_helpers, npg_geom
-from . import npg_boolean, npg_min_circ, npg_overlay, npg_analysis
+from . import npg_bool_hlp, npg_min_circ, npg_overlay, npg_analysis
 from . import npg_setops, npg_io, npg_table, npg_create, npg_utils
 from . import npg_pip, npg_prn  # noqa
 
 from . npGeo import *  # noqa
 from . npg_helpers import *  # noqa
 from . npg_geom import *  # noqa
+from . npg_io import *  # noqa
+from . npg_bool_hlp import *  # noqa
 
 """
 from npGeo import (
@@ -157,7 +159,7 @@ from . npgDocs import (
 
 # ---- define __all__
 __all__ = [
-    'npgDocs', 'npGeo', 'npg_io', 'npg_geom', 'npg_boolean', 'npg_helpers',
+    'npgDocs', 'npGeo', 'npg_io', 'npg_geom', 'npg_bool_hlp', 'npg_helpers',
     'npg_overlay', 'npg_table', 'npg_create', 'npg_analysis', 'npg_utils',
     'npg_setops', 'npg_helpers', 'npg_min_circ'
 ]
@@ -172,12 +174,12 @@ __all__.extend(npgDocs.__all__)
 __all__.extend(npGeo.__all__)
 __all__.extend(npg_geom.__all__)
 __all__.extend(npg_helpers.__all__)
-__all__.extend(npg_boolean.__all__)
+__all__.extend(npg_bool_hlp.__all__)
 __all__.sort()
 
 __helpers__.extend(npg_helpers.__helpers__)
 __helpers__.extend(npg_geom.__helpers__)
-__helpers__.extend(npg_boolean.__helpers__)
+__helpers__.extend(npg_bool_hlp.__helpers__)
 __helpers__.sort()
 
 """

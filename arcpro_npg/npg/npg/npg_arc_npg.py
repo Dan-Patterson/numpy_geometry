@@ -28,7 +28,7 @@ See `_npgeom_notes_.py` for extra notes.
 
 Using da.SearchCursor to project data::
 
-    fc2 = r'C:/Git_Dan/npgeom/Project_npg/tests.gdb\sq'
+    fc2 = r'C:/Git_Dan/npgeom/Project_npg/tests.gdb/sq'
     import arcpy
     SR0 = arcpy.da.Describe(fc2)['spatialReference']
     SR1 = arcpy.SpatialReference(4326)
@@ -84,7 +84,7 @@ from numpy.lib.recfunctions import structured_to_unstructured as stu
 # if 'npg' not in list(locals().keys()):
 #    import npgeom as npg
 
-from npg import npGeo
+from npg import npGeo  # noqa
 from npg.npGeo import Geo
 # from npGeo import *
 

@@ -1059,7 +1059,7 @@ def sequences(data, stepsize=0):
         |array([(0, 0, 4, 1, 4), (1, 4, 6, 4, 2)],
         |      dtype=[('ID', '<i4'), ('From_', '<i4'), ('To_', '<i4'),
         |             ('Value', '<i4'), ('Count', '<i4')])
-        >>> art.prn(s)
+        >>> npg.prn(s)
         id  ID    From_   To_   Value   Count
         ----------------------------------------
         000     0       0     4       1       4

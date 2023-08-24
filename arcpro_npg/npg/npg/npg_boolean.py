@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2023-03-21
+    2023-04-07
 
 Purpose
 -------
@@ -45,7 +45,7 @@ import sys
 import numpy as np
 import npg
 from npg.npGeo import roll_arrays
-from npg.npg_helpers import uniq_2d, a_eq_b
+from npg.npg_helpers import a_eq_b
 from npg.npg_plots import plot_polygons  # noqa
 
 ft = {"bool": lambda x: repr(x.astype(np.int32)),
@@ -57,9 +57,11 @@ np.set_printoptions(
 
 script = sys.argv[0]
 
-__all__ = ['clip_poly', 'find_overlap_segments', 'split_poly']
-__helpers__ = ['_add_pnts_', 'del_seq_pnts', '_roll_', '_sort_on_line_',
-               '_wn_clip_', '_node_type_', '_prepare_']
+__all__ = ['add_intersections', 'clip_poly', 'find_segment_overlaps',
+           'split_poly']
+__helpers__ = ['_add_pnts_', 'del_seq_pnts', '_roll_', 'side',
+               '_sort_on_line_', '_w_', '_wn_clip_', '_node_type_',
+               '_prepare_']
 
 
 # ---- (1) private helpers
@@ -190,35 +192,45 @@ def _roll_(arrs):
     return out
 
 
-def _side_(pnts, line=None):
-    """Return the side of a line that the points lie on.
-
-    Notes
-    -----
-    - Above the line (+ve) is left.
-    - Below the line is right (-ve).
-    - Zero (0) is on the line.
-    A-B is the line.    X,Y is the point.  This is vectorized by numpy using.
-
-    >>> sign((Bx - Ax) * (Y - Ay) - (By - Ay) * (X - Ax))
-    """
-    A, _ = line[0], line[1]  # A, B
-    BAx, BAy = line[1] - line[0]
-    XAx = pnts[:, 0] - A[0]
-    YAy = pnts[:, 1] - A[1]
-    return np.sign(np.int32((BAx * YAy - BAy * XAx) + 0.0))  # -- ref 2
-
-
-def _sort_on_line_(ln_pnts, cross_pnts):
-    """Order intersection points on a straight line, from the start."""
-    p = np.concatenate((ln_pnts, cross_pnts), axis=0)
-    dxdy = np.abs(p[0] - p[1:])
-    order = np.argsort(dxdy[:, 0])
-    if dxdy.sum(axis=0)[0] == 0:
-        order = np.argsort(dxdy[:, 1])
-    tmp = p[1:][order]
-    tmp = np.concatenate(np.atleast_2d(p[0], tmp))
-    return uniq_2d(tmp), order
+# ---- (2) prepare for boolean operations
+#
+def _w_(a, b, all_info):
+    """Return winding number and other values."""
+    x0, y0 = a[:-1].T   # point `from` coordinates
+    # x1, y1 = a[1:].T  # point `to` coordinates
+    x1_x0, y1_y0 = (a[1:] - a[:-1]).T
+    #
+    x2, y2 = b[:-1].T  # clip polygon `from` coordinates
+    x3, y3 = b[1:].T   # clip polygon `to` coordinates
+    x3_x2, y3_y2 = (b[1:] - b[:-1]).T
+    # reshape poly deltas
+    x3_x2 = x3_x2[:, None]
+    y3_y2 = y3_y2[:, None]
+    # deltas between pnts/poly x and y
+    x0_x2 = x0 - x2[:, None]
+    y0_y2 = y0 - y2[:, None]
+    #
+    a_0 = y0_y2 * x3_x2
+    a_1 = y3_y2 * x0_x2
+    b_0 = y0_y2 * x1_x0
+    b_1 = y1_y0 * x0_x2
+    #
+    a_num = (a_0 - a_1) + 0.0  # signed distance diff_ in npg.pip.wn_np
+    b_num = (b_0 - b_1) + 0.0
+    #
+    # pnts in poly
+    chk1 = (y0_y2 >= 0.0)  # y above poly's first y value, per segment
+    chk2 = np.less(y0, y3[:, None])  # y above the poly's second point
+    chk3 = np.sign(a_num).astype(np.int32)
+    pos = (chk1 & chk2 & (chk3 > 0)).sum(axis=0, dtype=np.int32)
+    neg = (~chk1 & ~chk2 & (chk3 < 0)).sum(axis=0, dtype=np.int32)
+    wn_vals = pos - neg
+    wn_ = np.concatenate((wn_vals, np.array([wn_vals[0]])))
+    #
+    if all_info:  # denom of determinant
+        denom = (x1_x0 * y3_y2) - (y1_y0 * x3_x2) + 0.0
+        return wn_, denom, x0, y0, x1_x0, y1_y0, a_num, b_num
+    return wn_
 
 
 def _wn_clip_(pnts, poly, all_info=True):
@@ -253,43 +265,6 @@ def _wn_clip_(pnts, poly, all_info=True):
     a[z[:, 0]] and b[z[:, 1]] return the points from both arrays that have a
     distance of 0.0 and they intersect.
     """
-    def _w_(a, b, all_info):
-        """Return winding number and other values."""
-        x0, y0 = a[:-1].T   # point `from` coordinates
-        # x1, y1 = a[1:].T  # point `to` coordinates
-        x1_x0, y1_y0 = (a[1:] - a[:-1]).T
-        #
-        x2, y2 = b[:-1].T  # clip polygon `from` coordinates
-        x3, y3 = b[1:].T   # clip polygon `to` coordinates
-        x3_x2, y3_y2 = (b[1:] - b[:-1]).T
-        # reshape poly deltas
-        x3_x2 = x3_x2[:, None]
-        y3_y2 = y3_y2[:, None]
-        # deltas between pnts/poly x and y
-        x0_x2 = x0 - x2[:, None]
-        y0_y2 = y0 - y2[:, None]
-        #
-        a_0 = y0_y2 * x3_x2
-        a_1 = y3_y2 * x0_x2
-        b_0 = y0_y2 * x1_x0
-        b_1 = y1_y0 * x0_x2
-        #
-        a_num = (a_0 - a_1) + 0.0  # signed distance diff_ in npg.pip.wn_np
-        b_num = (b_0 - b_1) + 0.0
-        #
-        # pnts in poly
-        chk1 = (y0_y2 >= 0.0)  # y above poly's first y value, per segment
-        chk2 = np.less(y0, y3[:, None])  # y above the poly's second point
-        chk3 = np.sign(a_num).astype(np.int32)
-        pos = (chk1 & chk2 & (chk3 > 0)).sum(axis=0, dtype=np.int32)
-        neg = (~chk1 & ~chk2 & (chk3 < 0)).sum(axis=0, dtype=np.int32)
-        wn_vals = pos - neg
-        wn_ = np.concatenate((wn_vals, np.array([wn_vals[0]])))
-        #
-        if all_info:  # denom of determinant
-            denom = (x1_x0 * y3_y2) - (y1_y0 * x3_x2) + 0.0
-            return wn_, denom, x0, y0, x1_x0, y1_y0, a_num, b_num
-        return wn_
 
     def _xsect_(a_num, b_num, denom, x1_x0, y1_y0, x0, y0):
         """Return the intersections and their id values."""
@@ -411,8 +386,6 @@ def _node_type_(p_in_c, c_in_p, poly, clp, x_pnts):
     return px_in_c, p_in_c, p_eq_c, p_eq_x, cx_in_p, c_in_p, c_eq_p, c_eq_x
 
 
-# ---- (2) prepare for boolean operations
-#
 def _prepare_(arrs, roll=True, polygons=[True, True]):
     """Prepare arrays for overlay analysis.
 
@@ -480,6 +453,51 @@ def _prepare_(arrs, roll=True, polygons=[True, True]):
     return x_pnts, a0, a1, a0_new, a1_new, args
 
 
+def _in_out_(w0, as_array=False):
+    """Return the array indices.
+
+    Requires
+    --------
+    `add_intersections` is used to produce the following::
+
+      # -- outside and inside ids
+      w0 = p0_ioo[p0_ioo[:, 1] < 0, 0]  # slice the indices where p0_ioo < 0
+      w1 = p0_ioo[p0_ioo[:, 1] > 0, 0]  # slice the indices where p0_ioo > 0
+      w2 = p1_ioo[p1_ioo[:, 1] < 0, 0]  # slice the indices where p1_ioo < 0
+      w3 = p1_ioo[p1_ioo[:, 1] > 0, 0]
+
+    The following can be determined, but w* needs to be checked that they
+    are not empty::
+
+      Pout = subs(w0)  # poly outside clip
+      Pin = subs(w1)  # poly inside clip
+      Cout = subs(w2)  # clip outside poly
+      Cin = subs(w3)  # clip inside poly
+
+    """
+    if w0.size == 0:
+        print("Empty array.")
+        return []
+    out = []
+    sub = [w0[0] - 1, w0[0]]
+    for cnt, i in enumerate(w0[1:], 0):
+        prev = w0[cnt]
+        if i - prev == 1:
+            sub.append(i)
+        else:
+            sub.append(prev + 1)
+            out.append(sub)
+            sub = [i - 1, i]
+    if cnt == len(w0) - 2:
+        if len(sub) >= 2:
+            sub.append(i + 1)
+        out.append(sub)
+    if as_array:
+        if len(out) >= 1:
+            out = np.concatenate([np.array(i) for i in out])
+    return out
+
+
 # ---- (3) add intersection points
 #
 def add_intersections(p0, p1, polygons=[True, True]):
@@ -497,32 +515,97 @@ def add_intersections(p0, p1, polygons=[True, True]):
 
     Requires
     --------
-    `_add_pnts_`, `_wn_clip_`
-     _add_pnts_(p0, p1, x_pnts, whr)
+    `_add_pnts_`, `_del_seq_pnts_`, `_w_`, `_wn_clip_`
 
     Returns
     -------
-    The poly features rotated to the first intersection point (`p0_n, p1_n`),
-    their respective indices from the start (`id_01`) and the intersection
-    points (`x_pnts`).
+    The poly features:
+      - rotated to the first intersection point (`p0_n, p1_n`),
+      - their respective indices from the start (`id_01`),
+      - the intersection points (`x_pnts`),
+      - the classified indices for each polygon as to whether the points are
+        outside, on or inside the other
+
+    p0_n, p1_n : arrays
+        The input arrays, rotated to their first intersection point and those
+        points added to their perimeter.
+
+    x_pnts : array
+        The intersection points with sequential duplicates removed.
+
+    id_01 : array
+        Where the polygons intersect with p0, p1 representing the ids in their
+        respective column.
+
+    p0_ioo, p1_ioo : arrays
+        Poly id values and whether the point is outside the other (-1), an
+        intersection point on the boundary (0) or inside the other polygon (1).
+
+    Example
+    -------
+    Using `E` and `d0_` as `p0_` and `p1_`::
+
+        w0 =  np.nonzero(p0_ioo[:, 1] <= 0)[0]  # outside and on
+        z0 = p0_n[w0]
+        w1 =  np.nonzero(p1_ioo[:, 1] >= 0)[0]  # inside and on
+        z1 = p1_n[w1]
+        z0_id, z1_id = np.nonzero((z0 == z1[:, None]).all(-1))
+        id_s10 = np.concatenate((z0_id[:, None], z1_id[:, None]), axis=1)  # or
+        id_s01 = np.concatenate((z1_id[:, None], z0_id[:, None]), axis=1)
+        id_s01srt = id_s01[np.argsort(id_s01[:, 0])]
+        plot_polygons([z0, z1])
     """
+    def _classify_(p0_, p1_, id_):
+        """Return poly points classified as inside, on or outside."""
+        p_ids = np.arange(0, p0_.shape[0])
+        p_neq = sorted(list(set(p_ids).difference(set(id_))))
+        p_neq = np.array(p_neq)  # convert to array
+        z = p0_[p_neq]  # check the points not on, but may be in or out
+        p_w = _w_(z, p1_, False)  # use _w_ from _wn_clip_
+        p_i = np.nonzero(p_w)[0]
+        p_o = np.nonzero(p_w + 1)[0]
+        p_in = p_neq[p_i]   # in ids
+        p_out = p_neq[p_o]  # out ids
+        p_ioo = np.zeros(p0_.shape, dtype='int')  # create the output indices
+        p_ioo[:, 0] = p_ids  # p0 ids (i)n (o)ut (o)n -> ``ioo``
+        p_ioo[p_in, 1] = 1
+        p_ioo[p_out, 1] = -1
+        return p_ioo
+    # --
+    # id0, id1 : where p0_n, p1_n are equal
+    # p0_neq, p1_neq : p0_n, p1_n not equal, may be in or out
+    # p0_i, p1_i   : p0_n, p1_n in their counterpart
     is_0, is_1 = polygons
+    p0, p1 = _roll_([p0, p1])  # roll the arrays so they are closest to LL
+    # -- get intersection information
     vals = _wn_clip_(p0, p1, all_info=True)
     x_pnts, pInc, cInp, x_type, whr = vals
-    # args = _node_type_(pInc, cInp, a0, a1, x_pnts)
-    # px_in_c, cx_in_p, p_in_c, c_in_p, c_eq_p, c_eq_x, p_eq_c, p_eq_x = args
     p0_n, p1_n = _add_pnts_(p0, p1, x_pnts, whr)
     p0_n = _del_seq_pnts_(np.concatenate((p0_n), axis=0), poly=is_0)
     p1_n = _del_seq_pnts_(np.concatenate((p1_n), axis=0), poly=is_1)
-    # -- locate roll coordinates
+    x_pnts = _del_seq_pnts_(x_pnts, False)  # True, if wanting a polygon
+    # try rolling the x_pnts closest to its lower left
+    x_pnts = _roll_(x_pnts)[0]
+    # -- locate the roll coordinates
     r0 = np.nonzero((x_pnts[0] == p0_n[:, None]).all(-1).any(-1))[0]
     r1 = np.nonzero((x_pnts[0] == p1_n[:, None]).all(-1).any(-1))[0]
     v0, v1 = r0[0], r1[0]
     p0_n = np.concatenate((p0_n[v0:-1], p0_n[:v0], [p0_n[v0]]), axis=0)
     p1_n = np.concatenate((p1_n[v1:-1], p1_n[:v1], [p1_n[v1]]), axis=0)
+    # -- fix the id pairing
+    p0N = len(p0_n) - 1
+    p1N = len(p1_n) - 1
     id0, id1 = np.nonzero((p1_n == p0_n[:, None]).all(-1))
-    id_01 = np.concatenate((id0[:, None], id1[:, None]), axis=1)
-    return p0_n, p1_n, id_01, x_pnts
+    whr0 = np.nonzero(id0 == p0N)[0]
+    whr1 = np.nonzero(id1 == p1N)[0]
+    id0[whr0] = 0
+    id1[whr1] = 0  # slice off the first and last
+    id_01 = np.concatenate((id0[:, None], id1[:, None]), axis=1)[1:-1]
+    id_01[-1] = [p0N, p1N]
+    #
+    p0_ioo = _classify_(p0_n, p1_n, id0)
+    p1_ioo = _classify_(p1_n, p0_n, id1)
+    return p0_n, p1_n, id_01, x_pnts, p0_ioo, p1_ioo
 
 
 # ---- (4) clip polygons
@@ -541,7 +624,8 @@ def clip_poly(poly, clp, as_geo=False):
     --------
     `npg_helpers` : `a_eq_b`
 
-    `_roll_`, `_wn_clip_`, `_node_type_`, `_add_pnts_`, `_del_seq_pnts_
+    local helpers : `_roll_`, `_wn_clip_`, `_node_type_`, `_add_pnts_`,
+    `_del_seq_pnts_`
     """
 
     def _bits_(i0, i1, in_, seen_):
@@ -563,6 +647,20 @@ def clip_poly(poly, clp, as_geo=False):
         ids = sorted(list(r.intersection(in_).difference(seen_)))
         return ids
 
+    def prePC(i0_, i1_, cN, j0_, j1_, pN, pinside, cinside):
+        """Determine pre `p` and `c` points."""
+        preP, preC = [], []
+        i1_ = 0 if i1_ in [i1_, cN] else i1_  # clp first/last point check
+        j1_ = 0 if j1_ in [j1_, pN] else j1_  # poly first/last point check
+        #
+        # -- add preceeding pinside points
+        if j0_ > 0 and j1_ < j0_:
+            preP = [m for m in range(j1_, j0_ + 1) if m in pinside]
+        # -- add preceeding cinside points
+        if i0_ > 0 and i1_ < i0_:
+            preC = [m for m in range(i1_, i0_ + 1) if m in cinside]
+        return preP, preC
+
     # -- quick bail 1
     bail = a_eq_b(poly, clp).all()  # from npg_helpers
     if bail:
@@ -573,133 +671,180 @@ def clip_poly(poly, clp, as_geo=False):
     #
     # -- Returns the intersections, the rolled input polygons, the new polygons
     #    and how the points in both relate to one another.
-    result = _prepare_([poly, clp], roll=False, polygons=[True, True])
-    x_pnts, pl, cl, pl_new, cl_new, args = result
-    px_in_c, p_in_c, p_eq_c, p_eq_x, cx_in_p, c_in_p, c_eq_p, c_eq_x = args
+    pl_n, cl_n, id_01, x_pnts, pl_ioo, cl_ioo = add_intersections(poly, clp)
+    #
+    srt = np.argsort(id_01[:, 1])
+    inCinP = id_01[srt][:, [1, 0]]
+    #
+    w0 = pl_ioo[pl_ioo[:, 1] < 0, 0]  # slice the indices where pl_ioo < 0
+    w1 = pl_ioo[pl_ioo[:, 1] > 0, 0]  # slice the indices where pl_ioo > 0
+    w2 = cl_ioo[cl_ioo[:, 1] < 0, 0]  # slice the indices where cl_ioo < 0
+    w3 = cl_ioo[cl_ioo[:, 1] > 0, 0]  # slice the indices where cl_ioo > 0
+    #
+    p_out_on = _in_out_(w0, as_array=True)  # poly outside clip
+    p_in_on = _in_out_(w1, as_array=True)   # poly inside clip
+    c_out_on = _in_out_(w2, as_array=True)  # clip outside poly
+    c_in_on = _in_out_(w3, as_array=True)   # clip inside poly
+    #
+    pinside = sorted(list(set(p_in_on).union(inCinP[:, 1])))
+    cinside = sorted(list(set(c_in_on).union(inCinP[:, 0])))
+    # result = _prepare_([poly, clp], roll=False, polygons=[True, True])
+    # x_pnts, pl, cl, pl_new, cl_new, args = result
+    # px_in_c, p_in_c, p_eq_c, p_eq_x, cx_in_p, c_in_p, c_eq_p, c_eq_x = args
     #
     # -- locate first intersection and roll geometry to it.
-    r0 = np.nonzero((x_pnts[0] == pl_new[:, None]).all(-1).any(-1))[0]
-    r1 = np.nonzero((x_pnts[0] == cl_new[:, None]).all(-1).any(-1))[0]
-    fix_out = []
-    out2 = []
-    nums = [r0[0], r1[0]]
+    # r0 = np.nonzero((x_pnts[0] == pl_new[:, None]).all(-1).any(-1))[0]
+    # r1 = np.nonzero((x_pnts[0] == cl_new[:, None]).all(-1).any(-1))[0]
+    # fix_out = []
+    # out2 = []
+    # nums = [r0[0], r1[0]]
     # --
-    fixes = [[px_in_c, p_in_c, p_eq_c, p_eq_x],
-             [cx_in_p, c_in_p, c_eq_p, c_eq_x]]
-    for cnt, ar in enumerate([pl_new, cl_new]):
-        num = nums[cnt]
-        fix = fixes[cnt]
-        tmp = np.concatenate((ar[num:-1], ar[:num], [ar[num]]), axis=0)
-        fix_out.append(tmp)
-        new = []
-        for i in fix:
-            if i:
-                v = [j + num for j in i]
-                v = [i - 1 if i < 0 else i for i in v]
-                new.append(v)
-            else:
-                new.append(i)
-        out2.append(new)
-    #
-    # -- rolled output and point locations fixed
-    pl_r, cl_r = fix_out  # temporary, renamed down further
-    px_in_c_1, p_in_c_1, p_eq_c_1, p_eq_x_1 = out2[0]
-    cx_in_p_1, c_in_p_1, c_eq_p_1, c_eq_x_1 = out2[1]
-    # --
-    z0 = np.nonzero((x_pnts == cl_r[:, None]).all(-1).any(-1))[0]
-    z1 = np.nonzero((cl[c_in_p] == cl_r[:, None]).all(-1).any(-1))[0]
-    z1a = np.nonzero((cl[c_eq_x] == cl_r[:, None]).all(-1).any(-1))[0]
-    idx0 = sorted(list(set(np.concatenate((z0, z1, z1a)))))
-    # --
-    z2 = np.nonzero((x_pnts == pl_r[:, None]).all(-1).any(-1))[0]
-    z3 = np.nonzero((pl[p_in_c] == pl_r[:, None]).all(-1).any(-1))[0]
-    z3a = np.nonzero((pl[p_eq_x] == pl_r[:, None]).all(-1).any(-1))[0]
-    idx1 = sorted(list(set(np.concatenate((z2, z3, z3a)))))
-    #
-    # -- mask those that are in, out or on
-    cl_n = cl_r[idx0]  # cl, with just the intersection and `in` points
-    pl_n = pl_r[idx1]
+    # fixes = [[px_in_c, p_in_c, p_eq_c, p_eq_x],
+    #          [cx_in_p, c_in_p, c_eq_p, c_eq_x]]
+    # for cnt, ar in enumerate([pl_new, cl_new]):
+    #     num = nums[cnt]
+    #     fix = fixes[cnt]
+    #     tmp = np.concatenate((ar[num:-1], ar[:num], [ar[num]]), axis=0)
+    #     fix_out.append(tmp)
+    #     new = []
+    #     for i in fix:
+    #         if i:
+    #             v = [j + num for j in i]
+    #             v = [i - 1 if i < 0 else i for i in v]
+    #             new.append(v)
+    #         else:
+    #             new.append(i)
+    #     out2.append(new)
+    # #
+    # # -- rolled output and point locations fixed
+    # pl_r, cl_r = fix_out  # temporary, renamed down further
+    # px_in_c_1, p_in_c_1, p_eq_c_1, p_eq_x_1 = out2[0]
+    # cx_in_p_1, c_in_p_1, c_eq_p_1, c_eq_x_1 = out2[1]
+    # # --
+    # z0 = np.nonzero((x_pnts == cl_r[:, None]).all(-1).any(-1))[0]
+    # z1 = np.nonzero((cl[c_in_p] == cl_r[:, None]).all(-1).any(-1))[0]
+    # z1a = np.nonzero((cl[c_eq_x] == cl_r[:, None]).all(-1).any(-1))[0]
+    # idx0 = sorted(list(set(np.concatenate((z0, z1, z1a)))))
+    # # --
+    # z2 = np.nonzero((x_pnts == pl_r[:, None]).all(-1).any(-1))[0]
+    # z3 = np.nonzero((pl[p_in_c] == pl_r[:, None]).all(-1).any(-1))[0]
+    # z3a = np.nonzero((pl[p_eq_x] == pl_r[:, None]).all(-1).any(-1))[0]
+    # idx1 = sorted(list(set(np.concatenate((z2, z3, z3a)))))
+    # #
+    # # -- mask those that are in, out or on
+    # cl_n = cl_r[idx0]  # cl, with just the intersection and `in` points
+    # pl_n = pl_r[idx1]
     #
     cN = len(cl_n) - 1
     pN = len(pl_n) - 1
     # --
     # inside points for both
-    inC, inP = np.where((pl_n == cl_n[:, None]).all(-1))
-    inCinP = np.concatenate((inC[None, :], inP[None, :])).T
-    cinside = np.nonzero((pl_n != cl_n[:, None]).any(-1).all(-1))[0]
-    pinside = np.nonzero((cl_n != pl_n[:, None]).any(-1).all(-1))[0]
+    # inC, inP = np.where((pl_n == cl_n[:, None]).all(-1))
+    # inCinP = np.concatenate((inC[None, :], inP[None, :])).T
+    # cinside = np.nonzero((pl_n != cl_n[:, None]).any(-1).all(-1))[0]
+    # pinside = np.nonzero((cl_n != pl_n[:, None]).any(-1).all(-1))[0]
     #
     # -- make sure first intersection is added
     #
-    whr0 = np.nonzero(inCinP[:, 0] == cN)[0]
-    whr1 = np.nonzero(inCinP[:, 1] == pN)[0]
-    inCinP[whr0, 0] = 0
-    inCinP[whr1, 1] = 0
-    inCinP = inCinP[1:-1]  # strip off one of the duplicate start/end 0`s
+    # whr0 = np.nonzero(inCinP[:, 0] == cN)[0]
+    # whr1 = np.nonzero(inCinP[:, 1] == pN)[0]
+    # inCinP[whr0, 0] = 0
+    # inCinP[whr1, 1] = 0
+    # inCinP = inCinP[1:-1]  # strip off one of the duplicate start/end 0`s
     #
-    prev = inCinP[0]      # -- set the first `previous` for enumerate
+    # preP, preC = prePC(i0_, i1_, cN, j0_, j1_, pN, pinside, cinside)
+    # prev = inCinP[0]      # -- set the first `previous` for enumerate
+    # if preP and preC:
+    #     print("\nBoth have preceeding points. \n")
+    # elif preP:
+    #     out.extend(pl_n[preP])
+    #     out.append(pl_n[j0_])
+    #     p_seen.extend(preP + [j0_, j1_])
+    #     c_seen.append(i0_)
+    # elif preC:
+    #     out.extend(cl_n[preC])
+    #     out.append(cl_n[i0_])
+    #     c_seen.extend(preC + [i0_, i1_])
+    #     p_seen.append(j0_)
+    # else:
+    #     # c_seen.append(i1_)
+    #     # p_seen.append(j1_)
+    #     c_seen.extend([i0_, i1_])
+    #     p_seen.extend([j0_, j1_])
+    prev = inCinP[0]
     ic = sorted(cinside)  # -- use the equivalent of p_in_c, c_in_p
     ip = sorted(pinside)
     close = False
     null_pnt = np.array([np.nan, np.nan])
     out, p_seen, c_seen = [], [], []
-    for cnt, p in enumerate(inCinP[1:-1], 1):  # enumerate from inCinP[1:]
+    out = [cl_n[0]]
+    for cnt, p in enumerate(inCinP[1:], 1):  # enumerate from inCinP[1:]
+        p = inCinP[cnt]
         i_c, j_c = p       # current ids, this is an intersection point
         i_p, j_p = prev    # previous ids
         d0, d1 = p - prev  # differences in ids
         sub, p_a, c_a = [], [], []
         # --
-        if i_p == 0:
-            out.append(cl_n[i_p])  # already added, unless i_c is first, 0
+        # if i_p == 0:
+        #     out.append(cl_n[i_p])  # already added, unless i_c is first, 0
         # --
         if d0 == 0:
             if j_c not in p_seen:
                 out.append(cl_n[i_p])
+                c_seen.append(i_p)
         elif d0 == 1:
             if d1 == 1:
                 if j_c not in p_seen:  # same point
                     sub.append(cl_n[i_c])  # in original
+                    c_seen.append(i_c)
             elif d1 < 0:  # negative so can't use `_bits_`
                 if j_c not in p_seen:
                     sub.append(pl_n[j_c])
+                    p_seen.append(j_c)
             elif d1 > 1:  # this may close a sub-polygon
-                if j_c not in p_seen:  # and cnt < 2 :   # cludge
+                if i_c not in c_seen:
+                    sub.append(cl_n[i_c])
+                    c_seen.append(i_c)
+                if j_c not in p_seen and cnt > 1:   # cludge
                     p_a = _bits_(j_p, j_c, pinside, p_seen)  # !!!!!
                     if d1 > 2 and cnt > 2 and len(p_a) == 0:  # check
                         sub.append(null_pnt)  # this works with E, d0_
                     if p_a:  # needed for edgy1, eclip
                         sub.extend(pl_n[p_a])
+                        p_seen.extend(p_a)
+                elif cnt == 1:
                     sub.append(cl_n[i_c])  # append cl_n[i_c] or pl_n[j_c]
-                if j_c + 1 in p_seen:  # if the next point was seen, close out
-                    sub.extend([pl_n[j_c + 1], null_pnt])
-                    p_seen.append(j_c)  # add the index before decreasing
-                    j_c -= 1
-                    close = True
-                elif j_c + 1 in ip:
-                    # same as
-                    # _bits_(j_c + 1, pN, ip, p_seen)
-                    p_a = []  # poly points to add
-                    st = j_c
-                    for i in ip:
-                        if i - st == 1:
-                            p_a.append(i)
-                            st = i
-                        else:
-                            break
-                    if p_a:
-                        sub.extend(pl_n[p_a])
-                        nxt = p_a[-1] + 1
-                        if nxt in inCinP[:, 1]:
-                            sub.append(pl_n[nxt])
-                            p_a.append(nxt)
-                        close = True
-                if i_c + 1 in ic:
-                    sub.append(cl_n[i_c + 1])
-                    c_a.append(i_c + 1)
-                # --
-                if close:
-                    sub.append(null_pnt)
-                    close = not close
+                    c_seen.append(i_c)
+                # if j_c + 1 in p_seen:  # if the next point was seen, close out
+                #     sub.extend([pl_n[j_c + 1], null_pnt])
+                #     p_seen.append(j_c)  # add the index before decreasing
+                #     j_c -= 1
+                #     close = True
+                # elif j_c + 1 in ip:
+                #     # same as
+                #     # _bits_(j_c + 1, pN, ip, p_seen)
+                #     p_a = []  # poly points to add
+                #     st = j_c
+                #     for i in ip:
+                #         if i - st == 1:
+                #             p_a.append(i)
+                #             st = i
+                #         else:
+                #             break
+                #     if p_a:
+                #         sub.extend(pl_n[p_a])
+                #         nxt = p_a[-1] + 1
+                #         if nxt in inCinP[:, 1]:
+                #             sub.append(pl_n[nxt])
+                #             p_a.append(nxt)
+                #         close = True
+                # if i_c + 1 in ic:
+                #     sub.append(cl_n[i_c + 1])
+                #     c_a.append(i_c + 1)
+                # # --
+                # if close:
+                #     sub.append(null_pnt)
+                #     close = not close
         # --
         elif d0 > 1:
             if d1 == 1:
@@ -707,36 +852,46 @@ def clip_poly(poly, clp, as_geo=False):
                 # sub.append(cl_n[i_c])  # only if d0 previous == 1 ????
                 sub.extend(cl_n[c_a])
                 sub.append(cl_n[i_c])  # edgy1, eclip
+                c_seen.extend(c_a)
+                c_seen.append(i_c)
                 # sub.append(pl_n[j_c])
             elif d1 < 0:
                 c_a = _bits_(i_p, i_c, ic, c_seen)
                 sub.extend(cl_n[c_a])
                 sub.append(cl_n[i_c])  # in clip_poly2
+                c_seen.extend(c_a)
+                c_seen.append(i_c)
             elif d1 > 1:
                 c_a = _bits_(i_p, i_c, ic, c_seen)
                 if c_a:
                     sub.extend(cl_n[c_a])
+                    c_seen.extend(c_a)
                 sub.append(cl_n[i_c])
+                c_seen.append(i_c)
         # --
         elif d0 < 0:  # needs fixing with d1==1, d1<0, d1>0
             if i_c == 0 and i_p == cN - 1:  # second last connecting to first
                 p_a = _bits_(j_p, pN, pinside, p_seen)
                 sub.extend(pl_n[p_a])
+                p_seen.extend(p_a)
                 # sub.append(pl_n[pN])  # commented out 2023-03-19 for E, d0_
             elif i_c == 0 and cnt == len(inCinP) - 2:  # last slice
                 c_a = _bits_(i_p, cN, cinside, c_seen)
                 sub.extend(cl_n[c_a])
                 sub.append(cl_n[i_c])
+                c_seen.extend(c_a)
+                c_seen.append(i_c)
         else:
             if i_c not in c_seen:
                 sub.append(cl_n[i_c])
+                c_seen.append(i_c)
             # if i_c not in c_seen:  # not in clip_poly2
             #     sub.append(cl_n[i_c])
         #
-        c_seen.extend([i_c, i_p])
-        p_seen.extend([j_c, j_p])
-        c_seen.extend(c_a)
-        p_seen.extend(p_a)
+        # c_seen.extend([i_c, i_p])
+        # p_seen.extend([j_c, j_p])
+        # c_seen.extend(c_a)
+        # p_seen.extend(p_a)
         # --
         out.extend(sub)  # add the sub array if any
         prev = p         # swap current point to use as previous in next loop
@@ -781,333 +936,7 @@ def clip_poly(poly, clp, as_geo=False):
     # out, final = clip_poly(p00, c00)
 
 
-# ---- (5) difference polygons
-#
-def erase_poly(poly, clp, as_geo=True):
-    """Return the symmetrical difference between two polygons, `poly`, `clp`.
-
-    Parameters
-    ----------
-    poly, clp : array_like
-        `poly` is the polygon being differenced by polygon `clp`
-
-    Requires
-    --------
-    `npg_helpers` : `a_eq_b`
-
-    `_roll_`, `_wn_clip_`, `_node_type_`, `_add_pnts_`, `_del_seq_pnts_
-    """
-    def prePC_out(i0_, i1_, cN, j0_, j1_, pN):
-        """Determine pre `p` and `c` points."""
-        preP, preC = [], []
-        i1_ = 0 if i1_ in [i1_, cN] else i1_  # clp first/last point check
-        j1_ = 0 if j1_ in [j1_, pN] else j1_  # poly first/last point check
-        #
-        # -- add preceeding pinside points
-        if j0_ > 0 and j1_ < j0_:
-            preP = [m for m in range(j1_, j0_ + 1) if m in p_outside]
-        # -- add preceeding cinside points
-        if i0_ > 0 and i1_ < i0_:
-            preC = [m for m in range(i1_, i0_ + 1) if m in c_outside]
-        return preP, preC
-
-    def _bits_(i0, i1, in_, seen_):
-        """Return indices which are in `in_` and not in `seen_`.
-
-        Parameters
-        ----------
-        i0, i1 : integers
-        in_, seen_ : list / array
-            These are the values in an `inclusion` being checked if they
-            have not been `seen` yet.
-
-        Notes
-        -----
-        >>> p_add = [m for m in range(j_p, j_c + 1)
-        ...          if m in ip and m not in p_seen]
-
-        """
-        r = set(range(i0, i1 + 1))
-        ids = sorted(list(r.intersection(in_).difference(seen_)))
-        return ids
-
-    # -- Returns the intersections, the rolled input polygons, the new polygons
-    #    and how the points in both relate to one another.
-    result = _prepare_([poly, clp], roll=False, polygons=[True, True])
-    x_pnts, pl, cl, pl_new, cl_new, args = result
-    px_in_c, p_in_c, p_eq_c, p_eq_x, cx_in_p, c_in_p, c_eq_p, c_eq_x = args
-    #
-    # -- locate roll coordinates
-    r0 = np.nonzero((x_pnts[0] == pl_new[:, None]).all(-1).any(-1))[0]
-    r1 = np.nonzero((x_pnts[0] == cl_new[:, None]).all(-1).any(-1))[0]
-    fix_out = []
-    out2 = []
-    nums = [r0[0], r1[0]]
-    # --
-    fixes = [[px_in_c, p_in_c, p_eq_c, p_eq_x],
-             [cx_in_p, c_in_p, c_eq_p, c_eq_x]]
-    for cnt, ar in enumerate([pl_new, cl_new]):
-        num = nums[cnt]
-        fix = fixes[cnt]
-        tmp = np.concatenate((ar[num:-1], ar[:num], [ar[num]]), axis=0)
-        fix_out.append(tmp)
-        new = []
-        for i in fix:
-            if i:
-                v = [j + num for j in i]
-                v = [i - 1 if i < 0 else i for i in v]
-                new.append(v)
-            else:
-                new.append(i)
-        out2.append(new)
-    #
-    # -- rolled output and point locations fixed
-    pl_r, cl_r = fix_out  # temporary, renamed down further
-    px_in_c_1, p_in_c_1, p_eq_c_1, p_eq_x_1 = out2[0]
-    cx_in_p_1, c_in_p_1, c_eq_p_1, c_eq_x_1 = out2[1]
-    # -- quick bail 2
-    # if len(x_pnts) == 0:
-    #     print("No intersection between `poly` and `clp`.")
-    #     return poly
-    #
-    # -- assemble the `cl` points that are in or on `pl`
-    cinp = cl_r[c_in_p_1]
-    z0 = np.nonzero((x_pnts == cl_r[:, None]).all(-1).any(-1))[0]
-    z1 = np.nonzero((cinp == cl_r[:, None]).all(-1).any(-1))[0]
-    idx0 = sorted(list(set(np.concatenate((z0, z1)))))
-    cl_n = cl_r[idx0]  # rotated and non inside points removed
-    #
-    # -- assemble the `pl` points that are outside of `cl`
-    nP = pl_r.shape[0]
-    pinc = pl[p_in_c]
-    z2 = np.nonzero((x_pnts == pl_r[:, None]).all(-1).any(-1))[0]
-    z3 = np.nonzero((pinc == pl_r[:, None]).all(-1).any(-1))[0]
-    poutc_ids = sorted(list(set(np.arange(nP)).difference(z3)))
-    # p_out = pl_r[poutc_ids]
-    # z3 = poutc_ids
-    idx1 = sorted(list(set(np.concatenate((z2, poutc_ids)))))
-    pl_n = pl_r[idx1]
-    # !!!!!!!!  works up to here 2023-03-23
-    cN = len(cl_n) - 1
-    pN = len(pl_n) - 1
-    # --
-    # inside points for both
-    inC, inP = np.where((pl_n == cl_n[:, None]).all(-1))
-    # try swapping
-    # inP1, inC1 = np.where((cl_n == pl_n[:, None]).all(-1))
-    # inPinC = np.concatenate((inP1[None, :], inC1[None, :])).T
-    inC[inC == cN] = 0
-    inP[inP == pN] = 0
-    inCinP = np.concatenate((inC[None, :], inP[None, :])).T
-    c_outside = np.nonzero((pl_n != cl_n[:, None]).any(-1).all(-1))[0]
-    p_outside = np.nonzero((cl_n != pl_n[:, None]).any(-1).all(-1))[0]
-    # --
-    # pl_n = np.copy(pl_rn)  # -- temporary until done
-    # cl_n = np.copy(cl_rn)  # -- pl_r, cl_r from above
-    #
-    #  previous setup for first loop
-    #
-    #  Determine preceeding points to first clip,  From working copy
-    i0_, j0_ = inCinP[0]   # i0i1[0]   first    with old i0i1 = to new inCinP
-    i1_, j1_ = inCinP[-1]  # i0i1[-1]  last
-    # preP, preC = prePC_out(i0_, i1_, cN, j0_, j1_, pN)  # changed 2023-03-15
-    # # ---- end from working copy
-    # # -- assemble
-    out, p_seen, c_seen = [], [], []
-    # #
-    # if preP and preC:
-    #     print("\nBoth have preceeding points. \n")
-    # elif preP:
-    #     out.extend(pl_n[preP])
-    #     out.append(pl_n[j0_])
-    #     p_seen.extend(preP + [j0_, j1_])
-    #     c_seen.append(i0_)
-    # elif preC:
-    #     out.extend(cl_n[preC])
-    #     out.append(cl_n[i0_])
-    #     c_seen.extend(preC + [i0_, i1_])
-    #     p_seen.append(j0_)
-    # else:
-    #     # c_seen.append(i1_)
-    #     # p_seen.append(j1_)
-    #     c_seen.extend([i0_, i1_])
-    #     p_seen.extend([j0_, j1_])
-    #
-    # -- make sure first intersection is added and end points renumbered to 0
-    #
-    # whr0 = np.nonzero(inCinP[:, 0] == cN)[0]
-    # whr1 = np.nonzero(inCinP[:, 1] == pN)[0]
-    # inCinP[whr0, 0] = 0
-    # inCinP[whr1, 1] = 0
-    #
-    out, p_seen, c_seen = [], [], []
-    prev = inCinP[0]  # -- set the first `previous` for enumerate
-    #
-    # ic = sorted(c_outside)  # -- use the equivalent of p_in_c, c_in_p
-    # ip = sorted(p_outside)
-    # close = False
-    null_pnt = np.array([np.nan, np.nan])
-    # --
-    # a small pause in the code to explore something different
-    #
-    pad = np.array([[cN, pN], [cN + 1, pN + 1]])
-    tmp = np.concatenate((inCinP, pad), axis=0)
-    k = np.argsort(tmp, 0)[:, 1]  # get the order and temporarily sort
-    inPinC = tmp[:, [1, 0]][k]    # slice to rearrange the columns
-    sl = np.diff(inPinC[:, 0]) > 0   # preceeding extra zeros need to be sliced
-    inPinC = inPinC[np.nonzero(sl)]
-    col = inPinC[:, 0]
-    ft_c = np.concatenate((col[:-1][:, None], col[1:][:, None]), axis=1)
-    row = inPinC[:, 1]
-    ft_r = np.concatenate((row[:-1][:, None], row[1:][:, None]), axis=1)
-    #
-    bits0 = []
-    for i in ft_c:
-        bits0.append(pl_n[i[0]: i[1] + 1])
-    #
-    bits1 = []
-    seen = []
-    for i in ft_r:
-        f, t = i
-        if t not in seen:
-            ra = np.arange(f, t + 1)
-            f0 = list(set(ra).difference(seen))
-            bits1.append(cl_n[f0])
-            seen.append(t)
-    all_bits = []
-    for cnt, b in enumerate(bits0):
-        all_bits.append([b, bits1[cnt][::-1]])
-    # test = [np.concatenate((i, i[0][None, :]), axis=0)
-    #         for i in bits0 if len(i) > 2]
-    # --
-    for cnt, p in enumerate(inCinP[1:8], 1):  # enumerate from inCinP[1:]
-        i_c, j_c = p       # current ids, this is an intersection point
-        i_p, j_p = prev    # previous ids
-        d0, d1 = p - prev  # differences in ids
-        sub, p_a, c_a = [], [], []
-        # --
-        if d0 == 0:
-            if i_c == 0 and cnt <= 2:  # prevent unwanted additions if
-                out.append(cl_n[i_c])  # already added, unless i_c is first, 0
-        # --
-        elif d0 == 1:
-            if d1 == 1:
-                if j_c not in p_seen:  # same point
-                    sub.append(cl_n[i_c])  # in original
-            # --
-            elif d1 < 0:  # negative so can't use `_bits_`
-                if -2 <= d1 < 0:  # one or 2 intervening outside points
-                    p_a = _bits_(j_c, j_p, p_outside, p_seen)
-                    if p_a:
-                        sub.extend(pl_n[p_a])
-                        sub.append(pl_n[j_c])  # p_a will be < j_c
-                    else:
-                        sub.append(pl_n[j_c])
-                elif j_c - 1 in p_outside:
-                    if j_c - 1 in p_seen:
-                        sub.extend([null_pnt, pl_n[j_p]])
-                    sub.extend(pl_n[[j_c, j_c - 1]])
-                    p_seen.append(j_c - 1)
-                    # if j_c + 1 in p_outside:  # close polygon potentially
-                    #     sub.append(null_pnt)
-            # --
-            elif d1 > 1:  # this may close a sub-polygon
-                p_a = _bits_(j_p, j_c, p_outside, p_seen)
-                chk = len(p_a) > 1 and (np.diff(p_a) == 1).all()
-                if j_p in p_seen and not chk:  # second time around
-                    sub.extend([null_pnt, pl_n[j_c]])
-                    # p_a = []
-                elif chk:
-                    sub.extend(pl_n[p_a])
-                    sub.append(pl_n[j_c])
-
-        # --
-        # elif d0 > 1:
-        #     if d1 == 1:
-        #         c_a = _bits_(i_p, i_c, ic, c_seen)
-        #         # sub.append(cl_n[i_c])  # only if d0 previous == 1 ????
-        #         sub.extend(cl_n[c_a])
-        #         sub.append(cl_n[i_c])  # edgy1, eclip
-        #         # sub.append(pl_n[j_c])
-        #     elif d1 < 0:
-        #         c_a = _bits_(i_p, i_c, ic, c_seen)
-        #         sub.extend(cl_n[c_a])
-        #         sub.append(cl_n[i_c])  # in clip_poly2
-        #     elif d1 > 1:
-        #         c_a = _bits_(i_p, i_c, ic, c_seen)
-        #         if c_a:
-        #             sub.extend(cl_n[c_a])
-        #         sub.append(cl_n[i_c])
-        # # --
-        # elif d0 < 0:  # needs fixing with d1==1, d1<0, d1>0
-        #     if i_c == 0 and i_p == cN - 1:  # second last connecting to first
-        #         p_a = _bits_(j_p, pN, pinside, p_seen)
-        #         sub.extend(pl_n[p_a])
-        #         # sub.append(pl_n[pN])  # commented out 2023-03-19 for E, d0_
-        #     elif i_c == 0 and cnt == len(inCinP) - 2:  # last slice
-        #         c_a = _bits_(i_p, cN, cinside, c_seen)
-        #         sub.extend(cl_n[c_a])
-        #         sub.append(cl_n[i_c])
-        # else:
-        #     if i_c not in c_seen:
-        #         sub.append(cl_n[i_c])
-            # if i_c not in c_seen:  # not in clip_poly2
-            #     sub.append(cl_n[i_c])
-        #
-        c_seen.extend([i_c, i_p])
-        p_seen.extend([j_c, j_p])
-        c_seen.extend(c_a)
-        p_seen.extend(p_a)
-        p_seen = sorted(list(set(p_seen)))
-        c_seen = sorted(list(set(c_seen)))
-        # --
-        out.extend(sub)  # add the sub array if any
-        prev = p         # swap current point to use as previous in next loop
-        #
-        # print("cnt {}\nout\n{}".format(cnt, np.asarray(out)))  # uncomment
-    # --
-    # -- post cleanup for trailing inside points
-    inC_0, inP_0 = prev
-    # c_missing = list(set(c_inside).difference(c_seen))
-    # p_missing = list(set(p_inside).difference(p_seen))
-    # if p_missing or c_missing:
-    #     # out.extend(pl_n[p_missing])
-    #     # out.extend(cl_n[c_missing])
-    #     msg = "\nMissed during processing clip {} poly {}"
-    #     print(msg.format(c_missing, p_missing))
-    # if pN + 1 == pl_n.shape[0]:
-    #     inP_0 = min(0, inP_0)
-    # postC, postP = postPC(inC_0, cN, inP_0, pN, cinside, pinside)
-    # if len(postC) > 0 or len(postP) > 0:
-    #     print("\nPost issue, stray points found {} {}".format(postC, postP))
-    # if postC:
-    #     out.extend(cl_n[postC])
-    # if postP:
-    #     out.extend(pl_n[postP])
-    #
-    out = np.asarray(out)
-    final = []
-    #
-    # -- check for sub-arrays created during the processing
-    whr = np.nonzero(np.isnan(out[:, 0]))[0]  # split at null_pnts
-    if len(whr) > 0:
-        ft = np.asarray([whr, whr + 1]).T.ravel()
-        subs = np.array_split(out, ft)
-        final = [i for i in subs if not np.isnan(i).all()]  # dump the nulls
-        tmp = []
-        for f in final:
-            if not (f[0] == f[-1]).all(-1):
-                f = np.concatenate((f, f[0][None, :]), axis=0)
-                tmp.append(f)
-        final = tmp
-    # --
-    # if as_geo:
-    #     return npg.arrays_to_Geo(final, kind=2, info=None, to_origin=False)
-    # return final, [out, subs, dups, pl_n, cl_n, xtras]
-    return out, final
-
-
-# ---- (6) split polygon
+# ---- (5) split polygon
 #
 def split_poly(poly, line):
     """Return polygon parts split by a polyline.
@@ -1184,7 +1013,7 @@ def split_poly(poly, line):
 
 
 # ---- Extras section --------------------------------------------------------
-def find_overlap_segments(arr, is_poly=True, return_all=True):
+def find_segment_overlaps(arr, is_poly=True, return_all=True):
     """Locate and remove overlapping segments in a polygon boundary.
 
     Notes
@@ -1220,73 +1049,6 @@ def find_overlap_segments(arr, is_poly=True, return_all=True):
         return final, [subs, idx_dup, dups]
     return final, []
 
-# i0_, j0_ = inCinP[0]   # i0i1[0]   first    with old i0i1 = to new inCinP
-# i1_, j1_ = inCinP[-1]  # i0i1[-1]  last
-# preP, preC = prePC(i0_, i1_, cN, j0_, j1_, pN)  # changed 2023-03-15
-# if preP and preC:
-#     print("\nBoth have preceeding points. \n")
-# elif preP:
-#     out.extend(pl_n[preP])
-#     out.append(pl_n[j0_])
-#     p_seen.extend(preP + [j0_, j1_])
-#     c_seen.append(i0_)
-# elif preC:
-#     out.extend(cl_n[preC])
-#     out.append(cl_n[i0_])
-#     c_seen.extend(preC + [i0_, i1_])
-#     p_seen.append(j0_)
-# else:
-#     # c_seen.append(i1_)
-#     # p_seen.append(j1_)
-#     c_seen.extend([i0_, i1_])
-#     p_seen.extend([j0_, j1_])
-
-
-def prePC(i0_, i1_, cN, j0_, j1_, pN, pinside, cinside):
-    """Determine pre `p` and `c` points."""
-    preP, preC = [], []
-    i1_ = 0 if i1_ in [i1_, cN] else i1_  # clp first/last point check
-    j1_ = 0 if j1_ in [j1_, pN] else j1_  # poly first/last point check
-    #
-    # -- add preceeding pinside points
-    if j0_ > 0 and j1_ < j0_:
-        preP = [m for m in range(j1_, j0_ + 1) if m in pinside]
-    # -- add preceeding cinside points
-    if i0_ > 0 and i1_ < i0_:
-        preC = [m for m in range(i1_, i0_ + 1) if m in cinside]
-    return preP, preC
-
-
-def postPC(inC_0, cN, inP_0, pN, cinside, pinside):
-    """Determine pre `p` and `c` points."""
-    preC, preP = [], []
-    # -- add trailing cinside points
-    if inC_0 != 0:
-        preC = [m for m in range(inC_0, cN + 1) if m in cinside]
-    # -- add trailing pinside points
-    if inP_0 != 0:
-
-        preP = [m for m in range(inP_0, pN + 1) if m in pinside]
-    return preC, preP
-
-
-def _bits2_(i0, i1, in_, seen_):
-    """Return indices version 2."""
-    r = set(range(i0, i1 + 1))
-    ids = sorted(list(r.intersection(in_)))
-    return ids
-
-
-def _bits3_(i0, i1, in_=None, seen_=None):
-    """Return indices which are in `in_` and not in `seen_`."""
-    rev = False
-    step = 1 if i1 >= i0 else -1
-    rev = rev if step > 0 else ~rev
-    r = set(range(i0, i1 + step, step))
-    ids = sorted(list(r), reverse=rev)
-    r = set(r)
-    ids = sorted(list(r.intersection(in_).difference(seen_)))
-    return ids
 
 # ---- Final main section ----------------------------------------------------
 if __name__ == "__main__":

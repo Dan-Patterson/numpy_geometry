@@ -19,7 +19,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2021-06-30
+    2023-08-23
 
 Purpose
 -------
@@ -153,6 +153,7 @@ def make_row_format(dim=3, cols=5, a_kind='f', deci=1,
     Requires
     --------
     ``col_hdr``
+
     """
     if a_kind not in NUMS:
         a_kind = 'f'
@@ -212,7 +213,7 @@ def prn_(a, deci=2, width=120, prefix=". . "):
     if a.ndim <= 1:
         for i, arr in enumerate(a):
             print("{} ...\n{}".format(i, arr))
-        return
+        return None
     if a.ndim == 2:
         a = a.reshape((1,) + a.shape)
     # -- pull the 1st and 3rd dimension for 3D and 4D arrays
@@ -262,8 +263,9 @@ def prn_tbl(a, rows_m=20, names=None, deci=2, width=75):
 
     See Also
     --------
-    Alternate formats and information in `g.info` and `g.structure()` where
+    Alternate formats and information in `g.facts` and `g.structure` where
     `g` in a geo array.
+
     """
     # --
     if hasattr(a, "IFT"):  # geo array
@@ -305,14 +307,14 @@ def prn_tbl(a, rows_m=20, names=None, deci=2, width=75):
 
 
 def prn_geo(a, rows_m=100, names=None, deci=2, width=75):
-    """Print and format a structured array with a mixed dtype.
+    """Print and format a `geo` array with ring information.
 
     Derived from arraytools.frmts and the prn_rec function therein.
 
     Parameters
     ----------
     a : array
-        A structured/recarray.
+        A geo array.
     rows_m : integer
         The maximum number of rows to print.  If rows_m=10, the top 5 and
         bottom 5 will be printed.
@@ -326,6 +328,7 @@ def prn_geo(a, rows_m=100, names=None, deci=2, width=75):
     Requires
     --------
     `_ckw_`, `_col_format`
+
     """
     # --
     if names is None:
@@ -445,7 +448,7 @@ def prn_arrays(a, edgeitems=2):
                     head, tail = _ht_(val, _e)
                     ht = head + " ... " + tail
                     print("     {} - {}".format(k, ht))  # val.tolist()))
-    return
+    return None
 
 
 def prn_as_obj(arr, full=False):
@@ -468,35 +471,17 @@ def prn_as_obj(arr, full=False):
         # ids = np.unique(arr.IDs)
     elif isinstance(arr, np.ndarray):
         arrs = arr
-        # ids = np.arange(len(arrs))
     else:
         return prn_lists(arr)
     #
-    # fmt = [repr(arr).replace("([", "\n"+" "*7) for arr in arrs]
     fmt = [repr(arr) for arr in arrs]
     if full and hasattr(arr, "IFT"):
-        arr.structure()
+        arr.structure
     else:
         print("\nArray structure by sub-array.")
-# =============================================================================
-#     fr_to = [["[", " "],
-#              ["]]", ""],
-#              ["]", ""],
-#              ["(", ""],
-#              [",\n", "\n"],
-#              [")", "\n"],
-#              [", dtype=object", ""]
-#              ]
-# =============================================================================
     with np.printoptions(precision=2):
         for i, z in enumerate(fmt):
             print("{}...\n{}".format(i, z))
-# =============================================================================
-#         for fr, to in fr_to:
-#             z = z.replace(fr, to)
-#             z = z.rstrip()
-#         print("\n...{}\n{}".format(ids[i], z))
-# =============================================================================
     return None
 
 
@@ -536,6 +521,8 @@ def _svg(arr, as_polygon=True):
     -----
     Geometry must be expected to form polylines or polygons.
     IPython required.
+
+    If `arr` is a Geo array, this can be called by **arr.svg()**.
 
     >>> from IPython.display import SVG
 
@@ -655,7 +642,7 @@ def gms(arr):
                 # print("{}\n".format(dimensions(row, level + 1)))
                 yield from get_dimensions(row, level + 1)
         except TypeError:  # not an iterable
-            pass
+            pass  #
     # --
     dimensions = defaultdict(int)
     for level, length in get_dimensions(arr):

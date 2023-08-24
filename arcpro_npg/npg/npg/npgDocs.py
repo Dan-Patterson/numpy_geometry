@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2022-10-16
+    2023-02-17
 
 Purpose
 -------
@@ -54,6 +54,7 @@ __all__ = [
     'sort_by_extent_doc', 'array_IFT_doc', 'dirr_doc'
 ]
 
+Modified = "2023-02-17"
 author_date = r"""
 
 Author :
@@ -81,7 +82,7 @@ def _update_docstring(obj, doc):
 # ----------------------------------------------------------------------------
 # ---- (1) ...npGeo
 #
-npGeo_doc = author_date + r"""
+npGeo_doc = author_date + Modified + r"""
 
 Purpose
 -------

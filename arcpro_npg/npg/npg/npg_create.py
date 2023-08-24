@@ -14,7 +14,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2022-11-09
+    2023-08-23
 
 Purpose
 -------
@@ -84,11 +84,11 @@ import sys
 # from functools import wraps
 import numpy as np
 
-from npg import npg_plots
+from npg import npg_plots  # noqa
 from npg.npGeo import arrays_to_Geo
-from npg_helpers import _to_lists_
-from npg.npg_overlay import merge_
-from npg.npg_plots import plot_mixed, plot_polygons  # plot_2d, 
+from npg.npg_helpers import _to_lists_
+from npg.npg_overlay import merge_  # noqa
+from npg.npg_plots import plot_mixed, plot_polygons    # noqa # plot_2d, 
 
 np.set_printoptions(
     edgeitems=10, linewidth=120, precision=3, suppress=True, threshold=200,

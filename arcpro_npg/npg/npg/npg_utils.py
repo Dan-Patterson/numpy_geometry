@@ -568,7 +568,7 @@ def get_dirs(pth, ignore=['__pycache__']):
     -----
     Used by.. folders.
 
-    >>> get_dir('C:/arcpro_npg/npg')
+    >>> get_dirs('C:/arcpro_npg/npg')
     ['C:/arcpro_npg/npg/.pylint.d', 'C:/arcpro_npg/npg/data',
      'C:/arcpro_npg/npg/docs', 'C:/arcpro_npg/npg/Extra_scripts',
      'C:/arcpro_npg/npg/images', 'C:/arcpro_npg/npg/npg_2022',

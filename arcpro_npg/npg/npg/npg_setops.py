@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 # noqa: D205, D400
 """
------
-ndset
------
+----------
+npg_setops
+----------
 
 Script :
-    ndset.py
+    npg_setops.py
 Author :
     Dan_Patterson@carleton.ca
 Modified :
-    2021-05-29
+    2023-08-23
 
 Purpose
 -------

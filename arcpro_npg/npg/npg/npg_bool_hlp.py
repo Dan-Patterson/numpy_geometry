@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2023-04-13
+    2023-06-03
 
 Purpose
 -------
@@ -135,7 +135,7 @@ def _del_seq_pnts_(arr, poly=True):
     """
     # -- like np.unique but not sorted
     shp_in, dt_in = arr.shape, arr.dtype
-    # ar = np.ascontiguousarray(ar)
+    # arr = np.ascontiguousarray(arr)
     dt = [(f'f{i}', dt_in) for i in range(arr.shape[1])]
     tmp = arr.view(dt).squeeze()  # -- view data and reshape to (N,)
     # -- mask and check for sequential equality.
@@ -443,10 +443,8 @@ def prep_overlay(arrs, roll=True, polygons=[True, True]):
 
 # ---- (3) add intersection points
 #
-def add_intersections(p0, p1,
-                      roll_to_minX=True,
-                      polygons=[True, True],
-                      class_ids=True):
+def add_intersections(
+        p0, p1, roll_to_minX=True, polygons=[True, True], class_ids=True):
     """Return input polygons with intersections points added.
 
     Parameters
