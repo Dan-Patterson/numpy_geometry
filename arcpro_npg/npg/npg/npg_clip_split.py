@@ -259,7 +259,7 @@ def clip_poly(poly, clp, as_geo=False):
                 p_a = _bits_(j_p, pN, pinside, p_seen)
                 sub.extend(pl_n[p_a])
                 # sub.append(pl_n[pN])  # commented out 2023-03-19 for E, d0_
-            elif i_c == 0 and cnt == len(inCinP) - 2:  # last slice
+            elif i_c == 0 and cnt == len(inCinP) - 1:  # last slice was -1
                 c_a = _bits_(i_p, cN, cinside, c_seen)
                 sub.extend(cl_n[c_a])
                 sub.append(cl_n[i_c])
