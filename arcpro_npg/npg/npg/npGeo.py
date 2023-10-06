@@ -31,9 +31,6 @@ from npg import npg_min_circ as sc
 from npg.npg_helpers import (
     _angles_3pnt_, _area_centroid_, _bit_area_, _bit_crossproduct_,
     _bit_min_max_, _bit_length_, _rotate_, polyline_angles, uniq_1d)
-# import npg_io
-# import npg_prn
-
 
 from npg.npgDocs import (
     Geo_hlp, array_IFT_doc, dirr_doc, shapes_doc, parts_doc, get_shapes_doc,
@@ -57,7 +54,7 @@ TwoPI = np.pi * 2.0
 
 __all__ = [
     'Geo', 'is_Geo',
-    'roll_coords', 'array_IFT', 'arrays_to_Geo',
+    'roll_coords', 'roll_arrays', 'array_IFT', 'arrays_to_Geo',
     'Geo_to_arrays', 'Geo_to_lists', '_fill_float_array',
     'is_Geo', 'reindex_shapes', 'remove_seq_dupl', 'check_geometry',
     'dirr'
@@ -1050,9 +1047,30 @@ class Geo(np.ndarray):
         return uni
 
     def segment_polys(self, as_basic=True, shift_back=False, as_3d=False):
-        """Call `polys_to_segments`.  See `od_pairs` also."""
+        """Call `polys_to_segments`.
+
+        See Also
+        --------
+        `common_segments`, `od_pairs`, `fr_to_segments` and `to_fr_segments`
+        """
         return geom.polys_to_segments(self, as_basic=as_basic,
                                       to_orig=shift_back, as_3d=as_3d)
+
+    def fr_to_segments(self, as_basic=True, shift_back=False, as_3d=False):
+        """Return `from-to` points segments for poly* features as 2D array.
+
+        Call `polys_to_segments`.  See `segment_polys`.
+        """
+        return geom.polys_to_segments(self, as_basic=as_basic,
+                                      to_orig=shift_back, as_3d=as_3d)
+
+    def to_fr_segments(self, as_basic=True, shift_back=False, as_3d=False):
+        """Return to-from points segments to compare to fr_to_segments."""
+        b_vals = self.bits
+        # -- Do the concatenation
+        to_fr = np.concatenate(
+            [np.concatenate((b[1:], b[:-1]), axis=1) for b in b_vals], axis=0)
+        return to_fr
 
     def close_polylines(self, out_kind=1):
         """Produce closed-loop polylines (1) or polygons (2) from polylines.
@@ -2060,4 +2078,4 @@ Geo.sort_by_extent.__doc__ += sort_by_extent_doc
 # ---- == __main__ section ==
 if __name__ == "__main__":
     """optional location for parameters"""
-    # in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\Polygons"
+    # in_fc = r"C:\arcpro_npg\Project_npg\npgeom.gdb\Polygons"

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# noqa: D205, D400
+# noqa: D205, D208, D400
 r"""
 
 npg_utils
@@ -42,7 +42,7 @@ Retrieve function information::
        1   '''Do nothing'''
        2      pass
 
-get_modu :
+get_modulue_info :
     retrieve module info
 
 **info** :
@@ -270,7 +270,7 @@ def doc_func(func=None, verbose=True):
 # -----------------------------------------------------------------------
 # ---- (2) get_func .... code section ----
 def get_func(func, line_nums=True, output=False):
-    """Get function information (ie. for a def).
+    r"""Get function information (ie. for a def).
 
     Parameters
     ----------
@@ -296,9 +296,30 @@ def get_func(func, line_nums=True, output=False):
     Import the module containing the function and put the object name in
     without quotes...
 
-    >>> import npgeom as npg
-    >>> npg.get_func(get_func)  # returns this source code etc.
-    """
+    >>> import npg
+    >>> npg.npg_utils.get_func(get_func)  # returns this source code etc.
+
+    or a more elaborate one::
+
+        >>> npg.npg_utils.get_func(npg.npGeo.array_IFT)
+        -----------------------------------------------------------------
+        File path: ... C:\arcpro_npg\npg\npGeo.py
+        Function: .... array_IFT ....
+        Signature .... In [1]: array_IFT(in_arrays, shift_to_origin=False)
+        Line number... 1522
+        Defaults:  ... (False,)
+        kwdefaults: .. None
+        Variable names:
+            in_arrays, shift_to_origin, id_too, a_2d, subs,
+            cnt, p, kind, bits, sub, b_id, j, k, a_stack, ids,
+            part, id_prt, uni, idx, CL, i, too, frum,
+            pnt_nums, u, cnts, IFT, extent
+        Source code:
+        1522  def array_IFT(in_arrays, shift_to_origin=False):
+        ... etc ...
+
+        """
+    # --
     frmt = r"""
     -----------------------------------------------------------------
     File path: ... {}
@@ -309,7 +330,6 @@ def get_func(func, line_nums=True, output=False):
     kwdefaults: .. {}
     Variable names:
     {}
-
     Source code:
     {}
     -----------------------------------------------------------------

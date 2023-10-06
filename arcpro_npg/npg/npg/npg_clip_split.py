@@ -45,7 +45,7 @@ import sys
 import numpy as np
 import npg  # noqa
 from npg.npg_helpers import a_eq_b
-from npg_bool_hlp import _del_seq_pnts_, prep_overlay
+from npg.npg_bool_hlp import _del_seq_pnts_, prep_overlay
 from npg.npg_plots import plot_polygons  # noqa
 
 ft = {"bool": lambda x: repr(x.astype(np.int32)),

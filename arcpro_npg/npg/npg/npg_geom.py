@@ -1233,7 +1233,7 @@ def in_hole_check(pnts, geo):
     return out
 
 
-def _quad_(line):
+def which_quad(line):
     """Return the quadrant a vector lies in.
 
     >>> q = _quad_(line)

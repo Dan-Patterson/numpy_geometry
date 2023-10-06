@@ -16,7 +16,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2023-03-04
+    2023-10-02
 
 Purpose
 -------
@@ -769,6 +769,17 @@ def a_eq_b(a, b, atol=1.0e-8, rtol=1.0e-5, return_pnts=False):
     return w.squeeze()
 
 
+def _close_pnts_(a, b, tol=.0001, ret_whr=True):
+    """Alternate to `a_eq_b`. Returns indices or common points within `tol`."""
+    ba = np.abs(b - a[:, None])
+    whr = (ba.sum(axis=-1, keepdims=True) < tol).any(-1)
+    whr = np.nonzero(whr)
+    if ret_whr:
+        return whr
+    w0, w1 = whr[0], whr[1]
+    return a[w0], b[w1]
+
+
 def common_pnts(pnts, self, remove_common=True):
     """Check for coincident points between `pnts` and the Geo array.
 
@@ -823,11 +834,11 @@ def compare_geom(arr, look_for, unique=True, invert=False, return_idx=False):
     >>> a = np.array([[ 5.,  5.], [ 6.,  6.], [10., 10.], [12., 12.]])
     >>> b = np.array([[ 6.,  6.], [12., 12.]])
 
-    >>> compare_2d(a, b, invert=False)
+    >>> compare_geom(a, b, invert=False)
     ... array([[ 6.,  6.],
     ...        [12., 12.]])
 
-    >>> compare_2d(a, b, invert=True)
+    >>> compare_geom(a, b, invert=True)
     ... array([[ 5.,  5.],
     ...        [10., 10.]])
     """
