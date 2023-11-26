@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2023-09-26
+    2023-10-30
 
 Purpose
 -------
@@ -27,10 +27,10 @@ Functions for boolean operations on polygons:
     - erase
 
 """
-# pylint: disable=C0103,C0302,C0415
-# pylint: disable=E1101,E1121
-# pylint: disable=W0105,W0201,W0212,W0221,W0611,W0612,W0621
+# pylint: disable=C0103,C0201,C0209,C0302,C0415
 # pylint: disable=R0902,R0904,R0912,R0913,R0914,R0915
+# pylint: disable=W0105,W0201,W0212,W0221,W0611,W0612,W0613,W0621
+# pylint: disable=E0401,E0611,E1101,E1121
 
 import sys
 import copy
@@ -165,7 +165,8 @@ def erase_poly(poly, clp, as_geo=True):
     #    and how the points in both relate to one another.
     result = add_intersections(poly, clp,
                                roll_to_minX=True,
-                               polygons=[True, True],
+                               p0_pgon=True,
+                               p1_pgon=True,
                                class_ids=True)
     pl_n, cl_n, id_plcl, x_pnts, p_out, p_in, c_out, c_in = result
     # --
@@ -350,7 +351,7 @@ def erase_poly(poly, clp, as_geo=True):
     idx_all = np.nonzero(idx < 2)[0]     # symmetrical difference
     idx_p_out = np.nonzero(idx == 0)[0]  # pairwise erase
     idx_c_out = np.nonzero(idx != 0)[0]  # reverse pairwise erase
-    idx_c_in = np.nonzero(idx == 1)[0]  # clp ?? reverse pairwise erase
+    idx_c_in = np.nonzero(idx == 1)[0]   # clp ?? reverse pairwise erase
     #
     hole_ply = final[idx_hole] if len(idx_hole) > 0 else []
     symm_ply = final[idx_all]

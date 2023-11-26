@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2023-04-12
+    2023-11-03
 
 Purpose
 -------
@@ -36,10 +36,10 @@ Functions for boolean operations on polygons:
  A XOR B
 
 """
-# pylint: disable=C0103,C0302,C0415
-# pylint: disable=E1101,E1121
-# pylint: disable=W0105,W0201,W0212,W0221,W0611,W0612,W0621
+# pylint: disable=C0103,C0201,C0209,C0302,C0415
 # pylint: disable=R0902,R0904,R0912,R0913,R0914,R0915
+# pylint: disable=W0105,W0201,W0212,W0221,W0611,W0612,W0613,W0621
+# pylint: disable=E0401,E0611,E1101,E1121
 
 import sys
 import numpy as np
@@ -57,8 +57,8 @@ np.set_printoptions(
 
 script = sys.argv[0]
 
-__all__ = ['clip_poly', 'find_overlap_segments', 'split_poly']
-__helpers__ = ['del_seq_pnts', '_roll_', 'prep_overlay']
+__all__ = ['clip_poly', 'split_poly', 'find_overlap_segments']
+# __helpers__ = ['del_seq_pnts', '_roll_', 'prep_overlay']
 
 
 # ---- (1) clip polygons
@@ -109,7 +109,7 @@ def clip_poly(poly, clp, as_geo=False):
     #
     # -- Returns the intersections, the rolled input polygons, the new polygons
     #    and how the points in both relate to one another.
-    result = prep_overlay([poly, clp], roll=False, polygons=[True, True])
+    result = prep_overlay([poly, clp], roll=False, p0_pgon=True, p1_pgon=True)
     x_pnts, pl, cl, pl_new, cl_new, args = result
     px_in_c, p_in_c, p_eq_c, p_eq_x, cx_in_p, c_in_p, c_eq_p, c_eq_x = args
     #
@@ -341,7 +341,8 @@ def split_poly(poly, line):
     """
     #
     # -- (1) Prepare for splitting
-    result = prep_overlay([poly, line], roll=False, polygons=[True, False])
+    arrs = [poly, line]
+    result = prep_overlay(arrs, roll=False, p0_pgon=True, p1_pgon=True)
     # -- intersection points, arrays rolled to first intersection,
     #    rolled with intersections added on, optional arguments
     x_pnts, pl_roll, cl_roll, pl_, cl_, args = result

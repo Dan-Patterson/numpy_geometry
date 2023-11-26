@@ -64,11 +64,10 @@ References
 ----------
 None (yet).
 """
-# pylint: disable=C0103, C0302, C0415, E0611, E1136, E1121, R0904, R0914,
-# pylint: disable=W0201, W0212, W0221, W0612, W0621, W0105
-# pylint: disable=R0902
-
-# pylint: disable=R1710  # inconsistent-return-statements
+# pylint: disable=C0103,C0201,C0209,C0302,C0415
+# pylint: disable=R0902,R0904,R0912,R0913,R0914,R0915
+# pylint: disable=W0105,W0201,W0212,W0221,W0611,W0612,W0613,W0621
+# pylint: disable=E0401,E0611,E1101,E1121
 
 
 import sys
@@ -88,15 +87,13 @@ from npg import npGeo  # noqa
 from npg.npGeo import Geo
 # from npGeo import *
 
-# import arcpy
+import arcpy
 from arcpy import Array, Exists, Multipoint, Point, Polygon, Polyline
 
 from arcpy.da import (
     Describe, InsertCursor, SearchCursor, FeatureClassToNumPyArray,
     TableToNumPyArray)  # ExtendTable, NumPyArrayToTable,  UpdateCursor
 
-# from arcpy.geoprocessing import gp
-from arcpy.geoprocessing import env
 from arcpy.management import (
     AddField, CopyFeatures, CreateFeatureclass, Delete)  # DeleteFeatures
 
@@ -110,7 +107,7 @@ __all__ = [
     'fc_to_Geo', 'id_fr_to',                        # option 1, use this ***
     'Geo_to_arc_shapes', 'Geo_to_fc', 'view_poly',  # back to fc
     'make_nulls', 'fc_data', 'tbl_data',            # get attributes
-    'fc2na', 'array_poly', 'geometry_fc',
+    'fc2na', 'attr_to_npz', 'array_poly', 'geometry_fc',
     '_array_to_poly_', '_poly_to_array_',           # geometry to array
     '_poly_arr_', 'poly2array',                     # extras
     'fc_union', 'shp_dissolve', 'fc_dissolve'       # arcpy functions
@@ -358,7 +355,7 @@ def id_fr_to(a, oids):
         id_val = [oids[val]]  # a list for concatenation
         if n < 1:
             continue
-        elif n == 1:          # one found, use the next one
+        if n == 1:          # one found, use the next one
             val = w[0] + 1
         elif n == 2:          # two found, use the last one + 1
             key = w[-1]
@@ -414,6 +411,7 @@ def Geo_to_arc_shapes(geo, as_singlepart=True):
         The inputs may be nested and mixed in content.
         """
         aa = []
+        poly = None
         for pairs in a:
             sub = pairs[0]
             oid = pairs[1]
@@ -462,7 +460,7 @@ def Geo_to_fc(geo, gdb=None, name=None, kind=None, SR=None):
     # geo = geo.shift(dx, dy)
     polys = Geo_to_arc_shapes(geo, as_singlepart=True)
     out_name = gdb.replace("\\", "/") + "/" + name
-    wkspace = env.workspace = 'memory'  # legacy is in_memory
+    wkspace = arcpy.env.workspace = r'memory'  # legacy is in_memory
     tmp_name = r"memory\tmp"  # r"{}\{}".format(wkspace, "tmp")
     if Exists(tmp_name):
         Delete(tmp_name)
@@ -505,13 +503,12 @@ def view_poly(geo, id_num=1, view_as=2):
     z = [Array([Point(*i) for i in b]) for b in shp.bits]
     if view_as == 2:
         return Polygon(Array(z))
-    elif view_as == 1:
+    if view_as == 1:
         return Polyline(Array(z))
-    else:
-        zz = []
-        for i in z:
-            zz.extend(i)
-        return Multipoint(Array(zz))
+    zz = []
+    for i in z:
+        zz.extend(i)
+    return Multipoint(Array(zz))
 
 
 # ============================================================================
@@ -790,7 +787,7 @@ def geometry_fc(a, IFT, p_type=None, gdb=None, fname=None, sr=None):
         p_type = "POLYGON"
     out = array_poly(a, p_type.upper(), sr=sr, IFT=IFT)   # call array_poly
     name = gdb + "/" + fname
-    wkspace = env.workspace = 'memory'  # legacy is in_memory
+    wkspace = arcpy.env.workspace = r'memory'  # legacy is in_memory
     CreateFeatureclass(wkspace, fname, p_type, spatial_reference=sr)
     AddField(fname, 'ID_arr', 'LONG')
     with InsertCursor(fname, ['SHAPE@', 'ID_arr']) as cur:
@@ -963,7 +960,7 @@ def fc_union(in_fc, poly_type="polygon"):
     a = Array(arr)
     if poly_type == "polygon":
         return Polygon(a, SR)
-    elif poly_type == "polyline":
+    if poly_type == "polyline":
         return Polyline(a, SR)
     else:
         print("Not polygon or polyline")

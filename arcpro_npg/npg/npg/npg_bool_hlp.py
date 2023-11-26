@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2023-06-03
+    2023-10-30
 
 Purpose
 -------
@@ -27,7 +27,7 @@ Functions for boolean operations on polygons:
 
 """
 # pylint: disable=C0103,C0302,C0415
-# pylint: disable=E1101,E1121
+# pylint: disable=E0401,E1101,E1121
 # pylint: disable=W0105,W0201,W0212,W0221,W0611,W0612,W0621
 # pylint: disable=R0902,R0904,R0912,R0913,R0914,R0915
 
@@ -207,7 +207,7 @@ def _w_(a, b, all_info):
     b_num = (b_0 - b_1) + 0.0
     #
     # pnts in poly
-    chk1 = (y0_y2 >= 0.0)  # y above poly's first y value, per segment
+    chk1 = y0_y2 >= 0.0  # y above poly's first y value, per segment
     chk2 = np.less(y0, y3[:, None])  # y above the poly's second point
     chk3 = np.sign(a_num).astype(np.int32)
     pos = (chk1 & chk2 & (chk3 > 0)).sum(axis=0, dtype=np.int32)
@@ -261,7 +261,7 @@ def _wn_clip_(pnts, poly, all_info=True):
             u_b = (b_num / denom) + 0.0
             z0 = np.logical_and(u_a >= 0., u_a <= 1.)  # np.isfinite(u_a)`
             z1 = np.logical_and(u_b >= 0., u_b <= 1.)  # np.isfinite(u_b)
-            both = (z0 & z1)
+            both = z0 & z1
             xs = (u_a * x1_x0 + x0)[both]
             ys = (u_a * y1_y0 + y0)[both]
         x_pnts = []
@@ -374,18 +374,21 @@ def _node_type_(p_in_c, c_in_p, poly, clp, x_pnts):
     return px_in_c, p_in_c, p_eq_c, p_eq_x, cx_in_p, c_in_p, c_eq_p, c_eq_x
 
 
-def prep_overlay(arrs, roll=True, polygons=[True, True]):
+def prep_overlay(arrs, roll=True, p0_pgon=True, p1_pgon=True,):
     """Prepare arrays for overlay analysis.
 
     Parameters
     ----------
     arrs : list/tuple
+        arrs = [poly, line]
         The first geometry is the one being acted upon and the second is the
         one being used to overlay the first for operations such as clipping,
         splitting, intersection.
-    polygons : list/tuple
-        True, the input geometry is a polygon, False otherwise.
+    p0_pgon, p1_pgon : boolean
+        True, the input geometry is a polygon feature, False, for polyline.
         Some operations permit polygon and polyline inputs, so you can alter
+        `p0_pgon=True, p1_pgon=False]` if the first is a polygon and the
+        second a polyline.
 
     Requires
     --------
@@ -425,9 +428,9 @@ def prep_overlay(arrs, roll=True, polygons=[True, True]):
     # -- roll towards LL.  `_wn_clp_` gets pnts inside, on, outside each other
     if len(arrs) != 2:
         print("Two poly* type geometries expected.")
-        # return None
+        return None
     a0, a1 = arrs
-    is_0, is_1 = polygons
+    is_0, is_1 = p0_pgon, p1_pgon
     if roll:
         a0, a1 = _roll_(arrs)
     vals = _wn_clip_(a0, a1, all_info=True)
@@ -444,18 +447,18 @@ def prep_overlay(arrs, roll=True, polygons=[True, True]):
 # ---- (3) add intersection points
 #
 def add_intersections(
-        p0, p1, roll_to_minX=True, polygons=[True, True], class_ids=True):
+        p0, p1, roll_to_minX=True, p0_pgon=True, p1_pgon=True, class_ids=True):
     """Return input polygons with intersections points added.
 
     Parameters
     ----------
     p0, p1 : array_like
        The overlapping poly features.
-    polygons : list/tuple
+    p0_pgon, p1_pgon : boolean
         True, the input geometry is a polygon feature, False, for polyline.
         Some operations permit polygon and polyline inputs, so you can alter
-        `polygons=[True, False]` if the first is a polygon and the second a
-        polyline.
+        `p0_pgon=True, p1_pgon=False]` if the first is a polygon and the
+        second a polyline.
     roll_to_minX : boolean
         Select the intersection point with the minimum x-value.  This is used
         to roll the arrays.
@@ -470,10 +473,11 @@ def add_intersections(
 
     Returns
     -------
-    The poly features rotated to the first intersection point (`p0_n, p1_n`),
-    their respective indices from the start (`id_01`) and the intersection
-    points (`x_pnts`), and the classified indices for each polygon as to
-    whether the points are outside, on or inside the other
+    - The poly features rotated to the first intersection point (`p0_n, p1_n`),
+    - Their respective indices from the start (`id_01`),
+    - Intersection points (`x_pnts`),
+    - The classified indices for each polygon as to whether the points are
+      outside, on or inside the other.
 
     p0_n, p1_n : arrays
         The input arrays, rotated to their first intersection point and those
@@ -525,14 +529,14 @@ def add_intersections(
 
     def in_out_on(w0, p_sze):
         """Return the array indices as lists."""
-        if w0.size == 0:
-            # print("Empty array.")
+        if w0.size == 0:  # print("Empty array.")
             return []
-        elif len(w0) == 1:  # 2023-05-07
+        if len(w0) == 1:  # 2023-05-07
             val = w0.tolist()[0]
             vals = [val - 1, val, val + 1] if val > 0 else [val, val + 1]
             return vals
         out = []
+        cnt = 0
         sub = [w0[0] - 1, w0[0]]
         for cnt, i in enumerate(w0[1:], 0):
             prev = w0[cnt]
@@ -550,7 +554,7 @@ def add_intersections(
         return out
     # --
     #
-    is_0, is_1 = polygons
+    is_0, is_1 = p0_pgon, p1_pgon
     vals = _wn_clip_(p0, p1, all_info=True)
     x_pnts, pInc, cInp, x_type, whr = vals
     p0_n, p1_n = _add_pnts_(p0, p1, x_pnts, whr)

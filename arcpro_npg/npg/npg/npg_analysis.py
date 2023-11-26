@@ -13,7 +13,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2023-08-23
+    2023-11-03
 
 Purpose
 -------
@@ -28,10 +28,11 @@ References
 Derived from arraytools ``convex_hull, mst, near, n_spaced``
 
 """
-# pylint: disable=C0103  # invalid-name
-# pylint: disable=R0914  # Too many local variables
-# pylint: disable=R1710  # inconsistent-return-statements
-# pylint: disable=W0105  # string statement has no effect
+# pylint: disable=C0103,C0201,C0209,C0302,C0415
+# pylint: disable=R0902,R0904,R0912,R0913,R0914,R0915
+# pylint: disable=W0105,W0201,W0212,W0221,W0611,W0612,W0613,W0621
+# pylint: disable=E0401,E0611,E1101,E1121
+
 
 # import sys
 from textwrap import dedent
@@ -112,16 +113,12 @@ def n_check(a):  # N=3, order=True):
     ----------
     Two 2D array of X,Y coordinates required.  Parse your data to comply.
     """
-    has_err = False
     if isinstance(a, (list, tuple, np.ndarray)):
         if (hasattr(a[0], '__len__')) and (len(a[0]) == 2):
             return True
-        has_err = True
-    else:
-        has_err = True
-    if has_err:
-        print(n_check.__doc__)
         return False
+    print(n_check.__doc__)
+    return False
 
 
 def n_near(a, N=3, ordered=True, return_all=False):
@@ -289,24 +286,22 @@ def _x_sect_2(args):
     s02_y = p0[1] - p2[1]
     #
     # -- Second check ----   np.cross(p1-p0, p3-p2)
-    denom = (s10_x * s32_y - s32_x * s10_y)  # .item()
+    denom = s10_x * s32_y - s32_x * s10_y  # .item()
     if denom == 0.0:  # collinear
         return False, None
     #
     # -- Third check ----  np.cross(p1-p0, p0-p2)
     positive_denom = denom > 0.0  # denominator greater than zero
-    s_numer = (s10_x * s02_y - s10_y * s02_x)  # .item()
-#    if (s_numer < 0) == positive_denom:
-#        return False
+    s_numer = s10_x * s02_y - s10_y * s02_x  # .item()
     #
     # -- Fourth check ----  np.cross(p3-p2, p0-p2)
     t_numer = s32_x * s02_y - s32_y * s02_x
-#    if (t_numer < 0) == positive_denom:
-#        return False
     #
-    if ((s_numer > denom) == positive_denom) or \
-       ((t_numer > denom) == positive_denom):
+    if positive_denom in (s_numer > denom, t_numer > denom):
         return False, None
+    # if ((s_numer > denom) == positive_denom) or \
+    #    ((t_numer > denom) == positive_denom):
+    #     return False, None
     #
     # -- check to see if the intersection point is one of the input points
     # substitute p0 in the equation  These are the intersection points
@@ -625,8 +620,10 @@ def concave(points, k, pip_check=False):
         if (t_numer < 0) == den_gt0:
             return False
         #
-        if ((s_numer > denom) == den_gt0) or ((t_numer > denom) == den_gt0):
+        if den_gt0 in (s_numer > denom, t_numer > denom):
             return False
+        # if ((s_numer > denom) == den_gt0) or ((t_numer > denom) == den_gt0):
+        #     return False
         #
         # -- check if the intersection point is one of the input points
         t = t_numer / denom
@@ -641,7 +638,7 @@ def concave(points, k, pip_check=False):
     def _angle_(p0, p1, prv_ang=0):
         """Return the angle between two points and the previous angle, or."""
         ang = np.arctan2(p0[1] - p1[1], p0[0] - p1[0])
-        a0 = (ang - prv_ang)
+        a0 = ang - prv_ang
         a0 = a0 % (PI * 2) - PI
         return a0
 

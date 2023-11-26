@@ -12,7 +12,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2022-07-26
+    2023-10-09
 
 Purpose
 -------
@@ -116,7 +116,8 @@ script = sys.argv[0]  # print this should you need to locate the script
 
 __all__ = [
     'time_deco', 'run_deco', 'doc_func', 'get_func', 'get_module_info',
-    'find_def', '_wrapper', '_utils_help_'
+    'find_def', '_wrapper', '_utils_help_', 'get_dirs', 'folders',
+    'sub_folders', 'env_list', 'dir_py'
 ]
 
 
@@ -707,6 +708,70 @@ def dir_py(obj, colwise=False, cols=3, prn=True):
     else:
         return txt_out
 
+
+# ---- (6) toolbox ... code section ... --------------------------------------
+#
+def toolbox_info(t_box):
+    """Return toolbox information.
+
+    Parameters
+    ----------
+    t_box : toolbox in *.atbx format
+
+    Notes
+    -----
+    t_box = "C:/arcpro_npg/npGeom_32.atbx"
+    """
+    def _hdr_(hdr_n):
+        """Format the header."""
+        return "{{:<{}s}}".format(hdr_n) + "  {!s:<}"
+
+    from arcgisscripting._arcgisscripting import _utbx
+    t_box = t_box.replace("\\", "/")
+    t_props = _utbx.getToolboxProps(t_box, "*")
+    t_keys = sorted(list(t_props.keys()))
+    hdr_n = max([len(i) for i in t_keys])
+    frmt0 = _hdr_(hdr_n)
+    msg = frmt0.format("Property", "Value") + "\n" + ("-")*(hdr_n + 7)
+    z0 = ['name', 'display name', 'direction', 'data type', 'parameter type',
+          'enabled', 'category', 'symbology', 'multi-value']
+    keys0 = [i for i in t_keys if i != 'tools']
+    keys1 = 'tools' if 'tools' in t_keys else None
+    for k in keys0:  # toolbox properties
+        v = t_props[k]
+        msg += "\n" + frmt0.format(k, v)
+    if keys1:  # `tool` properties
+        v = t_props[keys1]
+        v_keys = sorted(list(v.keys()))
+        hdr_1 = max([len(i) for i in v_keys])
+        frmt1 = _hdr_(hdr_1)
+        msg += "\n" + frmt1.format("--Tool", "  Toolset")
+        for k1 in v_keys:
+            v1 = v[k1]
+            msg += "\n  " + frmt1.format(k1, v1)
+        # for k1 in v_keys:
+        #     pth = "{}/{}".format(t_box, k1)
+        #     t_0 = _utbx.getToolProps(pth, '*')
+        #     tool_keys = list(t_0.keys())
+        #     msg += "\nTools and Properties"
+        #     msg += "\n--Tool : {!s:<}\n--Toolset : {!s:}".format(k1, v[k1])
+            # for k2 in tool_keys:
+            #     if k2 != 'params':
+            #         msg += "  {!s:}  : {!s}\n".format(k2, t_0[k2])
+            #     elif k2 == 'params':
+            #         for i in t_0['params']:
+            #             z1 = [str(j) if j != '' else 'None'
+            #                   for j in [i.name, i.displayName, i.direction,
+            #                   i.datatype, i.parameterType, i.enabled,
+            #                   i.category, i.symbology, i.multiValue]
+            #                   ]
+            #         msg += "--Parameters\n"
+            #         txt = "\n".join(["  {!s:<} : {!s:}".format(*j)
+            #                           for j in list(zip(z0, z1))])
+            #         msg += "parameter"
+            #     else:
+            #         msg += "unknown"
+        return msg
 
 # ----------------------------------------------------------------------
 # __main__ .... code section

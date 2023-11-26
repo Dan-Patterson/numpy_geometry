@@ -54,7 +54,7 @@ __all__ = [
     'sort_by_extent_doc', 'array_IFT_doc', 'dirr_doc'
 ]
 
-Modified = "2023-02-17"
+Modified = "2023-10-09"
 author_date = r"""
 
 Author :
@@ -80,7 +80,7 @@ def _update_docstring(obj, doc):
 
 
 # ----------------------------------------------------------------------------
-# ---- (1) ...npGeo
+# ---- (1) npGeo
 #
 npGeo_doc = author_date + Modified + r"""
 
@@ -250,8 +250,7 @@ All Geo arrays require the IFT property.
 
 """
 
-# ---- (2) ... Geo class
-# --- Geo_hlp
+# ---- (2) Geo_hlp
 
 Geo_hlp = r"""
 
@@ -339,7 +338,7 @@ array([[ 1,  0,  5,  1,   1,  0],  # first shape, first part, outer ring
                      dtype=int64)
 """
 
-# ---- (3) shapes_doc
+# ---- (3) shapes
 shapes_doc = r"""
 
 Returns
@@ -354,7 +353,7 @@ locations. Finally, slice the actual coordinates for each range.
 
 """
 
-# ---- (4) parts_doc
+# ---- (4) parts
 parts_doc = r"""
 
 Returns
@@ -592,7 +591,7 @@ References
 """
 
 
-# ---- (17) ... array_IFT
+# ---- (17) array_IFT
 array_IFT_doc = r"""
 
 Parameters
@@ -625,7 +624,7 @@ Notes
 """
 
 
-# ---- (18) ... dirr function
+# ---- (18) dirr
 dirr_doc = r"""
 
 Source, ``arraytools.py_tools`` has a pure python equivalent.

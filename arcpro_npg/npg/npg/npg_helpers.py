@@ -16,7 +16,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2023-10-02
+    2023-10-29
 
 Purpose
 -------
@@ -54,7 +54,7 @@ Extras
 ...     '__all__', '__builtins__', '__cached__', '__doc__', '__file__',
 ...     '__loader__', '__name__', '__package__', '__spec__', 'np', 'npg',
 ...     'sys', 'script'
-...     ]
+...     ] + __imports__
 
 >>> __all__ = [i for i in dir(npg.npg_helpers)
 ...            if i[0] != "_" and i not in not_in]
@@ -64,9 +64,11 @@ Extras
 
 """
 
-# pylint: disable=C0103,C0415
-# pylint: disable=R0912, R0913, R0914, R1710, R1705
-# pylint: disable=W0105,W0212,W0612,W0613
+# pylint: disable=C0103,C0201,C0209,C0302,C0415
+# pylint: disable=R0902,R0904,R0912,R0913,R0914,R0915
+# pylint: disable=W0105,W0201,W0212,W0221,W0611,W0612,W0613,W0621
+# pylint: disable=E0401,E0611,E1101,E1121
+
 
 import sys
 # from textwrap import dedent
@@ -86,23 +88,29 @@ script = sys.argv[0]  # print this should you need to locate the script
 nums = 'efdgFDGbBhHiIlLqQpP'
 
 # -- See script header
+__imports__ = [
+    'uts', 'npg_prn', 'prn_tbl'
+    ]
+
 __all__ = [
     'a_eq_b', 'cartesian_product', 'coerce2array', 'common_pnts',
     'compare_geom', 'del_seq_dups', 'dist_angle_sort', 'flat', 'interweave',
-    'keep_geom', 'polyline_angles', 'project_pnt_to_line', 'radial_sort',
-    'remove_geom', 'segment_angles', 'shape_finder', 'sort_xy', 'stride_2d',
-    'reclass_ids', 'uniq_1d', 'uniq_2d'
-]
+    'keep_geom', 'multi_check', 'polyline_angles', 'project_pnt_to_line',
+    'radial_sort', 'reclass_ids', 'remove_geom', 'segment_angles',
+    'shape_finder', 'sort_xy', 'stride_2d', 'uniq_1d', 'uniq_2d'
+    ]
 
 __helpers__ = [
-    'prn_tbl', '_angles_3pnt_', '_od_angles_dist_', '_area_centroid_',
-    '_bit_area_', '_bit_check_', '_bit_crossproduct_', '_bit_length_',
-    '_bit_min_max_', '_bit_segment_angles_', '_from_north_', '_from_to_pnts_',
-    '_get_base_', '_in_LBRT_', '_in_extent_', '_is_clockwise_', '_is_ccw_',
-    '_is_convex_', '_is_right_side', '_isin_2d_', '_pnts_in_extent_',
-    '_rotate_', '_scale_', '_to_lists_', '_trans_rot_', '_translate_',
-    '_perp_'
-]  # ---- core bit functions
+    '_angles_3pnt_', '_area_centroid_', '_bit_area_', '_bit_check_',
+    '_bit_crossproduct_', '_bit_length_', '_bit_min_max_',
+    '_bit_segment_angles_', '_close_pnts_', '_from_north_', '_from_to_pnts_',
+    '_from_xaxis_', '_get_base_', '_in_LBRT_', '_in_extent_', '_is_ccw_',
+    '_is_clockwise_', '_is_convex_', '_is_right_side', '_isin_2d_',
+    '_iterate_', '_od_angles_dist_', '_perp_', '_pnts_in_extent_',
+    '_rotate_', '_scale_', '_to_lists_', '_trans_rot_', '_translate_'
+    ]
+
+# ---- core bit functions
 
 # __all__ = __helpers__ + __all__
 
@@ -182,15 +190,14 @@ def _to_lists_(a, outer_only=True):
         if outer_only:
             return a.outer_rings(False)  # a.bits
         return a.bits
-    elif isinstance(a, np.ndarray):
+    if isinstance(a, np.ndarray):
         if a.dtype.kind == 'O':
-            return a
+            a = a
         elif a.ndim == 2:
-            return [a]
+            a = [a]
         elif a.ndim == 3:
-            return list(a)
-    else:  # a list already
-        return a
+            a = list(a)
+    return a  # a list already
 
 
 def uniq_1d(arr):
@@ -554,7 +561,7 @@ def _from_xaxis_(angles):
 
     Example::
 
-        >>> a = np.arange(180., -180 - 45, -45, float)
+        >>> a = np.arange(180., -180 - 45, -45, dtype=np.float64)
         >>> a
         >>> array([ 180., 135., 90., 45., 0., -45., -90., -135., -180.])
         >>> b = (-a + 90.) % 360.
@@ -1238,8 +1245,7 @@ def shape_finder(arr, start=0, prn=False, structured=True):
             prn_tbl(out)
             return None
         return out
-    else:
-        return info
+    return info
 
 
 def coerce2array(arr, start=0):
@@ -1330,8 +1336,7 @@ def project_pnt_to_line(x1, y1, x2, y2, xp, yp):
         lx = x1 + x12 * coeff
         ly = y1 + y12 * coeff
         return lx, ly
-    else:
-        return None
+    return None
 
 
 def reclass_ids(vals=None):
@@ -1418,5 +1423,5 @@ def _iterate_(N, n):
 # ---- ==== main section
 if __name__ == "__main__":
     """optional location for parameters"""
-    # in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\Polygons"
-    # in_fc = r"C:\Git_Dan\npgeom\Project_npg\npgeom.gdb\Polygons2"
+    # in_fc = r"C:\arcpro_npg\Project_npg\npgeom.gdb\Polygons"
+    # in_fc = r"C:\arcpro_npg\Project_npg\npgeom.gdb\Polygons2"

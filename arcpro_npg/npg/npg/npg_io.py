@@ -21,7 +21,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2023-08-23
+    2023-111-14
 
 Purpose
 -------
@@ -81,8 +81,10 @@ np.set_printoptions(
     edgeitems=10, linewidth=160, precision=2, suppress=True,
     threshold=100, formatter=ft)
 
-__all__ = ['dtype_info', 'load_geo', 'save_geo', 'load_txt', 'save_txt',
-           'load_geojson', 'geojson_Geo']
+__all__ = [
+    'dtype_info', 'load_geo', 'load_geo_attr', 'save_geo', 'load_txt',
+    'save_txt', 'load_geojson', 'geojson_Geo'
+    ]
 
 
 # ---- (1) arrays : in and out------------------------------------------------
@@ -117,8 +119,8 @@ def dtype_info(a, as_string=False):
     return names, formats
 
 
-def load_geo(f_name, suppress_extras=False):
-    """Load a well formed `npy` file representing a structured array.
+def load_geo(f_name, extras=False, prn_info=False):
+    r"""Load a well formed `npy` file representing a structured array.
 
     Unpack an `npz` file containing a Geo array.
 
@@ -126,16 +128,18 @@ def load_geo(f_name, suppress_extras=False):
     ----------
     f_name : text
         Full path and filename.
-    suppress_extras : boolean
+    extras : boolean
         If False, only the Geo array is returned, otherwise, the Geo array,
         the constituent arrays and their names are returned.
+    prn_info : boolean
+        If True, then run info is printed.
 
     Returns
     -------
     geo : Geo array
         The Geo array is created within this function and returned along with
         the base arrays, (`arrs`) and the list of array names (`names`), if
-        ``suppress_extras`` is False.
+        ``suppress_extras`` is True.
     arrs : arrays
         The arrays within the npz,
     names : list
@@ -144,73 +148,88 @@ def load_geo(f_name, suppress_extras=False):
 
     Example
     -------
-    >>> f_name = "C:/arcpro_npg/data/g_arr.npz"
-    >>> geo, arrs, names = npg.load_geo(f_name)
-    >>> geo
-    Geo([[ 10.00,  10.00],
-         [ 10.00,   0.00],
-         [  1.50,   1.50],
-          ...,
-         [ 10.00,  10.00],
-         [ 15.00,  18.00],
-         [ 14.00,  10.00]])
-    >>> arrs
-    NpzFile 'C:/arcpro_npg/data/g_arr.npz' with keys:
-        g, ift, kind, extents, spatial_ref
-    >>> arrs['extents']  # same array of bounding rectangle extents
-    array([[ 300000.00,  5000000.00],
-           [ 300025.00,  5000018.00]])
-    >>> arr_names = arrs.files  # returns the list of array names inside
-    ['g', 'ift', 'kind', 'extents', 'spatial_ref']
+    This a sample::
 
-    An array or arrays. The description, field names and their size of each
-    are returned.
+        f_name = "C:/arcpro_npg/data/sq2.npz"
+        sq2, arrs, names = npg.load_geo(f_name, extras=False, prn_info=False)
+        # the array coordinates
+        sq2
+        Geo([[ 10.00,  10.00],
+             [ 10.00,   0.00],
+             [  1.50,   1.50],
+              ...,
+             [ 10.00,  10.00],
+             [ 15.00,  18.00],
+             [ 14.00,  10.00]])
+        # -- the extra array names if `extras=True`.
+        arrs
+        NpzFile 'C:/arcpro_npg/data/g_arr.npz' with keys:
+            g, ift, kind, extents, spatial_ref
+        #
+        # -- returns the list of array names inside
+        arr_names = arrs.files
+        ['g', 'ift', 'kind', 'extents', 'spatial_ref']
+        # -- the array of bounding rectangle extents
+        arrs['extents']
+        array([[ 300000.00,  5000000.00],
+               [ 300025.00,  5000018.00]])
+
+        An array or arrays. The description, field names and their size of each
+        are returned.
 
     Notes
     -----
-    From above: arrs = np.load(f_name)
-    arrs : numpy.lib.npyio.NpzFile
-        The type of file.
-    other properties : dir(arrs)
-        'allow_pickle', 'close', 'f', 'fid', 'files', 'get', 'items',
-        'iteritems', 'iterkeys', 'keys', 'pickle_kwargs', 'values', 'zip'
+    From above::
+
+        arrs = np.load(f_name)
+        arrs : numpy.lib.npyio.NpzFile
+            The type of file.
+        other properties : dir(arrs)
+            'allow_pickle', 'close', 'f', 'fid', 'files', 'get', 'items',
+            'iteritems', 'iterkeys', 'keys', 'pickle_kwargs', 'values', 'zip'
     """
-    arrs = np.load(f_name)
-    names = arrs.files  # array names
-    print("\nLoading...{}\nArrays include...{}".format(f_name, names))
-    frmt = "({}) name : {}\n  shape : {}\n  descr. : {}"
-    for i, name in enumerate(names):
-        tmp = arrs[name]
-        shp = tmp.shape
-        desc = tmp.dtype.descr
-        print(frmt.format(i, name, shp, desc))
-    n0, n1, n2, n3, n4 = names
-    geo = npGeo.Geo(arrs[n0],
-                    IFT=arrs[n1],
-                    Kind=int(arrs[n2]),
-                    Extent=arrs[n3],
-                    SR=str(arrs[n4])
-                    )
-    if suppress_extras:
+    def _to_geo_(arrs, names):
+        """Pull out the info."""
+        n0, n1, n2, n3, n4 = names
+        geo = npGeo.Geo(
+            arrs[n0], IFT=arrs[n1], Kind=int(arrs[n2]), Extent=arrs[n3],
+            SR=str(arrs[n4])
+            )
         return geo
-    return geo, arrs, names
+
+    arrs = np.load(f_name)
+    names = arrs.files  # the array names
+    msg = "\nLoading...{}\nArray(s) include...{}"
+    geo = _to_geo_(arrs, names)
+    if extras:
+        if prn_info:
+            print(msg.format(f_name, names))
+        return geo, arrs, names
+    if prn_info:
+        print(msg.format(f_name, names[0]))
+    return geo
 
 
-def load_geo_attr(f_name):
+def load_geo_attr(f_name, prn_info=False):
     """Load the attributes in an npy file associated with a geo array.
 
     Parameters
     ----------
     f_name : text
         The complete filename path and extension.
+    prn_info : boolean
+        If True, then run info is printed.
 
     Returns
     -------
-        names : the list of array names.
-        arrs  : the arrays themselves `arr` and `fields`.
-            The two arrays are the:
-                - attribute data
-                - field names and data type.
+    names : the list of array names.
+
+    arrs : the arrays themselves `arr` and `fields`.
+
+    The two arrays are the:
+
+    - attribute data
+    - field names and data type.
 
     Example
     -------
@@ -226,20 +245,21 @@ def load_geo_attr(f_name):
     """
     arrs = np.load(f_name)
     names = arrs.files  # array names
-    frmt0 = "\nLoading attributes from...  {}\n\nArrays include...{}"
-    print(frmt0.format(f_name, names))
-    frmt1 = "({}) name : {}\n"
-    for i, name in enumerate(names):
-        print(frmt1.format(i, name))
-    msg = """
-    To use :
-    >>> n0, n1 = names
-    >>> n0, n1
-    ... ('arr', 'fields')
-    >>> arr = arrs[n0]
-    >>> flds = arrs[n1]
-    """
-    print(msg)
+    if prn_info:
+        frmt0 = "\nLoading attributes from...  {}\n\nArrays include...{}"
+        print(frmt0.format(f_name, names))
+        frmt1 = "\n({}) name : {}"
+        for i, name in enumerate(names):
+            print(frmt1.format(i, name))
+        msg = """
+        To use :
+        >>> n0, n1 = names
+        >>> n0, n1
+        ... ('arrs', 'fields')
+        >>> arr = arrs[n0]
+        >>> flds = arrs[n1]
+        """
+        print(msg)
     return names, arrs
 
 

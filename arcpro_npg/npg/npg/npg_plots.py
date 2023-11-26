@@ -18,7 +18,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2022-11-27
+    2023-10-09
 
 Purpose
 -------
@@ -78,7 +78,12 @@ np.ma.masked_print_option.set_display('-')
 
 script = sys.argv[0]
 
-__all__ = ['plot_2d', 'plot_3d', 'plot_polygons', 'plot_mesh']
+__all__ = [
+    'plot_mixed', 'plot_2d', 'plot_3d', 'plot_polygons', 'plot_mesh',
+    'plot_mst'
+    ]
+
+__helpers__ = ['axis_mins_maxs', '_get_cmap', 'subplts', 'scatter_params']
 
 
 # ---- (1) helper functions ----

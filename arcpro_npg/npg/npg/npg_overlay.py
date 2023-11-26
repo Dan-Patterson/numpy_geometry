@@ -29,7 +29,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2022-09-21
+    2023-10-09
 
 Purpose
 -------
@@ -110,7 +110,8 @@ __all__ = [
     'append_',
     'merge_',
     'union_as_one',
-    'line_crosses', 'in_out_crosses', 'crossings'
+    'line_crosses', 'in_out_crosses', 'crossings',
+    'left_right_pnts', 'line_side', '_line_crossing_'
 ]
 __helpers__ = ['_intersect_', '_adj_']
 

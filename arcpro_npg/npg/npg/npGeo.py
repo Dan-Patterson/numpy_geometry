@@ -12,10 +12,11 @@ properties.
 ----
 
 """
-# pylint: disable=C0103,C0302,C0415
-# pylint: disable=E1101,E1121
-# pylint: disable=W0105,W0201,W0212,W0221,W0611,W0612,W0621
+
+# pylint: disable=C0103,C0201,C0209,C0302,C0415
 # pylint: disable=R0902,R0904,R0912,R0913,R0914,R0915
+# pylint: disable=W0105,W0201,W0212,W0221,W0611,W0612,W0613,W0621
+# pylint: disable=E0401,E0611,E1101,E1121
 
 import sys
 from textwrap import indent, dedent, wrap
@@ -24,8 +25,9 @@ import numpy as np
 from numpy.lib.recfunctions import unstructured_to_structured as uts
 from numpy.lib.recfunctions import repack_fields
 
+import npg  # noqa
 from npg import npg_geom as geom
-from npg import (npg_helpers, npg_io, npg_prn)  # npg_create)
+from npg import npg_helpers, npg_io, npg_prn  # npg_create)
 from npg import npg_min_circ as sc
 
 from npg.npg_helpers import (
@@ -53,10 +55,9 @@ NUMS = FLOATS + INTS
 TwoPI = np.pi * 2.0
 
 __all__ = [
-    'Geo', 'is_Geo',
-    'roll_coords', 'roll_arrays', 'array_IFT', 'arrays_to_Geo',
+    'Geo', 'roll_coords', 'roll_arrays', 'array_IFT', 'arrays_to_Geo',
     'Geo_to_arrays', 'Geo_to_lists', '_fill_float_array',
-    'is_Geo', 'reindex_shapes', 'remove_seq_dupl', 'check_geometry',
+    'remove_seq_dupl', 'check_geometry', 'is_Geo', 'reindex_shapes',
     'dirr'
 ]
 
@@ -167,14 +168,14 @@ class Geo(np.ndarray):
         self.UR = getattr(src_arr, 'UR', None)
         self.Z = getattr(src_arr, 'Z', None)
         self.SVG = getattr(src_arr, 'SVG', None)
+        return self
 
     def __array_wrap__(self, out_arr, context=None):
         """Wrap it up."""
         return np.ndarray.__array_wrap__(self, out_arr, context)
 
-    # ----  ------------------------------------------------------------------
     # ---- End of class definition -------------------------------------------
-    #
+    # ----  ------------------------------------------------------------------
     # ---- help : information
     @property
     def H(self):
@@ -189,12 +190,8 @@ class Geo(np.ndarray):
         structure, and/or more records use the `prn_geo` method.
         """
         info_ = self.IFT_str[:25]
-        frmt = """
-        {}\nExtents :\n  LL {}\n  UR {}
-        Shapes :{:>6.0f}
-        Parts  :{:>6.0f}
-        Points :{:>6.0f}
-        \nSp Ref : {}
+        frmt = """{}\nExtents :\n  LL {}\n  UR {}\nShapes :{:>6.0f}\
+        \nParts  :{:>6.0f}\nPoints :{:>6.0f}\nSp Ref : {}
         """
         args = ["-" * 14, self.LL, self.UR, len(self.U), self.IFT.shape[0],
                 self.IFT[-1, 2], self.SR]
@@ -228,7 +225,7 @@ class Geo(np.ndarray):
         w = wrap(t, 79)
         print(">>> geo_info(geo_array)\n... Geo methods and properties.")
         for i in w:
-            print(indent("{}".format(i), prefix="    "))
+            print(indent(f"{i}", prefix="    "))
         print("\n... Geo base properties.")
         s0 = set(srt)
         s1 = set(Geo.__dict__.keys())
@@ -236,13 +233,13 @@ class Geo(np.ndarray):
         t = ", ".join([str(i) for i in s0s1])
         w = wrap(t, 79)
         for i in w:
-            print(indent("{}".format(i), prefix="    "))
+            print(indent(f"{i}", prefix="    "))
         print("\n... Geo special.")
         s1s0 = sorted(list(s1.difference(s0)))
         t = ", ".join([str(i) for i in s1s0])
         w = wrap(t, 79)
         for i in w:
-            print(indent("{}".format(i), prefix="    "))
+            print(indent(f"{i}", prefix="    "))
         # return
 
     # ----  ---------------------------
@@ -499,7 +496,7 @@ class Geo(np.ndarray):
 
         Holes are retained.  The IFT is altered to account for point removal.
         """
-        info = "{} first part".format(self.Info)
+        info = f"{self.Info} first part"
         ift_s = self.IFT[self.PID == 1]
         a_2d = [self.XY[ft[0]:ft[1]] for ft in self.FT]
         if asGeo:
@@ -591,7 +588,7 @@ class Geo(np.ndarray):
 
     def perimeters(self, by_shape=True):
         """Polyline lengths or polygon perimeter. Calls `lengths`."""
-        return self.lengths(by_shape=True)
+        return self.lengths(by_shape)
 
     def centers(self, by_shape=True):
         """Return the center of outer ring points."""
@@ -879,7 +876,9 @@ class Geo(np.ndarray):
     #
     def bounding_circles(self, angle=5, shift_back=False, return_xyr=False):
         """Bounding circles for features."""
-        chk = False if len(self.IFT) > 1 else True
+        chk = True
+        if len(self.IFT) > 1:
+            chk = False
         chs = self.convex_hulls(chk, False, 50)  # check for singlepart shapes
         xyr = [sc.small_circ(s) for s in chs.shapes]
         circs = []
@@ -979,7 +978,7 @@ class Geo(np.ndarray):
         cs = np.cumsum(tmp_ft)
         id_too[1:, 0] = cs[:-1]
         id_too[:, 1] = cs
-        info = "{} fill_holes".format(self.Info)
+        info = f"{self.Info} fill_holes"
         tmp_ift[:, 1:3] = id_too
         return Geo(a_2d, IFT=tmp_ift, Kind=2, Extent=self.XT, Info=info)
 
@@ -1164,8 +1163,7 @@ class Geo(np.ndarray):
     def to_segments(self, ignore_holes=True):
         """Segment poly* structures into (x0, y0, x1, y1) data per shape.
 
-        An object array is returned. Holes removed from polygons by default,
-        but multipart shapes are not.
+        An object array is returned. Holes in polygons can be removed.
 
         See Also
         --------
@@ -1185,7 +1183,7 @@ class Geo(np.ndarray):
         return segs
 
     def common_segments(self, shift_back=False):
-        """Return the common segments in poly features.
+        """Return the common segments in poly* features.
 
         The result is an array of  from-to pairs of points.  ft, tf pairs are
         evaluated to denote common segments or duplicates.
@@ -1216,7 +1214,7 @@ class Geo(np.ndarray):
         return _fill_float_array(common)  # , idx  # stu(common)
 
     def unique_segments(self, shift_back=False):
-        """Return the unique segments in poly features.
+        """Return the unique segments in poly* features.
 
         The output is an ndarray of from-to pairs of points.
 
@@ -1301,8 +1299,10 @@ class Geo(np.ndarray):
         ext_ids = self.shp_ids
         xs = ext[:, 0]
         ys = ext[:, 1]
-        azim = np.array([0, 45, 90, 135, 180, 225, 270, 315])  # azimuths
-        val = np.radians(azim[key])              # sort angle in radians
+        # azimuth dictionary
+        azim = {0: 0, 1: 45, 2: 90, 3: 135, 4: 180, 5: 225, 6: 270, 7: 315}
+        val = azim[key] if key in azim.keys() else 0
+        val = np.radians(val)                    # sort angle in radians
         z = np.sin(val) * xs + np.cos(val) * ys  # - sort by vector
         idx = np.argsort(z)  # sort order
         sorted_ids = ext_ids[idx]
@@ -1824,7 +1824,9 @@ def remove_seq_dupl(g, asGeo=True):
         return sub[np.sort(idx)]
 
     chunks = Geo_to_arrays(g)
-    poly = True if g.K == 2 else False
+    poly = False
+    if g.K == 2:
+        poly = True
     out = []
     for i, c in enumerate(chunks):
         n = len(c.shape)

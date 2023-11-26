@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2023-02-16
+    2023-10-29
 
 Purpose
 -------
@@ -102,7 +102,7 @@ algorithm>`_.
 >>> not_in = [
 ...     '__all__', '__builtins__', '__cached__', '__doc__', '__file__',
 ...     '__loader__', '__name__', '__package__', '__spec__', 'np', 'npg', 'sys'
-...     ]
+...     ] + __imports__
 
 >>> __all__ = [i for i in dir(npg.npg_geom)
 ...            if i[0] != "_" and i not in not_in]
@@ -112,10 +112,10 @@ algorithm>`_.
 
 """
 
-# pylint: disable=C0103, C0302, C0415, E0611, E1136, E1121
-# pylint: disable=R0904, R0913, R0914, R0915
-# pylint: disable=W0201, W0212, W0221, W0612, W0621, W0105
-# pylint: disable=R0902
+# pylint: disable=C0103,C0201,C0209,C0302,C0415
+# pylint: disable=R0902,R0904,R0912,R0913,R0914,R0915
+# pylint: disable=W0105,W0201,W0212,W0221,W0611,W0612,W0613,W0621
+# pylint: disable=E0401,E0611,E1101,E1121
 
 import sys
 import numpy as np
@@ -142,8 +142,14 @@ np.ma.masked_print_option.set_display('-')  # change to a single -
 script = sys.argv[0]  # print this should you need to locate the script
 
 # -- See script header
+__imports__ = [
+    'CH', 'Delaunay', 'npGeo', 'np_wn', 'npg_helpers', 'npg_pip', 'stu',
+    'uts', '_get_base_', '_bit_area_', '_bit_min_max_', '_in_extent_',
+    '_angles_3pnt_'
+    ]
+
 __all__ = [
-    'CH', 'Delaunay', 'bin_pnts', 'common_extent', 'densify_by_distance',
+    'bin_pnts', 'common_extent', 'densify_by_distance',
     'densify_by_factor', 'eucl_dist', 'extent_to_poly',
     'find_closest', 'in_hole_check', 'mabr', 'npGeo', 'np_wn',
     'offset_buffer', 'on_line_chk', 'pnts_in_pnts', 'pnts_on_poly',
@@ -277,7 +283,7 @@ def _percent_along_(a, percent=0):
     x1, y1 = a[_end_]
     _start_ = _end_ - 1
     x0, y0 = a[_start_]
-    t = (percent - perleng[_start_])
+    t = percent - perleng[_start_]
     xt = x0 * (1. - t) + (x1 * t)
     yt = y0 * (1. - t) + (y1 * t)
     return np.array([xt, yt])
@@ -1121,7 +1127,7 @@ def segments_to_polys(self):
 def simplify_lines(a, deviation=10):
     """Simplify array. Requires, `_angles_3pnt_` from npg_helpers."""
     ang = _angles_3pnt_(a, inside=True, in_deg=True)
-    idx = (np.abs(ang - 180.) >= deviation)
+    idx = np.abs(ang - 180.) >= deviation
     sub = a[1: -1]
     p = sub[idx]
     return a, p, ang
@@ -1241,14 +1247,15 @@ def which_quad(line):
     >>>     line = line[::-1]
     """
     x_, y_ = np.sign(np.diff(line[[0, -1]], axis=0))[0]
-    if x_ >= 0:  # right
+    # right
+    if x_ >= 0:
         if y_ >= 0:  # upper
             return 1
         return 4
-    elif x_ < 0:  # left
-        if y_ >= 0:  # upper
-            return 2
-        return 3
+    # left
+    if y_ >= 0:  # upper
+        return 2
+    return 3
 
 
 # ===========================================================================

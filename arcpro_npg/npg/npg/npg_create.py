@@ -14,7 +14,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2023-08-23
+    2023-10-09
 
 Purpose
 -------
@@ -100,16 +100,18 @@ script = sys.argv[0]  # print this should you need to locate the script
 
 __all__ = ['code_grid', 'rot_matrix',
            'arc_', 'arc_sector',
-           'circle', 'circle_mini', 'circle_ring', 'circ_3pa', 'circ_3p',
+           'circle', 'circle_mini', 'circle_ring', 'circ_3pa',
+           'circle_sectors',  'circ_3p',
            'ellipse',
+           'hex_flat', 'hex_pointy',
            'rectangle',
            'triangle',
-           'hex_flat', 'hex_pointy',
            'mesh_xy',
            'pyramid',
            'pnt_from_dist_bearing',
            'xy_grid',
            'transect_lines',
+           'buffer_rings',
            'spiral_archim', 'spiral_sqr', 'spiral_cw', 'spiral_ccw',
            'base_spiral', 'to_spiral', 'from_spiral',
            'repeat', 'mini_weave'

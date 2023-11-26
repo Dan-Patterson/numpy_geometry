@@ -19,7 +19,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2023-08-23
+    2023-10-09
 
 Purpose
 -------
@@ -72,8 +72,12 @@ np.set_printoptions(
     edgeitems=5, linewidth=120, precision=2, suppress=True, threshold=100,
     formatter=ft)
 
-__all__ = ['prn_q', 'prn_', 'prn_tbl', 'prn_geo', 'prn_lists', 'prn_arrays',
-           'prn_as_obj', 'prn_Geo_shapes', '_svg']
+__all__ = [
+    'prn_q', 'prn_', 'prn_tbl', 'prn_geo', 'prn_lists', 'prn_arrays',
+    'prn_as_obj', 'prn_Geo_shapes', '_svg'
+    ]
+
+__helpers__ = ['_ckw_', '_col_format', 'col_hdr', 'ake_row_format']
 
 
 # ============================================================================
