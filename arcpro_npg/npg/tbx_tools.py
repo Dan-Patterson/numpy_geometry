@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 # noqa: D205, D400
 r"""
 tbx_tools
@@ -7,15 +7,16 @@ tbx_tools
 **Toolbox tools for Free tools.**
 
 Script :
-    'C:/Git_Dan/npgeom/Project_npg/tbx_tools.py'
+    'C:/arcpro_npg/tbx_tools.py'
 Author :
     Dan_Patterson@carleton.ca
 Modified :
-    2022-02-07
+    2023-10-13
 
 Purpose
 -------
-Tools to provide ``free`` advanced license functionality for ArcGIS Pro.
+Tools to provide ``free`` advanced license functionality for ArcGIS Pro,
+amongst other things.
 
 Notes
 -----
@@ -94,11 +95,26 @@ split-line-at-vertices.htm>`_.
 <https://stackoverflow.com/questions/64995977/generating-equidistance-points
 -along-the-boundary-of-a-polygon-but-cw-ccw>`_.
 
+
 **To do**
+
+`Delete Identical
+<https://pro.arcgis.com/en/pro-app/latest/tool-reference/data-management/
+delete-identical.htm>`_.
+
+`Eliminate Polygon Part
+<https://pro.arcgis.com/en/pro-app/latest/tool-reference/data-management/
+eliminate-polygon-part.htm>`_.
+
+`Erase
+<https://pro.arcgis.com/en/pro-app/latest/tool-reference/analysis/erase.htm>`_.
 
 `Find Identical
 <https://pro.arcgis.com/en/pro-app/tool-reference/data-management/
 find-identical.htm>`_.
+
+`Split
+<https://pro.arcgis.com/en/pro-app/latest/tool-reference/analysis/split.htm>`_.
 
 `Unsplit line
 <https://pro.arcgis.com/en/pro-app/tool-reference/data-management/
@@ -128,19 +144,14 @@ from numpy.lib.recfunctions import append_fields
 from npg.npGeo import arrays_to_Geo  # Geo
 from npg.npg_arc_npg import (get_SR, get_shape_K, fc_to_Geo, Geo_to_fc,
                              Geo_to_arc_shapes, fc_data)
-from npg.npg_create import circle
+from npg.npg_create import circle, hex_flat, hex_pointy, rectangle, triangle
 from npg.npg_overlay import dissolve, merge_
-
-# from npg.npGeo import arrays_to_Geo  # Geo
-# from npg.npg_arc_npg import (get_SR, get_shape_K, fc_to_Geo, Geo_to_fc,
-#                              Geo_to_arc_shapes)
-# from npg.npg_create import circle
-# from npg.npg_overlay import dissolve
 
 from scipy.spatial import Voronoi  # Delaunay
 
+# import arcpy
 import arcgisscripting as ags
-from arcpy import da, env, AddMessage, Exists  # ImportToolbox, gp
+from arcpy import (da, env, AddMessage, Exists, GetMessages, gp)  # noqa
 from arcpy.management import (
     AddField, CopyFeatures, CreateFeatureclass, Delete, MakeFeatureLayer,
     MultipartToSinglepart, SelectLayerByLocation, XYToLine)
@@ -165,18 +176,21 @@ pth = os.path.split(script)[0]
 
 tool_list = [
     'Attribute sort', 'Frequency and Stats',
-    'Bounding Circles', 'Convex Hulls', 'Extent Polys',
-    'Minimum area bounding rectangle',
     'Features to Points', 'Polygons to Polylines', 'Split at Vertices',
     'Vertices to Points',
     'Extent Sort', 'Geometry Sort',
     'Area Sort', 'Length Sort',
-    'Densify by Distance', 'Densify by Percent', 'Fill Holes', 'Keep Holes',
+    'Fill Holes', 'Keep Holes',
     'Rotate Features', 'Shift Features', 'Dissolve Boundaries',
     'Delaunay', 'Voronoi']
+cont_list = ['Bounding Circles', 'Convex Hulls', 'Extent Polys',
+             'Minimum area bounding rectangle']
+dens_list = ['Densify by Distance', 'Densify by Percent', 'Densify by Factor']
+tile_list = ['rectangle', 'hex_pointy', 'hex_flat', 'triangle']
 
-# ===========================================================================
-# ---- def section: def code blocks go here ---------------------------------
+all_tools = sorted(tool_list + tile_list + cont_list + dens_list)
+# ============================================================================
+# ---- messages --------------------------------------------------------------
 msg0 = """
 ----
 Either you failed to specify the geodatabase location and filename properly
@@ -215,8 +229,12 @@ def tweet(msg):
     print(m)
 
 
+# ============================================================================
+# ---- io tools --------------------------------------------------------------
+#
 def check_path(fc):
-    r"""Check file name and file path for compliance.
+    r"""
+    Check file name and file path for compliance.
 
     ---- check_path ----
 
@@ -242,6 +260,7 @@ def check_path(fc):
     msg = dedent(check_path.__doc__)
     flotsam = '!"#$%&\'()*+,-;<=>?@[]^`~}{ '  # " ... plus the `space`"
     fail = False
+    fc = (r"{}").format(fc)
     if (".gdb" not in fc) or np.any([i in fc for i in flotsam]):
         fail = True
     pth = fc.replace("\\", "/").split("/")
@@ -249,15 +268,12 @@ def check_path(fc):
     if (len(pth) == 1) or (name[-4:] == ".gdb"):
         fail = True
     if fail:
-        tweet(msg)
+        # tweet(msg)
         return (None, None)
     gdb = "/".join(pth[:-1])
     return gdb, name
 
 
-# ============================================================================
-# ---- io tools --------------------------------------------------------------
-#
 def _in_(in_fc, info):
     """Produce the Geo array.
 
@@ -302,18 +318,18 @@ def _out_(shps, gdb, name, out_kind, SR):
 
 
 def _extend_table_(shps, gdb, name, in_fc):
-    """Return."""
+    """Return joined data."""
     out = gdb + "\\" + name
     if Exists(out):
         d = fc_data(in_fc)
         import time
         time.sleep(1.0)
         da.ExtendTable(out, 'OBJECTID', d, 'OID_', append_only=False)
-    return
+    return None
 
 
 def temp_fc(geo, name, kind, SR):
-    """Similar to _out_ but creates a `memory` featureclass."""
+    """Similar to `_out_` but creates a `memory` featureclass."""
     polys = Geo_to_arc_shapes(geo, as_singlepart=True)
     wkspace = env.workspace = 'memory'  # legacy is in_memory
     tmp_name = "{}\\{}".format(wkspace, name)
@@ -329,7 +345,7 @@ def temp_fc(geo, name, kind, SR):
 
 
 # ============================================================================
-# ---- Attribute tools -------------------------------------------------------
+# ---- Attribute Tools -------------------------------------------------------
 # attribute sort
 def attr_sort(a, oid_fld=None, sort_flds=None, out_fld=None):
     """Return old and new id values for the sorted array."""
@@ -392,11 +408,7 @@ def freq(a, cls_flds, stat_fld):
 
 
 # ============================================================================
-# ---- Create geometry
-#
-
-# ============================================================================
-# ---- Container ------------------------------------------------------------
+# ---- Container Tools -------------------------------------------------------
 #
 # bounding circles
 def circles(in_fc, gdb, name, out_kind):
@@ -409,7 +421,7 @@ def circles(in_fc, gdb, name, out_kind):
     info = "bounding circles"
     g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
     shps = g.bounding_circles(angle=2, shift_back=True, return_xyr=False)
-    Geo_to_fc(shps, gdb, name, kind=out_kind, SR=SR)
+    _out_(shps, gdb, name, out_kind, SR)
     return "{} completed".format("Circles")
 
 
@@ -419,7 +431,7 @@ def convex_hull_polys(in_fc, gdb, name, out_kind):
     info = "convex hulls to polygons"
     g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
     shps = g.convex_hulls(by_bit=False, shift_back=True, threshold=50)
-    Geo_to_fc(shps, gdb, name, kind=out_kind, SR=SR)
+    _out_(shps, gdb, name, out_kind, SR)
     return "{} completed".format("Convex Hulls")
 
 
@@ -429,7 +441,7 @@ def extent_poly(in_fc, gdb, name, out_kind):
     info = "extent to polygons"
     g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
     shps = g.extent_rectangles(shift_back=True, asGeo=True)
-    Geo_to_fc(shps, gdb, name, kind=out_kind, SR=SR)
+    _out_(shps, gdb, name, out_kind, SR)
     return "{} completed".format("Extents")
 
 
@@ -439,7 +451,7 @@ def mabr(in_fc, gdb, name, out_kind):
     g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
     shps = g.min_area_rect(shift_back=True, as_structured=False)
     # LBRT = shps[:, 1:]
-    Geo_to_fc(shps, gdb, name, kind=out_kind, SR=SR)
+    _out_(shps, gdb, name, out_kind, SR)
     return "{} completed".format("Minimum area bounding rectangle")
 
 
@@ -482,13 +494,14 @@ def pgon_to_pline(in_fc, gdb, name):
     z2.K = 1
     out_kind = "Polyline"
     _out_(z2, gdb, name, out_kind, SR)
+    # extend_table_(shps, gdb, name, in_fc)
     # if Exists(out):
     #     d = fc_data(in_fc)
     #     import time
     #     time.sleep(1.0)
     #     da.ExtendTable(out, 'OBJECTID', d, 'OID_', append_only=False)
     tweet(dedent(msg_pgon_pline))
-    return
+    return None
 
 
 # split line at vertices
@@ -504,7 +517,7 @@ def split_at_vertices(in_fc, out_fc):
     xyxy = list(od.dtype.names[:4])
     args = [tmp, out_fc] + xyxy + ["GEODESIC", "Orig_id", SR]
     XYToLine(*args)
-    return
+    return None
 
 
 # vertices to points
@@ -522,7 +535,6 @@ def p_uni_pnts(in_fc):
 # sort by area, length
 def sort_geom(in_fc, gdb, name, sort_kind):
     """Sort features by area, length for full shape."""
-    SR = get_SR(in_fc)
 #    tmp = MultipartToSinglepart(in_fc, r"memory\in_fc_temp")
     info = "sort features"
     g, oids, shp_kind, k, m, SR = _in_(in_fc, info)  # tmp, info)
@@ -530,25 +542,23 @@ def sort_geom(in_fc, gdb, name, sort_kind):
         srt = g.sort_by_area(ascending=True, just_indices=False)
     elif sort_kind == 'length':
         srt = g.sort_by_length(ascending=True, just_indices=False)
-#    p = kind.upper()
     out_kind = shp_kind
     x, y = g.LL
     srt = srt.translate(dx=x, dy=y)
     _out_(srt, gdb, name, out_kind, SR)
-#    geometry_fc(srt, srt.IFT, p_type=p, gdb=gdb, fname=name, sr=SR)
-    return
+    return None
 
 
 # sort by extent
 def sort_extent(in_fc, gdb, name, key):
-    """Sort features by extent, area, length."""
+    """Sort features by extent."""
     g, oids, shp_kind, k, m, SR = _in_(in_fc, info="sort features")
     srt = g.sort_by_extent(extent_pnt='LB', key=key, just_indices=False)
     out_kind = shp_kind
     x, y = g.LL
     srt = srt.translate(dx=x, dy=y)
     _out_(srt, gdb, name, out_kind, SR)
-    return
+    return None
 
 
 # ============================================================================
@@ -560,12 +570,14 @@ def dens_dist(in_fc, gdb, name, dist):
     g, oids, shp_kind, k, m, SR = _in_(in_fc, info="densify by distance")
     if dist is None:
         dist = 1.
+    elif dist < 1. or dist > 100.:  # limit of 1 to 100%
+        dist = np.abs(min(dist, 100.))
     dens = g.densify_by_distance(spacing=dist)
     out_kind = shp_kind
     x, y = g.LL
     dens = dens.translate(dx=x, dy=y)
     _out_(dens, gdb, name, out_kind, SR)
-    return
+    return None
 
 
 def dens_fact(in_fc, gdb, name, dist):
@@ -578,7 +590,7 @@ def dens_fact(in_fc, gdb, name, dist):
     x, y = g.LL
     dens = dens.translate(dx=x, dy=y)
     _out_(dens, gdb, name, out_kind, SR)
-    return
+    return None
 
 
 def dens_perc(in_fc, gdb, name, dist):
@@ -591,7 +603,7 @@ def dens_perc(in_fc, gdb, name, dist):
     x, y = g.LL
     dens = dens.translate(dx=x, dy=y)
     _out_(dens, gdb, name, out_kind, SR)
-    return
+    return None
 
 
 def fill_holes(in_fc, gdb, name):
@@ -606,13 +618,14 @@ def fill_holes(in_fc, gdb, name):
     x, y = g.LL
     o_rings = o_rings.translate(dx=x, dy=y)
     _out_(o_rings, gdb, name, out_kind, SR)
+    # _extend_table_(shps, gdb, name, in_fc)
     # out = "{}/{}".format(gdb, name)
     # if Exists(out):
     #     import time
     #     time.sleep(1.0)
     #     d = fc_data(tmp)
     #     da.ExtendTable(out, 'OBJECTID', d, 'OID@')
-    return
+    return None
 
 
 def keep_holes(in_fc, gdb, name):
@@ -633,7 +646,7 @@ def keep_holes(in_fc, gdb, name):
     #     time.sleep(1.0)
     #     d = fc_data(tmp)
     #     da.ExtendTable(out, 'OBJECTID', d, 'OID@')
-    return
+    return None
 
 
 def rotater(in_fc, gdb, name, as_group, angle, clockwise):
@@ -653,7 +666,7 @@ def rotater(in_fc, gdb, name, as_group, angle, clockwise):
     #     time.sleep(1.0)
     #     d = fc_data(tmp)
     #     da.ExtendTable(out, 'OBJECTID', d, 'OID_')
-    return
+    return None
 
 
 def shifter(in_fc, gdb, name, dX, dY):
@@ -675,7 +688,7 @@ def shifter(in_fc, gdb, name, dX, dY):
     #     time.sleep(1.0)
     #     d = fc_data(tmp)
     #     da.ExtendTable(out, 'OBJECTID', d, 'OID_', append_only=False)
-    return
+    return None
 
 
 def dissolve_boundaries(in_fc, gdb, name):
@@ -692,7 +705,7 @@ def dissolve_boundaries(in_fc, gdb, name):
 
 
 # ============================================================================
-# ---- Triangulation tools ---------------------------------------------------
+# ---- Triangulation Tools ---------------------------------------------------
 #
 def tri_poly(in_fc, gdb, name, out_kind, constrained=True):
     """Return the Delaunay triangulation of the poly* features."""
@@ -710,7 +723,7 @@ def tri_poly(in_fc, gdb, name, out_kind, constrained=True):
         CopyFeatures(tmp_lyr, out_name)
     else:
         _out_(g0, gdb, name, shp_kind, SR)
-    return
+    return None
 
 
 def vor_poly(in_fc, gdb, name, out_kind):
@@ -745,8 +758,14 @@ def vor_poly(in_fc, gdb, name, out_kind):
     tmp1 = temp_fc(ext_poly, "tmp1", shp_kind, SR)
     final = gdb.replace("\\", "/") + "/" + name
     Clip(tmp, tmp1, final)  # arcpy.analysis.Clip
-    return
+    return None
 
+
+# ============================================================================
+# ---- Tile Creation ---------------------------------------------------------
+#
+# from npg.npg_create import circle, hex_flat, hex_pointy, rectangle, triangle
+# tile_list = ['rectangle', 'hex_pointy', 'hex_flat', 'triangle']
 
 # ---- =======================================================================
 # ---- pick tool section
@@ -807,19 +826,19 @@ def pick_tool(tool, in_fc, out_fc, gdb, name):
         ags.da.NumPyArrayToTable(out, out_fc)
     #
     # ---- Containers
-    elif tool in ['Bounding Circles', 'Convex Hulls', 'Extent Polys',
-                  'Minimum area bounding rectangle']:
+    #
+    elif tool in cont_list:
         out_kind = sys.argv[4].upper()
-        if tool == 'Bounding Circles':           # ---- (1) bounding circles
-            circles(in_fc, gdb, name, out_kind)
-        elif tool == 'Convex Hulls':             # ---- (2) convex hulls
-            convex_hull_polys(in_fc, gdb, name, out_kind)
-        elif tool == 'Extent Polys':             # ---- (3) extent_poly
-            extent_poly(in_fc, gdb, name, out_kind)
-        elif tool == 'Minimum area bounding rectangle':
-            mabr(in_fc, gdb, name, out_kind)
+        c_d = {
+            'Bounding Circles': circles(in_fc, gdb, name, out_kind),
+            'Convex Hulls': convex_hull_polys(in_fc, gdb, name, out_kind),
+            'Extent Polys': extent_poly(in_fc, gdb, name, out_kind),
+            'Minimum area bounding rectangle': mabr(in_fc, gdb, name, out_kind)
+            }
+        c_d[tool]  # run the tool
     #
     # ---- Conversion
+    #
     elif tool in ['Features to Points', 'Vertices to Points']:
         if tool == 'Features to Points':         # ---- (1) features to point
             out, SR = f2pnts(in_fc)
@@ -832,6 +851,7 @@ def pick_tool(tool, in_fc, out_fc, gdb, name):
         split_at_vertices(in_fc, out_fc)
     #
     # ---- Sort geometry
+    #
     elif tool in ['Area Sort', 'Length Sort', 'Geometry Sort']:
         srt_type = tool.split(" ")[0].lower()
         tweet("...\n{} as {}".format(tool, 'input'))
@@ -842,17 +862,14 @@ def pick_tool(tool, in_fc, out_fc, gdb, name):
         sort_extent(in_fc, gdb, name, srt_type)
     #
     # ---- Alter geometry
-    elif tool == 'Densify by Distance':          # ---- (1) densify distance
+    #
+    elif tool in dens_list:
         dist = float(sys.argv[4])
-        dens_dist(in_fc, gdb, name, dist)
-    elif tool == 'Densify by Percent':           # ---- (2) densify percent
-        dist = float(sys.argv[4])
-        if dist < 1. or dist > 100.:  # limit of 1 to 100%
-            dist = np.abs(min(dist, 100.))
-        dens_dist(in_fc, gdb, name, dist)
-    elif tool == 'Densify by Factor':            # ---- (3) densify percent
-        dist = float(sys.argv[4])
-        dens_fact(in_fc, gdb, name, dist)
+        d_d = {'Densify by Distance': dens_dist(in_fc, gdb, name, dist),
+               'Densify by Percent': dens_perc(in_fc, gdb, name, dist),
+               'Densify by Factor': dens_fact(in_fc, gdb, name, dist)
+               }
+        d_d[tool]  # run the tool
     elif tool == 'Fill Holes':                   # ---- (4) fill holes
         fill_holes(in_fc, gdb, name)
     elif tool == 'Keep Holes':                   # ---- (5) keep holes
@@ -887,6 +904,33 @@ def pick_tool(tool, in_fc, out_fc, gdb, name):
     elif tool == 'Voronoi':                      # ---- (2) Voronoi
         out_kind = sys.argv[4].upper()
         vor_poly(in_fc, gdb, name, out_kind)
+    #
+    # ---- Tiling
+    elif tool in tile_list:
+        out_fc = sys.argv[2]      # full featureclass path and name
+        SR = sys.argv[3]          # spatial reference
+        out_kind = sys.argv[4]         # 1 Polyline, 2 Polygon
+        dx = float(sys.argv[5])        # x distance/increment
+        dy = float(sys.argv[6])        # y distance/increment
+        x_c = int(sys.argv[7])         # x columns
+        y_r = int(sys.argv[8])         # y rows
+        o_x = float(sys.argv[9])       # x origin
+        o_y = float(sys.argv[10])      # y origin
+        # rot_angle = sys.argv[11]
+        k = 2 if out_kind == 'Polygon' else 1
+        tool = str(sys.argv[11])
+        t_d = {
+            'hex_flat': hex_flat(dx, -dy, x_c, y_r, o_x, o_y, True, k),
+            'hex_pointy': hex_pointy(dx, -dy, x_c, y_r, o_x, o_y, True, k),
+            'rectangle': rectangle(dx, -dy, x_c, y_r, o_x, o_y, True, k),
+            'triangle': triangle(dx, -dy, x_c, y_r, o_x, o_y, True, k)
+            }
+        a = t_d[tool]  # pick and use the appropriate function
+        tweet("type {}\n{}".format(type(a), a[:10]))
+        msg = "gdb   : {}\name : {}\nSR   : {}\ntype : {}"
+        tweet(msg.format(gdb, name, SR, out_kind))
+        _out_(a, gdb, name, k, SR)  # produce the output
+        return None
     else:
         tweet("Tool {} not found".format(tool))
         return None
@@ -898,9 +942,9 @@ def pick_tool(tool, in_fc, out_fc, gdb, name):
 def _testing_():
     """Run in spyder."""
     pth = "C:/arcpro_npg"
-    in_fc = "C:/arcpro_npg/npg/Project_npg/npgeom.gdb/sq2"
-    out_fc = "C:/arcpro_npg/npg/Project_npg/tests.gdb/x"
-    # tbx = pth + "/npg_tools.tbx"
+    in_fc = "C:/arcpro_npg/Project_npg/npgeom.gdb/sq2"
+    out_fc = "C:/arcpro_npg/Project_npg/tests.gdb/x"
+    # tbx = pth + "/npGeom_30.atbx"  # can't import a *.atbx
     # tbx = ImportToolbox(tbx)
     # tool = 'ShiftFeatures'  # None  #
     # info_ = gp.getParameterInfo(tool)
@@ -911,16 +955,20 @@ def _testing_():
     return in_fc, out_fc  # in_fc, out_fc, tool, kind
 
 
-def _tool_(tools=tool_list):
+def _tool_(all_tools):
     """Run from a tool in arctoolbox in ArcGIS Pro.
 
     The tool checks to ensure that the path to the output complies and that
     the desired tool actually exists, so it can be parsed based on type.
     """
     tool = sys.argv[1]
-    in_fc = sys.argv[2]
-    out_fc = sys.argv[3]
-    tweet("out_fc  {}".format(out_fc))
+    if tool not in tile_list:  # -- tile_list doesn't require an input FC
+        in_fc = sys.argv[2]
+        out_fc = sys.argv[3]
+    else:
+        in_fc = None
+        out_fc = sys.argv[2]
+    # tweet("out_fc  {}".format(out_fc))
     if out_fc not in (None, 'None'):
         gdb, name = check_path(out_fc)           # ---- check the paths
         if gdb is None:
@@ -929,13 +977,13 @@ def _tool_(tools=tool_list):
     else:
         gdb = None
         name = None
-    if tool not in tools:                        # ---- check the tool
+    if tool not in all_tools:                    # ---- check the tool
         tweet("Tool {} not implemented".format(tool))
         return None
     msg1 = "Tool   : {}\ninput  : {}\noutput : {}"
     tweet(msg1.format(tool, in_fc, out_fc))
     pick_tool(tool, in_fc, out_fc, gdb, name)    # ---- run the tool
-    return  # tool, in_fc, out_fc
+    return tool, in_fc, out_fc
 
 
 # ===========================================================================
@@ -946,7 +994,13 @@ if len(sys.argv) == 1:
     result = _testing_()
 else:
     testing = False
-    _tool_(tool_list)
+    AddMessage("=hello1")  # arcpy.AddMessage, AddMessage imported directly
+    AddMessage(r"<hello2>")
+    AddMessage("<{}>".format("hello3"))
+    tool, in_fc, out_fc = _tool_(all_tools)
+    msg = "Outside...\nTool   : {}\ninput  : {}\noutput : {}"
+    tweet(msg.format(tool, in_fc, out_fc))
+    GetMessages()
 
 # ===========================================================================
 #
@@ -954,5 +1008,5 @@ if __name__ == "__main__":
     """optional location for parameters"""
     info_ = _testing_()
 
-    # in_fc = "C:/arcpro_npg/npg/Project_npg/tests.gdb/sq2"
-    # out_fc = "C:/arcpro_npg/npg/Project_npg/tests.gdb/x"
+    # in_fc = "C:/arcpro_npg/Project_npg/tests.gdb/sq2"
+    # out_fc = "C:/arcpro_npg/Project_npg/tests.gdb/x0"
