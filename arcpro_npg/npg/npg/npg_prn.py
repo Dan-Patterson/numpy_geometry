@@ -46,9 +46,9 @@ import numpy as np
 
 # import npGeo
 
-from npg import npg_helpers as n_h
-# import npg_helpers as n_h
-# from npg_helpers import shape_finder
+from npg import npg_geom_hlp as n_h
+# import npg_geom_hlp as n_h
+# from npg_geom_hlp import shape_finder
 
 # ---- Keep for now.
 from numpy.lib.recfunctions import structured_to_unstructured as stu
@@ -390,11 +390,11 @@ def prn_lists(a, max_=None, prn_structure=False):
 
     See Also
     --------
-    ``npg_helpers.shape_finder`` to print or return the structure of the nested
+    ``npg_geom_hlp.shape_finder`` to print or return the structure of the nested
     structure.
     """
     if prn_structure:
-        n_h.shape_finder(a, prn=True)  # see npg_helpers
+        n_h.shape_finder(a, prn=True)  # see npg_geom_hlp
     if max_ is None:
         max_ = 70
     for i, v in enumerate(a):

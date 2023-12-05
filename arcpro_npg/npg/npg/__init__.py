@@ -20,7 +20,7 @@ Author :
 - Dan_Patterson@carleton.ca
 - https://github.com/Dan-Patterson
 
-Modified : 2022-09-12
+Modified : 2023-11-05
     Creation date during 2019 as part of ``arraytools``.
 
 Purpose
@@ -93,16 +93,21 @@ import numpy as np
 # ---- import for npg
 # import npg
 
-from . import npgDocs, npGeo, npg_helpers, npg_geom
-from . import npg_bool_hlp, npg_min_circ, npg_overlay, npg_analysis
+from . import npgDocs, npGeo, npg_geom_hlp, npg_geom_ops
+from . import npg_bool_hlp, npg_bool_ops
+from . import npg_min_circ, npg_overlay, npg_analysis
 from . import npg_setops, npg_io, npg_table, npg_create, npg_utils
 from . import npg_pip, npg_prn  # noqa
+# --
+# requires arcpy
+# npg_create, npg_arc_npg, npg_geom_ops, npg_io
 
 from . npGeo import *  # noqa
-from . npg_helpers import *  # noqa
-from . npg_geom import *  # noqa
+from . npg_geom_hlp import *  # noqa
+from . npg_geom_ops import *  # noqa
 from . npg_io import *  # noqa
 from . npg_bool_hlp import *  # noqa
+from . npg_bool_ops import *  # noqa
 
 """
 from npGeo import (
@@ -113,11 +118,11 @@ from npGeo import (
     dirr
 )
 """
-# import npg_helpers
-# import npg_geom
+# import npg_geom_hlp
+# import npg_geom_ops
 # import npgDocs
 """
-from . import (npgDocs, npGeo, npg_helpers, npg_pip, npg_geom, npg_boolean,
+from . import (npgDocs, npGeo, npg_geom_hlp, npg_pip, npg_geom_ops, npg_boolean,
                npg_min_circ, npg_overlay, npg_analysis, npg_setops, npg_io,
                npg_prn, npg_table, npg_create, npg_utils)  # pyflakes.ignore
 
@@ -140,9 +145,9 @@ from . npgDocs import (
 """
 
 # from . npGeo import *
-# from . npg_helpers import *
+# from . npg_geom_hlp import *
 # from . npg_pip import *
-# from . npg_geom import *
+# from . npg_geom_ops import *
 # from . npg_boolean import *
 # from . npg_min_circ import *
 # from . npg_overlay import *
@@ -159,9 +164,10 @@ from . npgDocs import (
 
 # ---- define __all__
 __all__ = [
-    'npgDocs', 'npGeo', 'npg_io', 'npg_geom', 'npg_bool_hlp', 'npg_helpers',
+    'npgDocs', 'npGeo', 'npg_io', 'npg_geom_ops', 'npg_geom_hlp',
+    'npg_bool_hlp', 'npg_bool_ops',
     'npg_overlay', 'npg_table', 'npg_create', 'npg_analysis', 'npg_utils',
-    'npg_setops', 'npg_helpers', 'npg_min_circ'
+    'npg_setops',  'npg_min_circ'
 ]
 
 __helpers__ = [
@@ -172,19 +178,20 @@ __helpers__ = [
 
 __all__.extend(npgDocs.__all__)
 __all__.extend(npGeo.__all__)
-__all__.extend(npg_geom.__all__)
-__all__.extend(npg_helpers.__all__)
+__all__.extend(npg_geom_ops.__all__)
+__all__.extend(npg_geom_hlp.__all__)
+__all__.extend(npg_bool_ops.__all__)
 __all__.extend(npg_bool_hlp.__all__)
 __all__.sort()
 
-__helpers__.extend(npg_helpers.__helpers__)
-__helpers__.extend(npg_geom.__helpers__)
+__helpers__.extend(npg_geom_hlp.__helpers__)
+__helpers__.extend(npg_geom_ops.__helpers__)
+__helpers__.extend(npg_bool_ops.__helpers__)
 __helpers__.extend(npg_bool_hlp.__helpers__)
 __helpers__.sort()
 
 """
 __all__.extend(npg.npg_io.__all__)
-__all__.extend(npg_boolean.__all__)
 __all__.extend(npg_prn.__all__)
 __all__.extend(npg_pip.__all__)
 __all__.extend(npg_table.__all__)
@@ -193,7 +200,6 @@ __all__.extend(npg_analysis.__all__)
 __all__.extend(npg_overlay.__all__)
 __all__.extend(npg_setops.__all__)
 # __all__.extend(npg_min_circ.__all__)
-__helpers__.extend(npg_boolean.__helpers__)
 __helpers__.extend(npg_analysis.__helpers__)
 __helpers__.extend(npg_overlay.__helpers__)
 

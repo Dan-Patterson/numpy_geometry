@@ -26,21 +26,21 @@ from numpy.lib.recfunctions import unstructured_to_structured as uts
 from numpy.lib.recfunctions import repack_fields
 
 import npg  # noqa
-from npg import npg_geom as geom
-from npg import npg_helpers, npg_io, npg_prn  # npg_create)
+from npg import npg_geom_ops as geom
+from npg import npg_geom_hlp, npg_io, npg_prn  # npg_create)
 from npg import npg_min_circ as sc
 
-from npg.npg_helpers import (
+from npg.npg_geom_hlp import (
     _angles_3pnt_, _area_centroid_, _bit_area_, _bit_crossproduct_,
-    _bit_min_max_, _bit_length_, _rotate_, polyline_angles, uniq_1d)
+    _clean_segments_, _bit_min_max_, _bit_length_, _rotate_, geom_angles,
+    uniq_1d)
 
 from npg.npgDocs import (
-    Geo_hlp, array_IFT_doc, dirr_doc, shapes_doc, parts_doc, get_shapes_doc,
-    inner_rings_doc, outer_rings_doc, is_in_doc, convex_hulls_doc,
-    bounding_circles_doc,
-    extent_rectangles_doc, od_pairs_doc, pnt_on_poly_doc,
-    sort_by_area_doc,
-    radial_sort_doc, sort_by_extent_doc)  #
+    Geo_hlp, shapes_doc, parts_doc, outer_rings_doc, inner_rings_doc,
+    get_shapes_doc, is_in_doc, convex_hulls_doc, extent_rectangles_doc,
+    bounding_circles_doc, od_pairs_doc, pnt_on_poly_doc, sort_by_area_doc,
+    radial_sort_doc, sort_by_extent_doc, array_IFT_doc, dirr_doc
+  )  #
 
 np.set_printoptions(
     edgeitems=10, linewidth=120, precision=2, suppress=True, threshold=200,
@@ -72,6 +72,7 @@ class Geo(np.ndarray):
     `npg.arrays_to_Geo`, `npg.array_IFT` and `npg.roll_coords`.
     See `npg.npg_arc_npg` and `npg.npg_io` for methods to acquire the ndarrays
     needed from other data sources.
+
     """
 
     __name__ = "npGeo"
@@ -95,7 +96,7 @@ class Geo(np.ndarray):
             print(dedent(m).format(arr.ndim, IFT.ndim))
             return None
         if (IFT.shape[-1] < 6) or (Kind not in (1, 2)):
-            print(dedent(Geo_hlp))
+            print("Improper IFT \nIFT shape (n x 6) required and K = 1 or 2")
             return None
         # --
         self = arr.view(cls)      # view as Geo class
@@ -406,14 +407,12 @@ class Geo(np.ndarray):
         fr, too = [uniq_1d(i) for i in [fr, too]]  # use uniq_1d vs unique
         fr_to = np.concatenate((fr[:, None], too[:, None]), axis=1)
         return [self.XY[ft[0]:ft[1]] for ft in fr_to]
-    # shapes.__doc__ += shapes_doc
 
     @property
     def parts(self):
         """Deconstruct the 2D array into its parts."""
         fr_to = self.part_IFT[:, 1:3]
         return [self.XY[ft[0]:ft[1]] for ft in fr_to]
-    # parts.__doc__ += parts_doc
 
     @property
     def bits(self):
@@ -429,6 +428,7 @@ class Geo(np.ndarray):
     # splitter : b, p, s
     #     Split by (b)it, (p)art (s)hape.
     #
+
     def all_shapes(self):
         """Return the shapes."""
         return self.shapes
@@ -544,12 +544,12 @@ class Geo(np.ndarray):
         **keep for now**
         Use self.bits, self.parts or self.shapes directly.
         """
-        case = splitter[0].lower()  # use first letter for case
-        if case == "b":
+        case_ = splitter[0].lower()  # use first letter for case
+        if case_ == "b":
             vals = self.bits
-        elif case == "p":
+        elif case_ == "p":
             vals = self.parts
-        elif case == "s":
+        elif case_ == "s":
             vals = self.shapes
         else:
             print("\nSplitter not in by (b)it, (p)art (s)hape")
@@ -562,7 +562,7 @@ class Geo(np.ndarray):
     def areas(self, by_shape=True):
         """Area for the sub arrays using einsum based area calculations.
 
-        Uses `npg_helpers._bit_area_` to calculate the area.
+        Uses `npg_geom_hlp._bit_area_` to calculate the area.
         The `by_shape=True` parameter returns the area for each shape. If
         False, each bit area is returned.  Negative areas are holes.
         """
@@ -741,7 +741,7 @@ class Geo(np.ndarray):
         return np.asarray([np.mean(i, axis=0) for i in chunks])
 
     # ---- ===================================================================
-    # ---- npg_geom methods/properties required
+    # ---- npg_geom_ops methods/properties required
     # ----  ------------------------------------------------------------------
     # ---- (1) **is** section, condition/case checking, kept to a minimum
     def is_clockwise(self, is_closed_polyline=False, as_structured=False):
@@ -823,9 +823,7 @@ class Geo(np.ndarray):
     def polyline_angles(self, right_side=True):
         """Polyline angles defined by sequential 3 points."""
         f_bits = self.first_bit(False)
-        inside = False
-        if right_side:
-            inside = True
+        inside = True if right_side else False
         return [_angles_3pnt_(p, inside, True) for p in f_bits]  # npg_helper
 
     def polygon_angles(self, inside=True, in_deg=True):
@@ -912,8 +910,8 @@ class Geo(np.ndarray):
 
         Requires
         --------
-        - `mabr` from npg_geom
-        - `_area_centroid_` from npg_helpers
+        - `mabr` from npg_geom_ops
+        - `_area_centroid_` from npg_geom_hlp
         """
         def _r_(a, cent, angle, clockwise):
             """Rotate by `angle` in degrees, about the center."""
@@ -929,7 +927,7 @@ class Geo(np.ndarray):
         p_centers = [_area_centroid_(i)[1] for i in polys]
         # p_centers = chs.extent_centers()  # -- try extent centers
         # p_angles = _bit_segment_angles_(polys, fromNorth=False)
-        p_angles = polyline_angles(polys, fromNorth=False)
+        p_angles = geom_angles(polys, fromNorth=False)
         rects = geom.mabr(polys, p_centers, p_angles)
         if as_structured:
             dt = np.dtype([('Rect_area', '<f8'), ('Angle_', '<f8'),
@@ -1122,6 +1120,16 @@ class Geo(np.ndarray):
         g0, ift, extent = array_IFT(polys)
         return Geo(g0, ift, self.K, self.XT, "Densify by percent")
 
+    def simplify_lines(self, tol=1e-6):
+        """Remove redundant points from features which lie on a straight line.
+
+        `tol` is the tolerance distance between point triplets
+        """
+        bits = self.bits
+        polys = [geom.simplify(a, tol) for a in bits]
+        g0, ift, extent = array_IFT(polys)
+        return Geo(g0, ift, self.K, self.XT, "Simplified perimeter/lines.")
+
     def pnt_on_poly(self, by_dist=True, val=1, as_structured=True):
         """Place a point on polyline/polygon by distance or percent."""
         dt = [('OID_', '<i4'), ('X_', '<f8'), ('Y_', '<f8')]
@@ -1167,7 +1175,7 @@ class Geo(np.ndarray):
 
         See Also
         --------
-        `npGeo.segment_polys()` and `npg_helpers.polys_to_segments` for other
+        `npGeo.segment_polys()` and `npg_geom_hlp.polys_to_segments` for other
         output options.
         """
         if self.K not in (1, 2):
@@ -1463,7 +1471,7 @@ class Geo(np.ndarray):
 # ---- == End of class definition ==
 # ---- Main Functions
 # ----  ---------------------------
-# ---- (2) Geo from sequences
+# ---- (2) Create Geo from sequences
 #  Construct the Geo array from sequences.
 #     ndarrays, object arrays, nested lists, lists of arrays etcetera.
 #
@@ -1546,6 +1554,8 @@ def array_IFT(in_arrays, shift_to_origin=False):
     a_2d = []
     if isinstance(in_arrays, (list, tuple)):  # next line, for single multipart
         in_arrays = np.asarray(in_arrays, dtype='O')  # .squeeze() removed
+        if in_arrays.ndim == 2:
+            in_arrays = in_arrays.squeeze()  # added 2023-11-30 for sq2 shape 1
     if isinstance(in_arrays, np.ndarray):
         if in_arrays.ndim == 2 or len(in_arrays) == 1:
             in_arrays = [in_arrays]
@@ -1884,6 +1894,22 @@ def check_geometry(g):
     return None
 
 
+def clean_polygons(g, tol=1e-06, asGeo=True):
+    """Remove redundant points on poly* segments.
+
+    The errors may be due to construction errors or extra points on the
+    segments used to construct the poly feature.
+    """
+    K = 2
+    if hasattr(g, "IFT"):
+        g = g.bits
+        K = g.K
+    out = [_clean_segments_(a, tol=1e-06) for a in g]
+    if asGeo:
+        return arrays_to_Geo(out, K, info='clean polygons', to_origin=False)
+    return out
+
+
 def is_Geo(obj, verbose=False):
     """Check the input to see if it is a Geo array.  Used by `roll_coords`.
 
@@ -2016,14 +2042,14 @@ def dirr(obj, cols=3, prn=True):
         a = ['... Geo class ...\n']
         a.extend(_sub_(sorted(list(sdo.difference(sda))), cols))
         a.extend(["\n\n... Functions from modules ..."])
-        a.extend(["\n... npg_geom ..."])
+        a.extend(["\n... npg_geom_ops ..."])
         a.extend(_sub_(sorted(geom.__all__), cols))
-        a.extend(["\n... npg_geom  helpers ..."])
+        a.extend(["\n... npg_geom_ops  helpers ..."])
         a.extend(_sub_(sorted(geom.__helpers__), cols))
-        a.extend(["\n... npg_helpers ..."])
-        a.extend(_sub_(sorted(npg_helpers.__all__), cols))
-        a.extend(["\n... npg_helpers helpers ..."])
-        a.extend(_sub_(sorted(npg_helpers.__helpers__), cols))
+        a.extend(["\n... npg_geom_hlp ..."])
+        a.extend(_sub_(sorted(npg_geom_hlp.__all__), cols))
+        a.extend(["\n... npg_geom_hlp helpers ..."])
+        a.extend(_sub_(sorted(npg_geom_hlp.__helpers__), cols))
         a.extend(["\n... npg_io ..."])
         a.extend(_sub_(npg_io.__all__, cols))
         a.extend(["\n... npg_prn ..."])
@@ -2060,22 +2086,22 @@ def dirr(obj, cols=3, prn=True):
     return txt_out
 
 
-array_IFT.__doc__ += array_IFT_doc
-dirr.__doc__ += dirr_doc
 Geo.all_shapes.__doc__ += shapes_doc
 Geo.all_parts.__doc__ += parts_doc
-Geo.get_shapes.__doc__ += get_shapes_doc
-Geo.inner_rings.__doc__ += inner_rings_doc
 Geo.outer_rings.__doc__ += outer_rings_doc
+Geo.inner_rings.__doc__ += inner_rings_doc
+Geo.get_shapes.__doc__ += get_shapes_doc
 Geo.is_in.__doc__ += is_in_doc
-Geo.bounding_circles.__doc__ += bounding_circles_doc
 Geo.convex_hulls.__doc__ += convex_hulls_doc
 Geo.extent_rectangles.__doc__ += extent_rectangles_doc
+Geo.bounding_circles.__doc__ += bounding_circles_doc
 Geo.od_pairs.__doc__ += od_pairs_doc
 Geo.pnt_on_poly.__doc__ += pnt_on_poly_doc
-Geo.radial_sort.__doc__ += radial_sort_doc
 Geo.sort_by_area.__doc__ += sort_by_area_doc
+Geo.radial_sort.__doc__ += radial_sort_doc
 Geo.sort_by_extent.__doc__ += sort_by_extent_doc
+array_IFT.__doc__ += array_IFT_doc
+dirr.__doc__ += dirr_doc
 
 # ---- == __main__ section ==
 if __name__ == "__main__":

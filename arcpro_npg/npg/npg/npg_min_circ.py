@@ -122,7 +122,7 @@ def small_circ(a):
         cent = center(*a[:2])
         radius = distance(cent, a[0])
         return cent, radius, a[:2]
-    # ---- corner-cases/garbage checking over
+    # corner-cases/garbage checking over
     p0, p1, _ = farthest(a, check=False)
     cent = center(p0, p1)
     radius = distance(cent, p0)

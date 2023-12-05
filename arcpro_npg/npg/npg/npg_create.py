@@ -86,7 +86,7 @@ import numpy as np
 
 from npg import npg_plots  # noqa
 from npg.npGeo import arrays_to_Geo
-from npg.npg_helpers import _to_lists_
+from npg.npg_geom_hlp import _to_lists_
 from npg.npg_overlay import merge_  # noqa
 from npg.npg_plots import plot_mixed, plot_polygons    # noqa # plot_2d, 
 

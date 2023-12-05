@@ -99,7 +99,7 @@ def _is_right_side(p, strt, end):
 
     See Also
     --------
-    line_crosses, in_out_crosses in npg_helpers.
+    line_crosses, in_out_crosses in npg_geom_hlp.
     position = sign((Bx - Ax) * (Y - Ay) - (By - Ay) * (X - Ax))
 
     Returns
@@ -194,7 +194,7 @@ def winding_num(pnts, poly, batch=False):
 
         See Also
         --------
-        `line_crosses`, `in_out_crosses` in npg_helpers.
+        `line_crosses`, `in_out_crosses` in npg_geom_hlp.
         position = sign((Bx - Ax) * (Y - Ay) - (By - Ay) * (X - Ax))
         negative for right of clockwise line, positive for left. So in essence,
         the reverse of _is_left_side with the outcomes reversed ;)

@@ -44,7 +44,7 @@ Functions for boolean operations on polygons:
 import sys
 import numpy as np
 import npg  # noqa
-from npg.npg_helpers import a_eq_b
+from npg.npg_geom_hlp import a_eq_b
 from npg.npg_bool_hlp import _del_seq_pnts_, prep_overlay
 from npg.npg_plots import plot_polygons  # noqa
 
@@ -75,7 +75,7 @@ def clip_poly(poly, clp, as_geo=False):
 
     Requires
     --------
-    `npg_helpers` : `a_eq_b`
+    `npg_geom_hlp` : `a_eq_b`
 
     `_roll_`, `_del_seq_pnts_
     """
@@ -100,7 +100,7 @@ def clip_poly(poly, clp, as_geo=False):
         return ids
 
     # -- quick bail 1
-    bail = a_eq_b(poly, clp).all()  # from npg_helpers
+    bail = a_eq_b(poly, clp).all()  # from npg_geom_hlp
     if bail:
         print("\nInput polygons are equal.\n")
         return None
@@ -405,7 +405,7 @@ def find_overlap_segments(arr, is_poly=True, return_all=True):
 
     See Also
     --------
-    See `simplify` in `npg_geom`.
+    See `simplify` in `npg_geom_ops`.
     """
     tmp = _del_seq_pnts_(np.asarray(arr), poly=is_poly)  # keep dupl last point
     # -- create from-to points

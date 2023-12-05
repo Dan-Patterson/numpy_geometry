@@ -1125,6 +1125,51 @@ def remove_seq_dupl(a):
     return uni
 
 
+def separate_string_number(string, as_list=False):
+    """Return a string split into strings and numbers, as a list.
+
+    z = 'Pj 60Pt 30Bw 10'
+    z0 = 'PJ60PT30BW10'
+    separate_string_number(z)
+    separate_string_number(z0)
+    returned value
+    ['Pj', '60', 'Pt', '30', 'Bw', '10']
+
+    separate_string_number("A .1 in the 1.1 is not 1")
+    ['A', '.1', 'in', 'the', '1.1', 'is', 'not', '1']
+
+    Modified from https://stackoverflow.com/a/57359921/6828711
+    """
+    groups = []
+    prev = string[0]
+    newword = string[0]
+    if len(string) <= 1:
+        return [string]
+    for x, i in enumerate(string[1:]):
+        if i.isalpha() and prev.isalpha():
+            newword += i
+        elif (i.isnumeric() or i == '.') and (prev.isnumeric() or prev == '.'):
+            newword += i
+        else:
+            groups.append(newword.strip())
+            newword = i
+        prev = i
+        if x == len(string) - 2:
+            groups.append(newword.strip())  # strip any spaces
+            newword = ''
+    # remove extraneous space values in groups
+    groups = [i for i in groups if i != '']
+    # -- for arrays
+    # np.asarray(np.split(groups, groups.size//2)  # split into pairs.)
+    if as_list:
+        return groups
+    # -- pair values, special case
+    s = " ".join(["".join(groups[pos:pos + 2])
+                  for pos in range(0, len(groups), 2)]
+                 )
+    return s
+
+
 # ==== Processing finished ====
 # ===========================================================================
 #

@@ -159,9 +159,9 @@ __init__.py :
     General comments about the package.
 npg_io.py :
     Import and conversion routines for the Geo class.
-npg_helpers.py :
+npg_geom_hlp.py :
     Many helper functions used the Geo class and often for ndarrays generally.
-npg_geom :
+npg_geom_ops :
     Methods/functions for working with the Geo class or used by it.
 npg_table :
     Methods/functions associated with tabular data.

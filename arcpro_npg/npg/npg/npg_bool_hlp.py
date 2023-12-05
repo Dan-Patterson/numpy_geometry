@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2023-10-30
+    2023-12-04
 
 Purpose
 -------
@@ -47,8 +47,10 @@ np.set_printoptions(
 script = sys.argv[0]
 
 __all__ = ['add_intersections', 'prep_overlay']
-__helpers__ = ['_add_pnts_', 'del_seq_pnts', '_roll_', '_w_', '_wn_clip_',
-               '_node_type_']
+__helpers__ = [
+    '_add_pnts_', 'del_seq_pnts', '_roll_', '_w_', '_wn_clip_', '_node_type_'
+]
+__imports__ = ['roll_arrays']
 
 
 # ---- (1) private helpers
@@ -454,15 +456,15 @@ def add_intersections(
     ----------
     p0, p1 : array_like
        The overlapping poly features.
+    roll_to_minX : boolean
+        Select the intersection point with the minimum x-value.  This is used
+        to roll the arrays.
     p0_pgon, p1_pgon : boolean
         True, the input geometry is a polygon feature, False, for polyline.
         Some operations permit polygon and polyline inputs, so you can alter
         `p0_pgon=True, p1_pgon=False]` if the first is a polygon and the
         second a polyline.
-    roll_to_minX : boolean
-        Select the intersection point with the minimum x-value.  This is used
-        to roll the arrays.
-    class_id : boolean
+    class_ids : boolean
         Return Pout, Pin, Cout, Cin if True.  These are the indices of the
         points that are in or out of their respective counterpart.
 

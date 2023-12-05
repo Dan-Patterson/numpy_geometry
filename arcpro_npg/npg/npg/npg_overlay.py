@@ -29,7 +29,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2023-10-09
+    2023-12-01
 
 Purpose
 -------
@@ -79,9 +79,9 @@ import numpy as np
 # from npGeo import array_IFT, arrays_to_Geo, roll_coords
 from npg import npGeo
 from npg.npg_pip import np_wn
-# import npg_helpers
-from npg.npg_helpers import (_to_lists_, _bit_check_, _in_LBRT_,
-                             remove_geom, radial_sort)
+# import npg_geom_hlp
+from npg.npg_geom_hlp import (_to_lists_, _bit_check_, _in_LBRT_,
+                              remove_geom, radial_sort)
 
 # -- optional imports
 # from numpy.lib.recfunctions import structured_to_unstructured as stu
@@ -96,10 +96,6 @@ np.set_printoptions(
 
 script = sys.argv[0]  # print this should you need to locate the script
 
-# FLOATS = np.typecodes['AllFloat']
-# INTS = np.typecodes['AllInteger']
-# NUMS = FLOATS + INTS
-# TwoPI = np.pi * 2.0
 
 __all__ = [
     'pnt_segment_info',
@@ -113,16 +109,14 @@ __all__ = [
     'line_crosses', 'in_out_crosses', 'crossings',
     'left_right_pnts', 'line_side', '_line_crossing_'
 ]
-__helpers__ = ['_intersect_', '_adj_']
-
-__all__ = __helpers__ + __all__
+__helpers__ = ['_intersect_', '_adj_within_']
 
 
 # ----------------------------------------------------------------------------
 # ---- (1) helpers/mini functions
 #
-def _adj_(a, full=False):
-    """Determine adjacency for a polygon Geo array's outer rings.
+def _adj_within_(a, full=False):
+    """Determine adjacency within a Geo array's outer rings.
 
     # Parameters
     ----------
@@ -325,7 +319,7 @@ def intersections(polys, overlays, outer_only=True, stacked=False):
 
     Requires
     --------
-    ``_to_lists_`` from npg_helpers
+    ``_to_lists_`` from npg_geom_hlp
 
     Notes
     -----
@@ -522,11 +516,11 @@ def dissolve(a, asGeo=True):
         #     sp1 = np.nonzero(~idx10)[0][::-1]
         sp1 = np.nonzero(sp1)[0]
         if sp1[0] + 1 == sp1[1]:  # added the chunk section 2023-03-12
-            print("split equal {}".format(sp1))
+            # print("split equal {}".format(sp1))
             chunk = b1[sp1]
         else:
             sp2 = np.nonzero(idx10)[0]
-            print("split not equal {} using sp2 {}".format(sp1, sp2))
+            # print("split not equal {} using sp2 {}".format(sp1, sp2))
             chunks = np.array_split(b1, sp2[1:])
             chunk = np.concatenate(chunks[::-1])
         return np.concatenate((z0[0], chunk, z0[-1]), axis=0)
@@ -824,7 +818,7 @@ def union_as_one(a, b):
 
     Requires
     --------
-    `npg_helpers.radial_sort`
+    `npg_geom_hlp.radial_sort`
         to close polygons and/or sort coordinates in cw or ccw order.
     `npg_pip.np_wn`
         point in polygon using winding number.
