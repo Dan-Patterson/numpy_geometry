@@ -12,7 +12,7 @@
 
 **New home base for Free Tools**
 
-Developed in ArcGIS Pro <= 3.02, python <= 3.9.11 and numpy <= 1.20.2.
+Developed in ArcGIS Pro <= 3.2.1, python <= 3.9.18 and numpy <= 1.22.
 
 These demo scripts and the toolbox show how numpy and arcpy can play nice together and generate geometries that are normally only available at the ArcGIS Pro Advanced level.  The tools are already provided to do this, but less attention is paid to the attributes.
 
