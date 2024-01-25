@@ -182,9 +182,77 @@ def _roll_(arrs):
     return out
 
 
+def p_ints_p(poly0, poly1):
+    r"""Intersect two polygons.  Used in clipping.
+
+    Parameters
+    ----------
+    poly0, poly1 : ndarrays
+        Two polygons/polylines. poly0, feature to intersect using poly1 as the
+        clipping feature.
+
+    Returns
+    -------
+    Points of intersection or None.
+
+    Notes
+    -----
+    Using Paul Bourke`s notation.
+
+    Intersection point of two line segments in 2 dimensions, 1989.
+
+    `<http://paulbourke.net/geometry/pointlineplane/>`_.
+
+    `<http://paulbourke.net/geometry/polygonmesh/>`_.
+
+    | line a : p0-->p1
+    | line b : p2-->p3
+
+    >>> d_nom = (y3 - y2) * (x1 - x0) - (x3 - x2) * (y1 - y0)
+    >>>       = (y3[:, None] - y2) * (x1[:, None] - x0) -
+    ...         (x3[:, None] - x2) * (y1[:, None] - x0)
+    >>> a_num = (x3 - x2) * (y0 - y2) - (y3 - y2) * (x0 - x2)  # ==> u_a
+    >>> b_num = (x1 - x0) * (y0 - y2) - (y1 - y0) * (x0 - x2)  # ==> u_b
+    >>> u_a = a_num/d_nom  # if d_nom != 0
+    >>> u_b = b_num/d_nom
+
+    if 0 <= u_a, u_b <=1 then the intersection is on both segments
+    """
+    poly0, poly1 = [i.XY if hasattr(i, "IFT") else i for i in [poly0, poly1]]
+    p10 = poly0[1:] - poly0[:-1]
+    p32 = poly1[1:] - poly1[:-1]
+    p10_x, p10_y = p10.T
+    p32_x, p32_y = p32.T
+    p02 = poly0[:-1] - poly1[:-1][:, None]
+    d_nom = (p32_y[:, None] * p10_x) - (p32_x[:, None] * p10_y)
+    a_num = p32_x[:, None] * p02[..., 1] - p32_y[:, None] * p02[..., 0]
+    b_num = p10_x * p02[..., 1] - p10_y * p02[..., 0]
+    #
+    with np.errstate(all='ignore'):  # divide='ignore', invalid='ignore'):
+        u_a = a_num / d_nom
+        u_b = b_num / d_nom
+        z0 = np.logical_and(u_a >= 0., u_a <= 1.)
+        z1 = np.logical_and(u_b >= 0., u_b <= 1.)
+        both = z0 & z1
+        xs = u_a * p10_x + poly0[:-1][:, 0]
+        ys = u_a * p10_y + poly0[:-1][:, 1]
+        # *** np.any(both, axis=1)
+        # yields the segment on the clipper that the points are on
+        # *** np.sum(bth, axis=1)  how many intersections on clipper
+        #     np.sum(both, axis=0)  intersections on the polygon
+    xs = xs[both]
+    ys = ys[both]
+    if xs.size > 0:
+        final = np.zeros((len(xs), 2))
+        final[:, 0] = xs
+        final[:, 1] = ys
+        return final  # z0, z1, both  # np.unique(final, axis=0)
+    return None
+
+
 # ---- (2) prepare for boolean operations
 #
-def _w_(a, b, all_info):
+def _w_(a, b, all_info=False):
     """Return winding number and other values."""
     x0, y0 = a[:-1].T   # point `from` coordinates
     # x1, y1 = a[1:].T  # point `to` coordinates
@@ -513,7 +581,10 @@ def add_intersections(
         plot_polygons([z0, z1])
     """
     def _classify_(p0_, p1_, id_):
-        """Return poly points classified as inside, on or outside."""
+        """Return classified points.
+
+        Classified as:  `inside` (1), `on` (0)  or `outside` (-1).
+        """
         p_ids = np.arange(0, p0_.shape[0])
         p_neq = sorted(list(set(p_ids).difference(set(id_))))
         p_neq = np.array(p_neq)  # convert to array
@@ -530,13 +601,20 @@ def add_intersections(
         return p_ioo
 
     def in_out_on(w0, p_sze):
-        """Return the array indices as lists."""
+        """Return the array indices as lists of lists.
+
+        Returns
+        -------
+        empty : [[]]
+        one seq : [[1]] or [[1, 2, 3]]
+        two seq : [[1, 2, 3], [4, 5, 6]]
+        """
         if w0.size == 0:  # print("Empty array.")
-            return []
+            return [[]]   # 2023-12-22
         if len(w0) == 1:  # 2023-05-07
             val = w0.tolist()[0]
             vals = [val - 1, val, val + 1] if val > 0 else [val, val + 1]
-            return vals
+            return [vals]  # 2023-12-22
         out = []
         cnt = 0
         sub = [w0[0] - 1, w0[0]]
@@ -562,11 +640,15 @@ def add_intersections(
     p0_n, p1_n = _add_pnts_(p0, p1, x_pnts, whr)
     p0_n = _del_seq_pnts_(np.concatenate((p0_n), axis=0), poly=is_0)
     p1_n = _del_seq_pnts_(np.concatenate((p1_n), axis=0), poly=is_1)
-    x_pnts = _del_seq_pnts_(x_pnts, False)  # True, if wanting a polygon
+    # x_pnts = _del_seq_pnts_(x_pnts, False)  # True, if wanting a polygon
+    x_pnts, idx = np.unique(x_pnts, True, axis=0) # sorted by x
+    # x_pnts = x_pnts[np.sort(idx)]  # crosses back and forth
+    # w = np.argsort(x_pnts[:, 0])[0]
+    # xp = u[w]  # not useful  just the minimum point
     # -- locate the roll coordinates
     if roll_to_minX:
-        w = np.argsort(x_pnts[:, 0])[0]  # sort and slice is quickest
-        xp = x_pnts[w]
+        # w = np.argsort(x_pnts[:, 0])[0]  # sort and slice is quickest
+        xp = x_pnts[0]
     else:
         xp = x_pnts
     r0 = np.nonzero((xp == p0_n[:, None]).all(-1).any(-1))[0]
@@ -582,8 +664,16 @@ def add_intersections(
     whr1 = np.nonzero(id1 == p1N)[0]
     id0[whr0] = 0
     id1[whr1] = 0  # slice off the first and last
+    # -- create id_plcl and onConP
     id_plcl = np.concatenate((id0[:, None], id1[:, None]), axis=1)[1:-1]
     id_plcl[-1] = [p0N, p1N]  # make sure the last entry is < shape[0]
+    #
+    w0 = np.argsort(id_plcl[:, 1])  # get the order and temporarily sort
+    z = np.zeros((id_plcl.shape[0], 4), dtype=int)
+    z[:, :2] = id_plcl[:, [1, 0]][w0]
+    z[1:, 2] = z[1:, 0] - z[:-1, 0]
+    z[1:, 3] = z[1:, 1] - z[:-1, 1]
+    onConP = np.copy(z)
     #
     if class_ids:
         p0_ioo = _classify_(p0_n, p1_n, id0)  # poly
@@ -600,7 +690,7 @@ def add_intersections(
         Cin = in_out_on(w3, p1_sze)   # clip inside poly
         # -- NOTE
         # -- id_plcl are the poly, clp point ids equal to x_pnts
-        return p0_n, p1_n, id_plcl, x_pnts, Pout, Pin, Cout, Cin
+        return p0_n, p1_n, id_plcl, onConP, x_pnts, Pout, Pin, Cout, Cin
     return p0_n, p1_n, id_plcl, x_pnts  # p0_ioo, p1_ioo
 
 
