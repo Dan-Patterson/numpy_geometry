@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2023-12-04
+    2024-03-18
 
 Purpose
 -------
@@ -155,7 +155,8 @@ __all__ = [
 __helpers__ = [
     '_add_pnts_on_line_', '_bit_min_max_', '_ch_', '_ch_scipy_',
     '_ch_simple_', '_closest_pnt_on_poly_', '_dist_along_', '_e_2d_',
-    '_is_pnt_on_line_', '_percent_along_', '_pnt_on_segment_'
+    '_is_pnt_on_line_', '_percent_along_', '_pnt_on_segment_',
+    'view_as_struct_'
 ]
 
 __imports__ = [
@@ -165,7 +166,7 @@ __imports__ = [
 ]
 
 
-# ===========================================================================
+# ---- ---------------------------
 # ---- general helpers
 #
 def _view_as_struct_(a, return_all=False):
@@ -197,6 +198,7 @@ def _view_as_struct_(a, return_all=False):
     return a_view
 
 
+# ---- ---------------------------
 # ---- (1) distance helpers
 #
 def _e_2d_(a, p):
@@ -573,7 +575,7 @@ def eucl_dist(a, b, metric='euclidean'):
     return dist_arr
 
 
-# ----------------------------------------------------------------------------
+# ---- ---------------------------
 # ---- (2) extent functions
 #
 def pnts_to_extent(a, as_pair=False):
@@ -639,10 +641,12 @@ def extent_to_poly(extent, kind=2):
     L, R = min(L, R), max(L, R)
     B, T = min(B, T), max(B, T)
     ext = np.array([[L, B], [L, T], [R, T], [R, B], [L, B]])
-    return npGeo.arrays_to_Geo([ext], kind=kind, info="extent to poly")
+    vals = npGeo.arrays_to_Geo(
+        [ext], kind=kind, info="extent to poly", to_origin=False)
+    return vals
 
 
-# ----------------------------------------------------------------------------
+# ---- ---------------------------
 # ---- (3) densify/simplify
 #
 def densify_by_factor(a, factor=2):
@@ -726,7 +730,7 @@ def simplify(arr, tol=1e-6):
     return keep
 
 
-# ----------------------------------------------------------------------------
+# ---- ---------------------------
 # ---- (4) buffer, scale
 #
 def scale_by_area(poly, factor=1, asGeo=False):
@@ -875,7 +879,7 @@ def offset_buffer(poly, buff_dist=1, keep_holes=False, asGeo=False):
     return final  # fr_to, z, final
 
 
-# ----------------------------------------------------------------------------
+# ---- ----------------------------
 # ---- (5) convex hulls
 #
 def _ch_scipy_(points):
@@ -931,7 +935,7 @@ def _ch_(points, threshold=50):
     return _ch_simple_(points)
 
 
-# ----------------------------------------------------------------------------
+# ---- ---------------------------
 # ---- (6) mabr (min. area bounding rectangle)
 #
 def mabr(polys, p_centers, p_angles):
@@ -995,7 +999,7 @@ def mabr(polys, p_centers, p_angles):
     return rects
 
 
-# ----------------------------------------------------------------------------
+# ---- ---------------------------
 # ---- (7) triangulation, Delaunay helper
 #
 def triangulate_pnts(pnts):
@@ -1034,7 +1038,7 @@ def triangulate_pnts(pnts):
     return new_pnts.tolist()
 
 
-# ----------------------------------------------------------------------------
+# ---- ---------------------------
 # ---- (8) poly* conversion
 #
 def polys_to_unique_pnts(a, as_structured=True):
@@ -1129,7 +1133,7 @@ def simplify_lines(a, deviation=10):
     return a, p, ang
 
 
-# ----------------------------------------------------------------------------
+# ---- ---------------------------
 # ---- (9) pnts in, or on, geometries
 #
 def pnts_in_pnts(pnts, geo, just_common=True):
@@ -1181,7 +1185,8 @@ def pnts_on_poly(pnts, poly):
     return z
 
 
-# ---- Not included yet -----------------------------------------------------
+# ---- ---------------------------
+# ---- Not included yet --------
 #
 def bin_pnts(pnts, x_bins=None, y_bins=None):
     """Bin points using a 2D bin.
@@ -1254,7 +1259,7 @@ def which_quad(line):
     return 3
 
 
-# ===========================================================================
+# ---- ---------------------------
 # ---- Extras used elsewhere
 '''
 

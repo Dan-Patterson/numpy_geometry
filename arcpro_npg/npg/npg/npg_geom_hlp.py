@@ -77,10 +77,6 @@ import numpy as np
 from numpy.lib.recfunctions import unstructured_to_structured as uts
 # from numpy.lib.recfunctions import repack_fields
 
-# if 'npg' not in list(locals().keys()):
-#     import npg
-
-# import npg_prn  # noqa
 from npg.npg_prn import prn_tbl  # used by `shape_finder`
 
 script = sys.argv[0]  # print this should you need to locate the script
@@ -88,9 +84,7 @@ script = sys.argv[0]  # print this should you need to locate the script
 nums = 'efdgFDGbBhHiIlLqQpP'
 
 # -- See script header
-__imports__ = [
-    'uts', 'npg_prn', 'prn_tbl'
-    ]
+__imports__ = ['uts', 'prn_tbl']
 
 __all__ = [
     'a_eq_b', 'cartesian_product', 'coerce2array', 'common_pnts',
@@ -115,7 +109,7 @@ __helpers__ = [
 # __all__ = __helpers__ + __all__
 
 
-# ---------------------------------------------------------------------------
+# ---- ---------------------------
 # ---- (1) Geo Helpers
 #
 def _get_base_(a):
@@ -200,7 +194,7 @@ def _to_lists_(a, outer_only=True):
     return a  # a list already
 
 
-# ---------------------------------------------------------------------------
+# ---- ---------------------------
 # ---- (2) Condition checking
 #
 def _is_clockwise_(a):
@@ -360,7 +354,7 @@ def _pnts_in_extent_(pnts, extent=None, return_index=False):
     return np.all(idx)
 
 
-# ---------------------------------------------------------------------------
+# ---- ---------------------------
 # ---- (3) Geometry helpers
 #
 def _clean_segments_(a, tol=1e-06):
@@ -375,7 +369,7 @@ def _clean_segments_(a, tol=1e-06):
 
     Notes
     -----
-    - Segments along a straight line can overlap (an construction error).
+    - Segments along a straight line can overlap (a construction error).
           [[0,0], [5, 5], [2, 2], [7, 7]]  # points out of order
     - Extraneous points can exist along a segment.
           [[0,0], [2, 2], [5, 5], [7, 7]]  # extra points not needed for line.
@@ -387,12 +381,16 @@ def _clean_segments_(a, tol=1e-06):
 
 
 def _bit_area_(a):
-    """Mini e_area, used by `areas` and `centroids`."""
+    """Mini e_area, used by `areas` and `centroids`.
+
+    Negative areas are holes.  This is intentionally reversed from
+    the `shoelace` formula.
+    """
     a = _get_base_(a)
-    x0, y1 = (a.T)[:, 1:]
+    x0, y1 = (a.T)[:, 1:]  # cross set up as follows
     x1, y0 = (a.T)[:, :-1]
-    e0 = np.einsum('...i,...i->...i', x0, y0)  # e0 = x0 * y0
-    e1 = np.einsum('...i,...i->...i', x1, y1)  # e1 = x1 * y1
+    e0 = np.einsum('...i,...i->...i', x0, y0)  # 2024-03-28 modified
+    e1 = np.einsum('...i,...i->...i', x1, y1)
     return np.sum((e0 - e1) * 0.5)
 
 
@@ -672,7 +670,7 @@ def _perp_(a):
     return b
 
 
-# ---------------------------------------------------------------------------
+# ---- ---------------------------
 # ---- (4) Geo / ndarray stuff
 #
 def uniq_1d(arr):
@@ -761,7 +759,7 @@ def segment_angles(a, fromNorth=False):
     return ang
 
 
-# ---------------------------------------------------------------------------
+# ---- ---------------------------
 # ---- (5) compare, remove, keep geometry
 #
 def a_eq_b(a, b, atol=1.0e-8, rtol=1.0e-5, return_pnts=False):
@@ -808,6 +806,39 @@ def _close_pnts_(a, b, tol=.0001, ret_whr=True):
         return whr
     w0, w1 = whr[0], whr[1]
     return a[w0], b[w1]
+
+
+def classify_pnts(a):
+    """Classify Geo array points.
+
+    Use np.argsort to sort the array and get the indices.
+    >>> z = uts(sq2)  # convert to a structured array
+    >>> perm = z.argsort(kind='mergesort')
+    >>> aux = z[perm]  # sorted
+    >>> sq2.shp_pnt_ids[perm]  # gives the ids and their shape
+    """
+    result = np.unique(
+        a,
+        return_index=True,
+        return_inverse=True,
+        return_counts=True,
+        axis=0
+        )
+    uni, idx, inv, cnt = result
+    n0 = np.arange(a.shape[0] + 1, dtype='int')
+    n1 = a.Fr
+    n2 = a.To - 1  # duplicate start/end ids
+    ft = np.sort(np.concatenate((n1, n2)))
+    rem_st_end = set(n0).symmetric_difference(ft)
+    # rem_st_end = np.sort(np.asarray(list(set(n0).symmetric_difference(ft))))
+    eq_1 = set(idx[cnt == 1])
+    gt_2 = set(idx[cnt > 2])
+    eq_2 = rem_st_end.symmetric_difference(eq_1.union(gt_2))
+    #
+    eq_1 = np.sort(np.asarray(list(eq_1)))
+    eq_2 = np.sort(np.asarray(list(eq_2)))
+    gt_2 = np.sort(np.asarray(list(gt_2)))
+    return ft, eq_1, eq_2, gt_2  # rem_strt
 
 
 def common_pnts(pnts, self, remove_common=True):
@@ -890,15 +921,21 @@ def compare_geom(arr, look_for, unique=True, invert=False, return_idx=False):
     if unique:
         out, ids = np.unique(tmp, return_index=True, axis=0)
         idx = sorted(ids)
-        out = tmp[idx]
+        tmp = tmp[idx]
     if return_idx:
-        return out, idx
-    return out
+        return tmp, idx
+    return tmp
 
 
 def keep_geom(arr, look_for, **kwargs):
     """Keep points in `arr` that match those in `look_for`."""
     return compare_geom(arr, look_for, invert=False, return_idx=False)
+
+
+def remove_geom(arr, look_for, **kwargs):
+    """Remove points from `arr` that match those in `look_for`."""
+    return compare_geom(arr, look_for, unique=False,
+                        invert=True, return_idx=False)
 
 
 def del_seq_dups(arr, poly=True):
@@ -939,7 +976,7 @@ def del_seq_dups(arr, poly=True):
     # sub_arrays = np.array_split(arr, wh_[wh_ > 0])
     tmp = arr[mask]  # -- slice the original array sequentially unique points
     if poly:  # -- polygon source check
-        if (tmp[0] != tmp[-1]).all(-1):
+        if not (tmp[0] != tmp[-1]).all(-1):
             arr = np.concatenate((tmp, tmp[0, None]), axis=0)
             return arr
     return tmp
@@ -982,13 +1019,7 @@ def multi_check(arr):
         return parts
 
 
-def remove_geom(arr, look_for, **kwargs):
-    """Remove points from `arr` that match those in `look_for`."""
-    return compare_geom(arr, look_for, unique=False,
-                        invert=True, return_idx=False)
-
-
-# ---------------------------------------------------------------------------
+# ---- ---------------------------
 # ---- (6) sort coordinates
 #
 def sort_xy(a, x_ascending=True, y_ascending=True, return_order=True):
@@ -1084,7 +1115,7 @@ def radial_sort(a, extent_center=True, close_poly=True, clockwise=True):
     return srted
 
 
-# ---------------------------------------------------------------------------
+# ---- ---------------------------
 # ---- (7) others functions
 #
 def interweave(arr, as_3d=False):

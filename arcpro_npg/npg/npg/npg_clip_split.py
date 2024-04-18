@@ -18,22 +18,14 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2023-11-03
+    2023-12-07
 
 Purpose
 -------
 Functions for boolean operations on polygons:
 
     - clip
-    - difference
-    - erase
-    - merge
     - split
-    - union
- A and B, A not B, B not A
- A union B (OR)
- A intersect B (AND)
- A XOR B
 
 """
 # pylint: disable=C0103,C0201,C0209,C0302,C0415
@@ -44,8 +36,10 @@ Functions for boolean operations on polygons:
 import sys
 import numpy as np
 import npg  # noqa
+# from npg.npGeo import roll_arrays
 from npg.npg_geom_hlp import a_eq_b
-from npg.npg_bool_hlp import _del_seq_pnts_, prep_overlay
+from npg.npg_bool_hlp import (_add_pnts_, _del_seq_pnts_, _wn_clip_,
+                              prep_overlay)  # _node_type_)
 from npg.npg_plots import plot_polygons  # noqa
 
 ft = {"bool": lambda x: repr(x.astype(np.int32)),
@@ -339,20 +333,33 @@ def split_poly(poly, line):
     Polygon split into two parts.  Currently only two parts are returned.
     Subsequent treatment will address multiple polygon splits.
     """
+    def _prep_(arrs, p0_pgon, p1_pgon):
+        """Prep the array and line."""
+        a0, a1 = arrs
+        vals = _wn_clip_(a0, a1, all_info=True)
+        x_pnts, pInc, cInp, x_type, whr = vals
+        # args = _node_type_(pInc, cInp, a0, a1, x_pnts)
+        # -- args =
+        #    px_in_c, cx_in_p, p_in_c, c_in_p, c_eq_p, c_eq_x, p_eq_c, p_eq_x
+        a0_new, a1_new = _add_pnts_(a0, a1, x_pnts, whr)
+        x_pnts = _del_seq_pnts_(x_pnts, poly=False)
+        a0_new = _del_seq_pnts_(np.concatenate((a0_new), axis=0), poly=True)
+        a1_new = _del_seq_pnts_(np.concatenate((a1_new), axis=0), poly=False)
+        # account for multiple points on intersection line, but start and
+        # end must intersect the line
+        w = np.nonzero((a1_new[:, None] == x_pnts).all(-1).any(-1))[0]
+        w = np.sort(w)  # sort just in case
+        a1_new = a1_new[w[0]: w[1] + 1]  # slice just in case
+        return x_pnts, a0_new, a1_new  # a0, a1, args
     #
     # -- (1) Prepare for splitting
     arrs = [poly, line]
-    result = prep_overlay(arrs, roll=False, p0_pgon=True, p1_pgon=True)
+    result = _prep_(arrs, p0_pgon=True, p1_pgon=False)
     # -- intersection points, arrays rolled to first intersection,
     #    rolled with intersections added on, optional arguments
-    x_pnts, pl_roll, cl_roll, pl_, cl_, args = result
-    # -- quick bail
-    # if len(x_pnts) > 2:
-    #     msg = "Only 2 intersection points permitted, {} found"
-    #     print(msg.format(len(x_pnts)))
-    #     return poly, line
+    x_pnts, pl_, cl_ = result  # pl_roll, cl_roll, args
     #
-    px_in_c, cx_in_p, p_in_c, c_in_p, c_eq_p, c_eq_x, p_eq_c, p_eq_x = args
+    # px_in_c, cx_in_p, p_in_c, c_in_p, c_eq_p, c_eq_x, p_eq_c, p_eq_x = args
     #
     r0 = np.nonzero((x_pnts[0] == pl_[:, None]).all(-1).any(-1))[0]
     r1 = np.nonzero((x_pnts[0] == cl_[:, None]).all(-1).any(-1))[0]
@@ -384,8 +391,8 @@ def split_poly(poly, line):
     st_en_ = np.nonzero((new_line == pl_[:, None]).all(-1).any(-1))[0]
     # st is always zero, so you want en to collect pl_ points
     st, en = st_en_[0], st_en_[1]  # the last one will be pl_.shape[0] - 1
-    rgt = np.concatenate((pl_[:en], rev), axis=0)
-    lft = np.concatenate((new_line, pl_[en + 1:]), axis=0)
+    lft = np.concatenate((pl_[:en], rev), axis=0)
+    rgt = np.concatenate((new_line, pl_[en + 1:]), axis=0)
     return lft, rgt
 
     # line = np.array([[0., 5.], [4., 4.], [6., 8.], [10.0, 9.0]])

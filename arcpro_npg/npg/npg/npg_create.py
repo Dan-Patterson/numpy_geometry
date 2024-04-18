@@ -87,7 +87,7 @@ import numpy as np
 from npg import npg_plots  # noqa
 from npg.npGeo import arrays_to_Geo
 from npg.npg_geom_hlp import _to_lists_
-from npg.npg_overlay import merge_  # noqa
+from npg.npg_bool_ops import merge_  # noqa
 from npg.npg_plots import plot_mixed, plot_polygons    # noqa # plot_2d, 
 
 np.set_printoptions(
@@ -260,7 +260,7 @@ def arc_(radius=10,
         pnts = np.concatenate((cent_, pnts, cent_))
     if asGeo:
         k = kind if kind in [1, 2] else 2
-        return arrays_to_Geo(pnts, kind=k)
+        return arrays_to_Geo(pnts, kind=k, info="arc")
     return pnts
 
 
@@ -296,7 +296,7 @@ def arc_sector(outer=10, inner=9, start=1, stop=6, step=0.5,
     pnts = np.concatenate((top, bott, [close]), axis=0)
     if asGeo:
         k = kind if kind in [1, 2] else 2
-        return arrays_to_Geo(pnts, kind=k)
+        return arrays_to_Geo(pnts, kind=k, info="arcsector")
     return pnts
 
 
@@ -344,7 +344,7 @@ def circle(radius=100, clockwise=True, theta=1, rot=0.0, scale=1,
     pnts = pnts + [xc, yc]
     if asGeo:
         k = kind if kind in [1, 2] else 2
-        return arrays_to_Geo(pnts, kind=k)
+        return arrays_to_Geo(pnts, kind=k, info="circle")
     return pnts
 
 
@@ -408,7 +408,7 @@ def circle_ring(outer=100, inner=0, theta=10, rot=0, scale=1,
         pnts = np.asarray([top, bott], dtype='O')  # a list of list of arrays
     if asGeo:
         k = kind if kind in [1, 2] else 2
-        return arrays_to_Geo(pnts, kind=k)
+        return arrays_to_Geo(pnts, kind=k, info="circle_ring")
     return pnts
 
 

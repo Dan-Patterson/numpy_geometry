@@ -87,16 +87,19 @@ from npg import npGeo  # noqa
 from npg.npGeo import Geo
 # from npGeo import *
 
-import arcpy
-from arcpy import Array, Exists, Multipoint, Point, Polygon, Polyline
+try:
+    import arcpy
+    from arcpy import Array, Exists, Multipoint, Point, Polygon, Polyline
+    
+    from arcpy.da import (
+        Describe, InsertCursor, SearchCursor, FeatureClassToNumPyArray,
+        TableToNumPyArray)  # ExtendTable, NumPyArrayToTable,  UpdateCursor
 
-from arcpy.da import (
-    Describe, InsertCursor, SearchCursor, FeatureClassToNumPyArray,
-    TableToNumPyArray)  # ExtendTable, NumPyArrayToTable,  UpdateCursor
-
-from arcpy.management import (
-    AddField, CopyFeatures, CreateFeatureclass, Delete)  # DeleteFeatures
-
+    from arcpy.management import (
+        AddField, CopyFeatures, CreateFeatureclass, Delete)  # DeleteFeatures
+except ImportError:
+    e = '-'*70
+    print(f"\n{e}\n No arcpy installed.\n{e}")
 
 script = sys.argv[0]  # print this should you need to locate the script
 

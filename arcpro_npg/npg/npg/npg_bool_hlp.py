@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2023-12-04
+    2024-03-28
 
 Purpose
 -------
@@ -35,7 +35,7 @@ import sys
 import numpy as np
 import npg
 from npg.npGeo import roll_arrays
-from npg.npg_plots import plot_polygons  # noqa
+from npg.npg_plots import plot_polygons, plot_2d  # noqa
 
 ft = {"bool": lambda x: repr(x.astype(np.int32)),
       "float_kind": '{: 6.2f}'.format}
@@ -53,6 +53,7 @@ __helpers__ = [
 __imports__ = ['roll_arrays']
 
 
+# ---- ---------------------------
 # ---- (1) private helpers
 #
 def _add_pnts_(ply0, ply1, x_pnts, whr):
@@ -136,6 +137,7 @@ def _del_seq_pnts_(arr, poly=True):
     uniqueness is desired.
     """
     # -- like np.unique but not sorted
+    arr = np.ascontiguousarray(arr)
     shp_in, dt_in = arr.shape, arr.dtype
     # arr = np.ascontiguousarray(arr)
     dt = [(f'f{i}', dt_in) for i in range(arr.shape[1])]
@@ -148,7 +150,7 @@ def _del_seq_pnts_(arr, poly=True):
     # sub_arrays = np.array_split(arr, wh_[wh_ > 0])
     tmp = arr[mask]  # -- slice the original array sequentially unique points
     if poly:  # -- polygon source check
-        if (tmp[0] != tmp[-1]).all(-1):
+        if (tmp[0] != tmp[-1]).any():  # any? all?
             arr = np.concatenate((tmp, tmp[0, None]), axis=0)
             return arr
     return tmp
@@ -250,11 +252,13 @@ def p_ints_p(poly0, poly1):
     return None
 
 
+# ---- ---------------------------
 # ---- (2) prepare for boolean operations
 #
 def _w_(a, b, all_info=False):
     """Return winding number and other values."""
-    x0, y0 = a[:-1].T   # point `from` coordinates
+    # -- if a polygon you can slice of the last point, otherwise dont
+    x0, y0 = a[:-1].T  # point `from` coordinates
     # x1, y1 = a[1:].T  # point `to` coordinates
     x1_x0, y1_y0 = (a[1:] - a[:-1]).T
     #
@@ -514,6 +518,7 @@ def prep_overlay(arrs, roll=True, p0_pgon=True, p1_pgon=True,):
     return x_pnts, a0, a1, a0_new, a1_new, args
 
 
+# ---- ---------------------------
 # ---- (3) add intersection points
 #
 def add_intersections(
@@ -641,13 +646,12 @@ def add_intersections(
     p0_n = _del_seq_pnts_(np.concatenate((p0_n), axis=0), poly=is_0)
     p1_n = _del_seq_pnts_(np.concatenate((p1_n), axis=0), poly=is_1)
     # x_pnts = _del_seq_pnts_(x_pnts, False)  # True, if wanting a polygon
-    x_pnts, idx = np.unique(x_pnts, True, axis=0) # sorted by x
-    # x_pnts = x_pnts[np.sort(idx)]  # crosses back and forth
-    # w = np.argsort(x_pnts[:, 0])[0]
-    # xp = u[w]  # not useful  just the minimum point
+    x_pnts, idx = np.unique(x_pnts, True, axis=0)  # sorted by x
+    # optional lexsort
+    # x_lex = np.lexsort((-x_pnts[:, 1], x_pnts[:, 0]))
+    # x_pnts = x_pnts[x_lex]
     # -- locate the roll coordinates
     if roll_to_minX:
-        # w = np.argsort(x_pnts[:, 0])[0]  # sort and slice is quickest
         xp = x_pnts[0]
     else:
         xp = x_pnts
@@ -666,6 +670,7 @@ def add_intersections(
     id1[whr1] = 0  # slice off the first and last
     # -- create id_plcl and onConP
     id_plcl = np.concatenate((id0[:, None], id1[:, None]), axis=1)[1:-1]
+    # --
     id_plcl[-1] = [p0N, p1N]  # make sure the last entry is < shape[0]
     #
     w0 = np.argsort(id_plcl[:, 1])  # get the order and temporarily sort
@@ -675,25 +680,35 @@ def add_intersections(
     z[1:, 3] = z[1:, 1] - z[:-1, 1]
     onConP = np.copy(z)
     #
+    p0_ioo = _classify_(p0_n, p1_n, id0)  # poly
+    p1_ioo = _classify_(p1_n, p0_n, id1)  # clipper
+    p0_ioo[-1][1] = p0_ioo[0][0]      # start and end have the same class
+    p1_ioo[-1][1] = p1_ioo[0][0]      # start and end have the same class
+    #
+    po_ = p0_ioo[p0_ioo[:, 1] < 0, 0]  # slice where p0_ioo < 0
+    pi_ = p0_ioo[p0_ioo[:, 1] > 0, 0]  # slice where p0_ioo > 0
+    pn_ = p0_ioo[p0_ioo[:, 1] == 0, 0]  # slice where p0_ioo == 0
+    co_ = p1_ioo[p1_ioo[:, 1] < 0, 0]  # slice where p1_ioo < 0
+    ci_ = p1_ioo[p1_ioo[:, 1] > 0, 0]  # slice where p1_ioo > 0
+    cn_ = p1_ioo[p1_ioo[:, 1] == 0, 0]  # slice where p1_ioo == 0
     if class_ids:
-        p0_ioo = _classify_(p0_n, p1_n, id0)  # poly
-        p1_ioo = _classify_(p1_n, p0_n, id1)  # clipper
-        w0 = p0_ioo[p0_ioo[:, 1] < 0, 0]  # slice where p0_ioo < 0
-        w1 = p0_ioo[p0_ioo[:, 1] > 0, 0]  # slice where p0_ioo > 0
-        w2 = p1_ioo[p1_ioo[:, 1] < 0, 0]  # slice where p1_ioo < 0
-        w3 = p1_ioo[p1_ioo[:, 1] > 0, 0]  # slice where p1_ioo > 0
         p0_sze = p0_n.shape[0] - 1
         p1_sze = p1_n.shape[0] - 1
-        Pout = in_out_on(w0, p0_sze)  # poly outside clip
-        Pin = in_out_on(w1, p0_sze)   # poly inside clip
-        Cout = in_out_on(w2, p1_sze)  # clip outside poly
-        Cin = in_out_on(w3, p1_sze)   # clip inside poly
+        Pout = in_out_on(po_, p0_sze)  # poly outside clip
+        Pin = in_out_on(pi_, p0_sze)   # poly inside clip
+        Cout = in_out_on(co_, p1_sze)  # clip outside poly
+        Cin = in_out_on(ci_, p1_sze)   # clip inside poly
         # -- NOTE
         # -- id_plcl are the poly, clp point ids equal to x_pnts
-        return p0_n, p1_n, id_plcl, onConP, x_pnts, Pout, Pin, Cout, Cin
-    return p0_n, p1_n, id_plcl, x_pnts  # p0_ioo, p1_ioo
+        r = [p0_n, p1_n, id_plcl, onConP, x_pnts,
+             Pout, Pin, Cout, Cin, p0_ioo, p1_ioo]
+        return r
+    ps_info = [po_, pn_, pi_, p0_ioo]
+    cs_info = [co_, cn_, ci_, p1_ioo]
+    return p0_n, p1_n, id_plcl, onConP, x_pnts, ps_info, cs_info
 
 
+# ---- ---------------------------
 # ---- (4) extras
 #
 def prePC(i0_, i1_, cN, j0_, j1_, pN, pinside, cinside):
@@ -724,7 +739,8 @@ def postPC(inC_0, cN, inP_0, pN, cinside, pinside):
     return preC, preP
 
 
-# ---- Final main section ----------------------------------------------------
+# ---- ---------------------------
+# ---- Final main section
 if __name__ == "__main__":
     """optional location for parameters"""
     print(f"\nRunning... {script}\n")

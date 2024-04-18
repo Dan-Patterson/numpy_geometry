@@ -6,7 +6,7 @@ npg_bool_ops
 ------------
 
 Modified :
-    2024-01-24
+    2024-03-28
 
 ** Boolean operations on poly geometry.
 
@@ -46,13 +46,17 @@ Author :
 # pylint: disable=E0401,E0611,E1101,E1121
 
 import sys
-import copy
 import numpy as np
+from numpy.lib.recfunctions import unstructured_to_structured as uts  # noqa
+
+import networkx as nx
+
 import npg  # noqa
 from npg import npGeo
+from npg.npGeo import roll_arrays  # noqa
 # from npg.npg_pip import np_wn
 from npg.npg_bool_hlp import add_intersections, _del_seq_pnts_  # p_ints_p
-from npg.npg_geom_hlp import _bit_check_  # radial_sort
+from npg.npg_geom_hlp import _bit_check_, _bit_area_  # radial_sort
 from npg.npg_prn import prn_  # noqa
 
 ft = {"bool": lambda x: repr(x.astype(np.int32)),
@@ -65,22 +69,44 @@ np.set_printoptions(
 script = sys.argv[0]
 
 __all__ = [
-    'clp_', 'erase_', 'symm_diff_', 'overlay_ops',
+    'clp_', 'erase_', 'symm_diff_',
     'append_',
     'adjacency_matrix',
     'merge_',
-    'union_adj'
+    'union_adj',
+    '_renumber_pnts_',
+    'connections_dict',
+    'polygon_overlay'
 ]   # 'dissolve'
 
-__helpers__ = ['_adjacent_', '_cut_pairs_']
+__helpers__ = ['_adjacent_', '_cut_pairs_', 'orient_clockwise']
 __imports__ = [
-    'add_intersections', '_del_seq_pnts_', 'p_ints_p',
-    '_bit_check_', 'remove_geom', 'radial_sort'
+    'add_intersections', '_del_seq_pnts_',
+    '_bit_check_', '_bit_area_', 'remove_geom', 'prn_'
 ]
 
 
 # ---- helpers
 #
+def trichk(c_p, c_c, p_p, p_c, c_cut):
+    """Check and classify triangles."""
+    tchk = False
+    ids = []
+    knd = 9
+    t0 = [c_c, c_c + 1] in c_cut
+    t1 = [c_c + 1, c_p] in c_cut
+    t2 = [c_p, c_c + 1] in c_cut
+    tchk = t0 and (t1 or t2)
+    if tchk:
+        if t1:
+            ids = [c_p, c_c + 1, c_c, c_p]
+            knd = 2
+        else:
+            ids = [c_p, c_c, c_c + 1, c_p]
+            knd = 1
+    return tchk, ids, knd
+
+
 def _adjacent_(a, b):
     """Check adjacency between 2 polygon shapes on their edges.
 
@@ -96,6 +122,7 @@ def _adjacent_(a, b):
     Adjacency is defined as meeting at least 1 point.  Further checks will be
     needed to assess whether two shapes meet at 1 point or 2 non-consequtive
     points.
+
     """
     s = np.sum((a[:, None] == b).all(-1).any(-1))
     if s > 0:
@@ -103,8 +130,8 @@ def _adjacent_(a, b):
     return False
 
 
-def _cut_pairs_(arr):
-    """Return cut lines from `onConP` or `id_plcl`."""
+def _cut_across_(arr):
+    """Return cut lines from `onConP` or `id_plcl` with only crossed lines."""
     c_segs = []
     p_segs = []
     idxs = arr[:, 0]
@@ -113,505 +140,794 @@ def _cut_pairs_(arr):
         dff = v - prev
         if dff == 1:
             vals = [arr[cn, 1], arr[cn + 1, 1]]
+            if abs(vals[1] - vals[0]) > 1:
+                c_segs.append([prev, v])
+                p_segs.append(vals)
+        prev = v
+    return c_segs, p_segs
+
+
+def _cut_pairs_(arr):
+    """Return cut lines from `onConP` or `id_plcl`.
+
+    A `cut` is where a line crosses two different segments.  The id value of
+    those segments is returned.  For the clipper ids, `c_segs`, these will have
+    a difference of 1.  For the poly ids, `p_segs` the id values indicate the
+    point connections, the order indicting the direction of the cut::
+
+      _cut_pairs_(onConP[:, :2])
+      ([[0, 1], [3, 4], [4, 5], [ 9, 10], [10, 11], [13, 14]],  # clp ids
+       [[0, 8], [6, 2], [2, 5], [16, 19], [19, 15], [13, 21]])  # poly ids
+      ...
+      _cut_pairs_(id_plcl)
+      ([[5, 6], [15, 16]],  # poly ids
+       [[5, 3], [11, 9]])   # clp ids
+
+    - `onConP`  - the columns are arranged as clipper, poly
+    - `id_plcl` - poly is first then clipper
+    """
+    c_segs = []
+    p_segs = []
+    idxs = arr[:, 0]
+    prev = idxs[0]
+    for cn, v in enumerate(idxs[1:], 0):
+        dff = v - prev
+        if dff == 1 or v == 0:
+            vals = [arr[cn, 1], arr[cn + 1, 1]]
             c_segs.append([prev, v])
             p_segs.append(vals)
         prev = v
     return c_segs, p_segs
 
 
-# ---- (1) Operations for polygon overlays.
-#
-def clp_(poly, clp, as_geo=True):
-    """Return the symmetrical difference.  See `overlay_ops`."""
-    result = overlay_ops(poly, clp)
-    final, idx, clipped, cin_, hole_, symm_, erase_, erase_r, hull_ = result
-    if as_geo:
-        return npg.arrays_to_Geo(clipped, kind=2, info=None, to_origin=False)
-    return clipped
-
-
-def erase_(poly, clp, as_geo=True):
-    """Return the symmetrical difference.  See `overlay_ops`."""
-    result = overlay_ops(poly, clp)
-    final, idx, clipped, cin_, hole_, symm_, erase_, erase_r, hull_ = result
-    if as_geo:
-        return npg.arrays_to_Geo(erase_, kind=2, info=None, to_origin=False)
-    return erase_
-
-
-def symm_diff_(poly, clp, as_geo=True):
-    """Return the symmetrical difference.  See `overlay_ops`."""
-    result = overlay_ops(poly, clp)
-    final, idx, clipped, cin_, hole_, symm_, erase_, erase_r, hull_ = result
-    if as_geo:
-        return npg.arrays_to_Geo(symm_, kind=2, info=None, to_origin=False)
-    return symm_
-
-
-def overlay_ops(poly, clp, as_geo=True):
-    """Return various overlay results between two polygons, `poly`, `clp`.
+def orient_clockwise(geom):
+    """Orient a polygon ring so it is clockwise.
 
     Parameters
     ----------
-    poly, clp : array_like
-        `poly` is the polygon being differenced by polygon `clp`
-
-    Returns
-    -------
-    erase, reverse erase, symmetrical difference, holes, clip (both orders)
+    geom : list
+        a list of polygons geometry arrays
 
     Requires
     --------
-    `npg_bool_hlp` : `add_intersections`, `_del_seq_pnts_`
+    Ensure `_delete_seq_dups_` is run on the geometry first.
+    """
+    cw_ordered = []
+    for i in geom:
+        if _bit_area_(i) > 0.0:
+            cw_ordered.append(i)
+        else:
+            cw_ordered.append(i[::-1])
+    return cw_ordered
 
-    `_roll_`, `_wn_clip_`, `_node_type_`, `_add_pnts_`, `_del_seq_pnts_
+
+def _c_p_(arr):
+    """Return cut lines from `onConP` or `id_plcl`."""
+    _segs = [[0]]
+    idxs = arr[:, 0]
+    prev = idxs[0]
+    for cn, v in enumerate(idxs[1:], 0):
+        dff = v - prev
+        if dff == 1:
+            _segs[-1].append(v)
+        else:
+            # vals = [arr[cn, 1], arr[cn + 1, 1]]
+            _segs.append([v])
+        prev = v
+    return _segs
+
+
+def _renumber_pnts_(cl_n, pl_n):
+    """Return renumbered points from two polygons that intersect.
+
+    Parameters
+    ----------
+    cl_n, pl_n : arrays
+        In normal useage, `pl_n` is the polygon being clipped by `cl_n`,
+
+    Returns
+    -------
+    The an array of id values which include columns for the original ids,
+    the re-sequenced ids and the new values the include id values from
+    `cl_n` ids, where the points are equal.  See `Example` below.
+
+     The combined `cl_n`, `pl_n` is returned as well as CP_.
+
+    Example
+    -------
+    Since the start and end of each poly are rotated to the first intersection
+    point, the first and last of each sequence are renumbered, then the polygon
+    ids are sequenced from there.  Unique points in `pl_n` are assigned a new
+    number.  Intersection points with `cl_n` are assigned their value, as
+    follows::
+
+      # Initial state
+      c_ids  [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11]
+      p_ids  [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12]
+      # Renumber end points
+      c_ids  [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 0]
+      p_ids  [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 0]
+      # pl_n intersects with points 1, 3, 5, 7, 8, 4 in `cl_n` sequentially
+      # new sequence
+      z = [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10,  0,
+            0, 13,  1,  3,  5,  7, 18, 19, 20, 21,  8,  4,  0]
+
+    The old and new id values can be derived using the following::
+
+      old_new = np.concatenate((p_ids_old[:, None],
+                                p_ids[:, None],
+                                z[N_c + 1:][:, None]),
+                               axis=1)
+      # where `z` is the new sequence and N_c is number of points in `cl_n`.
+      N_c = cl_n.shape[0] - 1
+      old_new
+      array([[ 0, 12,  0],
+             [ 1, 13, 13],
+             [ 2, 14,  1],
+             [ 3, 15,  3],
+             [ 4, 16,  5],
+             [ 5, 17,  7],
+             [ 6, 18, 18],
+             [ 7, 19, 19],
+             [ 8, 20, 20],
+             [ 9, 21, 21],
+             [10, 22,  8],
+             [11, 23,  4],
+             [12, 24,  0]])
+
+    The resultant `old_new` columns are the original sequence, the new
+    sequence and the renumbered ids which reference identical points in `cl_n`.
+    """
+    #
+    N_c = cl_n.shape[0] - 1
+    N_p = pl_n.shape[0] - 1
+    CP_ = np.concatenate((cl_n, pl_n), axis=0)  # noqa
+    # --
+    # -- Initially number the sequential points.
+    c_ids = np.arange(0, N_c + 1)  # cl_n ids
+    p_ids_old = np.arange(0, N_p + 1)
+    #
+    strt = c_ids[-1] + 1  # get new start and end points for `pl_n` sequence.
+    end_ = N_c + N_p + 2
+    p_ids = np.arange(strt, end_)  # new values for `pl_n` ids
+    cp_ids = np.concatenate((c_ids, p_ids), axis=0)  # combine both
+    #
+    # -- Find where the points on `cl_n` (wc0) are equal to the points
+    #    on `pl_n` (wp0).
+    wc0, wp0 = np.nonzero((pl_n == cl_n[:, None]).all(-1))  # onConP by part
+    wc0_ids = np.nonzero((wc0 == N_c))[0]  # reclass N_c to 0
+    wc0[wc0_ids] = 0                       # first is already 0
+    wp0_ids = np.nonzero((wp0 == N_p))[0]  # reclass N_p to 0 and set first
+    wp0[wp0_ids] = 0                       # to 0 as well
+    #
+    zz = wp0[1:-1] + N_c + 1         # increment the `pl_n` ids
+    zz0 = list(zip(zz, wc0[1:-1]))   # concatenate pl and cl ids to 2d array
+    zz0 = np.array(zz0)              #
+    new_ids = np.copy(cp_ids)            # use a copy of `cp_ids`
+    # find where they are equal, r0 is basically clp ids, r1 is the ids
+    # of where clp equals poly and poly ids outside and inside of clp
+    r0, r1 = (new_ids == zz0[:, 0][:, None]).nonzero()
+    # -- zz1 are the relabelled points in pl_n, cl_n is first, pl_n is 2nd
+    new_ids[r1] = zz0[:, 1]
+    new_ids[(new_ids == N_c).nonzero()] = 0   # renumber N_c and N_c+N_p+1 to 0
+    new_ids[(new_ids == N_c + N_p + 1).nonzero()] = 0
+    #
+    # -- tricky, renumber the points that aren't duplicate of clp from N_c+1
+    # tmp = np.nonzero(new_ids > N_c + 1)[0]
+    # tmp0 = [N_c + 1 + i for i in range(len(tmp))]
+    # new_ids[tmp] = tmp0
+    #
+    old_new = np.concatenate((p_ids_old[:, None],
+                              p_ids[:, None],
+                              new_ids[N_c + 1:][:, None]),
+                             axis=1)
+    return new_ids, old_new, CP_
+
+
+def connections_dict(from_to, bidirectional=False):
+    """Return a dictionary of point connections given an array of connections.
+
+    Parameters
+    ----------
+    from_to : array-like
+        A 2d array or list of lists showing from-to connections.
+    bidirectional : boolean
+        True, returns the dictionary showing from-to and to-from connections.
+
+    Example
+    -------
+    Given point from-to connections::
+
+        ex = [[0, 1], [0, 16], [0, 19], [1, 0], [1, 2], [2, 16], [16, 19]]
+
+        connections_dict(ex, bidirectional=False)
+        {0: [1, 16, 19], 1: [0, 2], 2: [16], 16: [19]}
+
+        connections_dict(ex, bidirectional=True)
+        {0: [1, 16, 19], 1: [0, 2], 2: [1, 16], 16: [0, 2, 19], 19: [0, 16]}
+    """
+    frto = from_to
+    if bidirectional:
+        _src_ = np.copy(frto)
+        _ft_ = np.concatenate((_src_, _src_[:, [1, 0]]), axis=0)
+    else:
+        _ft_ = np.copy(frto)
+    #
+    uniq_frto = np.unique(_ft_, axis=0)
+    if (uniq_frto[0] == [0, 0]).all():
+        uniq_frto = uniq_frto[1:]
+    frto2 = np.copy(uniq_frto)
+    #
+    d = {}
+    for elem in frto2:
+        if elem[0] in d:
+            if elem[0] != elem[1]:
+                d[elem[0]].append(elem[1])
+        else:
+            d[elem[0]] = [elem[1]]
+    for k, v in d.items():
+        if len(v) > 1:
+            d[k] = sorted(list(set(v)))
+    return d
+
+
+# ---- ---------------------------
+# ---- (1) polygon overlay operations.
+#
+def clp_(ply_a, ply_b, as_geo=True):
+    """Return the symmetrical difference.  See `overlay_ops`."""
+    result = polygon_overlay(ply_a, ply_b)
+    if as_geo:
+        return npg.arrays_to_Geo(result, kind=2, info=None, to_origin=False)
+    return result
+
+
+def erase_(ply_a, ply_b, as_geo=True):
+    """Return the symmetrical difference.  See `overlay_ops`."""
+    result = polygon_overlay(ply_a, ply_b)
+    if as_geo:
+        return npg.arrays_to_Geo(erase_, kind=2, info=None, to_origin=False)
+    return result
+
+
+def symm_diff_(ply_a, ply_b, as_geo=True):
+    """Return the symmetrical difference.  See `overlay_ops`."""
+    result = polygon_overlay(ply_a, ply_b)
+    if as_geo:
+        return npg.arrays_to_Geo(result, kind=2, info=None, to_origin=False)
+    return result
+
+
+# ---- ---------------------------
+# ---- (2) polygon overlay functions.
+#
+def _in_out_(geom, from_to_val, cuts):
+    """Return in, out polys for single cuts.  They aren't closed."""
+    out_ = []
+    in_ = []
+    not_zero = from_to_val[from_to_val[:, -1] != 0]
+    not_zero[:, 1] = not_zero[:, 1] + 1  # update the `to` value
+    for cnt, nz in enumerate(not_zero):  # originally from_to_val:
+        nz = not_zero[cnt]
+        f, t, v = nz
+        # if v != 0:  removed this check by using `not_zero`
+        ar = geom[f:t]
+        col0 = 0 if v == -1 else 1
+        col1 = 1 if v == -1 else 0
+        whr0 = f == cuts[:, col0]
+        whr1 = t - 1 == cuts[:, col1]
+        whr2 = ([t - 1, f] == cuts).all(-1).any(-1)
+        if whr0.any() and whr1.any():
+            pre = cuts[whr0][0]  # take the first
+            post = cuts[whr1][0]
+            btw = sorted([pre[1], post[0]])  # ensure btw is ascending
+            if v == -1:
+                pre = pre[::-1]
+                post = post[::-1]
+            if np.sum(whr1) > 1:  # check for more than one post crossing
+                post_more = cuts[whr1]
+                cross_cut = post_more[-1]
+                chk = [cross_cut[1], geom.shape[0] - 1]  # check for close
+                if chk in cuts:
+                    post = cross_cut
+            pre_g = geom[pre]
+            post_g = geom[post]
+            if (pre == post).all():  # btw_g will be ignored in this case
+                arrs = [pre_g, ar]
+                btw_g = None
+            else:
+                if (btw == cuts).all(-1).any(-1):
+                    r = np.arange(min(btw), max(btw) + 1)
+                    btw_g = geom[r]
+                else:
+                    btw_g = None
+                if btw_g is None:
+                    arrs = [pre_g, ar, post_g]
+                else:
+                    arrs = [pre_g, ar, post_g, btw_g]
+            ar = np.concatenate(arrs, axis=0)
+        elif whr2:
+            ar = np.concatenate((geom[t - 1][None, :], ar), axis=0)
+        if v == -1:
+            out_.append(ar)
+        else:
+            in_.append(ar)
+    return in_, out_
+
+
+def _in_out_on_(combos, cl_n, pl_n, c_cut, p_cut):
+    """Return the full results of in, out and on.
+
+    Parameters
+    ----------
+    See `polygon_overlay` for outputs and descriptions.
+    """
+    r0 = []
+    clp_ply = []
+    keep_bits = []
+    for cnt, _row_ in enumerate(combos):
+        _row_ = combos[cnt]
+        cfr, cto, cty, pty, pfr, pto = _row_
+        #
+        c_pnts = cl_n[cfr: cto + 1]
+        p_pnts = pl_n[pfr: pto + 1]
+        circ = None
+        #
+        # -- clip out
+        if cty == -1:
+            #
+            # clp, ply out  (-1, -1)
+            if pty == -1:  # both out, check pl_n cut line
+                #  previous may have been (0, 0), so check previous cut line
+                i, j = combos[cnt - 1, -2:]
+                cut_ = pl_n[i:j + 1]
+                chk = np.equal(c_pnts[[0, -1]], cut_[[0, -1]]).all()
+                # add first out
+                if chk:
+                    circ = np.concatenate((c_pnts, cut_[::-1]), axis=0)
+                    if not np.equal(clp_ply[-1], cut_).all():
+                        clp_ply.append(cut_)
+                    r0.append(circ)  # add circ
+                    # add second out
+                    circ = np.concatenate((p_pnts, p_pnts[0][None, :]), axis=0)
+                    clp_ply.append(p_pnts[[0, -1]])
+                else:
+                    keep_bits.append(c_pnts)
+                    clp_ply.append(c_pnts)  # have to append something
+            #
+            # ply on  (-1, 0)
+            elif pty == 0:
+                if (cl_n[cto] == pl_n[pto]).all(-1):
+                    circ = np.concatenate((c_pnts, p_pnts[::-1]), axis=0)
+                    clp_ply.append(p_pnts)
+                elif (np.array([cfr, cto]) == c_cut).all(-1).any(-1):
+                    circ = np.concatenate((c_pnts, cl_n[[cto, cfr]]), axis=0)
+                    clp_ply.append(cl_n[cfr: cto + 1])
+                else:  # -- close up double outside potentially, e.g. A,C
+                    bits = np.concatenate((pl_n[[pto, pfr]], c_pnts))
+                    if len(keep_bits) == 0:
+                        keep_bits.append(bits)
+                    else:
+                        keep_bits.append(cl_n[cfr:cto + 1])
+                        circ = np.concatenate(keep_bits, axis=0)
+                        keep_bits = []
+            #
+            # clp out, ply in
+            elif pty == 1:
+                circ = np.concatenate((c_pnts, p_pnts[::-1]), axis=0)
+                clp_ply.append(p_pnts)
+        #
+        # -- clip on
+        elif cty == 0:  #
+            # ply out  (0, -1)
+            if pty == -1:
+                circ = np.concatenate((c_pnts[::-1], p_pnts), axis=0)
+                chk = (p_pnts[-1] == c_pnts[-1]).all()
+                if not chk:
+                    keep_bits.append(p_pnts)
+                    circ = None
+                clp_ply.append(c_pnts)
+            # ply on  (0, 0)
+            elif pty == 0:
+                # -- possible issue, both are valid and may be a triangle
+                if cnt == 0:
+                    clp_ply.append(p_pnts)
+                elif combos[cnt - 1][2] != 0:  # if == 0, append to clp_ply
+                    # determine whether clp crosses 2 lines or is on one
+                    chk0 = np.equal(cl_n[cto], pl_n[pfr + 1]).all()
+                    chk1 = np.equal(cl_n[cto + 1], pl_n[pto]).all()
+                    if chk0:  # clp forms a triangle, cuts 2 lines
+                        circ = np.concatenate((c_pnts, p_pnts[::-1]),
+                                              axis=0)
+                        clp_ply.append(c_pnts)
+                    elif chk1:  # did not work for p02,c02 previous was (-1,-1)
+                        bits = cl_n[cfr:cto + 2]
+                        clp_ply.append(bits)  # 2/3 triangle
+                        circ = np.concatenate((p_pnts, bits[::-1]), axis=0)
+                        # clp_ply = []  # empty clp_ply
+                    else:
+                        clp_ply.append(p_pnts)
+                else:  # 2 sequential 0,0 s
+                    clp_ply.append(p_pnts)
+            # ply in  (0, 1)
+            elif pty == 1:
+                circ = np.concatenate((p_pnts, c_pnts[::-1]), axis=0)
+                clp_ply.append(p_pnts)
+        #
+        # -- clip in
+        elif cty == 1:  # (1, 0) and (1, -1)
+            circ = np.concatenate((p_pnts, c_pnts[::-1]), axis=0)
+            clp_ply.append(c_pnts)
+        #
+        # add circ
+        if circ is not None:
+            if len(circ) > 3:
+                r0.append(circ)
+    #
+    # -- assemble and clean the geometry
+    geom = [_del_seq_pnts_(i) for i in r0]  # -- remove duplicates
+    geom = orient_clockwise(geom)           # -- orient clockwise
+    clp_ply = np.concatenate(clp_ply, axis=0)
+    clp_ply = _del_seq_pnts_(clp_ply)
+    return geom, clp_ply, keep_bits
+
+
+def polygon_overlay(ply_a, ply_b):
+    """Return the overlay of two polygons and assemble the areas by type.
+
+    Parameters
+    ----------
+    ply_a, ply_b : array_like
+        `ply_a` is the polygon being differenced/overlain by polygon `ply_b`.
+
+    synonyms::
+
+        `ply_a` = `ply` = `under`
+        `ply_b` = `clp` = `over`
+
+    Extras
+    ------
+    pl_n, cl_n : array-like
+        ply_a, ply_b point arrays with new intersections points added.
+    p0new_ioo, p1_ioo : array-like
+        polygon in-out-on, p1_ioo for ply_b
 
     Notes
     -----
-    The notations `p_p, p_c` refer to the previous and current poly points
-    during iterations.  Similarily `c_p, c_c` denote the previous and current
-    clipper poly points.
+    Description for `combos`::
+
+        uniq_c_p, idx_ = np.unique(combos[:, 2:4], True, axis=0)
+        # possible classes
+        uni
+        #                   over under
+        #     ply_b ply_a   clp  ply
+        #      ----------   ---------
+        array([[-1,  0],     out, on
+               [-1,  1],     out, in
+               [-1, -1],     out, out
+               [ 0, -1],     on,  out
+               [ 0,  1],     on,  in
+               [ 1, -1],     in,  out
+               [ 1,  0]])    in,  on
+
+    Example for `onConP` for `E`, `d0_`::
+
+      np.nonzero((x_pnts == cl_n[:, None]).all(-1))
+      array([ 0,  1,  3,  4,  5,  9, 10, 11, 13, 14])  # x_pnts equals cl_n
+      array([ 0,  2,  4,  6,  8,  7,  5,  3,  1,  0])  # cl_n equals x_pnts
+
+      np.nonzero((x_pnts == pl_n[:, None]).all(-1))
+      array([ 0,  2,  5,  6,  8, 13, 15, 16, 19, 21])  # x_pnts equals pl_n
+      array( [0,  6,  8,  4,  2,  1,  3,  7,  5,  0])  # pl_n equals x_pnts
+
+      np.nonzero((x_pnts == pl_n[:, None]).all(-1))
+      # cl_n equals pl_n
+      array([ 0,  0,  1,  3,  4,  5,  9, 10, 11, 13, 14, 14])  # 0, 14 equal
+      # pl_n equals cl_n
+      array([ 0, 21,  8,  6,  2,  5, 16, 19, 15, 13,  0, 21])  # 0, 21 equal
+
+      onConP[:, :2]     id_plcl
+      array([[ 0,  0],  array([[ 0,  0],
+             [ 1,  8],         [ 2,  4],
+             [ 3,  6],         [ 5,  5],
+             [ 4,  2],         [ 6,  3],
+             [ 5,  5],         [ 8,  1],
+             [ 9, 16],         [13, 13],
+             [10, 19],         [15, 11],
+             [11, 15],         [16,  9],
+             [13, 13],         [19, 10],
+             [14, 21]])        [21, 14]])
+
+      c_out, c_on, c_in
+      array([ 2,  6,  7,  8, 12]),
+      array([ 0,  1,  3,  4,  5,  9, 10, 11, 13, 14]),
+      array([])
+
+      p_out, p_on, p_in
+      array([ 1,  3,  4,  7, 14, 17, 18, 20]),
+      array([ 0,  2,  5,  6,  8, 13, 15, 16, 19, 21]),
+      array([ 9, 10, 11, 12])
+
     """
+    #
+    result = add_intersections(
+                ply_a, ply_b,
+                roll_to_minX=True,
+                p0_pgon=True,
+                p1_pgon=True,
+                class_ids=False
+                )
+    # pl_ioo polygon in-out-on, cl_ioo for clip
+    pl_n, cl_n, id_plcl, onConP, x_pnts, ps_info, cs_info = result
+    p_out, p_on, p_in, pl_ioo = ps_info
+    c_out, c_on, c_in, cl_ioo = cs_info
+    #
+    # CP_ = np.concatenate((cl_n, pl_n), axis=0)  # noqa
+    N_c = cl_n.shape[0] - 1  # noqa
+    N_p = pl_n.shape[0] - 1  # noqa
+    #
+    # -- get the renumbered point values for `pl_n`
+    ids_new, old_new_ids, CP_ = _renumber_pnts_(cl_n, pl_n)
+    _old, _, _new = old_new_ids.T
+    frto = np.concatenate((ids_new[:-1][:, None], ids_new[1:][:, None]),
+                          axis=1)
+    frto = frto[frto[:, 0] != frto[:, 1]]  # -- remove 0,0 middle point
+    #
+    c_ft = list(zip(c_on[:-1], c_on[1:]))  # removed +1 to `to`
+    c_subs = [cl_ioo[i[0]:i[1] + 1] for i in c_ft]  # added +1 to `to`
+    c_vals = [sub[1][1] for sub in c_subs]
+    c_ft_v = np.concatenate((c_ft, np.array(c_vals)[:, None]), axis=1)
+    #
+    # c_slices = [cl_n[i:j + 1] for i,j in c_ft_v[:, :2]]
+    # c_cut_slices = [cl_n[[i, j]] for i,j in c_cut]
+    #
+    p_ft = list(zip(p_on[:-1], p_on[1:]))  # removed +1 to `to`
+    p_subs = [pl_ioo[i[0]:i[1] + 1] for i in p_ft]  # added +1 to `to`
+    p_vals = [sub[1][1] for sub in p_subs]
+    p_ft_v = np.concatenate((p_ft, np.array(p_vals)[:, None]), axis=1)
+    #
+    combos = np.zeros((c_ft_v.shape[0], 6), dtype='int')
+    combos[:, :3] = c_ft_v
+    combos[:, 3:] = p_ft_v[:, [-1, 0, 1]]
+    #
     """
-    Create dictionary from list using first value as key
 
-    ky = [i[0] for i in p_out]
-    dct = dict(list(zip(ky, p_out)))
+    w0 = np.nonzero(old_new[:, 0] == p_cut[:, 0][:, None])[1]
+    w1 = np.nonzero(old_new[:, 0] == p_cut[:, 1][:, None])[1]
+    col1 = old_new[w1, -1]
+    col0 = old_new[w0, -1]
+    p_cut_n = np.concatenate((col0[:, None], col1[:, None]), axis=1)
+    all_cuts = np.concatenate((c_cut, p_cut_n), axis=0)
+    uni_cuts = np.unique(all_cuts, axis=0)
+
     """
-
-    def _out_1_(_c, _seen, _out):
-        """Return sub lists."""
-        if len(_out) > 0:
-            if _c in _out[0]:
-                vals = _out.pop(0)
-                # c_seen.extend(vals)
-                return vals  # cl_n[vals]
-        return []
-
-    def _in_1_(_c, _seen, _in):
-        """Return sub lists."""
-        if len(_in) > 0:
-            if _c in _in[0]:
-                vals = _in.pop(0)
-                # c_seen.extend(vals)
-                return vals  # cl_n[vals]
-        return []
-
-    def trichk(c_p, c_c, p_p, p_c):
-        """Check and classify triangles."""
-        tchk = False
-        ids = []
-        knd = 9
-        t0 = [c_c, c_c + 1] in c_cut
-        t1 = [c_c + 1, c_p] in c_cut
-        t2 = [c_p, c_c + 1] in c_cut
-        tchk = t0 and (t1 or t2)
-        if tchk:
-            if t1:
-                ids = [c_p, c_c + 1, c_c, c_p]
-                knd = 2
-            else:
-                ids = [c_p, c_c, c_c + 1, c_p]
-                knd = 1
-        return tchk, ids, knd
-
-    def _op_(_p, _c, _seen, _out):
-        """Return multiple out bits."""
-        _bits, vals, _pop_, frst = [], [], [], []  # initialize
-        if len(_out) == 0:
-            return vals, _pop_, _bits
-        for i in [_p, _c]:
-            for cnt_, out_ in enumerate(_out):
-                if i in out_:  # and _c not in _seen:  conditions  !!!!
-                    vals = _out[cnt_]  # .pop(cnt_)
-                    if vals not in _bits:
-                        _bits.append(vals)
-        if len(_bits) == 0:
-            return [], [], []
-        frst = _bits[0]
-        if len(_bits) > 1:
-            e = _bits[0][-1]
-            s = _bits[1][0]
-            if e != s:
-                vals = sum(_bits, [])  # flatten subarrays here
-            else:
-                vals = _bits[0]
-        if frst in _out:
-            idx = _out.index(frst)
-            _pop_ = _out.pop(idx)  # _in[0]  # drop the first in out
-        return vals, _pop_, _bits
-
-    def _ip_(_p, _c, _seen, _in):
-        """Return multiple in bits."""
-        _bits, vals, _pop_, frst = [], [], [], []  # initialize
-        if len(_in) == 0:
-            return vals, _pop_, _bits
-        for i in [_p, _c]:
-            for cnt_, in_ in enumerate(_in):
-                if i in in_:  # and _c not in _seen:  conditions
-                    vals = _in[cnt_]  # .pop(cnt_)
-                    if vals not in _bits:
-                        _bits.append(vals)
-        if len(_bits) == 0:
-            return [], [], []
-        frst = _bits[0]
-        if len(_bits) > 1:
-            e = _bits[0][-1]
-            s = _bits[1][0]
-            if e != s:
-                vals = sum(_bits, [])  # flatten subarrays here
-            else:
-                vals = _bits[0]
-        if frst in _in:
-            idx = _in.index(frst)
-            _pop_ = _in.pop(idx)  # _in[0]  # drop the first in out
-        return vals, _pop_, _bits
-
-    # -- Returns the intersections, the rolled input polygons, the new polygons
-    #    and how the points in both relate to one another.
+    # -- If the equality below doesn't match, p_on and its comparison may be
+    #    out of order.
     #
-    testing = True
-    #
-    result = add_intersections(poly, clp,
-                               roll_to_minX=True,
-                               p0_pgon=True,
-                               p1_pgon=True,
-                               class_ids=True)
-    pl_n, cl_n, id_plcl, onConP, x_pnts = result[:5]
-    p_outside, p_inside, c_outside, c_inside = result[5:]
-    # --
-    # -- cut lines, where one crosses the other
-    # -- two point cut lines, which cross the other polygon
-    #    cut lines that are more than two points are either inside or
-    #    outside the other polygon
-    c_cut0, p_cut0 = _cut_pairs_(onConP[:, :2])  # use onConP, it is sorted
-    p_cut1, c_cut1 = _cut_pairs_(id_plcl)  # use id_plcl col 0 to save a sort
-    c_cut = c_cut0 + c_cut1  # sorted(c_cut0 + c_cut1, key=lambda l:l[0])
-    p_cut = p_cut0 + p_cut1  # sorted(p_cut0 + p_cut1, key=lambda l:l[0])
-    #
-    c_cut_out = [i for i in c_cut if i[1] - i[0] != 1]
-    p_cut_out = [i for i in p_cut if i[1] - i[0] != 1]
-    #
-    # -- cut lines that are more than two points are either inside or
-    #    outside the other polygon
-    p_out = copy.deepcopy(p_outside)
-    p_in = copy.deepcopy(p_inside)
-    c_out = copy.deepcopy(c_outside)
-    c_in = copy.deepcopy(c_inside)
-    #
-    #  Determine preceeding points to first clip.
-    out = []  # p_seen, c_seen = [], [], []
-    prev = onConP[0, :2]  # -- set the first `previous` for enumerate
-    p_seen, c_seen = [0], [0]
-    in_clp = []  # collect `clipping` segments to use for clip.
-    kind_ = []  # see below
-    # -1 symmetrical diff : feature areas are outside one another
-    #  0 erase : poly area outside of clip
-    #  1 clip  : poly areas that are clipped by clp
-    #  2 hole  : boundary area between clip and poly segments
-    #  3 identity : features or parts that overlap
-    if testing:
-        print("onConP\n{}".format(onConP))
-        print("\np_outside : {}".format(p_outside))
-        print("p_inside  : {}".format(p_inside))
-        print("c_outside : {}".format(c_outside))
-        print("c_inside  : {}".format(c_inside))
-    msg = []
-    fmt = "{:>3}"*4 + ":" + "{:>3}"*2 + "  " + "{!s:<6}"*6
-    # --
-    # -------------------------------------------------------------------
-    for cnt, row in enumerate(onConP[1:], 1):  # enumerate fromonConP[1:]
-        # current ids and differences... this is an intersection point
-        c_c, p_c, d0, d1 = row  # row[:2], row[2], row[3]
-        c_p, p_p = prev    # previous ids
-        bts, sub, sub0, sub1, _, __ = [], [], [], [], [], []
-        # --
-        chk0, chk1, chk2, chk3 = [False, False, False, False]
-        c_out_f = sum(c_out, [])  # flatten list of sub lists
-        c_in_f = sum(c_in, [])
-        p_out_f = sum(p_out, [])
-        p_in_f = sum(p_in, [])
-        #
-        chk0 = c_p in c_out_f and c_c in c_out_f
-        chk1 = c_p in c_in_f and c_c in c_in_f
-        chk2 = p_p in p_out_f and p_c in p_out_f
-        chk3 = p_p in p_in_f and p_c in p_in_f
-        #
-        chk4 = c_c in c_out_f  # c_p in c_out_f and c_p in c_in_f
-        chk5 = p_c in p_out_f
-        #
-        t = [c_p, c_c, p_p, p_c, d0, d1, chk0, chk1, chk2, chk3, chk4, chk5]
-        msg.append(fmt.format(*t))
-        # d0, d1, chk0, chk1, chk2, chk3, chk4, chk5
-        # --
-        # -- d0 clp ids are sequential and are on the densified clp line
-        # -- d0 should never be <= 0 since you are following clp sequence
-        # -- When d0 == 1, this is a shared edge between the two polygons
-        #    it is equivalent to `[c_p, c_c] in c_cut`
-        # --
-        # -------------------------------------------------------------------
-        #
-        if d0 == 1:  # this is a `cutting` segment inside `c_cut`
-            _clp_ = cl_n[[c_p, c_c]]
-            if chk2:                   # poly outside, use _clp_
-                in_clp += [_clp_]
-            elif chk3:                 # poly inside _clp_
-                in_clp += [pl_n[p_p: p_c + 1]]  # p_cut_out possibly
-            elif [c_p, c_c] in c_cut:  # when ch2 and ch3 are False
-                in_clp += [_clp_]      # add the cut line
-            # --
-            if d1 > 1:  # poly inside and outside check
-                p_chk = [p_p, p_c] in p_cut  # p_p, p_c may be cut line
-                # c_p, c_c is a cut, so check for triangular cuts
-                tri_chk, ids, knd = trichk(c_p, c_c, p_p, p_c)
-                # tri_chk = [c_c, c_c + 1] in c_cut and [c_c + 1, c_p] in c_cut
-                #
-                # -- check for inside poly points
-                if p_chk and chk3:  # poly inside, clip is an edge
-                    in_ids, _, __ = _ip_(p_p, p_c, p_seen, p_in)
-                    if len(in_ids) > 0:
-                        bts = pl_n[in_ids[::-1]]
-                        out.append(np.concatenate((_clp_, bts), axis=0))
-                        p_seen += in_ids
-                        if chk5:             # hole, if p_chk, chk3 and chk5
-                            kind_.append(2)
-                        else:
-                            kind_.append(1)  # inside
-                # -- handle possible triangles
-                elif p_chk and tri_chk:  # form the triangle
-                    ids = [c_p, c_c, c_c + 1, c_p]
-                    bts = cl_n[ids]
-                    out.append(bts)
-                    c_seen += [c_p, c_c]
-                    kind_.append(1)
-                    # put chk2 here?????
-                    if chk2:
-                        a_, b_ = min([p_p, p_c]), max([p_p, p_c])
-                        out_ids, _, __ = _op_(a_, b_, p_seen, p_out)
-                        keep_ = [i for i in out_ids if i >= a_ and i <= b_]
-                        ids = sorted(list(set(keep_)))
-                        bts = np.concatenate(
-                                (pl_n[ids], pl_n[[ids[0]]]), axis=0)
-                        out.append(bts)
-                        p_seen += ids
-                #
-                # -- handle in and out bit
-                elif chk2 and chk5:  # to handle E d0_ first clip
-                    out_ids, _, __ = _op_(p_p, p_c, p_seen, p_out)
-                    if len(out_ids) > 0:
-                        tmp = pl_n[out_ids + [p_p]]
-                        p_seen += out_ids[:-1]
-                        out.append(tmp)
-                        kind_.append(0)  # poly outside
-                    # --
-                    if not chk4:  # pl_, cl_ has chk4 and chk5 leading values
-                        in_ids, _, __ = _ip_(p_p, p_c, p_seen, p_in)
-                        if len(in_ids) > 0:
-                            tmp = pl_n[[p_p] + in_ids + [p_p]]
-                            p_seen += in_ids[:-1]
-                            out.append(tmp)
-                            kind_.append(1)
-                        # -- update _seen lists first
-                    #
-                elif chk2:
-                    print("{} {} chk2 bit using _out_1_".format(d0, d1))
-                    ids = _out_1_(p_c, p_seen, p_out)
-                    tmp = pl_n[ids]
-                    out.append(np.concatenate((tmp, _clp_), axis=0))
-                elif chk3:
-                    print("{} {} chk2 bit using in_1_".format(d0, d1))
-                    ids = _in_1_(p_c, p_seen, p_in)
-                    tmp = pl_n[ids]
-                    out.append(np.concatenate((tmp, _clp_[::-1]), axis=0))
-            # --
-            elif d1 < 0:  # not common, but accounted for (eg. E, d0_ polys)
-                # check for inside points, perhaps a triangle
-                p_chk = [p_p, p_c] in p_cut  # p_p, p_c may be cut line
-                c_chk = [c_c, c_c + 1] in c_cut  # c_p, c_c d0 = 1, is a cut
-                if p_chk and c_chk:
-                    ids = [c_p, c_c, c_c + 1, c_p]
-                    bts = cl_n[ids]
-                    out.append(bts)
-                    c_seen += [c_p, c_c]
-                    kind_.append(1)
-                elif p_chk and [c_p, c_c] in c_cut:  # both are cut lines
-                    c_seen.append(c_c)
-                    p_seen.append(p_c)
-                #
-                # This will be true:  p_p > p_c:
-                # check for seen points
-                else:
-                    a_, b_ = min([p_p, p_c]), max([p_p, p_c])
-                    rng = list(range(a_, b_ + 1))
-                    all_seen = set(rng).issubset(set(p_seen))
-                    if not all_seen:
-                        out_ids, _, __ = _op_(a_, b_, p_seen, p_out)
-                        keep_ = [i for i in out_ids if i >= a_ and i <= b_]
-                        # keep_ should now equal _pop_
-                        if len(keep_) > 0:
-                            # in_clp.extend([])  # fix !!!
-                            bts = pl_n[keep_]
-                            s0 = np.concatenate((bts, bts[0][None, :]), axis=0)
-                            kind_.append(0)  # was -1 which is wrong
-                            p_seen += keep_
-                            out.append(s0)
-            # --
-            elif d1 == 1:  # unexpected, get in and out at once
-                if chk5:
-                    # -- get inside bit
-                    in_ids, _, __ = _ip_(c_p, c_c, c_seen, c_in)
-                    if len(in_ids) > 0:
-                        bts = cl_n[in_ids]
-                        c_seen += in_ids
-                        kind_.append(1)
-                        out.append(np.concatenate((_clp_, bts), axis=0))
-                    # -- get outside bit
-                    out_ids, _, __ = _op_(0, 1, p_seen, p_out)
-                    if len(out_ids) > 0:
-                        bts2 = pl_n[out_ids]
-                        p_seen += out_ids
-                        kind_.append(0)
-                        out.append(np.concatenate((bts[::-1], bts2), axis=0))
-            # --
-        # -------------------------------------------------------------------
-        # -- Note: clip can be inside or outside
-        elif d0 > 1:
-            if chk0:  # chk4 as well  ... clp seg outside
-                out_ids, _, __ = _op_(c_p, c_c, c_seen, c_out)
-                sub0 = cl_n[out_ids]
-                c_seen += out_ids
-                if out_ids[-1] == cl_n.shape[0] - 1:  # check for last outside
-                    out.append(cl_n[out_ids + [out_ids[0]]])
-                # in_clp added later
-            elif chk1:  # clp seg is inside
-                in_ids, _, __ = _ip_(c_p, c_c, c_seen, c_in)
-                sub0 = cl_n[in_ids]
-                c_seen += in_ids
-                in_clp += [sub0]
-                # polygons touch at 1 point, collect clip area
-                if (sub0[0] == sub0[-1]).any().all():
-                    out.append(sub0)
-                    kind_.append(1)
-            # elif chk2:  # clp is in a poly edge
-            #     _clp_ =
-            # --
-            if d1 < 0:  # -- chk4, chk5  : E, d0_ because of wrapping crosses
-                if chk0:  # clip segment outside ply
-                    sub0 = sub0[::-1] if len(sub0) > 0 else []
-                    out_ids, _, __ = _op_(p_p, p_c, p_seen, p_out)
-                    sub1 = pl_n[out_ids[::-1]]
-                if len(sub0) > 0 and len(sub1) > 0:
-                    # reinsert vals since a hole was formed
-                    p_out.insert(0, out_ids)
-                    sub = np.concatenate((sub1, sub0), axis=0)
-                    out.append(sub)
-                    kind_.append(2)  # a hole between the two
-                else:
-                    sub = []  # or _out_bits_
-            # --
-            if d1 == 1:  # poly ids are sequential, clp is inside or outside
-                sub1 = pl_n[[p_p, p_c]]
-                if chk0:
-                    in_clp += [sub1]
-                    sub = np.concatenate((sub0, sub1[::-1]), axis=0)
-                    out.append(sub)
-                    kind_.append(-1)
-                elif chk1:
-                    sub = np.concatenate((sub1, sub0[::-1]), axis=0)
-                    out.append(sub)
-                    kind_.append(0)  # ?? check
-            # --
-            elif d1 > 1:  # clp inside and outside check
-                if chk0:  # also clip segment outside ply, chk3==True
-                    in_ids, _, __ = _ip_(p_p, p_c, p_seen, p_in)
-                    if len(in_ids) > 0:
-                        # -- in_ids 0 & -1 should be in p_cut
-                        sub1 = pl_n[in_ids]
-                        in_clp += [sub1]
-                        p_seen += in_ids
-                        sub = np.concatenate((sub0[::-1], sub1), axis=0)
-                        out.append(sub)
-                        kind_.append(-1)
-                        sub0 = []  # empty sub0 from above since it is outside
-                elif chk1:  # poly outside clp and chk2==True?
-                    out_ids, _, __ = _op_(p_p, p_c, p_seen, p_out)
-                    if len(out_ids) > 0:
-                        sub1 = pl_n[out_ids]
-                        sub = np.concatenate((sub1, sub0[::-1]), axis=0)
-                        out.append(sub)
-                        kind_.append(0)
-                elif chk2:
-                    out_ids, _, __ = _op_(p_p, p_c, p_seen, p_out)
-                    if len(out_ids) > 0:
-                        p_seen += in_ids
-                        out.append(pl_n[out_ids + [out_ids[0]]])
-                        kind_.append(-9)
-        # --
-        print("cnt {} : p_out {}\n      : c_out {}".format(cnt, p_out, c_out))
-        msg[-1] = msg[-1] + "{!s:>4}".format(kind_[-1])
-        prev = [c_c, p_c]
-        p_seen.append(p_c)
-        c_seen.append(c_c)
-        # # --
-    # --
-    #
-    if isinstance(in_clp, list) and len(in_clp) > 1:
-        _c_ = np.concatenate(in_clp, axis=0)  # intersect as well
-        clipped = _del_seq_pnts_(_c_, True)      # this seems to be
-        if (_c_[0] != _c_[-1]).any():
-            clipped = np.concatenate((clipped, clipped[0][None, :]), axis=0)
-        kind_.append(1)  # or 3 if concave hull in c_in check below
-        out.append(clipped)
+    if np.equal(p_on, onConP[:, 1]).all():  # c_on == onConP[:, 0] always
+        c_cut0, p_cut0 = _cut_pairs_(onConP[:, :2])  # use onConP, it is sorted
+        p_cut1, c_cut1 = _cut_pairs_(id_plcl)  # use id_plcl col 0, save a sort
+        c_cut = np.array(sorted(c_cut0 + c_cut1, key=lambda l:l[0]))  # noqa
+        p_cut = np.array(sorted(p_cut0 + p_cut1, key=lambda l:l[0]))  # noqa
+        results = _in_out_on_(combos, cl_n, pl_n, c_cut, p_cut)
+        # geom has dupls removed and oriented clockwise
+        geom, clp_ply, keep_bits = results
+        return geom, clp_ply, combos, keep_bits
     else:
-        clipped = np.asarray([])
-    #
-    final = np.asarray(out, dtype='O')
-    hull_ = []
-    idx = np.array(kind_)
-    idx_hole = np.nonzero(idx == 2)[0]    # holes, 2
-    idx_all = np.nonzero(idx < 2)[0]      # symmetrical difference, -1, 0, 1
-    idx_p_out = np.nonzero(idx == 0)[0]   # poly outside clip (pairwise erase)
-    idx_c_out = np.nonzero(idx == -1)[0]  # clp outside poly
-    idx_p_in = np.nonzero(idx == 1)[0]    # clipped
-    idx_c_in = np.nonzero(idx == 1)[0]    # reverse pairwise erase, eg clipped
-    #
-    hole_ = final[idx_hole] if len(idx_hole) > 0 else []
-    symm_ = final[idx_all]
-    cin_ = final[idx_c_in] if len(idx_c_in) > 0 else []  # clp times E,d0_
-    if isinstance(cin_, np.ndarray):
-        if len(cin_) == 1:
-            cin_ = cin_[0]
-            clipped = cin_
-        else:
-            tmp = _del_seq_pnts_(cin_[-1], True)
-            if clipped.shape == tmp.shape:
-                chk = np.equal(clp_, tmp).all()
-                if chk:
-                    hull_ = tmp
-                    z = np.asarray(cin_[:-1], dtype='O')
-                    # print("chk {}\n{}".format(chk, z))
-                    cin_ = z
-                    idx[-1] = 3
-                    idx_c_in = np.nonzero(idx == 1)[0]
-                    cin_ = final[idx_c_in]
-    erase_ = final[idx_p_out] if len(idx_p_out) > 0 else []
-    erase_r = final[idx_c_out] if len(idx_c_out) > 0 else []
-    hull_idx = np.nonzero(idx == 3)[0]
-    hull_ = final[hull_idx] if len(hull_idx) > 0 else []
+        # -- `_cut_pairs_` to get cuts and crosses, then sort
+        c_cut0, p_cut0 = _cut_pairs_(onConP[:, :2])  # use onConP, it is sorted
+        p_cut1, c_cut1 = _cut_pairs_(id_plcl)  # use id_plcl col 0, save a sort
+        c_cut = np.array(sorted(c_cut0 + c_cut1, key=lambda l:l[0]))  # noqa
+        p_cut = np.array(sorted(p_cut0 + p_cut1, key=lambda l:l[0]))  # noqa
+        #
+        # -- `_in_out_` to get geometry
+        ply_a_in, ply_a_out = _in_out_(pl_n, p_ft_v, p_cut)
+        ply_b_in, ply_b_out = _in_out_(cl_n, c_ft_v, c_cut)
+        #
+        geom = ply_a_in + ply_a_out + ply_b_in + ply_b_out
+        geom = [_del_seq_pnts_(i) for i in geom]
+        geom = orient_clockwise(geom)
+        #
+        clip_polys = [cl_n[c_on], pl_n[p_on]]
+        keep_bits = None
+        # -- clip result is either pl_n[w0], or cl_n[w1] when the cut line
+        #     is 2 points, otherwise you have to assemble the inside and cut
+        #     segments
+        return geom, clip_polys, combos, keep_bits
+
+    # works for
+    # (p00, c00), (p00, c01), (p00, c02), (p00, c03)
+    # (p01, c00), (p01, c01), (p01, c02), (p01, c03)
+    # (p02, c00), (p02, c01), (p02, c02)*, (p02, c03)*  * used _in_out_on_
+    # (p03, c00), (p03, c01), (p03, c02), (p03, c03)
+    # A, C  nope
+    # B, K
+    # C, K  nope
+    # E, d0_
+
+
+def overlay_nx(poly, clp, extras=True):
+    """Return the results of overlay using networkx."""
+    result = add_intersections(
+                poly, clp,
+                roll_to_minX=True,
+                p0_pgon=True, p1_pgon=True,
+                class_ids=False
+                )
+    # pl_ioo polygon in-out-on, cl_ioo for clip
+    pl_n, cl_n, id_plcl, onConP, x_pnts, ps_info, cs_info = result
+    p_out, p_on, p_in, pl_ioo = ps_info
+    c_out, c_on, c_in, cl_ioo = cs_info
     # --
-    # if as_geo:
-    #     return npg.arrays_to_Geo(final, kind=2, info=None, to_origin=False)
-    # erase_, clp_0, clp_1, hole_, symm_, erase_r
-    if testing:
-        print("\nidx : {}\n".format(idx))
-        print("cc  cp pc pp   d0 d1 chk0  chk1  chk2  chk3  chk4  chk5  kind")
-        print("\n".join([i for i in msg]))
-    # return final, idx
-    return final, idx, clipped, cin_, hole_, symm_, erase_, erase_r, hull_
+    # -- Initially number the sequential points, slicing off the duplicate 0
+    #    point between clp and poly
+    N_c = cl_n.shape[0] - 1
+    N_p = pl_n.shape[0] - 1  # noqa
+    #
+    # --
+    cp_ids, old_new_ids, CP_ = _renumber_pnts_(cl_n, pl_n)
+    #
+    # -- point designations and renumbering p_sing_o and p_sing_i
+    c_sing_out = c_out
+    c_sing_in = c_in  # -- c_on defined above
+    p_sing_out = np.asarray([], dtype='int')
+    p_sing_in = np.asarray([], dtype='int')
+    if len(p_out > 0):
+        p_sing_out = old_new_ids[p_out, :][:, -1]  # p_out + N_c + 1  # -- out
+        cp_ids[p_sing_out] = p_sing_out
+    if len(p_in) > 0:
+        p_sing_in = old_new_ids[p_in, :][:, -1]  # p_in + N_c + 1  # -- in
+        cp_ids[p_sing_in] = p_sing_in
+    if len(p_on) > 0:
+        p_sing_on = old_new_ids[p_on[1:-1], :][:, -1]  # first and last are on
+        cp_ids[p_sing_on] = p_sing_on
+    #
+    # -- Create frto and get unique values
+    frto = np.concatenate((cp_ids[:-1][:, None], cp_ids[1:][:, None]), axis=1)
+    frto = frto[frto[:, 0] != frto[:, 1]]  # -- remove 0,0 middle point
+    # ioo = np.concatenate((cl_ioo[:-1, 1], pl_ioo[:-1, 1]))  # ditto
+    # frto_ioo = np.concatenate((frto, ioo[:, None]), axis=1)
+    # -- construct the cycles
+    #  import networkx as nx
+    #
+    # d = connections_dict(frto, True)
+    # H = nx.from_dict_of_lists(d)  # yields the same edges etc as below
+    #
+    G = nx.Graph()
+    G.add_edges_from(frto)
+    #
+    # -- weighted graph examples
+    # G.add_weighted_edges_from(frto_ioo, weights='ioo')
+    # --
+    # nx.set_edge_attributes(G, values=ioo, name = 'ioo')
+    # nx.set_edge_attributes(G, values=1, name = 'ioo')
+    # to view edge data:  G.edges(data=True)
+    # H = G.to_directed()  # to get a directed graph from `frto`
+    # --
+    # -- code from _minimum_cycle_basis
+    # list(nx.minimum_spanning_tree(G)) # just returns the nodes of G
+    # tree_edges = list(nx.minimum_spanning_edges(G, weight=None, data=False))
+    # chords = sorted(list(G.edges - tree_edges -
+    #                 {(v, u) for u, v in tree_edges}))
+    # tree_edges = np.asarray(tree_edges)
+    # chords = np.asarray(chords)
+    # -- minimum_cycle_basis
+    out = []
+    # cycles = sorted(list(nx.cycle_basis(G)))  # needs to be parsed a bit
+    cycles = sorted(nx.cycles.minimum_cycle_basis(G))  # not for directed
+    for cycle in cycles:
+        out.append(nx.find_cycle(G.subgraph(cycle), orientation='ignore'))
+    #
+    out_ = []
+    for i in out:
+        sub = []
+        if len(i) > 1:
+            for j in i[:-1]:
+                sub.append(j[0])
+            sub.extend(i[-1][:2])
+            out_.append(sub)
+    out_ = sorted(out_, key=len)
+    #
+    # -- `cycle_basis`, doesn't solve or return all the polys
+    #    cycles2 = sorted(nx.cycles.cycle_basis(G))
+    #
+    ps = [CP_[i] for i in out_]                  # -- get the polygons
+    #
+    # -- get the area and centroid and reorient the polys to clockwise
+    #
+    area_ = [_bit_area_(i) for i in ps]  # -- calculate area, centroid
+    _area_ = []
+    cw_order = []
+    cw_ps = []
+    for cnt, ar in enumerate(area_):
+        _p, _o = ps[cnt], out_[cnt]
+        if ar < 0:  # cw area is positive, ccw area is negative
+            _p = _p[::-1]
+            _o = _o[::-1]
+            ar = abs(ar)
+        _area_.append(ar)
+        cw_ps.append(_p)
+        cw_order.append(_o)
+    #
+    # cw_ps = [CP_[i] for i in cw_order]  # these are the clockwise polygons
+    #
+    # -- Check the resultant geometries
+    _class_ = np.zeros(len(cw_order), dtype='int')
+    _class_.fill(9)
+    for i, cw in enumerate(cw_order):
+        cw = np.array(cw)
+        chk1 = np.isin(cw[:-1], c_on).any()  # on check
+        chk2 = np.isin(cw[:-1], c_sing_in).any()  # in check
+        chk3 = np.isin(cw[:-1], c_sing_out).any()  # out check
+        #
+        if max(cw) <= N_c - 1:  # check clp all points are on clp edges
+            # -- or :
+            chk0 = (_bit_area_(cl_n) - _bit_area_(ps[i])) == 0.
+            if chk0:  # could be the clp itself
+                _class_[i] = -7
+            elif chk1:  # all clp on, poly in
+                if len(cw[:-1]) == 3:  # first line crosses 2 poly lines
+                    _class_[i] = 1 if chk2 else 0  # poly chk
+                elif chk2:
+                    _class_[i] = 1     # poly is in
+                elif chk3:
+                    _class_[i] = -1    # poly is out
+                else:  # clp on with > 3 pnts, hence poly in
+                    _class_[i] = 1     # poly in, all pnts are on clp segments
+            elif chk2:  # clp in
+                _class_[i] = 1
+            elif chk3:  # may be redundant
+                _class_[i] = -1
+        elif chk1 and chk2 and chk3:  # no clp on, out or in
+            _class_[i] = -8
+        else:  # some of the points are ply pnts
+            whr = np.nonzero(cw < N_c - 1)[0]  # use n-1 probably a cut line
+            vals = cw[whr]
+            _c_o_ = np.isin(vals, c_sing_out).any()
+            _c_i_ = np.isin(vals, c_sing_in).any()
+            chk4 = max(cw) in p_sing_in  # ply in clp
+            chk5 = max(cw) in p_sing_out
+            if len(cw[:-1]) == 3:  # first line crosses 2 poly lines
+                _class_[i] = 0 if chk4 else 1
+            elif chk4 and _c_o_:  # some clp outside of poly
+                _class_[i] = -1
+            elif chk4 and _c_i_:  # some clp inside
+                _class_[i] = 1
+            elif chk5 and _c_i_:  # some clip in, some poly out
+                _class_[i] = 0
+            elif chk5 and _c_o_:
+                _class_[i] = 2    # hole between poly, clp
+            elif chk4:
+                _class_[i] = 1    # ply in
+            elif chk5:
+                _class_[i] = 0    # ply out
+            else:
+                print("i {} cw {}".format(i, cw))
+    #
+    """
+     -1 clip outside poly:
+      0 poly outside clip :  erase
+      1 poly inside clip :   clip
+      2 area between clip and poly : hole
+      3 identity : features or parts that overlap
+      : symmetrical diff -1 and 0
+    """
+    final = []
+    kind = [-1, 0, 1, 2]
+    for i in kind:
+        whr = np.nonzero(_class_ == i)[0]
+        sub = []
+        if whr.size > 0:
+            for j in whr:
+                sub.append(ps[j])
+        final.append(sub)
+    if extras:
+        return final, kind, cw_order
+    return final, None
 
 
-# ----------------------------------------------------------------------------
-# ---- (2) append geometry
+# ---- ---------------------------
+# ---- (3) append geometry
 #
 def append_(this, to_this):
     """Append `this` geometry `to_this` geometry.
@@ -660,8 +976,8 @@ def append_(this, to_this):
     return out
 
 
-# ----------------------------------------------------------------------------
-# ---- (3) dissolve shared boundaries
+# ---- ---------------------------
+# ---- (4) dissolve shared boundaries
 #
 def _union_op_(a, b):
     """Union two polygon features with a dissolve of their shared edges.
@@ -752,16 +1068,16 @@ def union_adj(a, asGeo=False):
     return out
 
 
-def union_over(this, on_this):
+def union_over(ply_a, ply_b):
     """Return union of geometry."""
-    result = overlay_ops(this, on_this, False)
-    final, idx, clp_, cin_, hole_, symm_, erase_, erase_r = result
-    out = merge_(clp_, on_this)
+    result = polygon_overlay(ply_a, ply_b)
+    final, idx, over_, cin_, hole_, symm_, erase_, erase_r = result
+    out = merge_(over_, ply_b)
     return out
 
 
-# ----------------------------------------------------------------------------
-# ---- (4) adjacency
+# ---- ---------------------------
+# ---- (5) adjacency
 #
 def adjacency_matrix(a, collapse=True, prn=False):
     """Construct an adjacency matrix from an input polygon geometry.
@@ -868,7 +1184,7 @@ def adjacency_matrix(a, collapse=True, prn=False):
     return ad
 
 
-# ----------------------------------------------------------------------------
+# ---- ---------------------------
 # ---- (6) merge geometry
 #
 def merge_(this, to_this):
@@ -931,168 +1247,212 @@ def merge_(this, to_this):
     return out
 
 
-# ----------------------------------------------------------------------------
-# -- (7) union geometry
-#
-# ---- Old
-# def dissolve(a, asGeo=True):
-#     """Dissolve polygons sharing edges.
+def find_cycles(graph):
+    """Find cycles in a graph represented by a dictionary.
 
-#     Parameters
-#     ----------
-#     a : Geo array
-#         A Geo array is required. Use ``arrays_to_Geo`` to convert a list of
-#         lists/arrays or an object array representing geometry.
-#     asGeo : boolean
-#         True, returns a Geo array. False returns a list of arrays.
+    Reference
+    ---------
+    https://stackoverflow.com/questions/76948570/
+    finding-cycles-in-an-undirected-graph-in-node-node-format-returns
+    -wrong-resul
+    """
+    cycles = []
+    checked = set()
 
-#     Notes
-#     -----
-#     >>> from npgeom.npg_plots import plot_polygons  # to plot the geometry
+    def dfs(node, visited, path):
+        """Depth first search implementation."""
+        visited.add(node)
+        path.append(node)
 
-#     `_isin_2d_`, `find`, `_adjacent_` equivalent::
+        neighbors = graph.get(node, [])
 
-#         (b0[:, None] == b1).all(-1).any(-1)
-#     """
+        for neighbor in neighbors:
+            if neighbor in visited:
+                # Cycle detected
+                start_index = path.index(neighbor)
+                cycle = path[start_index:]
+                m = tuple(sorted(cycle))
+                if len(cycle) > 2 and m not in checked:
+                    checked.add(m)
+                    cycles.append(cycle)
+            else:
+                dfs(neighbor, visited, path)
 
-#     def _adjacent_(a, b):
-#         """Check adjacency between 2 polygon shapes."""
-#         s = np.sum((a[:, None] == b).all(-1).any(-1))
-#         if s > 0:
-#             return True
-#         return False
+        visited.remove(node)
+        path.pop()
 
-#     def _cycle_(b0, b1):
-#         """Cycle through the bits."""
+    for node in graph.keys():
+        dfs(node, set(), [])
 
-#         def _find_(a, b):
-#             """Find.  Abbreviated form of ``_adjacent_``,
-#             to use for slicing."""
-#             return (a[:, None] == b).all(-1).any(-1)
-
-#         idx01 = _find_(b0, b1)
-#         idx10 = _find_(b1, b0)
-#         if idx01.sum() == 0:
-#             return None
-#         if idx01[0] == 1:  # you can't split between the first and last pnt.
-#             b0, b1 = b1, b0
-#             idx01 = _find_(b0, b1)
-#         dump = b0[idx01]
-#         # dump1 = b1[idx10]
-#         sp0 = np.nonzero(idx01)[0]
-#         sp1 = np.any(np.isin(b1, dump, invert=True), axis=1)
-#         z0 = np.array_split(b0, sp0[1:])
-#         # direction check
-#         # if not (dump[0] == dump1[0]).all(-1):
-#         #     sp1 = np.nonzero(~idx10)[0][::-1]
-#         sp1 = np.nonzero(sp1)[0]
-#         if sp1[0] + 1 == sp1[1]:  # added the chunk section 2023-03-12
-#             # print("split equal {}".format(sp1))
-#             chunk = b1[sp1]
-#         else:
-#             sp2 = np.nonzero(idx10)[0]
-#             # print("split not equal {} using sp2 {}".format(sp1, sp2))
-#             chunks = np.array_split(b1, sp2[1:])
-#             chunk = np.concatenate(chunks[::-1])
-#         return np.concatenate((z0[0], chunk, z0[-1]), axis=0)
-
-#     def _combine_(r, shps):
-#         """Combine the shapes."""
-#         missed = []
-#         processed = False
-#         for i, shp in enumerate(shps):
-#             adj = _adjacent_(r, shp[1:-1])  # shp[1:-1])
-#             if adj:
-#                 new = _cycle_(r, shp[:-1])  # or shp)
-#                 r = new
-#                 processed = True
-#             else:
-#                 missed.append(shp)
-#         if len(shps) == 2 and not processed:
-#             missed.append(r)
-#         return r, missed  # done
-
-#     # --- check for appropriate Geo array.
-#     if not hasattr(a, "IFT") or a.is_multipart():
-#         msg = """function : dissolve
-#         A `Singlepart` Geo array is required. Use ``arrays_to_Geo``
-#         to convert
-#         arrays to a Geo array and use ``multipart_to_singlepart`` if needed.
-#         """
-#         print(msg)
-#         return None
-#     # --- get the outer rings, roll the coordinates and run ``_combine_``.
-#     a = a.outer_rings(True)
-#     a = a.roll_shapes()  # not needed
-#     a.IFT[:, 0] = np.arange(len(a.IFT))
-#     out = []
-#     # -- try sorting by  y coordinate rather than id, doesn't work
-#     # cent = a.centers()
-#     # s_ort = np.argsort(cent[:, 1])  # sort by y
-#     # shps = a.get_shapes(s_ort, False)
-#     # -- original, uncomment below
-#     ids = a.IDs
-#     shps = a.get_shapes(ids, False)
-#     r = shps[0]
-#     missed = shps
-#     N = len(shps)
-#     cnt = 0
-#     while cnt <= N:
-#         r1, missed1 = _combine_(r, missed[1:])
-#         if r1 is not None and N >= 0:
-#             out.append(r1)
-#         if len(missed1) == 0:
-#             N = 0
-#         else:
-#             N = len(missed1)
-#             r = missed1[0]
-#             missed = missed1
-#         cnt += 1
-#     # final kick at the can
-#     if len(out) > 1:
-#         r, missed = _combine_(out[0], out[1:])
-#         if missed is not None:
-#             out = [r] + missed
-#         else:
-#             out = r
-#     if asGeo:
-#         out = npGeo.arrays_to_Geo(out, 2, "dissolved", False)
-#         out = npGeo.roll_coords(out)
-#     return out  # , missed
+    return cycles
 
 
-# -- Extras
+"""
+visited = [] # List for visited nodes.
+queue = []     #Initialize a queue
 
-    # def on_pairs(col):
-    #     """Return sequential ids from the intersections not in or out."""
-    #     segs = []
-    #     for cn, v in enumerate(col[1:], 0):
-    #         prev = col[cn]
-    #         dff = v - prev
-    #         if dff == 1:
-    #             segs.append([prev, v])
-    #     return segs
+def bfs(visited, graph, node): #function for BFS
+  visited.append(node)
+  queue.append(node)
 
-    # def _chk_in_lst(_p, _c, _case):
-    #     """Boolean check of poly or clip points.
+  while queue:          # Creating loop to visit each node
+    m = queue.pop(0)
+    print (m, end = " ")
 
-    #     Parameters
-    #     ----------
-    #     _p, _c : integer
-    #         Previous or current point id values.
-    #     _case : list of lists
-    #         Inside or outside point lists.
+    for neighbour in graph[m]:
+      if neighbour not in visited:
+        visited.append(neighbour)
+        queue.append(neighbour)
 
-    #     Notes
-    #     -----
-    #     This function is used to see if the previous (`_p`) or current (`_c`)
-    #     poly or clip points are inside or outside their counterpart.
-    #       The same function can be used for either case.
-    #     """
-    #     for lst in _case:
-    #         if _p in lst and _c in lst:
-    #             return True, lst
-    #     return False, []
+# Driver Code
+print("Following is the Breadth-First Search")
+bfs(visited, graph, '5')    # function calling
+
+"""
+
+
+"""
+produces a dictionary for the above
+
+
+graph = {
+    # 'node': ['adjacent'],
+}
+
+n, m = map(int, data.pop(0).split())
+
+for _ in range(m):
+    a, b = map(int, data.pop(0).split())
+    if b not in graph:
+        graph[b] = []
+    if a not in graph:
+        graph[a] = []
+
+    if a not in graph[b]:
+        graph[b].append(a)
+    if b not in graph[a]:
+        graph[a].append(b)
+
+ans = find_cycles(graph)
+print(ans)
+print(len(ans))
+"""
+
+"""
+d = None
+def get_cycles(n, o = None, c = []):
+   if n == o: #check if current node being examined is the same as the start
+      yield c
+      # if the condition is met, then a cycle is found and the path is yielded
+      #
+   else:
+      # get the children of the current node from d and iterate over only
+      # those that have not been encountered before (except if the node is
+      # the same as the start)
+      for i in filter(lambda x:x not in c or x == o, d.get(n, [])):
+         # recursively find the children of this new node `i`, saving the
+         # running path (c + [n])
+         yield from get_cycles(i, o = n if o is None else o, c = c + [n])
+"""
+
+
+# ---- old
+def _inouton_(combos, cl_n, pl_n):
+    """Return the full results of in, out and on.
+
+    Parameters
+    ----------
+    See `polygon_overlay` for outputs and descriptions.
+    """
+    # -- 8 possible unique combinations of crosses and segment locations
+    ch = np.array([[-1, -1], [-1, 0], [-1, 1],
+                   [0, -1], [0, 0], [0, 1],
+                   [1, -1], [1, 0], [1, 1]])
+
+    uniq_c_p = np.unique(combos[:, 2:4], axis=0)
+    z0 = combos[:, :2]
+    # c_val = combos[:, 2]
+    cs = [cl_n[i[0]:i[1]] for i in z0]  # overlay segments
+    cs = np.array(cs, dtype='O')
+    #
+    z1 = combos[:, -2:]
+    ps = [pl_n[i[0]:i[1]] for i in z1]  # poly segments
+    ps = np.array(ps, dtype='O')
+    #
+    pl_in, pl_out, cl_in, cl_out, _tri_, odd = [], [], [], [], [], []
+    clp_ply = []
+    type_whr_lst = []
+    #
+    # -- Begin groupings
+    for cnt, pair in enumerate(uniq_c_p):
+        wh = np.nonzero((combos[:, 2:4] == pair).all(-1))[0]
+        type_whr_lst.append([pair, wh])
+        c_sub = cs[wh]
+        p_sub = ps[wh]
+        #
+        _x_ = np.nonzero((pair == ch).all(-1))[0][0]
+        #
+        # ch[[1, 2]] : [-1, 0], [-1, 1]
+        #   clp (b) out, ply (a) on/in
+        if _x_ in [1, 2]:
+            clp_ply.extend(p_sub)
+            circs = [np.concatenate((i[0], i[1][::-1]), axis=0)
+                     for i in list(zip(c_sub, p_sub))]
+            cl_out.extend(circs)
+        #
+        # ch[[3] : [0, -1]
+        #   clp on, ply out
+        elif _x_ == 3:
+            clp_ply.extend(c_sub)
+            circs = [np.concatenate((i[0][::-1], i[1]), axis=0)
+                     for i in list(zip(c_sub, p_sub))]
+            pl_out.extend(circs)
+        #
+        # ch[[5]] : [0, 1]
+        #   clp on,  ply in
+        elif _x_ == 5:
+            clp_ply.extend(p_sub)
+            circs = [np.concatenate((i[1], i[0][::-1]), axis=0)
+                     for i in list(zip(c_sub, p_sub))]
+            pl_in.extend(circs)
+        #
+        # ch[[6, 7] : [1, -1], [1, 0]
+        #   clp in, ply out or on
+        elif _x_ in [6, 7]:
+            clp_ply.extend(c_sub)
+            circs = [np.concatenate((i[1], i[0][::-1]), axis=0)
+                     for i in list(zip(c_sub, p_sub))]
+            cl_in.extend(circs)
+        #
+        # ch[[4] : [0, 0]
+        #   clp on ply , probable triangles
+        elif _x_ == 4:
+            clp_ply.extend(c_sub)
+            circs = [np.concatenate((i[0], i[1]), axis=0)
+                     for i in list(zip(c_sub, p_sub))]
+            _tri_.append(circs)
+        else:
+            clp_ply.extend(c_sub)
+            circs = [np.concatenate((i[0], i[1]), axis=0)
+                     for i in list(zip(c_sub, p_sub))]
+            odd.extend(circs)
+    # --
+    order = np.concatenate([i[1] for i in type_whr_lst])
+    srt_order = np.argsort(order)
+    clp_ply = np.array(clp_ply, dtype='O')
+    clp_final = np.concatenate(clp_ply[srt_order], axis=0)
+    clp_final = _del_seq_pnts_(clp_final)
+    all_ = [pl_in, pl_out, cl_in, cl_out]
+    tmp = []
+    for lst in all_:
+        sub = []
+        if len(lst) > 0:
+            for i in lst:
+                sub.append(_del_seq_pnts_(i))
+        tmp.append(sub)
+    #
+    pl_in, pl_out, cl_in, cl_out = tmp
+    return clp_final, pl_in, pl_out, cl_in, cl_out, _tri_, odd, type_whr_lst
 
 
 # ---- Final main section ----------------------------------------------------

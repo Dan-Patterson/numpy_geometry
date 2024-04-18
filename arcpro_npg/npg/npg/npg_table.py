@@ -14,7 +14,7 @@ Script :
 Author :
     Dan_Patterson@carleton.ca
 Modified :
-    2023-11-05
+    2024-03-28
 
 Purpose
 -------
@@ -108,7 +108,8 @@ l_case = "abcdefghijklmnopqrstuvwxyz"
 flotsam = ' !"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~'  # including the space
 
 
-# ---- conversion helpers
+# ---- ---------------------------
+# ---- (1) conversion helpers
 #
 def nd2struct(a, fld_names=None):
     """Return a view of an ndarray as structured array with a uniform dtype.
@@ -388,7 +389,8 @@ def merge_arrays(a, others):
     return z
 
 
-# ---- Crosstabulation tools -------------------------------------------------
+# ---- ---------------------------
+# ---- (2) Crosstabulation tools
 # -- fancy print/string formatter for crosstabulation and pivot
 def _prn(r, c, a, stat_name="Total"):
     """Fancy print formatting."""
@@ -441,7 +443,7 @@ def _as_pivot(a):
 """
 
 
-# ---- (1) from featureclass table
+# ---- (2a) from featureclass table
 def crosstab_tbl(in_tbl, flds=None, as_pivot=True):
     """Derive the unique attributes in a table for all or selected fields.
 
@@ -474,7 +476,7 @@ def crosstab_tbl(in_tbl, flds=None, as_pivot=True):
     return out_arr
 
 
-# ---- (2) from two, 1D numpy ndarrays
+# ---- (2b) from two, 1D numpy ndarrays
 def crosstab_rc(row, col, reclassed=False):
     """Crosstabulate 2 data arrays, with shape (N,), using np.unique.
 
@@ -507,7 +509,7 @@ def crosstab_rc(row, col, reclassed=False):
     return ctab
 
 
-# ---- (3) from a structured array
+# ---- (2c) from a structured array
 def crosstab_array(a, flds=None):
     """Frequency and crosstabulation for structured arrays.
 
@@ -546,8 +548,8 @@ def crosstab_array(a, flds=None):
     return fr
 
 
-# ---- Summarize tools -------------------------------------------------------
-# ---- (1) statistics functions
+# ---- ---------------------------
+# ---- (3) Summarize tools/statistics functions
 def calc_stats(arr, axis=None, deci=4):
     """Calculate stats for numeric arrays which may contain `nodata`.
 
@@ -710,8 +712,9 @@ def group_stats(a, case_fld=None, num_flds=None, deci=2, verbose=False):
     return results
 
 
-# ---- finding tools -------------------------------------------------------
-# ---- (1) find array in array (ndarray or structured array version)
+# ---- ---------------------------
+# ---- (4) finding tools
+# ---- (4a) find array in array (ndarray or structured array version)
 def find_a_in_b(a, b, fld_names=None):
     """Find the indices of the elements between two, 2D arrays.
 
@@ -774,7 +777,7 @@ def find_a_in_b(a, b, fld_names=None):
     return indices
 
 
-# ---- (2) find object in array (structured array version)
+# ---- (4b) find object in array (structured array version)
 def find_in(a, col, what, where="in", any_case=True, pull="all"):
     """Query a recarray/structured array for values.
 
@@ -850,8 +853,9 @@ def find_in(a, col, what, where="in", any_case=True, pull="all"):
     return a[q][pull]
 
 
-# ---- sorting and slicing --------------------------------------------------
-# ---- (1) row sorting and slicing
+# ---- ---------------------------
+# ---- (5) sorting and slicing --------------------------------------------------
+# ---- (5a) row sorting and slicing
 def split_sort_slice(a, split_fld=None, order_fld=None):
     """Split a structured array into groups of common values.
 
@@ -905,7 +909,7 @@ def split_sort_slice(a, split_fld=None, order_fld=None):
     return ordered
 
 
-# ---- (2) group, then sort with group
+# ---- (5b) group, then sort with group
 def group_sort(a, group_fld, sort_fld=None, ascend=True, sort_name=None):
     """Group records in an structured array and sort on the sort_field.
 
@@ -960,7 +964,7 @@ def group_sort(a, group_fld, sort_fld=None, ascend=True, sort_name=None):
     return final
 
 
-# ---- (3) n-largest/smallest
+# ---- (5c) n-largest/smallest
 def n_largest_vals(a, group_fld=None, val_fld=None, num=1):
     """Run `split_sort_slice` to get the N largest values in the array."""
     ordered = split_sort_slice(a, split_fld=group_fld, order_fld=val_fld)
@@ -982,7 +986,8 @@ def n_smallest_vals(a, group_fld=None, val_fld=None, num=1):
     return np.asarray(final)
 
 
-# ---- to organize-----------------------------------------------------------
+# ---- ---------------------------
+# ---- (6) to organize
 #
 def running_count(a, to_label=False):
     """Perform a running count on a 1D array.

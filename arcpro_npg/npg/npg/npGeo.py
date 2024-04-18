@@ -27,20 +27,21 @@ from numpy.lib.recfunctions import repack_fields
 
 import npg  # noqa
 from npg import npg_geom_ops as geom
-from npg import npg_geom_hlp, npg_io, npg_prn  # npg_create)
-from npg import npg_min_circ as sc
+from npg import npg_geom_hlp, npg_io, npg_prn  # npg_create
+from npg import npg_min_circ as sc  # requires scipy
 
 from npg.npg_geom_hlp import (
     _angles_3pnt_, _area_centroid_, _bit_area_, _bit_crossproduct_,
     _clean_segments_, _bit_min_max_, _bit_length_, _rotate_, geom_angles,
-    uniq_1d)
+    uniq_1d
+)
 
 from npg.npgDocs import (
     Geo_hlp, shapes_doc, parts_doc, outer_rings_doc, inner_rings_doc,
     get_shapes_doc, is_in_doc, convex_hulls_doc, extent_rectangles_doc,
     bounding_circles_doc, od_pairs_doc, pnt_on_poly_doc, sort_by_area_doc,
     radial_sort_doc, sort_by_extent_doc, array_IFT_doc, dirr_doc
-  )  #
+)  #
 
 np.set_printoptions(
     edgeitems=10, linewidth=120, precision=2, suppress=True, threshold=200,
@@ -175,8 +176,8 @@ class Geo(np.ndarray):
         """Wrap it up."""
         return np.ndarray.__array_wrap__(self, out_arr, context)
 
-    # ---- End of class definition -------------------------------------------
-    # ----  ------------------------------------------------------------------
+    # ---- End of class definition
+    # ----  ----------------------
     # ---- help : information
     @property
     def H(self):
@@ -252,7 +253,10 @@ class Geo(np.ndarray):
         if self.is_multipart():  # multiparts check
             return self.part_IFT
         df = self.To - self.Fr
-        cnt = np.bincount(self.IDs, df)  # -- check to account for
+        if self.IDs[0] == 0:
+            cnt = np.bincount(self.IDs + 1, df)  # -- check to account for
+        else:
+            cnt = np.bincount(self.IDs, df)
         gt0 = np.nonzero(cnt)[0]         # -- discontinuous ids
         too = np.cumsum(cnt[gt0], axis=0, dtype=np.int32)
         fr = np.concatenate(([0], too[:-1]), axis=0)
@@ -419,7 +423,7 @@ class Geo(np.ndarray):
         """Deconstruct the 2D array returning all rings."""
         return [self.XY[ft[0]:ft[1]] for ft in self.FT]
 
-    # ----  ------------------------------------------------------------------
+    # ----  -------------------------------------
     # ---- methods and derived properties section
     # ---- (1) slicing, sampling equivalents
     #
@@ -531,11 +535,12 @@ class Geo(np.ndarray):
         if asGeo:
             info = "Old_order" + (" {}" * len(ids)).format(*ids)
             if len(ids) == 1:  # cludge workaround for length 1 ids
-                arr = arrays_to_Geo(xys, kind=self.K, info=info)
+                arr = arrays_to_Geo(
+                    xys, kind=self.K, info=info, to_origin=False)
                 arr.IFT[:, 0] = 0
                 # arr.IFT[:, 5] = np.arange(len(arr.IFT))  # fixed in arr2geo
                 return arr
-            return arrays_to_Geo(xys, kind=self.K, info=info)
+            return arrays_to_Geo(xys, kind=self.K, info=info, to_origin=False)
         return xys
 
     def split_by(self, splitter="bit"):
@@ -564,7 +569,8 @@ class Geo(np.ndarray):
 
         Uses `npg_geom_hlp._bit_area_` to calculate the area.
         The `by_shape=True` parameter returns the area for each shape. If
-        False, each bit area is returned.  Negative areas are holes.
+        False, each bit area is returned.  Negative areas are holes.  This is
+        intentionally reversed from the `shoelace` formula.
         """
         if self.K != 2:
             print("Polygons required.")
@@ -687,7 +693,8 @@ class Geo(np.ndarray):
                 poly = poly + self.LL
             ext_polys.append(poly)
         if asGeo:
-            ext_polys = arrays_to_Geo(ext_polys, kind=2, info="extent pnts")
+            ext_polys = arrays_to_Geo(
+                ext_polys, kind=2, info="extent pnts", to_origin=False)
         return ext_polys
 
     def extent_rectangles(
@@ -701,7 +708,8 @@ class Geo(np.ndarray):
                 poly = poly + self.LL
             ext_polys.append(poly)
         if asGeo:
-            ext_polys = arrays_to_Geo(ext_polys, kind=2, info="extent polys")
+            ext_polys = arrays_to_Geo(
+                ext_polys, kind=2, info="extent polys", to_origin=False)
         return ext_polys
 
     def boundary(self):
@@ -740,9 +748,9 @@ class Geo(np.ndarray):
             chunks = [np.unique(i, axis=0) for i in chunks]
         return np.asarray([np.mean(i, axis=0) for i in chunks])
 
-    # ---- ===================================================================
+    # ---- ---------------------------
     # ---- npg_geom_ops methods/properties required
-    # ----  ------------------------------------------------------------------
+    # ----
     # ---- (1) **is** section, condition/case checking, kept to a minimum
     def is_clockwise(self, is_closed_polyline=False, as_structured=False):
         """Utilize the `shoelace` area calculation to determine orientation.
@@ -807,7 +815,7 @@ class Geo(np.ndarray):
         return lead[check]
 
     # ----  ---------------------------
-    # ---- (2) angles -----------------
+    # ---- (2) angles
     #
     def segment_angles(self, fromNorth=False):
         """Segment angles for all bits of a Geo array.
@@ -832,7 +840,7 @@ class Geo(np.ndarray):
         return [_angles_3pnt_(p, inside, in_deg) for p in f_bits]  # npg_helper
 
     # ----  ---------------------------
-    # ---- (3) alter geometry ---------
+    # ---- (3) alter geometry
     #
     def moveto(self, x=0, y=0):
         """Shift/translate the dataset origin is the lower-left corner."""
@@ -869,7 +877,7 @@ class Geo(np.ndarray):
         return Geo(out, self.IFT, self.K, ext, info)
 
     # ----  ---------------------------
-    # ---- (4) bounding containers ----
+    # ---- (4) bounding containers
     # **see also** extent properties above
     #
     def bounding_circles(self, angle=5, shift_back=False, return_xyr=False):
@@ -885,7 +893,7 @@ class Geo(np.ndarray):
             circs.append(sc.circle_mini(r, angle, x, y))
         if shift_back:
             circs = [circ + self.LL for circ in circs]
-        circs = arrays_to_Geo(circs, kind=2, info="circs")
+        circs = arrays_to_Geo(circs, kind=2, info="circs", to_origin=False)
         if return_xyr:
             return xyr, circs
         return circs
@@ -902,7 +910,8 @@ class Geo(np.ndarray):
                 ch_out[i] = np.vstack((c, c[0]))
         if shift_back:
             ch_out = [i + self.LL for i in ch_out]
-        out = arrays_to_Geo(ch_out, kind=2, info="convex hulls")
+        out = arrays_to_Geo(
+            ch_out, kind=2, info="convex hulls", to_origin=False)
         return out
 
     def min_area_rect(self, shift_back=False, as_structured=False):
@@ -946,7 +955,7 @@ class Geo(np.ndarray):
             if shift_back:
                 tmp += LL
             mabrs.append(tmp)
-        return arrays_to_Geo(mabrs, kind=2, info="mabr")
+        return arrays_to_Geo(mabrs, kind=2, info="mabr", to_origin=False)
 
     def triangulate(self, as_one=False, as_polygon=True):
         """Delaunay triangulation for point groupings."""
@@ -960,7 +969,7 @@ class Geo(np.ndarray):
         return Geo(g, ift, Kind=kind, Extent=self.XT, Info="triangulation")
 
     # ----  ---------------------------
-    # ---- (5) conversions ------------
+    # ---- (5) conversions
     #
     def fill_holes(self):
         """Fill holes in polygon shapes.  Returns a Geo array."""
@@ -1247,7 +1256,7 @@ class Geo(np.ndarray):
         return vals  # , idx0  # return stu(uniq01)
 
     # ----  ---------------------------
-    # ---- (7) sort section -----------
+    # ---- (7) sort section
     # Sorting the fc shape-related fields needs an advanced arcgis pro license.
     # The following applies to the various sort options.
     #
@@ -1374,7 +1383,7 @@ class Geo(np.ndarray):
         return tmp
 
     # ----  ---------------------------
-    # ---- (8) point info section -----
+    # ---- (8) point info section
     # -- points: indices, info, find duplicates
     #
     def pnt_indices(self, as_structured=False):
@@ -1470,7 +1479,7 @@ class Geo(np.ndarray):
 
 # ---- == End of class definition ==
 # ---- Main Functions
-# ----  ---------------------------
+# ----
 # ---- (2) Create Geo from sequences
 #  Construct the Geo array from sequences.
 #     ndarrays, object arrays, nested lists, lists of arrays etcetera.
@@ -1505,7 +1514,11 @@ def roll_coords(self):
         LL = np.min(ar, axis=0)
         dist = _closest_to_LL_(ar, LL, sqrd_=True)
         num = np.argmin(dist)
-        arrs.append(np.concatenate((ar[num:-1], ar[:num], [ar[num]]), axis=0))
+        if (ar[0] == ar[-1]).all():
+            to_end = ar[num:-1]
+        else:
+            to_end = ar[num:]
+        arrs.append(np.concatenate((to_end, ar[:num], [ar[num]]), axis=0))
     g = np.concatenate(arrs, axis=0)
     g = Geo(g, self.IFT, self.K, extent, "rolled", None)
     g.SR = SR
@@ -1542,7 +1555,11 @@ def roll_arrays(arrs):
         LL = np.min(ar, axis=0)
         dist = _closest_to_LL_(ar, LL, sqrd_=False)
         num = np.argmin(dist)
-        out.append(np.concatenate((ar[num:-1], ar[:num], [ar[num]]), axis=0))
+        if (ar[0] == ar[-1]).all():
+            to_end = ar[num:-1]
+        else:
+            to_end = ar[num:]
+        out.append(np.concatenate((to_end, ar[:num], [ar[num]]), axis=0))
     if len(out) == 1:
         return out[0]
     return out
@@ -1690,7 +1707,6 @@ def arrays_to_Geo(in_arrays, kind=2, info=None, to_origin=False):
     return g
 
 
-# ===========================================================================
 # ----  ---------------------------
 # ---- (3) Geo to arrays/lists
 #
@@ -1800,7 +1816,6 @@ def _fill_float_array(arr):
     return a_2d
 
 
-# ===========================================================================
 # ----  ---------------------------
 # ---- (4) check/fix functions
 #
@@ -2018,7 +2033,6 @@ def reindex_shapes(a, prn=True, start=0, end=-1):
     return z, q, z0
 
 
-# ===========================================================================
 # ----  ---------------------------
 # ---- (5) other functions
 #
@@ -2060,7 +2074,7 @@ def dirr(obj, cols=3, prn=True):
         a = dir(obj)
         a = [a[i: i + cols] for i in range(0, len(a), cols)]
     # w = len(max(a, key=len))  # max([len(i) for i in a])
-    w = 30
+    w = 22
     # frmt = (("{{!s:<{}}} ".format(w))) * cols
     # csze = len(a) / cols  # split it
     # csze = int(csze) + (csze % 1 > 0)
@@ -2080,6 +2094,11 @@ def dirr(obj, cols=3, prn=True):
         else:
             txt = i
         txt_out += txt
+    txt_out += """\n
+    Modules not directly imported:
+    npg_analysis, npg_arc_npg, npg_clip_split, npg_create,
+    npg_pip, npg_table, npg_utils
+    """
     if prn:
         print(txt_out)
         return None

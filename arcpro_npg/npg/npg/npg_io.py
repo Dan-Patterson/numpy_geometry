@@ -21,7 +21,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2023-111-14
+    2024-03-18
 
 Purpose
 -------
@@ -60,7 +60,7 @@ import numpy as np
 
 from npg import npGeo
 
-# ---- Keep for now.
+# -- Keep for now.
 # from numpy.lib.recfunctions import structured_to_unstructured as stu
 # from numpy.lib.recfunctions import unstructured_to_structured as uts
 # import npGeo
@@ -70,7 +70,7 @@ from npg import npGeo
 #
 script = sys.argv[0]
 
-FLOATS = np.typecodes['AllFloat']
+FLOATS = np.typecodes['AllFloat']  # np.typecodes.keys() to see all keys
 INTS = np.typecodes['AllInteger']
 NUMS = FLOATS + INTS
 
@@ -197,7 +197,7 @@ def load_geo(f_name, extras=False, prn_info=False):
             )
         return geo
 
-    arrs = np.load(f_name)
+    arrs = np.load(f_name, allow_pickle=True)  #
     names = arrs.files  # the array names
     msg = "\nLoading...{}\nArray(s) include...{}"
     geo = _to_geo_(arrs, names)
