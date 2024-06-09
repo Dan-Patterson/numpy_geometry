@@ -9,6 +9,8 @@ The Geo class is a subclass of numpy's ndarray.  Properties that are related
 to geometry have been assigned and methods developed to return geometry
 properties.
 
+Modified = "2024-05-04"
+
 ----
 
 """
@@ -602,13 +604,13 @@ class Geo(np.ndarray):
             shps = self.shapes
             if self.K == 2:
                 return np.stack([np.mean(s[:-1], axis=0) for s in shps])
-            return np.stack([np.mean(s, axis=0) for s in shps])
+            return np.asarray([np.mean(s, axis=0) for s in shps])
         # -- part centers
         o_rings = self.outer_rings(False)
         # Remove duplicate start-end for polygons. Use all points otherwise.
         if self.K == 2:
             return np.stack([np.mean(r[:-1], axis=0) for r in o_rings])
-        return np.stack([np.mean(r, axis=0) for r in o_rings])
+        return np.asarray([np.mean(r, axis=0) for r in o_rings])
 
     def centroids(self):
         """Return the centroid of the polygons using `_area_centroid_`."""

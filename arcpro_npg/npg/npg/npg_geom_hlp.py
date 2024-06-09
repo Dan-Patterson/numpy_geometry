@@ -207,9 +207,9 @@ def _is_ccw_(a):
     return 0 if _bit_area_(a) > 0. else 1
 
 
-def _is_convex_(a):
+def _is_convex_(a, is_closed=True):
     """Return whether a polygon is convex."""
-    check = _bit_crossproduct_(a)  # cross product
+    check = _bit_crossproduct_(a, is_closed)  # cross product
     return np.all(check >= 0)
 
 
@@ -394,9 +394,12 @@ def _bit_area_(a):
     return np.sum((e0 - e1) * 0.5)
 
 
-def _bit_crossproduct_(a, extras=False):
+def _bit_crossproduct_(a, is_closed=True, extras=False):
     """Cross product.  Used by `is_convex` and `_angles_3pnt_`."""
     a = _get_base_(a)
+    if is_closed:
+        if np.allclose(a[0], a[-1]):  # closed loop, remove dupl.
+            a = a[:-1]
     ba = a - np.concatenate((a[-1][None, :], a[:-1]), axis=0)
     bc = a - np.concatenate((a[1:], a[0][None, :]), axis=0)
     cross_pr = np.cross(ba, bc) + 0.0
@@ -461,7 +464,7 @@ def _angles_3pnt_(a, inside=True, in_deg=True):
     """
     if np.allclose(a[0], a[-1]):                 # closed loop, remove dupl.
         a = a[:-1]
-    cr, ba, bc = _bit_crossproduct_(a, extras=True)
+    cr, ba, bc = _bit_crossproduct_(a, is_closed=False, extras=True)
     dt = np.einsum('ij,ij->i', ba, bc)
     ang = np.arctan2(cr, dt)
     TwoPI = np.pi * 2.

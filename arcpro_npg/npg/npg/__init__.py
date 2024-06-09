@@ -20,7 +20,7 @@ Author :
 - Dan_Patterson@carleton.ca
 - https://github.com/Dan-Patterson
 
-Modified : 2023-11-05
+Modified : 2024-05-04
     Creation date during 2019 as part of ``arraytools``.
 
 Purpose
@@ -30,7 +30,7 @@ Requires npGeo to implement the array geometry class.
 
 See Also
 --------
-Many links and references in ``_npgeom_notes_.py``.
+Many links and references in ``..docs/_npgeom_notes_.txt``.
 
 .. note::
 
@@ -86,6 +86,7 @@ Note:  Python resides in... (substitute `arc_pro` for your install folder).
 # pyflakes: disable=E0401,F403,F401
 # pylint: disable=unused-import
 # pylint: disable=E0401
+
 # ---- sys, np imports
 import sys
 import numpy as np
@@ -105,55 +106,16 @@ from . import npg_pip, npg_prn  # noqa
 from . npGeo import *  # noqa
 from . npg_geom_hlp import *  # noqa
 from . npg_geom_ops import *  # noqa
-from . npg_io import *  # noqa
 from . npg_bool_hlp import *  # noqa
 from . npg_bool_ops import *  # noqa
+from . npg_clip_split import clip_poly, split_poly  # noqa
+from . npg_io import *  # noqa
 
-"""
-from npGeo import (
-    Geo,
-    roll_coords, array_IFT, arrays_to_Geo,
-    Geo_to_arrays, Geo_to_lists, _fill_float_array,
-    is_Geo, reindex_shapes, check_geometry,
-    dirr
-)
-"""
-# import npg_geom_hlp
-# import npg_geom_ops
-# import npgDocs
-"""
-from . import (npgDocs, npGeo, npg_geom_hlp, npg_pip, npg_geom_ops, npg_boolean,
-               npg_min_circ, npg_overlay, npg_analysis, npg_setops, npg_io,
-               npg_prn, npg_table, npg_create, npg_utils)  # pyflakes.ignore
-
-import npg_boolean
-import npg_min_circ
-import npg_overlay
-import npg_analysis
-import npg_setops
-import npg_io
-import npg_prn
-import npg_table
-import npg_create
-import npg_utils
-
-from . npgDocs import (
-    npGeo_doc, Geo_hlp, array_IFT_doc, dirr_doc, shapes_doc, parts_doc,
-    outer_rings_doc, inner_rings_doc, get_shapes_doc, sort_by_extent_doc,
-    radial_sort_doc
-)  # pyflakes.ignore
-"""
-
-# from . npGeo import *
-# from . npg_geom_hlp import *
 # from . npg_pip import *
-# from . npg_geom_ops import *
-# from . npg_boolean import *
 # from . npg_min_circ import *
 # from . npg_overlay import *
 # from . npg_analysis import *
 # from . npg_setops import *
-# from . npg_io import *
 # from . npg_prn import *
 # from . npg_table import *
 # from . npg_create import *

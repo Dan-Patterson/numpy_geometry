@@ -79,7 +79,7 @@ __all__ = [
     'polygon_overlay'
 ]   # 'dissolve'
 
-__helpers__ = ['_adjacent_', '_cut_pairs_', 'orient_clockwise']
+__helpers__ = ['_adjacent_', '_cut_across_', '_cut_pairs_', 'orient_clockwise']
 __imports__ = [
     'add_intersections', '_del_seq_pnts_',
     '_bit_check_', '_bit_area_', 'remove_geom', 'prn_'
@@ -461,6 +461,7 @@ def _in_out_on_(combos, cl_n, pl_n, c_cut, p_cut):
     Parameters
     ----------
     See `polygon_overlay` for outputs and descriptions.
+
     """
     r0 = []
     clp_ply = []
@@ -572,6 +573,31 @@ def _in_out_on_(combos, cl_n, pl_n, c_cut, p_cut):
     return geom, clp_ply, keep_bits
 
 
+def _prep_(ply_a, ply_b):
+    """Prepare for overlay analysis.
+
+    See `polygon_overlay` for details.
+
+    Used by `polygon_overlay` and `overlay_nx`.
+
+    """
+    result0 = add_intersections(
+                ply_a, ply_b,
+                roll_to_minX=True,
+                p0_pgon=True,
+                p1_pgon=True,
+                class_ids=False
+                )
+    pl_n, cl_n, id_plcl, onConP, x_pnts, ps_info, cs_info = result0
+    result1 = _renumber_pnts_(cl_n, pl_n)
+    # pl_ioo polygon in-out-on, cl_ioo for clip
+    # c_on[-1] and p_on[-1] are both the same as the first point
+    # CP_ = np.concatenate((cl_n, pl_n), axis=0)  # noqa
+    #
+    args = [result0, result1]
+    return args
+
+
 def polygon_overlay(ply_a, ply_b):
     """Return the overlay of two polygons and assemble the areas by type.
 
@@ -647,36 +673,32 @@ def polygon_overlay(ply_a, ply_b):
       array([ 1,  3,  4,  7, 14, 17, 18, 20]),
       array([ 0,  2,  5,  6,  8, 13, 15, 16, 19, 21]),
       array([ 9, 10, 11, 12])
-
     """
     #
-    result = add_intersections(
-                ply_a, ply_b,
-                roll_to_minX=True,
-                p0_pgon=True,
-                p1_pgon=True,
-                class_ids=False
-                )
-    # pl_ioo polygon in-out-on, cl_ioo for clip
-    pl_n, cl_n, id_plcl, onConP, x_pnts, ps_info, cs_info = result
+    args = _prep_(ply_a, ply_b)
+    result0, result1 = args
+    #
+    pl_n, cl_n, id_plcl, onConP, x_pnts, ps_info, cs_info = result0
     p_out, p_on, p_in, pl_ioo = ps_info
     c_out, c_on, c_in, cl_ioo = cs_info
     #
-    # CP_ = np.concatenate((cl_n, pl_n), axis=0)  # noqa
+    cp_ids, old_new_ids, CP_ = result1
+    #
     N_c = cl_n.shape[0] - 1  # noqa
     N_p = pl_n.shape[0] - 1  # noqa
     #
     # -- get the renumbered point values for `pl_n`
-    ids_new, old_new_ids, CP_ = _renumber_pnts_(cl_n, pl_n)
-    _old, _, _new = old_new_ids.T
-    frto = np.concatenate((ids_new[:-1][:, None], ids_new[1:][:, None]),
-                          axis=1)
+    #
+    frto = np.concatenate(
+        (cp_ids[:-1][:, None], cp_ids[1:][:, None]), axis=1
+        )
     frto = frto[frto[:, 0] != frto[:, 1]]  # -- remove 0,0 middle point
     #
     c_ft = list(zip(c_on[:-1], c_on[1:]))  # removed +1 to `to`
     c_subs = [cl_ioo[i[0]:i[1] + 1] for i in c_ft]  # added +1 to `to`
     c_vals = [sub[1][1] for sub in c_subs]
     c_ft_v = np.concatenate((c_ft, np.array(c_vals)[:, None]), axis=1)
+    c_ft_v[-1, 1] = 0  # set last `to` to 0
     #
     # c_slices = [cl_n[i:j + 1] for i,j in c_ft_v[:, :2]]
     # c_cut_slices = [cl_n[[i, j]] for i,j in c_cut]
@@ -685,22 +707,26 @@ def polygon_overlay(ply_a, ply_b):
     p_subs = [pl_ioo[i[0]:i[1] + 1] for i in p_ft]  # added +1 to `to`
     p_vals = [sub[1][1] for sub in p_subs]
     p_ft_v = np.concatenate((p_ft, np.array(p_vals)[:, None]), axis=1)
+    p_ft_v[-1, 1] = 0  # set last `to` to 0
+    #
+    # -- how combos2 p_ft_v is alternately derived
+    # p_ft2 = np.array(p_ft)
+    # w0 = np.nonzero((p_ft2[:, 0] == old_new_ids[:, 0][:, None]).any(-1))[0]
+    # w1 = np.nonzero((p_ft2[:, 1] == old_new_ids[:, 0][:, None]).any(-1))[0]
+    # p_ft2[:, 0] = old_new_ids[w0, -1]
+    # p_ft2[:, 1] = old_new_ids[w1, -1]
+    # p_ft_v2 = np.concatenate((p_ft2, np.array(p_vals)[:, None]), axis=1)
     #
     combos = np.zeros((c_ft_v.shape[0], 6), dtype='int')
     combos[:, :3] = c_ft_v
     combos[:, 3:] = p_ft_v[:, [-1, 0, 1]]
     #
-    """
-
-    w0 = np.nonzero(old_new[:, 0] == p_cut[:, 0][:, None])[1]
-    w1 = np.nonzero(old_new[:, 0] == p_cut[:, 1][:, None])[1]
-    col1 = old_new[w1, -1]
-    col0 = old_new[w0, -1]
-    p_cut_n = np.concatenate((col0[:, None], col1[:, None]), axis=1)
-    all_cuts = np.concatenate((c_cut, p_cut_n), axis=0)
-    uni_cuts = np.unique(all_cuts, axis=0)
-
-    """
+    combos2 = np.zeros((c_ft_v.shape[0], 6), dtype='int')
+    combos2[:, :4] = combos[:, :4]
+    z = np.copy(old_new_ids)
+    z0 = z[(combos[:, 4] == z[:, 0][:, None]).any(-1)][:, -1]
+    combos2[:, 4] = z0
+    combos2[:-1, 5] = z0[1:]
     # -- If the equality below doesn't match, p_on and its comparison may be
     #    out of order.
     #
@@ -746,89 +772,126 @@ def polygon_overlay(ply_a, ply_b):
     # E, d0_
 
 
-def overlay_nx(poly, clp, extras=True):
-    """Return the results of overlay using networkx."""
-    result = add_intersections(
-                poly, clp,
-                roll_to_minX=True,
-                p0_pgon=True, p1_pgon=True,
-                class_ids=False
-                )
-    # pl_ioo polygon in-out-on, cl_ioo for clip
-    pl_n, cl_n, id_plcl, onConP, x_pnts, ps_info, cs_info = result
+def overlay_nx(ply_a, ply_b, extras=True):
+    """Return the results of overlay using networkx.
+
+    Parameters
+    ----------
+    ply_a, ply_b : arrays
+        nx2 arrays representing polygons boundaries
+
+    Requires
+    --------
+    `_prep_` : which uses `add_intersections`, `_renumber_pnts_`
+
+    Notes
+    -----
+    Combinations::
+
+        : -1 clip outside poly
+        :  0 poly outside clip :  erase
+        :  1 poly inside clip :   clip
+        :  2 area between clip and poly : hole
+        :  3 identity : features or parts that overlap
+        :  symmetrical diff -1 and 0
+
+    """
+    args = _prep_(ply_a, ply_b)
+    result0, result1 = args
+    #
+    pl_n, cl_n, id_plcl, onConP, x_pnts, ps_info, cs_info = result0
     p_out, p_on, p_in, pl_ioo = ps_info
-    c_out, c_on, c_in, cl_ioo = cs_info
-    # --
-    # -- Initially number the sequential points, slicing off the duplicate 0
-    #    point between clp and poly
+    c_sing_out, c_on, c_sing_in, cl_ioo = cs_info
+    #
     N_c = cl_n.shape[0] - 1
     N_p = pl_n.shape[0] - 1  # noqa
     #
+    cp_ids, old_new_ids, CP_ = result1
     # --
-    cp_ids, old_new_ids, CP_ = _renumber_pnts_(cl_n, pl_n)
-    #
+    # -- Initially number the sequential points
     # -- point designations and renumbering p_sing_o and p_sing_i
-    c_sing_out = c_out
-    c_sing_in = c_in  # -- c_on defined above
+    #
     p_sing_out = np.asarray([], dtype='int')
     p_sing_in = np.asarray([], dtype='int')
     if len(p_out > 0):
         p_sing_out = old_new_ids[p_out, :][:, -1]  # p_out + N_c + 1  # -- out
         cp_ids[p_sing_out] = p_sing_out
     if len(p_in) > 0:
-        p_sing_in = old_new_ids[p_in, :][:, -1]  # p_in + N_c + 1  # -- in
+        p_sing_in = old_new_ids[p_in, :][:, -1]    # p_in + N_c + 1  # -- in
         cp_ids[p_sing_in] = p_sing_in
     if len(p_on) > 0:
         p_sing_on = old_new_ids[p_on[1:-1], :][:, -1]  # first and last are on
         cp_ids[p_sing_on] = p_sing_on
     #
-    # -- Create frto and get unique values
+    # -- Create frto and get unique values and slice off the duplicate 0
+    #    point between ply_b and poly
     frto = np.concatenate((cp_ids[:-1][:, None], cp_ids[1:][:, None]), axis=1)
-    frto = frto[frto[:, 0] != frto[:, 1]]  # -- remove 0,0 middle point
-    # ioo = np.concatenate((cl_ioo[:-1, 1], pl_ioo[:-1, 1]))  # ditto
-    # frto_ioo = np.concatenate((frto, ioo[:, None]), axis=1)
-    # -- construct the cycles
-    #  import networkx as nx
+    frto = frto[frto[:, 0] != frto[:, 1]]  # -- remove 0,0 middle
     #
-    # d = connections_dict(frto, True)
-    # H = nx.from_dict_of_lists(d)  # yields the same edges etc as below
+    # -- this is great, gives frto and in/out values
+    cp_v = np.concatenate((cl_ioo, pl_ioo), axis=0)
+    vs = cp_v[:, 1]  # used below with cp_ids
+    # -- concatenate the renumbered ids with the values
+    cp_id_v = np.concatenate((cp_ids[:, None], vs[:, None]), axis=1)
+    #
+    # vs_ft = np.concatenate((vs[:-1][:, None], vs[1:][:, None]), axis=1)
+    # vs_final = np.concatenate((vs_ft[:N_c], vs_ft[N_c+1:]), axis=0)
+    # frto_vals = np.concatenate((frto, vs_final), axis=1)
+    #
+    # Get cuts using cut_across.  The returned pairs are equivalent segments.
+    c_cut0, p_cut0 = _cut_across_(onConP[:, :2])  # use onConP, it is sorted
+    p_cut1, c_cut1 = _cut_across_(id_plcl)  # use id_plcl col 0, save a sort
+    c_cut = np.array(sorted(c_cut0 + c_cut1, key=lambda l_: l_[0]))  # noqa
+    # p_cut = np.array(sorted(p_cut0 + p_cut1, key=lambda l_: l_[0]))
+    # -- case check
+    # use cp_ids and vs
+    #
+    # id_v = np.concatenate((cp_ids[:, None], vs[:, None]), axis=1)
+    _ids = np.copy(cp_ids)
+    nz = np.nonzero(vs)[0]
+    diff = nz[1:] - nz[:-1]
+    w = np.nonzero(diff > 1)[0] + 1
+    subs = [i.tolist() for i in np.array_split(nz, w)]
+    f = []
+    t = []
+    arrs = []
+    for s in subs:
+        sn = sorted(s + [s[0] - 1, s[-1] + 1])
+        v0 = _ids[sn]
+        v1 = vs[sn]
+        f.append(v0)
+        t.append(v1)
+        arrs.append(np.concatenate((v0[:, None], v1[:, None]), axis=1))
     #
     G = nx.Graph()
     G.add_edges_from(frto)
-    #
-    # -- weighted graph examples
-    # G.add_weighted_edges_from(frto_ioo, weights='ioo')
-    # --
-    # nx.set_edge_attributes(G, values=ioo, name = 'ioo')
-    # nx.set_edge_attributes(G, values=1, name = 'ioo')
-    # to view edge data:  G.edges(data=True)
-    # H = G.to_directed()  # to get a directed graph from `frto`
-    # --
-    # -- code from _minimum_cycle_basis
-    # list(nx.minimum_spanning_tree(G)) # just returns the nodes of G
-    # tree_edges = list(nx.minimum_spanning_edges(G, weight=None, data=False))
-    # chords = sorted(list(G.edges - tree_edges -
-    #                 {(v, u) for u, v in tree_edges}))
-    # tree_edges = np.asarray(tree_edges)
-    # chords = np.asarray(chords)
     # -- minimum_cycle_basis
     out = []
     # cycles = sorted(list(nx.cycle_basis(G)))  # needs to be parsed a bit
     cycles = sorted(nx.cycles.minimum_cycle_basis(G))  # not for directed
-    for cycle in cycles:
-        out.append(nx.find_cycle(G.subgraph(cycle), orientation='ignore'))
     #
+    # -- sorting the ids should work since they are renumbered
+    out = [sorted(i) for i in cycles]
     out_ = []
     for i in out:
-        sub = []
-        if len(i) > 1:
-            for j in i[:-1]:
-                sub.append(j[0])
-            sub.extend(i[-1][:2])
-            out_.append(sub)
-    out_ = sorted(out_, key=len)
+        sub = i + [i[0]]
+        out_.append(sub)
     #
-    # -- `cycle_basis`, doesn't solve or return all the polys
+    # -- normally find the cycle within the subgraph
+    # for cycle in cycles:
+    #     out.append(nx.find_cycle(G.subgraph(cycle), orientation='ignore'))
+    #
+    # out_ = []
+    # for i in out:
+    #     sub = []
+    #     if len(i) > 1:
+    #         for j in i[:-1]:
+    #             sub.append(j[0])
+    #         sub.extend(i[-1][:2])
+    #         out_.append(sub)
+    out_ = sorted(out_)
+    #
+    # -- `cycle_basis`, doesn't solve for, or return all the polys
     #    cycles2 = sorted(nx.cycles.cycle_basis(G))
     #
     ps = [CP_[i] for i in out_]                  # -- get the polygons
@@ -849,6 +912,34 @@ def overlay_nx(poly, clp, extras=True):
         cw_ps.append(_p)
         cw_order.append(_o)
     #
+    #  This is good!!!
+    _class_ = np.zeros(len(cw_order), dtype='int')
+    _class_.fill(9)
+    # -1 clp out, 1 clp in -2 poly out 0 poly in
+    for i, cw in enumerate(cw_order):
+        # s_m = cp_id_v[cw][:, 1]
+        vs, s_m = cp_id_v[cw].T
+        if (vs <= N_c).all():
+            if -1 in s_m:    # -- some clp out
+                _class_[i] = -1
+            elif 1 in s_m:   # -- some clp in, the rest are poly on/in
+                _class_[i] = 0
+            else:
+                _class_[i] = 0
+        else:
+            if -1 in s_m:    # -- some poly out
+                _class_[i] = 2
+            elif 1 in s_m:   # -- some poly in
+                _class_[i] = 0
+            else:
+                _class_[i] = 0
+        # elif -2 in s_m:  # -- some poly out
+        #     _class_[i] = -2
+        # elif 2 in s_m:   # -- some poly in
+        #     _class_[i] = 2
+        # else:            # -- poly inside clp, all `on` points for both
+        #     _class_[i] = 0
+
     # cw_ps = [CP_[i] for i in cw_order]  # these are the clockwise polygons
     #
     # -- Check the resultant geometries
@@ -862,10 +953,10 @@ def overlay_nx(poly, clp, extras=True):
         #
         if max(cw) <= N_c - 1:  # check clp all points are on clp edges
             # -- or :
-            chk0 = (_bit_area_(cl_n) - _bit_area_(ps[i])) == 0.
-            if chk0:  # could be the clp itself
-                _class_[i] = -7
-            elif chk1:  # all clp on, poly in
+            # chk0 = (_bit_area_(cl_n) - _bit_area_(ps[i])) == 0.
+            # if chk0:  # could be the clp itself
+            #     _class_[i] = -7
+            if chk1:  # all clp on, poly in
                 if len(cw[:-1]) == 3:  # first line crosses 2 poly lines
                     _class_[i] = 1 if chk2 else 0  # poly chk
                 elif chk2:
@@ -904,14 +995,7 @@ def overlay_nx(poly, clp, extras=True):
             else:
                 print("i {} cw {}".format(i, cw))
     #
-    """
-     -1 clip outside poly:
-      0 poly outside clip :  erase
-      1 poly inside clip :   clip
-      2 area between clip and poly : hole
-      3 identity : features or parts that overlap
-      : symmetrical diff -1 and 0
-    """
+
     final = []
     kind = [-1, 0, 1, 2]
     for i in kind:
@@ -1079,6 +1163,30 @@ def union_over(ply_a, ply_b):
 # ---- ---------------------------
 # ---- (5) adjacency
 #
+def adjacency_array(d, to_array=True):
+    """Return an array of connections from `connections_dict` results.
+
+    Parameters
+    ----------
+    d : dictionary
+        connection ids of points forming the bounds of adjacent polygons
+
+    to_array : boolean
+        True, returns a nxn numpy array.  False, returns an nxn list-of-lists.
+
+    """
+    kys = sorted(d.keys())
+    sze = len(kys)
+    arr = [[0]*sze for i in range(sze)]
+    for a, b in [(kys.index(a), kys.index(b))
+                 for a, row in d.items()
+                 for b in row]:
+        arr[a][b] = 2 if (a == b) else 1
+    if to_array:
+        return np.asarray(arr)
+    return arr
+
+
 def adjacency_matrix(a, collapse=True, prn=False):
     """Construct an adjacency matrix from an input polygon geometry.
 
@@ -1245,214 +1353,6 @@ def merge_(this, to_this):
     sr = b.SR
     out = npGeo.Geo(xys, IFT=new_ift, Kind=kind, Extent=None, Info="", SR=sr)
     return out
-
-
-def find_cycles(graph):
-    """Find cycles in a graph represented by a dictionary.
-
-    Reference
-    ---------
-    https://stackoverflow.com/questions/76948570/
-    finding-cycles-in-an-undirected-graph-in-node-node-format-returns
-    -wrong-resul
-    """
-    cycles = []
-    checked = set()
-
-    def dfs(node, visited, path):
-        """Depth first search implementation."""
-        visited.add(node)
-        path.append(node)
-
-        neighbors = graph.get(node, [])
-
-        for neighbor in neighbors:
-            if neighbor in visited:
-                # Cycle detected
-                start_index = path.index(neighbor)
-                cycle = path[start_index:]
-                m = tuple(sorted(cycle))
-                if len(cycle) > 2 and m not in checked:
-                    checked.add(m)
-                    cycles.append(cycle)
-            else:
-                dfs(neighbor, visited, path)
-
-        visited.remove(node)
-        path.pop()
-
-    for node in graph.keys():
-        dfs(node, set(), [])
-
-    return cycles
-
-
-"""
-visited = [] # List for visited nodes.
-queue = []     #Initialize a queue
-
-def bfs(visited, graph, node): #function for BFS
-  visited.append(node)
-  queue.append(node)
-
-  while queue:          # Creating loop to visit each node
-    m = queue.pop(0)
-    print (m, end = " ")
-
-    for neighbour in graph[m]:
-      if neighbour not in visited:
-        visited.append(neighbour)
-        queue.append(neighbour)
-
-# Driver Code
-print("Following is the Breadth-First Search")
-bfs(visited, graph, '5')    # function calling
-
-"""
-
-
-"""
-produces a dictionary for the above
-
-
-graph = {
-    # 'node': ['adjacent'],
-}
-
-n, m = map(int, data.pop(0).split())
-
-for _ in range(m):
-    a, b = map(int, data.pop(0).split())
-    if b not in graph:
-        graph[b] = []
-    if a not in graph:
-        graph[a] = []
-
-    if a not in graph[b]:
-        graph[b].append(a)
-    if b not in graph[a]:
-        graph[a].append(b)
-
-ans = find_cycles(graph)
-print(ans)
-print(len(ans))
-"""
-
-"""
-d = None
-def get_cycles(n, o = None, c = []):
-   if n == o: #check if current node being examined is the same as the start
-      yield c
-      # if the condition is met, then a cycle is found and the path is yielded
-      #
-   else:
-      # get the children of the current node from d and iterate over only
-      # those that have not been encountered before (except if the node is
-      # the same as the start)
-      for i in filter(lambda x:x not in c or x == o, d.get(n, [])):
-         # recursively find the children of this new node `i`, saving the
-         # running path (c + [n])
-         yield from get_cycles(i, o = n if o is None else o, c = c + [n])
-"""
-
-
-# ---- old
-def _inouton_(combos, cl_n, pl_n):
-    """Return the full results of in, out and on.
-
-    Parameters
-    ----------
-    See `polygon_overlay` for outputs and descriptions.
-    """
-    # -- 8 possible unique combinations of crosses and segment locations
-    ch = np.array([[-1, -1], [-1, 0], [-1, 1],
-                   [0, -1], [0, 0], [0, 1],
-                   [1, -1], [1, 0], [1, 1]])
-
-    uniq_c_p = np.unique(combos[:, 2:4], axis=0)
-    z0 = combos[:, :2]
-    # c_val = combos[:, 2]
-    cs = [cl_n[i[0]:i[1]] for i in z0]  # overlay segments
-    cs = np.array(cs, dtype='O')
-    #
-    z1 = combos[:, -2:]
-    ps = [pl_n[i[0]:i[1]] for i in z1]  # poly segments
-    ps = np.array(ps, dtype='O')
-    #
-    pl_in, pl_out, cl_in, cl_out, _tri_, odd = [], [], [], [], [], []
-    clp_ply = []
-    type_whr_lst = []
-    #
-    # -- Begin groupings
-    for cnt, pair in enumerate(uniq_c_p):
-        wh = np.nonzero((combos[:, 2:4] == pair).all(-1))[0]
-        type_whr_lst.append([pair, wh])
-        c_sub = cs[wh]
-        p_sub = ps[wh]
-        #
-        _x_ = np.nonzero((pair == ch).all(-1))[0][0]
-        #
-        # ch[[1, 2]] : [-1, 0], [-1, 1]
-        #   clp (b) out, ply (a) on/in
-        if _x_ in [1, 2]:
-            clp_ply.extend(p_sub)
-            circs = [np.concatenate((i[0], i[1][::-1]), axis=0)
-                     for i in list(zip(c_sub, p_sub))]
-            cl_out.extend(circs)
-        #
-        # ch[[3] : [0, -1]
-        #   clp on, ply out
-        elif _x_ == 3:
-            clp_ply.extend(c_sub)
-            circs = [np.concatenate((i[0][::-1], i[1]), axis=0)
-                     for i in list(zip(c_sub, p_sub))]
-            pl_out.extend(circs)
-        #
-        # ch[[5]] : [0, 1]
-        #   clp on,  ply in
-        elif _x_ == 5:
-            clp_ply.extend(p_sub)
-            circs = [np.concatenate((i[1], i[0][::-1]), axis=0)
-                     for i in list(zip(c_sub, p_sub))]
-            pl_in.extend(circs)
-        #
-        # ch[[6, 7] : [1, -1], [1, 0]
-        #   clp in, ply out or on
-        elif _x_ in [6, 7]:
-            clp_ply.extend(c_sub)
-            circs = [np.concatenate((i[1], i[0][::-1]), axis=0)
-                     for i in list(zip(c_sub, p_sub))]
-            cl_in.extend(circs)
-        #
-        # ch[[4] : [0, 0]
-        #   clp on ply , probable triangles
-        elif _x_ == 4:
-            clp_ply.extend(c_sub)
-            circs = [np.concatenate((i[0], i[1]), axis=0)
-                     for i in list(zip(c_sub, p_sub))]
-            _tri_.append(circs)
-        else:
-            clp_ply.extend(c_sub)
-            circs = [np.concatenate((i[0], i[1]), axis=0)
-                     for i in list(zip(c_sub, p_sub))]
-            odd.extend(circs)
-    # --
-    order = np.concatenate([i[1] for i in type_whr_lst])
-    srt_order = np.argsort(order)
-    clp_ply = np.array(clp_ply, dtype='O')
-    clp_final = np.concatenate(clp_ply[srt_order], axis=0)
-    clp_final = _del_seq_pnts_(clp_final)
-    all_ = [pl_in, pl_out, cl_in, cl_out]
-    tmp = []
-    for lst in all_:
-        sub = []
-        if len(lst) > 0:
-            for i in lst:
-                sub.append(_del_seq_pnts_(i))
-        tmp.append(sub)
-    #
-    pl_in, pl_out, cl_in, cl_out = tmp
-    return clp_final, pl_in, pl_out, cl_in, cl_out, _tri_, odd, type_whr_lst
 
 
 # ---- Final main section ----------------------------------------------------
