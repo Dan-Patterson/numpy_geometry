@@ -58,6 +58,7 @@ import sys
 import json
 import numpy as np
 
+import npg
 from npg import npGeo
 
 # -- Keep for now.
@@ -66,7 +67,8 @@ from npg import npGeo
 # import npGeo
 # from npGeo import *
 
-# ---- Constants -------------------------------------------------------------
+# ---- ---------------------------
+# ---- Constants
 #
 script = sys.argv[0]
 
@@ -83,11 +85,13 @@ np.set_printoptions(
 
 __all__ = [
     'dtype_info', 'load_geo', 'load_geo_attr', 'save_geo', 'load_txt',
-    'save_txt', 'load_geojson', 'geojson_Geo'
+    'save_txt', 'load_geojson', 'geo_to_geojson', 'geojson_to_geo', 'get_keys',
+    'prn_keys', '_len_check_', 'lists_to_arrays', 'nested_len'
     ]
 
 
-# ---- (1) arrays : in and out------------------------------------------------
+# ---- ---------------------------
+# ---- (1) arrays : in and out
 #
 def dtype_info(a, as_string=False):
     """Return dtype information for a structured/recarray.
@@ -370,10 +374,12 @@ def save_txt(a, name="arr.txt", sep=",", dt_hdr=True):
     print("\nFile saved...")
 
 
-# ============================================================================
-# ---- (2) json section ------------------------------------------------------
+# ===== ======================================================================
+# ---- ---------------------------
+# ---- (2) json section
+
 # load json and geojson information
-def load_geojson(pth, full=False, geometry=True):
+def load_geojson(pth, full=True, just_geometry=False):
     """Load a geojson file and convert to a Geo Array.
 
     The geojson is from the ``Features to JSON`` tool listed in the references.
@@ -440,15 +446,69 @@ def load_geojson(pth, full=False, geometry=True):
         shapes = data['features']
         coord_key = ['rings', 'coordinates'][type_key == 'geojson']
         coords = [s['geometry'][coord_key] for s in shapes]  # 'rings'
-    if full and geometry:
+    if full and just_geometry:
+        print("\nReturning full geojson and just the geometry portion")
+        print("as a list")
         return data, coords
     if full:
         return data
-    if geometry:
+    if just_geometry:
         return coords
 
 
-def geojson_Geo(pth, kind=2, info=None, to_origin=False):
+def geo_to_geojson(arr, shift_back=True):
+    """Save a `geo` array as a geojson.
+
+    Parameters
+    ----------
+    arr : geo array
+
+    """
+    chk = npg.is_Geo(arr, verbose=True)  # is `geo`?, if not bail with message
+    if not chk:
+        return None
+    # -- all is good, continue on
+    d = {
+        "type": "FeatureCollection",
+        "crs": {
+            "type": "name",
+            "properties": {
+                "name": arr.SR
+                }
+            },
+        "features": [{}]
+        }
+
+    if shift_back:
+        arr = arr.shift(arr.LL[0], arr.LL[1])
+    IDs_, Fr_, To_, CL_, PID_, Bit_ = arr.IFT.T
+    K_ = arr.K
+    if K_ == 2:
+        K_ = "Polygon"
+    # prev_ = -1
+    uniq_ids = np.unique(IDs_)
+    # d2 = {}
+    d1 = []
+    for u in uniq_ids:
+        rows = arr.IFT[arr.IFT[:, 0] == u]
+        coords = []
+        for row in rows:
+            id_, fr_, to_, cl_, pid_, bit_ = row
+            # print(IDs_, Fr_, To_, CL_, PID_, Bit_)
+            coords.append(arr.XY[fr_:to_])
+        d1.append({"type": "Feature",
+                   "id": id_,
+                   "geometry": {
+                       "type": K_,
+                       "coordinates": coords
+                       }
+                   })
+    d["features"] = d1
+
+    return d
+
+
+def geojson_to_geo(pth, kind=2, info=None, to_origin=False):
     """Convert GeoJSON file to Geo array using `npGeo.arrays_to_Geo`.
 
     Parameters
@@ -460,11 +520,222 @@ def geojson_Geo(pth, kind=2, info=None, to_origin=False):
     info : text
         Supplementary information.
     """
-    coords = load_geojson(pth)
+    coords = load_geojson(pth, full=False, just_geometry=True)
     # a_2d, ift, extents = npGeo.array_IFT(coords)
     return npGeo.arrays_to_Geo(coords, kind=kind, info=info,
                                to_origin=to_origin)
 
+
+def get_keys(data, num):
+    """Return dictiony keys by level.
+
+    Parameters
+    ----------
+    data : dictionary in geojson format
+    num : beginning index number
+
+    Useage
+    ------
+    r = get_keys(data, 0)
+    """
+    keys = []
+    if isinstance(data, dict):
+        num += 1
+        for key, value in data.items():
+            t = type(value).__name__
+            keys.append((num, key, t))
+            keys += get_keys(value, num)
+    elif isinstance(data, list):
+        for value in data[:1]:
+            keys += get_keys(value, num)
+            # num += 1
+    return keys
+
+
+def prn_keys(data, num=0):
+    """Print the keys of a geojson."""
+    keys = get_keys(data, num)
+    o_array = np.asarray(keys, dtype='O')
+    s0 = np.max([len(i) for i in o_array[:, 1]]) + 2
+    s1 = np.max([len(i) for i in o_array[:, 2]]) + 2
+    f0 = "{:<5}" + " {{!s:<{}}} {{!s:<{}}}".format(s0, s1)
+    f1 = "  " + f0
+    f2 = "    " + f0
+    for i in o_array:
+        if i[0] == 1:
+            print(f0.format(*i))
+        elif i[0] == 2:
+            print(f1.format(*i))
+        elif i[0] == 3:
+            print(f2.format(*i))
+
+
+def _len_check_(arr):
+    """Check iterator lengths."""
+    arr = np.asarray(arr, dtype='O').squeeze()
+    if arr.shape[0] == 1:
+        return False, len(arr)
+    q = [len(a) == len(arr[0])      # check subarray and array lengths
+         if hasattr(a, '__iter__')  # if it is an iterable
+         else False                 # otherwise, return False
+         for a in arr]              # for each subarray in the array
+    return np.all(q), len(arr)
+
+
+def lists_to_arrays(coords, out=[]):  # ** works
+    """Return coordinates from a list of list of coordinates.
+
+    Parameters
+    ----------
+    coords : nested lists of x,y values, as lists or ndarrays
+    out : empty list
+
+    Notes
+    -----
+    This is a specialty function that uses recursion.
+
+    See Also
+    --------
+    `nested_len` can be used if you just want the depth of the nested lists.
+    """
+    if isinstance(coords, (list, np.ndarray)):
+        for sub in coords:
+            _is_, sze = _len_check_(sub)
+            if _is_:
+                arrs = [np.array(i) for i in sub]
+                out.append(np.asarray(arrs, dtype=np.float64).squeeze())
+            else:
+                prt = []
+                for j in sub:
+                    arrs = [np.array(i) for i in j]
+                    prt.append(np.asarray(arrs, dtype='O'))
+                out.append(np.asarray(prt, dtype='O').squeeze())
+    else:
+        return out
+    return out
+
+
+def nested_len(obj, out=[], target_cls=list):
+    """Return the lengths of nested iterables.
+
+    Parameters
+    ----------
+    obj : iterable
+        The iterable must be the same type as the `target_cls`.
+    out : list
+        The returned results in the form of a list of lists.
+    target_cls : class
+        A python, numpy class that is iterable.
+
+    Notes
+    -----
+    Array type and depth/size::
+
+          []         1
+          [[]]       2, size 1
+          [[], []]   2, size 2
+          [[[]]]     3, size 1
+          [[[], []]] 3, size 2
+
+    Example
+    -------
+        >>> # input list            nested_len
+        >>> lst = [                  idx0, idx1, count
+        ...        [[1, 2, 3],      [[0, 0, 3],       two lists in list 0
+        ...         [4, 5]],         [0, 1, 2],
+        ...        [[1, 2]],         [1, 0, 2],       one list in list 1
+        ...        [1, 2],           [2, 0], [2, 1],  no lists in list 2
+        ...        [[]],             [3, 0, 0]        one list in list 3
+        ...        [[1, 2, 3],       [4, 0, 3],       three lists in list 4
+        ...         [4, 5],          [4, 1, 2],
+        ...         [6, 7, 8]],      [4, 2, 3],
+        ...        [[[1, 2, 3],      [5, 0, 2],       two lists in list 5
+        ...          [4, 5]],
+        ...         [[6, 7, 8]]]     [5, 1, 1]]
+        ...       ]
+
+    """
+
+    def _len(obj):
+        """Object length."""
+        sub = len(obj) if isinstance(obj, target_cls) else 0
+        return sub
+
+    if not hasattr(obj, '__iter__'):
+        print("\nIterable required (e.g. list/tuple")
+        return None
+    #
+    for i, v0 in enumerate(obj):
+        num = _len(v0)
+        for j in range(0, num):
+            k = v0[j]
+            sub = [i, j]
+            if isinstance(k, target_cls):
+                s = _len(k)
+                sub.append(s)
+            out.append(sub)
+    return out
+
+
+"""
+out = []
+
+nl = nested_len(coords, out=[], target_cls=(int, float))
+
+
+# same as nested_len
+#
+out = []
+sub = []
+s = True
+while s:
+    for j in range(0, len(coords)):
+        for k in range(0, len(coords[j])):
+            chk = len(coords[j][k])
+            out.append([j, k, chk])
+    s = False
+#
+
+def depth(lst):
+    d = 0
+    for item in lst:
+        if isinstance(item, list):
+            d = max(depth(item), d)
+    return d + 1
+
+
+
+def nested_len(obj, *, target_cls=list):
+    return [len(x) if isinstance(x, target_cls) else
+            nested_len(x) for x in obj]
+
+
+nested_len(coords, target_cls=list)
+Out[9]: [2, 2, 1]
+
+[nested_len(i, target_cls=list) for i in coords]
+Out[10]: [[4, 2], [1, 4], [4]]
+
+[nested_len(i, target_cls=list) for i in coords[0]]
+Out[38]: [[5, 5, 4, 4], [5, 4]]
+
+[nested_len(i, target_cls=list) for i in coords[0][0]]
+Out[39]: [[2, 2, 2, 2, 2], [2, 2, 2, 2, 2], [2, 2, 2, 2], [2, 2, 2, 2]]
+
+def flatten(arr, list_=None):
+    if list_ is None:
+        list_ = []
+    if isinstance(arr, list):
+        for i in arr:
+            if isinstance(i[0], list) and len(i) > 1:
+                flatten(i, list_)
+            else:
+                list_.append(np.array(i))
+    else:
+        list_.append(np.array(arr))
+    return list_
+
+"""
 
 # ===========================================================================
 # -- main section

@@ -114,7 +114,7 @@ __helpers__ = ['_intersect_', '_adj_within_']
 def _adj_within_(a, full=False):
     """Determine adjacency within a Geo array's outer rings.
 
-    # Parameters
+    Parameters
     ----------
     a : Geo array
     full : boolean
@@ -205,7 +205,7 @@ def pnt_segment_info(arr):
 
     Notes
     -----
-    p_ids : Nx2 array
+    p_ids : Nx2 Geo array
         The first column is the point number and the second column is the
         feature they belong to.  The point IDs are in the sequence order of
         the poly feature construction.  This information is used to determine

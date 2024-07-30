@@ -1591,7 +1591,7 @@ def array_IFT(in_arrays, shift_to_origin=False):
             b_id = 0
             for j in p:
                 if isinstance(j, (list, tuple)):
-                    j = np.asarray(j)
+                    j = np.asarray(j, dtype='O')  # added 2024-07-23
                 if len(j.shape) == 2:
                     bits.append(np.asarray(j).squeeze())
                     id_too.append([cnt, b_id, len(j)])

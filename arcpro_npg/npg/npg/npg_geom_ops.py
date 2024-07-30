@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2024-03-18
+    2024-07-14
 
 Purpose
 -------
@@ -1231,7 +1231,7 @@ def bin_pnts(pnts, x_bins=None, y_bins=None):
 def in_hole_check(pnts, geo):
     """Check if points are in a hole."""
     w = np.where(geo.CL == 0)[0]
-    holes = geo.bits[w]
+    holes = [geo.bits[i] for i in w]
     out = []
     for h in holes:
         inside = np_wn(pnts, h)  # crossing_num(pnts, h, False)
