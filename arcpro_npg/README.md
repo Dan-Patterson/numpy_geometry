@@ -52,10 +52,13 @@ a simple conversion of the geometry type, no fancy intersection and overlap stuf
 You get what you pay for, but the widest use is probably the simplest.
 
 ----
-## Last update : 2022-02-07 ##
+## 2024-07-29 update ##
+Additions and modifications.  
+
+## 2022-02-07 update ##
 Fixed some errors...(I hope).
 
-## Last update : 2021-06-04 ##
+## 2021-06-04 update ##
 Rewrites of many functions to optimize array concatenations.
 *npg_clip* is still being tested.  convex polygons pose no problems, but clipping that results in multipart geometries is still being investigated.
 
