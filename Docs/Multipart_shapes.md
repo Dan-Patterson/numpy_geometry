@@ -242,7 +242,7 @@ a1  # ---- as a list of values ----
     (300015.0, 5000024.0),
     (300025.0, 5000024.0)]]]]
 
-np.asarray(a1)  # ---- as an object array containing lists of coordinates
+np.asarray(a1, dtype='O')  # ---- as an object array containing lists of coordinates
 
 array([[list([[(300010.0, 5000020.0), (300010.0, 5000010.0), (300000.0, 5000010.0), (300000.0, 5000020.0),
                (300010.0, 5000020.0)], [(300003.0, 5000019.0), (300003.0, 5000013.0), (300009.0, 5000013.0),
