@@ -75,6 +75,12 @@ See the **geonumeracy** repository for more examples of numpy geometry functions
 ----
 **Some links**
 
+*2024*
+
+- [Adjacency ... numpy snippets](https://community.esri.com/t5/python-blog/adjacency-numpy-snippets/ba-p/1401241)
+- [Recursion: Using the same function within itself](https://community.esri.com/t5/python-blog/recursion-using-the-same-function-within-itself/ba-p/1512093)
+- [Keys in dictionaries: the geojson example](https://community.esri.com/t5/python-blog/keys-in-dictionaries-the-geojson-example/ba-p/1512072)
+
 *2023*
 
 - [Fun with structured arrays](https://community.esri.com/t5/python-blog/fun-with-structured-arrays/ba-p/1258790)
