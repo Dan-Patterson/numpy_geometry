@@ -16,7 +16,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2023-12-04
+    2024-10-14
 
 Purpose
 -------
@@ -91,7 +91,8 @@ __all__ = [
     'compare_geom', 'del_seq_dups', 'dist_angle_sort', 'flat', 'interweave',
     'keep_geom', 'multi_check', 'geom_angles', 'project_pnt_to_line',
     'radial_sort', 'reclass_ids', 'remove_geom', 'segment_angles',
-    'shape_finder', 'sort_xy', 'stride_2d', 'uniq_1d', 'uniq_2d'
+    'shape_finder', 'sort_segment_pairs', 'sort_xy', 'stride_2d',
+    'swap_segment_pnts', 'uniq_1d', 'uniq_2d'
     ]
 
 __helpers__ = [
@@ -186,11 +187,11 @@ def _to_lists_(a, outer_only=True):
         return a.bits
     if isinstance(a, np.ndarray):
         if a.dtype.kind == 'O':
-            a = a
-        elif a.ndim == 2:
-            a = [a]
-        elif a.ndim == 3:
-            a = list(a)
+            return a
+        if a.ndim == 2:
+            return [a]
+        if a.ndim == 3:
+            return list(a)
     return a  # a list already
 
 
@@ -221,8 +222,8 @@ def _isin_2d_(a, b, as_integer=False):
     a, b : arrays
         The arrays to compare.
     as_integer : boolean
-        False, returns a boolean array.  True, returns integer array which may
-        useful for some operations.
+        False, returns a list of booleans.  True, returns an integer array
+        which may useful for some operations.
 
     Example
     -------
@@ -247,7 +248,7 @@ def _isin_2d_(a, b, as_integer=False):
     out = (a[:, None] == b).all(-1).any(-1)
     if as_integer:
         return out.astype('int')
-    return out
+    return out.tolist()
 
 
 def _is_right_side(p, strt, end):
@@ -644,8 +645,7 @@ def _translate_(a, dx=0, dy=0):
     if a.ndim == 1:
         a = a.reshape(1, a.shape[0], 2)
         return np.array([i + [dx, dy] for i in a])
-    else:
-        return a + [dx, dy]
+    return a + [dx, dy]
 
 
 def _trans_rot_(a, angle=0.0, clockwise=False):
@@ -1003,6 +1003,7 @@ def multi_check(arr):
                               axis=0)
     chk = uni[cnt > 1]
     # whr = np.nonzero(cnt > 1)[0]
+    parts = []
     if len(chk) == 1:
         val = chk[1]
         result = (arr[:, None] == val).all(-1).any(-1)
@@ -1019,7 +1020,7 @@ def multi_check(arr):
         for i in range(1, len(bits), 2):
             sub = np.concatenate((bits[i], bits[i + 1]), axis=0)
             parts.append(sub)
-        return parts
+    return parts
 
 
 # ---- ---------------------------
@@ -1038,6 +1039,7 @@ def sort_xy(a, x_ascending=True, y_ascending=True, return_order=True):
     a = _get_base_(a)
     x_s = a[:, 0]
     y_s = a[:, 1]
+    order = None
     if x_ascending:
         if y_ascending:
             order = np.lexsort((y_s, x_s))
@@ -1051,6 +1053,72 @@ def sort_xy(a, x_ascending=True, y_ascending=True, return_order=True):
     if return_order:
         return order
     return a[order]
+
+
+def swap_segment_pnts(a):
+    """Swap point pairs so that the x-values are increasing.
+
+    Parameters
+    ----------
+    a : array
+        The array is usually an Nx2 array of points representing the boundary
+        of a polygon or a polyline.  An Nx4 array representing (x0,y0, x1,y1)
+        from-to pairs may also be used.
+
+    Returns
+    -------
+    An Nx4 array representing the from-to point pairs is returned.  The angles
+    of these sequences will be in the first two quadrants (I, II).
+    """
+    shp0, shp1 = a.shape
+    shp0 -= 1
+    if shp1 == 2:
+        tmp = np.concatenate((a[:-1], a[1:]), axis=1)
+        idx_ = np.zeros((shp0, 2), dtype=int)
+        idx_[:, 0] = np.arange(shp0)
+        idx_[:-1, 1] = np.arange(1, shp0)
+    elif shp1 == 4:
+        tmp = np.copy(a)
+    else:
+        print("Array shape of Nx2 or Nx4 required.")
+        return None
+    #
+    # -- compare x columns, fill output array
+    gte_idx = tmp[:, 0] >= tmp[:, 2]  # compare x-coordinates
+    # check y if x is equal
+    eq_idx = np.logical_and(tmp[:, 0] == tmp[:, 2], tmp[:, 1] <= tmp[:, 3])
+    gte_idx = gte_idx ^ eq_idx
+    em = np.zeros(tmp.shape)
+    em[gte_idx == 0] = tmp[gte_idx == 0]  # correct orientation, keep values
+    em[gte_idx == 1, :2] = tmp[gte_idx == 1, -2:]  # swap needed
+    em[gte_idx == 1, -2:] = tmp[gte_idx == 1, :2]
+    whr = np.nonzero(gte_idx == 1)[0]  # index check
+    idx_[whr] = idx_[whr][:, [1, 0]]
+    return em, idx_
+
+
+def sort_segment_pairs(a):
+    """Sort point pairs.
+
+    Parameters
+    ----------
+    a : array
+        An Nx2 array of points representing the boundary of a polygon or a
+        polyline since it is assumed that the segments are somehow connected.
+
+    Returns
+    -------
+    The new segments and their from-to indices.
+    The segments are sorted lexicographically with ascending x-values for the
+    point pairs.  The segments are oriented so they lie in quadrant I or II.
+
+    Notes
+    -----
+    See `swap_segment_pnts` for parameters and details.
+    """
+    tmp, idx_ = swap_segment_pnts(a)
+    ind = np.lexsort((tmp[:, 2], tmp[:, 0]))
+    return tmp[ind], idx_[ind]  # ind, idx_
 
 
 def dist_angle_sort(a, sort_point=None, close_poly=True):
@@ -1263,6 +1331,7 @@ def shape_finder(arr, start=0, prn=False, structured=True):
     #
     cnt = start
     info = []
+    arrs = []
     if isinstance(arr, (list, tuple)):
         if len(arr[0]) == 2 and isinstance(arr[0][0], (int, float)):
             arrs = [arr]
@@ -1373,11 +1442,12 @@ def flat(lst):
     """Flatten input. Basic flattening but doesn't yield where things are."""
     def _flat(lst, r):
         """Recursive flattener."""
-        if not isinstance(lst[0], (list, np.ndarray, tuple)):  # added [0]
-            r.append(lst)
-        else:
-            for i in lst:
-                r = r + flat(i)
+        if len(lst) > 0:
+            if not isinstance(lst[0], (list, np.ndarray, tuple)):  # added [0]
+                r.append(lst)
+            else:
+                for i in lst:
+                    r = r + flat(i)
         return r
     return _flat(lst, [])
 

@@ -186,7 +186,7 @@ Modules not imported by default...
 ----------------------------------------------
 """
 
-pth = __path__[0]
+pth = __path__[0]  #noqa
 print(msg.format(pth, sys.version, sys.exec_prefix, np.__version__))
 del pth
 del msg

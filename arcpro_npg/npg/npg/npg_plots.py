@@ -174,7 +174,7 @@ def subplts(plots=1, by_col=True, max_rc=4):
     return row_col
 
 
-def scatter_params(plt, fig, ax, title="Title", ax_lbls=None):
+def scatter_params(plt, fig, ax, ax_lbls=None, title=None):
     """Assign default parameters for plots.
 
     Notes
@@ -195,7 +195,8 @@ def scatter_params(plt, fig, ax, title="Title", ax_lbls=None):
     ax.yaxis.label_position = 'left'
     plt.xlabel(x_label, fontdict=font1, labelpad=12, size=12)
     plt.ylabel(y_label, fontdict=font1, labelpad=12, size=12)
-    plt.title(title + "\n", loc='center', fontdict=font1, size=18)
+    if title is not None:
+        plt.title(title + "\n", loc='center', fontdict=font1, size=18)
     # plt.tight_layout(pad=0.2, h_pad=0.1, w_pad=0.1)
     plt.grid(True)
     return None
@@ -252,9 +253,9 @@ def plot_mixed(data, title="Title", invert_y=False, ax_lbls=None):
             _label_pnts(pnts, plt)
         elif kind == 2:
             # cmap = plt.cm.get_cmap('hsv', len(pnts))
-            cmap = matplotlib.colormaps['hsv']
+            # cmap = matplotlib.colormaps['hsv']
             for j, p in enumerate(pnts):
-                clr = cmap(j)  # clr=np.random.random(3,)  # clr = "b"
+                # clr = cmap(j)  # clr=np.random.random(3,)  # clr = "b"
                 # clr = 'None'
                 _line(p, plt)  # color, marker, linewdth=2)
                 # plt.fill(*zip(*p), facecolor=clr)
@@ -580,6 +581,52 @@ plt.show()
 
 # ----------------------------------------------------------------------------
 # ---- (3) testing section ----
+def plot_segments(a, title=None):
+    """
+    Plot line segments from from-to point pairs.
+
+    Parameters
+    ----------
+    frto : array
+        The array can be an Nx4 or an Nx2x2 array representing x0,y0 x1, y1
+        point pairs.
+
+    Returns
+    -------
+    None.
+
+    """
+    #
+    if a.ndim == 3:
+        pairs = a
+    elif a.shape[1] == 4:
+        pairs = a.reshape((-1, 2, 2))
+    else:
+        print("An Nx4 or an Nx2x2 array is expected")
+    font1 = {'family': 'sans-serif',
+             'weight': 'bold', 'size': 12}  # 'color': 'black',
+    fig, ax = plt.subplots(1, 1)
+    fig.set_figheight = 8
+    fig.set_figwidth = 8
+    fig.dpi = 200
+    plt.tight_layout(pad=0.2, h_pad=0.1, w_pad=0.1)
+    plt.grid(False)
+    plt.rc('font', **font1)
+    ax.set_aspect('equal', adjustable='box')
+    scatter_params(plt, fig, ax, title=title, ax_lbls=None)
+    #
+    plt.scatter(pairs[:, 0, 0], pairs[:, 0, 1])
+    mid_pnts = []
+    for pair in pairs:
+        i, j = pair
+        mid_pnts.append(np.average(pair, axis=0))
+        plt.plot(pair[:, 0], pair[:, 1], marker='o')
+    mid_pnts = np.array(mid_pnts)
+    lbl = np.arange(len(mid_pnts))
+    for label, xpt, ypt in list(zip(lbl[:], mid_pnts[:, 0], mid_pnts[:, 1])):
+        plt.annotate(label, xy=(xpt, ypt), size=8, ha='left', va='bottom')
+    plt.show()
+
 
 def plot_mst(a, pairs):
     """Plot minimum spanning tree test."""

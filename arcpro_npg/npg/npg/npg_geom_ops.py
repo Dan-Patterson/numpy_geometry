@@ -133,11 +133,11 @@ from npg.npg_geom_hlp import (
     _get_base_, _bit_area_, _bit_min_max_, _in_extent_, _angles_3pnt_)
 from npg.npg_pip import np_wn
 
-np.set_printoptions(
-    edgeitems=10, linewidth=100, precision=2, suppress=True, threshold=200,
-    formatter={"bool": lambda x: repr(x.astype(np.int32)),
-               "float_kind": '{: 6.2f}'.format})
-np.ma.masked_print_option.set_display('-')  # change to a single -
+# np.set_printoptions(
+#     edgeitems=10, linewidth=100, precision=2, suppress=True, threshold=200,
+#     formatter={"bool": lambda x: repr(x.astype(np.int32)),
+#                "float_kind": '{: 6.2f}'.format})
+# np.ma.masked_print_option.set_display('-')  # change to a single -
 
 script = sys.argv[0]  # print this should you need to locate the script
 
@@ -148,7 +148,7 @@ __all__ = [
     'eucl_dist', 'extent_to_poly', 'find_closest', 'in_hole_check', 'mabr',
     'npGeo', 'np_wn', 'offset_buffer', 'on_line_chk', 'pnts_in_pnts',
     'pnts_on_poly', 'pnts_to_extent', 'polys_to_segments',
-    'polys_to_unique_pnts', 'scale_by_area', 'simplify', 'segments_to_polys',
+    'polys_to_unique_pnts', 'scale_by_area', 'segments_to_polys', 'simplify',
     'simplify_lines', 'triangulate_pnts'
 ]
 

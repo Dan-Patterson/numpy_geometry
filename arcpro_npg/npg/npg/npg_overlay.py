@@ -11,7 +11,6 @@ confined to polygon and polyline objects.
 **Main functions**::
 
 - intersect, intersections
-- dissolve
 - adjacent, adjacency_matrix
 - append
 - merge
@@ -282,7 +281,7 @@ def intersections(polys, overlays, outer_only=True, stacked=False):
     return output, cl_info
 
 
-def intersects(*args):
+def intersects(args):
     r"""Line segment intersection check. **Largely kept for documentation**.
 
     Two lines or 4 points that form the lines.  This does not extrapolate to

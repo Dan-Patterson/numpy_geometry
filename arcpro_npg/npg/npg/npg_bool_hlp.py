@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2024-03-28
+    2024-10-14
 
 Purpose
 -------
@@ -35,6 +35,7 @@ import sys
 import numpy as np
 import npg
 from npg.npGeo import roll_arrays
+from npg_geom_hlp import sort_segment_pairs
 from npg.npg_plots import plot_polygons, plot_2d  # noqa
 
 ft = {"bool": lambda x: repr(x.astype(np.int32)),
@@ -709,7 +710,94 @@ def add_intersections(
 
 
 # ---- ---------------------------
-# ---- (4) extras
+# ---- (4) segment intersections
+#
+def _seg_prep_(a, b, all_info=False):
+    """Prepare segment intersection information.
+
+    a, b : arrays
+        The arrays are in the form of Nx4 point pairs, each row is a two point
+        line or a segment of from-to values of x0,y0 x1,y1.
+
+    Returns
+    -------
+    The intersection points.
+
+    Notes
+    -----
+    Use `npg_geom_hlp.sort_segment_pairs` to get the sorted from-to points in
+    the Nx4 format.
+
+    Use `npg_plots.plot_segments` to plot the segments.
+    """
+    def _xsect_(a_num, b_num, denom, x1_x0, y1_y0, x0, y0):
+        """Return the intersections and their id values."""
+        with np.errstate(all="ignore"):  # ignore all errors
+            u_a = (a_num / denom) + 0.0
+            u_b = (b_num / denom) + 0.0
+            z0 = np.logical_and(u_a >= 0., u_a <= 1.)  # np.isfinite(u_a)`
+            z1 = np.logical_and(u_b >= 0., u_b <= 1.)  # np.isfinite(u_b)
+            both = z0 & z1
+            xs = (u_a * x1_x0 + x0)[both]
+            ys = (u_a * y1_y0 + y0)[both]
+        x_pnts = []
+        if xs.size > 0:
+            x_pnts = np.concatenate((xs[:, None], ys[:, None]), axis=1)
+        whr = np.array(np.nonzero(both)).T
+        return whr, x_pnts
+
+    x0, y0, x1, y1 = a.T  # segments `from-to` coordinates
+    res0 = (a[:, -2:] - a[:, :2]).T
+    x1_x0, y1_y0 = res0
+    #
+    x2, y2, x3, y3 = b.T  # intersecting shapes `from-to` coordinates
+    res1 = (b[:, -2:] - b[:, :2]).T
+    x3_x2, y3_y2 = res1
+    # reshape poly deltas
+    x3_x2 = x3_x2[:, None]
+    y3_y2 = y3_y2[:, None]
+    # deltas between pnts/poly x and y
+    x0_x2 = x0 - x2[:, None]
+    y0_y2 = y0 - y2[:, None]
+    #
+    a_0 = y0_y2 * x3_x2
+    a_1 = y3_y2 * x0_x2
+    b_0 = y0_y2 * x1_x0
+    b_1 = y1_y0 * x0_x2
+    #
+    # numerators and denom of determinant
+    a_num = (a_0 - a_1) + 0.0  # signed distance diff_ in npg.pip.wn_np
+    b_num = (b_0 - b_1) + 0.0
+    denom = (x1_x0 * y3_y2) - (y1_y0 * x3_x2) + 0.0
+    whr, x_pnts = _xsect_(a_num, b_num, denom, x1_x0, y1_y0, x0, y0)
+    return whr, x_pnts, a_num, b_num, denom  # wn_, denom, x0, y0, x1_x0, y1_y0
+
+
+def segment_intersections(a, b):
+    """Return the intersection points of line segments.
+
+    Parameters
+    ----------
+    a, b : arrays
+        The Nx2 arrays to intersect.  Thes can represent polygon boundaries,
+        polylines or two point line segments.
+
+    Requires
+    --------
+    `npg_geom_hlp._sort_segment_pairs`
+    Notes
+    -----
+    If the geometry is composed of multi-segments, they are devolved into two
+    point lines and ordered lexicographically.
+    """
+    a_s, idx_a = sort_segment_pairs(a)
+    b_s, idx_b = sort_segment_pairs(b)
+    whr, x_pnts, a_num, b_num, denom = _seg_prep_(a_s, b_s, all_info=False)
+    return whr, x_pnts
+
+
+# ---- ---------------------------
+# ---- (5) extras
 #
 def prePC(i0_, i1_, cN, j0_, j1_, pN, pinside, cinside):
     """Determine pre `p` and `c` points."""

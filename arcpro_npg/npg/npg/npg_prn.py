@@ -390,8 +390,8 @@ def prn_lists(a, max_=None, prn_structure=False):
 
     See Also
     --------
-    ``npg_geom_hlp.shape_finder`` to print or return the structure of the nested
-    structure.
+    ``npg_geom_hlp.shape_finder`` to print or return the structure of the
+    nested structure.
     """
     if prn_structure:
         n_h.shape_finder(a, prn=True)  # see npg_geom_hlp

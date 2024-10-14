@@ -9,7 +9,7 @@ The Geo class is a subclass of numpy's ndarray.  Properties that are related
 to geometry have been assigned and methods developed to return geometry
 properties.
 
-Modified = "2024-05-04"
+Modified = "2024-08-01"
 
 ----
 
@@ -21,6 +21,7 @@ Modified = "2024-05-04"
 # pylint: disable=E0401,E0611,E1101,E1121
 
 import sys
+import inspect  # noqa useful to inspect objects
 from textwrap import indent, dedent, wrap
 import numpy as np
 # from numpy.lib.recfunctions import structured_to_unstructured as stu
@@ -47,8 +48,11 @@ from npg.npgDocs import (
 
 np.set_printoptions(
     edgeitems=10, linewidth=120, precision=2, suppress=True, threshold=200,
+    legacy='1.21',
     formatter={"bool": lambda x: repr(x.astype(np.int32)),
-               "float_kind": '{: 6.2f}'.format})
+               "float_kind": '{: 6.2f}'.format}
+    )
+np.ma.masked_print_option.set_display('-')  # change to a single -
 
 script = sys.argv[0]  # print this should you need to locate the script
 
@@ -501,6 +505,7 @@ class Geo(np.ndarray):
         """Return the first part of a multipart shape or a shape with holes.
 
         Holes are retained.  The IFT is altered to account for point removal.
+
         """
         info = f"{self.Info} first part"
         ift_s = self.IFT[self.PID == 1]
@@ -1725,6 +1730,12 @@ def Geo_to_arrays(g, shift_back=True):
     -------
     Most likely an object array of ndarrays (aka, a ragged array).  To shift
     the coordinates back to their original extent, set `shift_back` to True.
+
+    Notes
+    -----
+    See npg_prn and `prn_` and `prn_lists` if you want to print the resultant
+    list of lists.
+
     """
     if not hasattr(g, "IFT"):
         print("\nGeo array required...\n")
@@ -2082,10 +2093,13 @@ def dirr(obj, cols=3, prn=True):
     # csze = int(csze) + (csze % 1 > 0)
     #
     if hasattr(obj, '__module__'):
-        args = ["-" * 70, obj.__module__, obj.__class__]
+        args = ["-" * 70, obj.__module__ + "." + obj.__name__, obj.__class__]
+        txt_out = "\n{}\n| npg.dirr({}) ...\n|    {}\n-------".format(*args)
+    elif hasattr(obj, '__name__'):
+        args = ["-" * 70, obj.__name__, "npg.dirr..."]
     else:
         args = ["-" * 70, type(obj), "npg.dirr..."]
-    txt_out = "\n{}\n| dir({}) ...\n|    {}\n-------".format(*args)
+    txt_out = "\n{}\n| npg.dirr({}) ...\n|    {}\n-------".format(*args)
     cnt = 0
     for i in a:
         if isinstance(i, (list, tuple)):
@@ -2096,11 +2110,11 @@ def dirr(obj, cols=3, prn=True):
         else:
             txt = i
         txt_out += txt
-    txt_out += """\n
-    Modules not directly imported:
-    npg_analysis, npg_arc_npg, npg_clip_split, npg_create,
-    npg_pip, npg_table, npg_utils
-    """
+    # txt_out += """\n
+    # Modules not directly imported:
+    # npg_analysis, npg_arc_npg, npg_clip_split, npg_create,
+    # npg_pip, npg_table, npg_utils
+    # """
     if prn:
         print(txt_out)
         return None

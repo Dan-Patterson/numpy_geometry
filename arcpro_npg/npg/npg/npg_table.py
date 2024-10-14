@@ -27,6 +27,7 @@ Data types handled::
     f : float
     U : Unicode text
 
+>>> np.iinfo(np.int64).min # -9223372036854775808
 >>> np.iinfo(np.int32).min # -2147483648
 >>> np.iinfo(np.int16).min # -32768
 >>> np.iinfo(np.int8).min  # -128
@@ -854,7 +855,7 @@ def find_in(a, col, what, where="in", any_case=True, pull="all"):
 
 
 # ---- ---------------------------
-# ---- (5) sorting and slicing --------------------------------------------------
+# ---- (5) sorting and slicing
 # ---- (5a) row sorting and slicing
 def split_sort_slice(a, split_fld=None, order_fld=None):
     """Split a structured array into groups of common values.

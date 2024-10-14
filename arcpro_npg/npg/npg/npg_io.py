@@ -527,7 +527,7 @@ def geojson_to_geo(pth, kind=2, info=None, to_origin=False):
 
 
 def get_keys(data, num):
-    """Return dictiony keys by level.
+    """Return dictionary keys by level.
 
     Parameters
     ----------
@@ -680,7 +680,7 @@ def nested_len(obj, out=[], target_cls=list):
 """
 out = []
 
-nl = nested_len(coords, out=[], target_cls=(int, float))
+nl = nested_len(coords, out=[], target_cls=list)
 
 
 # same as nested_len
