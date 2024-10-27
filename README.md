@@ -72,11 +72,12 @@ There are tools to derive geometries from geojson format or other formats capabl
 
 See the **geonumeracy** repository for more examples of numpy geometry functions.
 
-----
+--------------
 **Some links**
 
 *2024*
 
+- [Finding irrecular patterns in data](https://community.esri.com/t5/python-blog/finding-irregular-patterns-in-data-numpy-snippets/ba-p/1549306)
 - [Adjacency ... numpy snippets](https://community.esri.com/t5/python-blog/adjacency-numpy-snippets/ba-p/1401241)
 - [Recursion: Using the same function within itself](https://community.esri.com/t5/python-blog/recursion-using-the-same-function-within-itself/ba-p/1512093)
 - [Keys in dictionaries: the geojson example](https://community.esri.com/t5/python-blog/keys-in-dictionaries-the-geojson-example/ba-p/1512072)
