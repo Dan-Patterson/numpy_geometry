@@ -33,6 +33,7 @@ Functions for boolean operations on polygons:
 
 import sys
 import numpy as np
+from numpy.lib.stride_tricks import sliding_window_view as swv
 import npg
 from npg.npGeo import roll_arrays
 from npg_geom_hlp import sort_segment_pairs
@@ -258,7 +259,7 @@ def p_ints_p(poly0, poly1):
 #
 def _w_(a, b, all_info=False):
     """Return winding number and other values."""
-    # -- if a polygon you can slice of the last point, otherwise dont
+    # -- if a polygon, you can slice off the last point, otherwise dont
     x0, y0 = a[:-1].T  # point `from` coordinates
     # x1, y1 = a[1:].T  # point `to` coordinates
     x1_x0, y1_y0 = (a[1:] - a[:-1]).T
@@ -797,7 +798,123 @@ def segment_intersections(a, b):
 
 
 # ---- ---------------------------
-# ---- (5) extras
+# ---- (5) sequences
+#
+def find_sequence(a, b):
+    """Return the indices of `a` sequence within the array 1d array `b`.
+
+    Parameters
+    ----------
+    a, b : array_like
+        The sequences must be 1d
+
+    Notes
+    -----
+    >>> from numpy.lib.stride_tricks import sliding_window_view as swv
+    >>> a = np.array([-1,  0, -1,  0, -1,  1,  0,  0, -1,  0,  0,  0])
+    >>> b = [0, -1, 0]
+    >>> n = len(b)
+    >>> idx = np.nonzero((swv(a, (n,)) == b).all(-1))[0]
+    >>> # -- the sliding window sequence
+    >>> swv(a, (n,))
+    ... array([[-1,  0, -1],
+    ...        [ 0, -1,  0],
+    ...        [-1,  0, -1],
+    ...        [ 0, -1,  1],
+    ...        [-1,  1,  0],
+    ...        [ 1,  0,  0],
+    ...        [ 0,  0, -1],
+    ...        [ 0, -1,  0],
+    ...        [-1,  0,  0],
+    ...        [ 0,  0,  0]])
+    >>> # -- result
+    >>> idx
+    ... array([1, 7], dtype=int64)
+    >>> seqs
+    ... array([[1, 2, 3],
+    ...        [7, 8, 9]], dtype=int64)
+
+    References
+    ----------
+    `<https://community.esri.com/t5/python-blog/finding-irregular-patterns-in-
+    data-numpy-snippets/ba-p/1549306>`_.
+    """
+    # from numpy.lib.stride_tricks import sliding_window_view as swv
+    a = np.asarray(a)
+    b = np.asarray(b)
+    if a.ndim > 1 or b.ndim > 1:
+        msg = """\n
+        1d sequences are required, your provided:
+        array, shape\na {}\nb {}
+        """
+        print(msg.format(a.shape, b.shape))
+    n = len(b)
+    idx = np.nonzero((swv(a, (n,)) == b).all(-1))[0]
+    seqs = np.asarray([np.arange(i, i + n) for i in idx]).reshape(-1, n)
+    return seqs
+
+
+def sequences(data, stepsize=0):
+    """Return an array of sequence information denoted by stepsize.
+
+    Parameters
+    ----------
+    data : array-like of values in 1D
+    stepsize : Separation between the values.
+        If stepsize=0, sequences of equal values will be searched. If stepsize
+        is 1, then sequences incrementing by 1... etcetera.
+        Stepsize can be both positive or negative.
+
+    >>> # check for incrementing sequence by 1's
+    d = [1, 2, 3, 4, 4, 5]
+    s, o = sequences(d, 1, True)
+    # s = [array([1, 2, 3, 4]), array([4, 5])]
+    # o = array([[1, 4, 4],
+    #            [4, 2, 6]])
+
+    Notes
+    -----
+    For strings, use
+
+    >>> partitions = np.where(a[1:] != a[:-1])[0] + 1
+
+    Variants
+    --------
+    Change `N` in the expression to find other splits in the data
+
+    >>> np.split(data, np.where(np.abs(np.diff(data)) >= N)[0]+1)
+
+    References
+    ----------
+    `<https://community.esri.com/t5/python-blog/patterns-sequences-occurrence-
+    and-position/ba-p/902504>`_.
+
+    `<https://stackoverflow.com/questions/7352684/how-to-find-the-groups-of-
+    sequences-elements-from-an-array-in-numpy>`_.
+
+    `<https://stackoverflow.com/questions/50551776/python-chunk-array-on-
+    condition#50551924>`_
+    """
+    a = np.array(data)
+    a_dt = a.dtype.kind
+    dt = [('ID', '<i4'), ('Value', a.dtype.str), ('Count', '<i4'),
+          ('From_', '<i4'), ('To_', '<i4')]
+    if a_dt in ('U', 'S'):
+        seqs = np.split(a, np.where(a[1:] != a[:-1])[0] + 1)
+    elif a_dt in ('i', 'f'):
+        seqs = np.split(a, np.where(np.diff(a) != stepsize)[0] + 1)
+    vals = [i[0] for i in seqs]
+    cnts = [len(i) for i in seqs]
+    seq_num = np.arange(len(cnts))
+    too = np.cumsum(cnts)
+    frum = np.zeros_like(too)
+    frum[1:] = too[:-1]
+    out = np.array(list(zip(seq_num, vals, cnts, frum, too)), dtype=dt)
+    return out
+
+
+# ---- ---------------------------
+# ---- (6) extras
 #
 def prePC(i0_, i1_, cN, j0_, j1_, pN, pinside, cinside):
     """Determine pre `p` and `c` points."""

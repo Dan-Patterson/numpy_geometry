@@ -188,15 +188,15 @@ def scatter_params(plt, fig, ax, ax_lbls=None, title=None):
         ax_lbls = ['X', 'Y']
     x_label, y_label = ax_lbls
     font1 = {'family': 'sans-serif', 'color': 'black',
-             'weight': 'bold', 'size': 14}  # set size to other values
+             'weight': 'bold', 'size': 10}  # set size to other values
     ax.set_aspect('equal', adjustable='box')
     ax.ticklabel_format(style='sci', axis='both', useOffset=False)
     ax.xaxis.label_position = 'bottom'
     ax.yaxis.label_position = 'left'
-    plt.xlabel(x_label, fontdict=font1, labelpad=12, size=12)
-    plt.ylabel(y_label, fontdict=font1, labelpad=12, size=12)
+    plt.xlabel(x_label, fontdict=font1, labelpad=10, size=10)
+    plt.ylabel(y_label, fontdict=font1, labelpad=10, size=10)
     if title is not None:
-        plt.title(title + "\n", loc='center', fontdict=font1, size=18)
+        plt.title(title + "\n", loc='center', fontdict=font1, size=14)
     # plt.tight_layout(pad=0.2, h_pad=0.1, w_pad=0.1)
     plt.grid(True)
     return None
@@ -319,7 +319,7 @@ def plot_2d(pnts, label_pnts=False, connect=False,
     def _scatter(p, plt, color, marker):
         """Do the actual point plotting. Change `s` to increase marker size."""
         X, Y = p[:, 0], p[:, 1]
-        plt.scatter(X, Y, s=50, c=color, linewidths=None, marker=marker)
+        plt.scatter(X, Y, s=30, c=color, linewidths=None, marker=marker)
 
     def _line(p, plt, color, marker, linewdth):
         """Connect the points with lines."""
@@ -335,7 +335,7 @@ def plot_2d(pnts, label_pnts=False, connect=False,
         """
         lbl = np.arange(len(pnts))
         for label, xpt, ypt in zip(lbl[:], pnts[:, 0], pnts[:, 1]):
-            plt.annotate(label, xy=(xpt, ypt), xytext=(2, 2), size=12,
+            plt.annotate(label, xy=(xpt, ypt), xytext=(2, 2), size=8,
                          textcoords='offset points', ha='left', va='bottom')
 
     # ---- main plotting routine
@@ -344,7 +344,7 @@ def plot_2d(pnts, label_pnts=False, connect=False,
     markers = ('o', 'v', '^', '<', '>', '8', 's', 'p', '*', 'h', 'H',
                'D', 'd', 'P', 'X')  # MarkerStyle.filled_markers
     # ---- set basic parameters ----
-    scatter_params(plt, fig, ax, title, ax_lbls)
+    scatter_params(plt, fig, ax, ax_lbls,  title)
     pnts, x_min, y_min, x_max, y_max = axis_mins_maxs(pnts)
     #
     plt.xlim(x_min, x_max)
@@ -485,7 +485,10 @@ def plot_polygons(arr, outline=True, vertices=True,
     # color_choice = ['black', 'red', 'green', 'blue']
     for i, shape in enumerate(shapes):
         if outline:   # _line(shape, plt)  # alternate, see line for options
-            if random_colors:
+            if hasattr(arr, 'IFT'):
+                if arr.K == 1:
+                    _line(shape, plt)  # alternate, see line for options
+            elif random_colors:
                 plt.fill(*zip(*shape), fill='none', facecolor='none',
                          edgecolor=colors_[i], linewidth=2)
             else:

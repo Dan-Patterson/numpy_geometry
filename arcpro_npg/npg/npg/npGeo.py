@@ -430,7 +430,7 @@ class Geo(np.ndarray):
         return [self.XY[ft[0]:ft[1]] for ft in self.FT]
 
     # ----  -------------------------------------
-    # ---- methods and derived properties section
+    # ---- Methods and derived properties section
     # ---- (1) slicing, sampling equivalents
     #
     # Common Parameters
@@ -519,6 +519,31 @@ class Geo(np.ndarray):
             return Geo(a_2d, ift_s, self.K, self.XT, info)
         return a_2d
 
+    def slice_(self, fr=0, to=1, step=1, asGeo=True):
+        """Get the shapes in the range of `fr`om - `to` by `step`."""
+        ids = self.shp_ids[fr:to]
+        if step > 1:
+            ids = ids[::step]
+        xys = []
+        for id_num in ids:
+            case_ = self.FT[self.IDs == id_num]
+            if len(case_) > 1:  # multipart and-or holes
+                sub = [self.XY[c[0]: c[-1]] for c in case_]
+                xys.append(sub)
+            else:
+                c0, c1 = case_.squeeze()
+                xys.append(self.XY[c0:c1])
+        if asGeo:
+            info = "Old_order" + (" {}" * len(ids)).format(*ids)
+            if len(ids) == 1:  # cludge workaround for length 1 ids
+                arr = arrays_to_Geo(
+                    xys, kind=self.K, info=info, to_origin=False)
+                arr.IFT[:, 0] = 0
+                # arr.IFT[:, 5] = np.arange(len(arr.IFT))  # fixed in arr2geo
+                return arr
+            return arrays_to_Geo(xys, kind=self.K, info=info, to_origin=False)
+        return xys
+
     def get_shapes(self, ids=None, asGeo=True):
         """Pull multiple shapes, in the order provided.  Holes are retained."""
         if ids is None:
@@ -532,12 +557,12 @@ class Geo(np.ndarray):
             return None
         xys = []
         for id_num in ids:
-            case = self.FT[self.IDs == id_num]
-            if len(case) > 1:
-                sub = [self.XY[c[0]: c[-1]] for c in case]
+            case_ = self.FT[self.IDs == id_num]
+            if len(case_) > 1:  # multipart and-or holes
+                sub = [self.XY[c[0]: c[-1]] for c in case_]
                 xys.append(sub)
             else:
-                c0, c1 = case.squeeze()
+                c0, c1 = case_.squeeze()
                 xys.append(self.XY[c0:c1])
         if asGeo:
             info = "Old_order" + (" {}" * len(ids)).format(*ids)
@@ -827,6 +852,11 @@ class Geo(np.ndarray):
     def segment_angles(self, fromNorth=False):
         """Segment angles for all bits of a Geo array.
 
+        Parameters
+        ----------
+        fromNorth : boolean
+            True, returns angles in the range 0 - 360 (0 = N, 90=E).
+            False returns angles relative to the x-axis +/- 180, (0=E, 90=N)
         Uses alternate slicing described in `Notes` in npGeo.
         """
         dxy = self.XY[1:] - self.XY[:-1]
@@ -836,8 +866,19 @@ class Geo(np.ndarray):
         return [ang[ft[0]:ft[1] - 1] for ft in self.FT]
 
     def polyline_angles(self, right_side=True):
-        """Polyline angles defined by sequential 3 points."""
-        f_bits = self.first_bit(False)
+        """Polyline angles defined by lines consisting of 3 or more points.
+
+        Parameters
+        ----------
+        right_side : boolean
+            True returns the right-side angle formed by sequential 3 point
+            triplets following in the direction of travel/construction.
+            False returns the angles to the left of said direction.
+        """
+        if self.K == 2:
+            f_bits = self.first_bit(False)
+        elif self.K == 1:
+            f_bits = self.first_part(False)
         inside = True if right_side else False
         return [_angles_3pnt_(p, inside, True) for p in f_bits]  # npg_helper
 
@@ -1572,7 +1613,7 @@ def roll_arrays(arrs):
     return out
 
 
-def array_IFT(in_arrays, shift_to_origin=False):
+def array_IFT(in_arrays, kind=2, shift_to_origin=False):
     """Produce the Geo array.  Construction information in `npgDocs`."""
     id_too = []
     a_2d = []
@@ -1611,7 +1652,7 @@ def array_IFT(in_arrays, shift_to_origin=False):
             sub = []
             p = p.squeeze()
             b_id = 0
-            if len(p) < 3:
+            if len(p) < 3 and kind == 2:  # -- added 2024-11-30
                 continue  # bust out, only 3 or fewer points
             if len(p.shape) == 2:
                 id_too.append([cnt, b_id, len(p)])
@@ -1683,7 +1724,9 @@ def arrays_to_Geo(in_arrays, kind=2, info=None, to_origin=False):
     arcgis pro featureclasses.
     """
     # -- call array_IFT
-    a_2d, ift, extent = array_IFT(in_arrays, shift_to_origin=to_origin)
+    a_2d, ift, extent = array_IFT(in_arrays,
+                                  kind=kind,
+                                  shift_to_origin=to_origin)
     a_2d = a_2d.astype(np.float64)  # see Notes
     rows, cols = ift.shape
     z0 = np.full((rows, 6), fill_value=-1, dtype=ift.dtype)
@@ -1710,6 +1753,7 @@ def arrays_to_Geo(in_arrays, kind=2, info=None, to_origin=False):
     elif kind == 1:  # check for closed-loop polylines
         _c = [(i[-1] == i[0]).all() for i in g.bits]
         CL_check = np.asarray(_c, dtype='int')
+        z0[:, 3] = CL_check  # g.CL = CL_check
         g = Geo(a_2d, z0, Kind=kind, Extent=extent, Info=info)
     return g
 

@@ -767,6 +767,9 @@ def scale_by_area(poly, factor=1, asGeo=False):
         return scaled + cent
     # --
     if npGeo.is_Geo(poly):
+        if poly.K != 2:
+            print("\n Polygon geo array required.")
+            return None
         final = [_area_scaler_(a, factor) for a in poly.bits]
     else:
         final = _area_scaler_(poly, factor)

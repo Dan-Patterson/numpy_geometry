@@ -90,7 +90,7 @@ from npg.npGeo import Geo
 try:
     import arcpy
     from arcpy import Array, Exists, Multipoint, Point, Polygon, Polyline
-    
+
     from arcpy.da import (
         Describe, InsertCursor, SearchCursor, FeatureClassToNumPyArray,
         TableToNumPyArray)  # ExtendTable, NumPyArrayToTable,  UpdateCursor

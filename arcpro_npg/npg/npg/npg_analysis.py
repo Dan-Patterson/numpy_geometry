@@ -219,8 +219,8 @@ def n_spaced(L=0, B=0, R=10, T=10, min_space=1, num=10, verbose=True):
         diff = b - a
         dist = np.einsum('ijk,ijk->ij', diff, diff)
         dist_arr = np.sqrt(dist).squeeze()
-        case = np.any(~np.triu(dist_arr <= min_space, 1), axis=0)
-        return a[case]
+        case_ = np.any(~np.triu(dist_arr <= min_space, 1), axis=0)
+        return a[case_]
     #
     cnt = 1
     n = num * 2  # check double the number required as a check
@@ -464,7 +464,8 @@ def mst(arr, calc_dist=True):
              [6.1, 4.0], [6.5, 6.8], [7.1, 7.6], [7.3, 2.0], [7.4, 1.0],
              [7.7, 9.6], [8.5, 6.5], [9.0, 4.7], [9.6, 1.6], [9.7, 9.6]])
     """
-    W = np.unique(arr, axis=0)
+    tmp, idx = np.unique(arr, return_index=True, axis=0)
+    W = arr[idx]  # retain input order
     # W = arr[~np.isnan(arr[:, 0])]
     a_copy = np.copy(W)
     if calc_dist:
@@ -524,7 +525,7 @@ def connect(a, dist_arr, edges):
 
 """
     a = np.array([[0, 0], [0, 8], [10, 8],  [10, 0], [3, 4], [7, 4]])
-    #
+    a = np.unique(a, axis=0)
     idx= np.lexsort((a[:,1], a[:,0]))  # sort X, then Y
     a_srt = a[idx,:]                   # slice the sorted array
     d = _e_dist_(a_srt)                # determine the square form distances

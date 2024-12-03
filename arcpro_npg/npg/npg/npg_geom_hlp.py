@@ -16,7 +16,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2024-10-14
+    2024-11-03
 
 Purpose
 -------
@@ -87,12 +87,12 @@ nums = 'efdgFDGbBhHiIlLqQpP'
 __imports__ = ['uts', 'prn_tbl']
 
 __all__ = [
-    'a_eq_b', 'cartesian_product', 'coerce2array', 'common_pnts',
-    'compare_geom', 'del_seq_dups', 'dist_angle_sort', 'flat', 'interweave',
-    'keep_geom', 'multi_check', 'geom_angles', 'project_pnt_to_line',
-    'radial_sort', 'reclass_ids', 'remove_geom', 'segment_angles',
-    'shape_finder', 'sort_segment_pairs', 'sort_xy', 'stride_2d',
-    'swap_segment_pnts', 'uniq_1d', 'uniq_2d'
+    'a_eq_b', 'cartesian_product', 'coerce2array', 'classify_pnts',
+    'common_pnts', 'compare_geom', 'compare_segments', 'del_seq_dups',
+    'dist_angle_sort', 'flat', 'interweave', 'keep_geom', 'multi_check',
+    'geom_angles', 'project_pnt_to_line', 'radial_sort', 'reclass_ids',
+    'remove_geom', 'segment_angles', 'shape_finder', 'sort_segment_pairs',
+    'sort_xy', 'stride_2d', 'swap_segment_pnts', 'uniq_1d', 'uniq_2d'
     ]
 
 __helpers__ = [
@@ -313,8 +313,8 @@ def _in_LBRT_(pnts, extent):
     if hasattr(pnts, "IFT"):
         pnts = pnts.XY
     LB, RT = extent[:2], extent[2:]
-    case = np.all(np.logical_and(LB < pnts, pnts <= RT), axis=1)
-    if np.sum(case) > 0:
+    case_ = np.all(np.logical_and(LB < pnts, pnts <= RT), axis=1)
+    if np.sum(case_) > 0:
         return True
     return False
 
@@ -403,10 +403,10 @@ def _bit_crossproduct_(a, is_closed=True, extras=False):
             a = a[:-1]
     ba = a - np.concatenate((a[-1][None, :], a[:-1]), axis=0)
     bc = a - np.concatenate((a[1:], a[0][None, :]), axis=0)
-    cross_pr = np.cross(ba, bc) + 0.0
+    cr = np.cross(ba, bc) + 0.0
     if extras:
-        return cross_pr, ba, bc
-    return cross_pr
+        return cr, ba, bc
+    return cr
 
 
 def _bit_min_max_(a):
@@ -464,7 +464,7 @@ def _angles_3pnt_(a, inside=True, in_deg=True):
     | triangle  : 1 + 4 - 3 = 2
     """
     if np.allclose(a[0], a[-1]):                 # closed loop, remove dupl.
-        a = a[:-1]
+        a = a[1:]  # a[:-1] 2024-10-20 changes to get 1st angle correct
     cr, ba, bc = _bit_crossproduct_(a, is_closed=False, extras=True)
     dt = np.einsum('ij,ij->i', ba, bc)
     ang = np.arctan2(cr, dt)
@@ -870,6 +870,64 @@ def common_pnts(pnts, self, remove_common=True):
         return idx
     print("{} not found".format(pnts))
     return pnts
+
+
+def compare_segments(a, b, both_ways=True, invert=False, return_idx=False):
+    """Return common segments between two poly* features.
+
+    Parameters
+    ----------
+    a, b : arrays, 2D with ndim=2
+        Arrays that may share common segments.  If the arrays are Nx2, from-to
+        points will be constructed from the arrays.  If the arrays are Nx4, it
+        is assumed that the from-to pairs have already been constructed.
+    both_ways : boolean
+        True, check for directionality in shared segments.
+    unique : boolean
+        True, return unique values.
+    invert : boolean
+        True, look for those not in.
+    return_idx : boolean
+        True, return indices in `a` that have common segments in `b`.
+
+    Notes
+    -----
+    The segments of `b` are compared to `a` in both the forward and reverse
+    directions in case there is directionality in shared segments.
+    """
+    ids_ = []
+    segs_ = []
+    shp0 = a.shape[1]
+    shp1 = b.shape[1]
+    if (a.ndim != 2 & b.ndim != 2) or shp0 != shp1:
+        print("Arrays do not have to correct number of dimensions or shape.")
+        return None
+    if shp0 == 2:
+        a_segs = np.concatenate((a[:-1], a[1:]), axis=1)
+        b_segs = np.concatenate((b[:-1], b[1:]), axis=1)
+    elif shp0 == 4:
+        a_segs = np.copy(a)
+        b_segs = np.copy(b)
+    result0 = (a_segs[:, None] == b_segs).all(-1).any(-1)  # ** see reference
+    if invert:
+        result0 = ~result0
+    idx_a = np.nonzero(result0)[0].tolist()
+    if len(idx_a) > 0:
+        segs_.append(a_segs[idx_a])
+        ids_.append(idx_a)
+    if both_ways:
+        tmp = b_segs[:, [2, 3, 0, 1]]
+        result1 = (a_segs[:, None] == tmp).all(-1).any(-1)
+        if invert:
+            result1 = ~result1
+        idx_a_rev = np.nonzero(result1)[0].tolist()
+        if len(idx_a_rev) > 0:
+            segs_.append(tmp[idx_a_rev])
+            ids_.append(idx_a_rev)
+    if len(segs_) == 0:
+        return [None, []]
+    else:
+        return [segs_, ids_]
 
 
 def compare_geom(arr, look_for, unique=True, invert=False, return_idx=False):
