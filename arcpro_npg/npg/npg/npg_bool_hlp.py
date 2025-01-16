@@ -34,10 +34,9 @@ Functions for boolean operations on polygons:
 import sys
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view as swv
-import npg
-from npg.npGeo import roll_arrays
-from npg_geom_hlp import sort_segment_pairs
-from npg.npg_plots import plot_polygons, plot_2d  # noqa
+from .npGeo import roll_arrays
+from .npg_geom_hlp import sort_segment_pairs
+from .npg_plots import plot_polygons, plot_2d  # noqa
 
 ft = {"bool": lambda x: repr(x.astype(np.int32)),
       "float_kind": '{: 6.2f}'.format}
