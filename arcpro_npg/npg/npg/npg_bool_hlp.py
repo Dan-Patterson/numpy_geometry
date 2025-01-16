@@ -598,6 +598,8 @@ def add_intersections(
         p_w = _w_(z, p1_, False)  # use _w_ from _wn_clip_
         p_i = np.nonzero(p_w)[0]
         p_o = np.nonzero(p_w + 1)[0]
+        p_in = p_neq[p_i]   # in ids
+        p_out = p_neq[p_o]  # out ids
         p_ioo = np.zeros(p0_.shape, dtype='int')  # create the output indices
         p_ioo[:, 0] = p_ids  # p0 ids (i)n (o)ut (o)n -> ``ioo``
         p_ioo[p_in, 1] = 1
