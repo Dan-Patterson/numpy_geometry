@@ -181,7 +181,7 @@ tool_list = [
     'Extent Sort', 'Geometry Sort',
     'Area Sort', 'Length Sort',
     'Fill Holes', 'Keep Holes',
-    'Rotate Features', 'Shift Features',
+    'Rotate Features', 'Shift Features', 'Dissolve Boundaries',
     'Delaunay', 'Voronoi']
 cont_list = ['Bounding Circles', 'Convex Hulls', 'Extent Polys',
              'Minimum area bounding rectangle']
