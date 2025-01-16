@@ -34,10 +34,9 @@ Functions for boolean operations on polygons:
 import sys
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view as swv
-import npg
-from npg.npGeo import roll_arrays
-from npg_geom_hlp import sort_segment_pairs
-from npg.npg_plots import plot_polygons, plot_2d  # noqa
+from .npGeo import roll_arrays
+from .npg_geom_hlp import sort_segment_pairs
+from .npg_plots import plot_polygons, plot_2d  # noqa
 
 ft = {"bool": lambda x: repr(x.astype(np.int32)),
       "float_kind": '{: 6.2f}'.format}
@@ -599,8 +598,6 @@ def add_intersections(
         p_w = _w_(z, p1_, False)  # use _w_ from _wn_clip_
         p_i = np.nonzero(p_w)[0]
         p_o = np.nonzero(p_w + 1)[0]
-        p_in = p_neq[p_i]   # in ids
-        p_out = p_neq[p_o]  # out ids
         p_ioo = np.zeros(p0_.shape, dtype='int')  # create the output indices
         p_ioo[:, 0] = p_ids  # p0 ids (i)n (o)ut (o)n -> ``ioo``
         p_ioo[p_in, 1] = 1

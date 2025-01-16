@@ -145,7 +145,7 @@ from npg.npGeo import arrays_to_Geo  # Geo
 from npg.npg_arc_npg import (get_SR, get_shape_K, fc_to_Geo, Geo_to_fc,
                              Geo_to_arc_shapes, fc_data)
 from npg.npg_create import circle, hex_flat, hex_pointy, rectangle, triangle
-from npg.npg_overlay import dissolve, merge_
+from npg.npg_bool_ops import merge_  # Changed from npg_overlay
 
 from scipy.spatial import Voronoi  # Delaunay
 
