@@ -145,7 +145,7 @@ from npg.npGeo import arrays_to_Geo  # Geo
 from npg.npg_arc_npg import (get_SR, get_shape_K, fc_to_Geo, Geo_to_fc,
                              Geo_to_arc_shapes, fc_data)
 from npg.npg_create import circle, hex_flat, hex_pointy, rectangle, triangle
-from npg.npg_bool_ops import merge_  # Changed from npg_overlay
+from npg.npg_bool_ops import merge_, union_adj  # Changed from npg_overlay
 
 from scipy.spatial import Voronoi  # Delaunay
 
@@ -181,7 +181,7 @@ tool_list = [
     'Extent Sort', 'Geometry Sort',
     'Area Sort', 'Length Sort',
     'Fill Holes', 'Keep Holes',
-    'Rotate Features', 'Shift Features', 'Dissolve Boundaries',
+    'Rotate Features', 'Shift Features',
     'Delaunay', 'Voronoi']
 cont_list = ['Bounding Circles', 'Convex Hulls', 'Extent Polys',
              'Minimum area bounding rectangle']
@@ -697,7 +697,7 @@ def dissolve_boundaries(in_fc, gdb, name):
     g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
     out_kind = shp_kind
     x, y = g.LL
-    g0 = dissolve(g, asGeo=True)
+    g0 = union_adj(g, asGeo=True)
     tweet("g0")
     # g0 = arrays_to_Geo(g0, kind=2, info="extent")
     g0 = g0.translate(dx=x, dy=y)
@@ -889,8 +889,8 @@ def pick_tool(tool, in_fc, out_fc, gdb, name):
         dX = float(sys.argv[4])
         dY = float(sys.argv[5])
         shifter(in_fc, gdb, name, dX=dX, dY=dY)
-    elif tool == 'Dissolve Boundaries':
-        dissolve_boundaries(in_fc, gdb, name)
+    # elif tool == 'Dissolve Boundaries':
+    #     dissolve_boundaries(in_fc, gdb, name)
     #
     # ---- Triangulation
     elif tool == 'Delaunay':                     # ---- (1) Delaunay
