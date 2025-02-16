@@ -135,3 +135,7 @@ See the **geonumeracy** repository for more examples of numpy geometry functions
 - [Don't believe what you see](https://community.esri.com/blogs/dan_patterson/2019/05/09/geometry-dont-believe-what-you-see-6)
 - [Geometry: forms of the same feature](https://community.esri.com/t5/python-blog/geometry-forms-of-the-same-feature-7/ba-p/902680)
 
+*2018*
+
+- [Minimum area bounding ellipse](https://community.esri.com/t5/python-blog/minimum-area-bounding-ellipses-containers-for/ba-p/902600)
+
