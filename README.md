@@ -75,6 +75,12 @@ See the **geonumeracy** repository for more examples of numpy geometry functions
 --------------
 **Some links**
 
+*2025*
+
+- [Polygon intersections](https://community.esri.com/t5/python-blog/polygon-intersections/ba-p/1585839)
+- [Intersections](https://community.esri.com/t5/python-blog/intersections/ba-p/1585828)
+
+
 *2024*
 
 - [Finding irregular patterns in data](https://community.esri.com/t5/python-blog/finding-irregular-patterns-in-data-numpy-snippets/ba-p/1549306)
