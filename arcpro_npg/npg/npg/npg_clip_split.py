@@ -309,6 +309,7 @@ def clip_poly(poly, clp, as_geo=False):
     # out, final = clip_poly(E, d0_)
     # out, final = clip_poly(pl_, cl_)
     # out, final = clip_poly(p00, c00)
+    # doesn't work with C, A or A, C
 
 
 # ---- (2) split polygon
@@ -347,9 +348,9 @@ def split_poly(poly, line):
         a1_new = _del_seq_pnts_(np.concatenate((a1_new), axis=0), poly=False)
         # account for multiple points on intersection line, but start and
         # end must intersect the line
-        w = np.nonzero((a1_new[:, None] == x_pnts).all(-1).any(-1))[0]
-        w = np.sort(w)  # sort just in case
-        a1_new = a1_new[w[0]: w[1] + 1]  # slice just in case
+        # w = np.nonzero((a1_new[:, None] == x_pnts).all(-1).any(-1))[0]
+        # w = np.sort(w)  # sort just in case
+        # a1_new = a1_new[w[0]: w[1] + 1]  # slice just in case
         return x_pnts, a0_new, a1_new  # a0, a1, args
     #
     # -- (1) Prepare for splitting

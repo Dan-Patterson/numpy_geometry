@@ -1727,6 +1727,8 @@ def arrays_to_Geo(in_arrays, kind=2, info=None, to_origin=False):
     a_2d, ift, extent = array_IFT(in_arrays,
                                   kind=kind,
                                   shift_to_origin=to_origin)
+    a_2d[:, 0] = np.round(a_2d[:, 0], 3)  # -- added round 2024-12-04
+    a_2d[:, 1] = np.round(a_2d[:, 1], 3)
     a_2d = a_2d.astype(np.float64)  # see Notes
     rows, cols = ift.shape
     z0 = np.full((rows, 6), fill_value=-1, dtype=ift.dtype)

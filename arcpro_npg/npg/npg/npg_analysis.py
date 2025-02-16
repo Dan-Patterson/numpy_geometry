@@ -455,6 +455,13 @@ def mst(arr, calc_dist=True):
     Returns
     -------
     pairs - the pair of nodes that form the edges.
+    fr_to - the id values from `arr` that form the mst
+
+    Notes
+    -----
+    To plot the results you can use::
+
+        plot_mst(arr, pairs)
 
     Example
     -------

@@ -18,7 +18,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2023-10-09
+    2024-12-13
 
 Purpose
 -------
@@ -399,19 +399,23 @@ def plot_3d(a):
     fig.set_figheight = 8
     fig.set_figwidth = 8
     fig.dpi = 200
-    ax = Axes3D(fig)  # old  #ax = fig.gca(projection='3d')
+    # ax = Axes3D(fig)  # old  #ax = fig.gca(projection='3d')
+    ax = fig.add_subplot(projection='3d')
     #
     x = a[:, 0]
     y = a[:, 1]
     z = a[:, 2]
-    ax.plot(x, y, z, label='xyz')
+    ax.scatter(x, y, z, s=10, marker='.')  # 'o'
+    ax.plot(x, y, z, label='xyz', linestyle='solid')
+    # ax.plot(x, y, z, label='xyz', linestyle='solid')
     ax.legend()
     # plt.tight_layout(pad=0.2, h_pad=0.1, w_pad=0.1)
     plt.show()
+    return plt
 
 
 def plot_polygons(arr, outline=True, vertices=True,
-                  labels=True, random_colors=True):
+                  labels=None, random_colors=True):
     """Plot Geo array poly boundaries.
 
     Parameters
@@ -438,13 +442,14 @@ def plot_polygons(arr, outline=True, vertices=True,
         X, Y = p[:, 0], p[:, 1]
         plt.plot(X, Y, color='black', linestyle='solid', linewidth=1)
 
-    def _label_pnts(pnts, plt, color_='black', offx=2, offy=2):
+    def _label_pnts(pnts, lbl, plt, color_='black', offx=2, offy=2):
         """Label the points.
 
         Note: to skips the last label for polygons, use
         zip(lbl[:-1], pnts[:-1, 0], pnts[:-1, 1])  **
         """
-        lbl = np.arange(len(pnts))
+        if lbl is None:
+            lbl = np.arange(len(pnts))
         for label, xpt, ypt in zip(lbl[:], pnts[:, 0], pnts[:, 1]):
             plt.annotate(label, color=color_, xy=(xpt, ypt),
                          xytext=(offx, offy),
@@ -506,10 +511,10 @@ def plot_polygons(arr, outline=True, vertices=True,
     # --
         if vertices:
             _scatter(shape[:-1], plt, size=50, color=colors_[i], marker=".")
-        if labels:
+        if labels is not None:
             ox, oy = lbl_off[i]  # offset point labels
-            _label_pnts(shape[:-1], plt, color_=colors_[i],
-                        offx=ox, offy=oy)
+            _label_pnts(shape, labels, plt, color_=colors_[i],
+                        offx=ox, offy=oy)  # got rid of shape[:-1]
     plt.show()
     return plt
 
@@ -584,6 +589,75 @@ plt.show()
 
 # ----------------------------------------------------------------------------
 # ---- (3) testing section ----
+def plot_polylines(a, title=None):
+    """
+    Plot polylines from point pairs.
+
+    Parameters
+    ----------
+    a : array
+        The array can be an Nx2 array or a list or an object array consisting
+        of point pairs.
+
+    Returns
+    -------
+    None.
+
+    """
+    def _line(p, plt, color):  # , arrow=True):  # , color, marker, linewdth):
+        """Connect the points."""
+        X, Y = p[:, 0], p[:, 1]
+        plt.plot(X, Y, color=color, linestyle='solid', linewidth=1)
+    #
+    if isinstance(a, (list, tuple)):
+        polys = a
+    elif isinstance(a, np.ndarray):
+        if a.dtype.kind == 'O':
+            polys = a
+        elif a.ndim == 2:
+            polys = [a]
+    font1 = {'family': 'sans-serif',
+             'weight': 'bold', 'size': 11}  # 'color': 'black',
+    fig, ax = plt.subplots(1, 1)
+    fig.set_figheight = 8
+    fig.set_figwidth = 8
+    fig.dpi = 200
+    plt.tight_layout(pad=0.2, h_pad=0.1, w_pad=0.1)
+    plt.grid(False)
+    plt.rc('font', **font1)
+    ax.set_aspect('equal', adjustable='box')
+    # scatter_params(plt, fig, ax, title=title, ax_lbls=None)
+    #
+    # plt.scatter(pairs[:, 0, 0], pairs[:, 0, 1])
+    # mid_pnts = []
+    N = len(polys)
+    fac = N // 9 + 1
+    colors = ['black', 'blue', 'green', 'red',
+              'darkgrey', 'darkblue', 'darkred', 'darkgreen', 'grey'] * fac
+    mid_pnts = []
+    for poly in polys:
+        if len(poly) > 2:
+            pair = poly[1:3]
+        else:
+            pair = poly
+        mid_pnts.append(np.average(pair, axis=0))
+        # plt.plot(pair[:, 0], pair[:, 1], marker='o')
+    for cnt, xys in enumerate(polys):
+        color = colors[cnt]
+        _line(xys, plt, color)
+    lbl = np.arange(len(polys))
+    mid_pnts = np.array(mid_pnts)
+    uni, idx, inv, cnts = np.unique(mid_pnts, True, True, True, axis=0)
+    dup_lbl = idx[cnts == 2]
+    # dup_mid = uni[cnts == 2]
+    lbl = lbl[idx]  # mark duplicates assuming only 2 based on sorting
+    lbl = [f"{i},{i + 1}" if i in dup_lbl else str(i) for i in lbl]
+    mid_pnts = mid_pnts[idx]
+    for label, xpt, ypt in list(zip(lbl[:], mid_pnts[:, 0], mid_pnts[:, 1])):
+        plt.annotate(label, xy=(xpt, ypt), size=8, ha='center', va='center')
+    plt.show()
+
+
 def plot_segments(a, title=None):
     """
     Plot line segments from from-to point pairs.
@@ -632,7 +706,15 @@ def plot_segments(a, title=None):
 
 
 def plot_mst(a, pairs):
-    """Plot minimum spanning tree test."""
+    """Plot minimum spanning tree test.
+
+    Parameters
+    ----------
+    a : array of points, (Nx2 as x,y values)
+    pairs : array of from-to pairs (Nx4 as x0, y0, x1, y1)
+        pairs is derived from `mst` in `npg.npg_analysis` which is the minimum
+        spanning tree for `a`
+    """
     fig, ax = plt.subplots(1, 1)
     scatter_params(plt, fig, ax, title="Title", ax_lbls=None)
     plt.scatter(a[:, 0], a[:, 1])

@@ -458,9 +458,6 @@ def Geo_to_fc(geo, gdb=None, name=None, kind=None, SR=None):
     if kind in (None, 0, 1, 2):
         print("\n ``kind`` must be one of Polygon, Polyline or Point.")
         return None
-    #
-    # dx, dy = geo.LL
-    # geo = geo.shift(dx, dy)
     polys = Geo_to_arc_shapes(geo, as_singlepart=True)
     out_name = gdb.replace("\\", "/") + "/" + name
     wkspace = arcpy.env.workspace = r'memory'  # legacy is in_memory
@@ -469,9 +466,9 @@ def Geo_to_fc(geo, gdb=None, name=None, kind=None, SR=None):
         Delete(tmp_name)
     CreateFeatureclass(wkspace, "tmp", kind, spatial_reference=SR)
     AddField("tmp", 'ID_arr', 'LONG')
-    with InsertCursor("tmp", ['SHAPE@', 'ID_arr']) as cur:
+    with InsertCursor("tmp", 'SHAPE@') as cur:
         for row in polys:
-            cur.insertRow(row)
+            cur.insertRow([row])
     CopyFeatures("tmp", out_name)
     return None
 

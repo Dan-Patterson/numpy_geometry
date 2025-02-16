@@ -100,9 +100,10 @@ __helpers__ = [
     '_bit_crossproduct_', '_bit_length_', '_bit_min_max_',
     '_bit_segment_angles_', '_clean_segments_', '_close_pnts_', '_from_north_',
     '_from_to_pnts_', '_from_xaxis_', '_get_base_', '_in_LBRT_', '_in_extent_',
-    '_is_ccw_', '_is_clockwise_', '_is_convex_', '_is_right_side', '_isin_2d_',
-    '_iterate_', '_od_angles_dist_', '_perp_', '_pnts_in_extent_',
-    '_rotate_', '_scale_', '_to_lists_', '_trans_rot_', '_translate_'
+    '_is_ccw_', '_is_clockwise_', '_is_convex_', '_is_right_side',
+    '_is_turn', '_isin_2d_', '_iterate_', '_od_angles_dist_', '_perp_',
+    '_pnts_in_extent_', '_rotate_', '_scale_', '_to_lists_', '_trans_rot_',
+    '_translate_'
     ]
 
 # ---- core bit functions
@@ -249,6 +250,39 @@ def _isin_2d_(a, b, as_integer=False):
     if as_integer:
         return out.astype('int')
     return out.tolist()
+
+
+def _is_turn(p0, p1=None, p2=None, tol=1e-6):
+    """Return whether 3 points create a right, or left turn or straight.
+
+    Parameters
+    ----------
+    p0, p1, p2 : points
+        p0 can be a 3 point array if p1 and p2 are None, otherwise specify
+        values for each point
+    tol : float
+        The tolerance to accommadate floating point errors in calculations.
+
+    Returns
+    -------
+    -1 : right
+     0 : straight
+     1 : left
+
+    Notes
+    -----
+    No error checking.  It is assumed you can provide an array of 3 points or
+    3 single points from an array.  Do any required conversion elsewhere.
+    """
+    if len(p0) == 3:
+        x0, y0, x1, y1, x2, y2 = p0.ravel()
+    elif p1 is not None and p2 is not None:
+        x0, y0, x1, y1, x2, y2 = *p0, *p1, *p2
+    v = (x1 - x0) * (y2 - y0) - (y1 - y0) * (x2 - x0)
+    v = 0 if abs(v) < tol else v
+    # out = True if v < 0 else False
+    out = int(np.sign(v))  # clever use of sign
+    return out
 
 
 def _is_right_side(p, strt, end):
@@ -1085,7 +1119,9 @@ def multi_check(arr):
 # ---- (6) sort coordinates
 #
 def sort_xy(a, x_ascending=True, y_ascending=True, return_order=True):
-    """Sort points by coordinates.
+    """Sort point coordinates lexicographically.
+
+    Return sorted points or just the order.
 
     Parameters
     ----------
@@ -1093,6 +1129,9 @@ def sort_xy(a, x_ascending=True, y_ascending=True, return_order=True):
         Convert lists of points to ndarrays or Geo arrays first.
     x_ascending, y_ascending : boolean
         If False, sort is done in decending order by axis.
+    return_order : boolean
+        True returns the order and not the sorted points.  False returns the
+        sorted points.
     """
     a = _get_base_(a)
     x_s = a[:, 0]

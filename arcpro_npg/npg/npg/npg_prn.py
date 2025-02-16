@@ -19,7 +19,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2023-10-09
+    2025-02-13
 
 Purpose
 -------
@@ -52,7 +52,7 @@ from npg import npg_geom_hlp as n_h
 
 # ---- Keep for now.
 from numpy.lib.recfunctions import structured_to_unstructured as stu
-# from numpy.lib.recfunctions import unstructured_to_structured as uts
+from numpy.lib.recfunctions import unstructured_to_structured as uts  #noqa
 # import npGeo
 # from npGeo import *
 

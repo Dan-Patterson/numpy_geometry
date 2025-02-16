@@ -18,12 +18,29 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2024-10-14
+    2025-01-22
 
 Purpose
 -------
 Functions for boolean operations on polygons:
 
+Notes
+-----
+To determine right turns in arrays::
+
+   zz = [_is_turn(i) for i in npg.stride_2d(cl_n, (3,2))]
+   # [-1, -1, 0, 0, -1, -1, 0, 0, 1, 0, 1, 0, 0, 0, -1, -1, 0, 0, 0]
+   whr = np.nonzero(zz)[0] + 1
+   # array([ 1,  2,  5,  6,  9, 11, 15, 16], dtype=int64)
+   seqs = np.array([[i - 1, i, i + 1] for i in whr])
+   array([[ 0,  1,  2],
+          [ 1,  2,  3],
+          [ 4,  5,  6],
+          [ 5,  6,  7],
+          [ 8,  9, 10],
+          [10, 11, 12],
+          [14, 15, 16],
+          [15, 16, 17]], dtype=int64)
 
 """
 # pylint: disable=C0103,C0302,C0415
@@ -643,12 +660,12 @@ def add_intersections(
     #
     is_0, is_1 = p0_pgon, p1_pgon
     vals = _wn_clip_(p0, p1, all_info=True)
-    x_pnts, pInc, cInp, x_type, whr = vals
+    x_pnts, pInc, cInp, x_type, whr = vals  # x_pnts are by decreasing y-value
     p0_n, p1_n = _add_pnts_(p0, p1, x_pnts, whr)
     p0_n = _del_seq_pnts_(np.concatenate((p0_n), axis=0), poly=is_0)
     p1_n = _del_seq_pnts_(np.concatenate((p1_n), axis=0), poly=is_1)
     # x_pnts = _del_seq_pnts_(x_pnts, False)  # True, if wanting a polygon
-    x_pnts, idx = np.unique(x_pnts, True, axis=0)  # sorted by x
+    x_pnts, idx = np.unique(x_pnts, True, axis=0)  # x_pnts increase by x-value
     # optional lexsort
     # x_lex = np.lexsort((-x_pnts[:, 1], x_pnts[:, 0]))
     # x_pnts = x_pnts[x_lex]
