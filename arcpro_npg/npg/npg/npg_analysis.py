@@ -261,6 +261,13 @@ def _x_sect_2(args):
     >>> npg._x_sect_2(s1)  # (True, [1.25, 1.25])
 
     See npg.geom.intersect for details.  This is a variant for concave hulls.
+
+    Notes
+    -----
+    np.cross for 2D arrays was deprecated in NumPy 2.0 use
+
+    def cross2d(x, y):
+        return x[..., 0] * y[..., 1] - x[..., 1] * y[..., 0]
     """
     if isinstance(args, np.ndarray):
         args = args.tolist()

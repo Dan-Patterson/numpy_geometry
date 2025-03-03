@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2024-07-14
+    2025-02-26
 
 Purpose
 -------
@@ -129,9 +129,12 @@ from scipy.spatial import Delaunay
 
 # import npGeo
 from npg import npGeo, npg_geom_hlp, npg_pip  # noqa
+from npg.npg_helpers import _view_as_struct_
 from npg.npg_geom_hlp import (
-    _get_base_, _bit_area_, _bit_min_max_, _in_extent_, _angles_3pnt_)
+    _angles_3pnt_, _bit_area_, _bit_min_max_, _get_base_, _in_extent_)
 from npg.npg_pip import np_wn
+from npg.npg_prn import prn_q, prn_tbl
+
 
 # np.set_printoptions(
 #     edgeitems=10, linewidth=100, precision=2, suppress=True, threshold=200,
@@ -144,58 +147,63 @@ script = sys.argv[0]  # print this should you need to locate the script
 # -- See script header
 
 __all__ = [
-    'bin_pnts', 'common_extent', 'densify_by_distance', 'densify_by_factor',
-    'eucl_dist', 'extent_to_poly', 'find_closest', 'in_hole_check', 'mabr',
-    'npGeo', 'np_wn', 'offset_buffer', 'on_line_chk', 'pnts_in_pnts',
-    'pnts_on_poly', 'pnts_to_extent', 'polys_to_segments',
-    'polys_to_unique_pnts', 'scale_by_area', 'segments_to_polys', 'simplify',
-    'simplify_lines', 'triangulate_pnts'
+    'on_line_chk',                     # (1a) distance functions
+    'eucl_dist',
+    'dist_array',                      # (1b) distance workflows
+    'find_closest',
+    'pnts_on_poly',
+    'near_analysis',
+    'spyder_diagram',
+    'pnts_to_extent',                  # (2) extent functions
+    'common_extent',
+    'extent_to_poly',
+    'densify_by_factor',               # (3) densify/simplify
+    'densify_by_distance',
+    'simplify',
+    'scale_by_area',                   # (4) buffer, scale
+    'offset_buffer',
+    '_ch_',                            # (5) convex hulls
+    '_ch_scipy_',
+    '_ch_simple_',
+    'mabr',                            # (6) mabr
+    'triangulate_pnts',                # (7) triangulation
+
+    'polys_to_unique_pnts',            # (8) poly* conversion
+    'polys_to_segments',
+    'segments_to_polys',
+    'simplify_lines',
+    'pnts_in_pnts',                    # (9) pnts in, or on, geometries
+    'bin_pnts',                        # Not included yet
+    'in_hole_check',
+    'which_quad'
 ]
 
 __helpers__ = [
-    '_add_pnts_on_line_', '_bit_min_max_', '_ch_', '_ch_scipy_',
-    '_ch_simple_', '_closest_pnt_on_poly_', '_dist_along_', '_e_2d_',
-    '_is_pnt_on_line_', '_percent_along_', '_pnt_on_segment_',
-    'view_as_struct_'
+    '_e_2d_',                          # (1) distance helpers
+    '_dist_along_',
+    '_percent_along_',
+    '_is_pnt_on_line_',
+    '_add_pnts_on_line_',
+    '_pnt_on_segment_',
+    '_closest_pnt_on_poly_',
 ]
 
 __imports__ = [
-    'CH', 'Delaunay', 'npGeo', 'np_wn', 'npg_geom_hlp', 'npg_pip', 'stu',
-    'uts', '_get_base_', '_bit_area_', '_bit_min_max_', '_in_extent_',
+    'CH', 'Delaunay',  # scipy
+    'uts', 'stu',      # np.lib.recfunctions
+    'npGeo',           # npGeo and sub modules
+    'npg_geom_hlp',
+    'npg_pip',
+    'npg.npg_prn'
+    'np_wn',           # npg.npg_pip
+    '_bit_area_',      # npg_geom_hlp
+    '_get_base_',
+    '_bit_min_max_',
+    '_in_extent_',
     '_angles_3pnt_'
+    'prn_q',           # npg.npg_prn
+    'prn_tbl'
 ]
-
-
-# ---- ---------------------------
-# ---- general helpers
-#
-def _view_as_struct_(a, return_all=False):
-    """Key function to get uniform 2d arrays to be viewed as structured arrays.
-
-    A bit of trickery, but it works for all set-like functionality.
-    Use `uts` for more complicated dtypes.
-
-    Parameters
-    ----------
-    a : array
-        Geo array or ndarray to be viewed.
-
-    Returns
-    -------
-    Array view as structured/recarray, with shape = (N, 1)
-
-    References
-    ----------
-    See `unstructured_to_structured` in... numpy/lib/recfunctions.py
-
-    >>> from numpy.lib.recfunctions import unstructured_to_structured as uts
-    """
-    shp = a.shape
-    dt = a.dtype
-    a_view = a.view(dt.descr * shp[1])[..., 0]
-    if return_all:
-        return a_view, shp, dt
-    return a_view
 
 
 # ---- ---------------------------
@@ -206,6 +214,8 @@ def _e_2d_(a, p):
 
     Use to determine distance of a point to a segment or segments.
     """
+    if hasattr(a, 'IFT'):
+        a = a.tolist()
     diff = a - p[None, :]
     return np.sqrt(np.einsum('ij,ij->i', diff, diff))
 
@@ -323,7 +333,7 @@ def _is_pnt_on_line_(start, end, xy, tolerance=0.0):
     return -tolerance <= d <= tolerance
 
 
-def _add_pnts_on_line_(a, spacing=1, is_percent=False):  # densify by distance
+def _add_pnts_on_line_(a, spacing=1, is_percent=False):
     """Add points, at a fixed spacing, to an array representing a line.
 
     **See**  `densify_by_distance` for documentation.
@@ -340,6 +350,7 @@ def _add_pnts_on_line_(a, spacing=1, is_percent=False):  # densify by distance
 
     Notes
     -----
+    densify by distance
     Called by `densify_by_distance`.
 
     """
@@ -359,7 +370,8 @@ def _add_pnts_on_line_(a, spacing=1, is_percent=False):  # densify by distance
         num = np.arange(steps[i])   # the new points
         pnts[i] = np.array((num, num)).T * deltas[i] + a[i]
     a0 = a[-1].reshape(1, -1)       # create the final point and concatenate
-    return np.concatenate((*pnts, a0), axis=0)
+    vals = np.concatenate((*pnts, a0), axis=0)
+    return vals
 
 
 def _pnt_on_segment_(pnt, seg):
@@ -384,7 +396,14 @@ def _pnt_on_segment_(pnt, seg):
 
     Generically, with cross products and norms.
 
+    np.cross for 2D arrays was deprecated in NumPy 2.0 use
+
+    def cross2d(x, y):
+        return x[..., 0] * y[..., 1] - x[..., 1] * y[..., 0]
+
     >>> d = np.linalg.norm(np.cross(p1-p0, p0-p))/np.linalg.norm(p1-p0)
+    >>> # becomes
+    >>> d = np.linalg.norm(cross2d(p1-p0, p0-p))/np.linalg.norm(p1-p0)
     """
     x0, y0, x1, y1, dx, dy = *pnt, *seg[0], *(seg[1] - seg[0])
     dist_ = dx * dx + dy * dy  # squared length
@@ -395,7 +414,7 @@ def _pnt_on_segment_(pnt, seg):
     return xy, np.hypot(d[0], d[1])
 
 
-def _closest_pnt_on_poly_(pnt, poly):
+def _closest_pnt_on_poly_(pnt, poly, azimuth=True):
     """Find closest point location on a polygon/polyline.
 
     See : `pnts_on_poly` for batch running of multiple points to a polygon.
@@ -407,6 +426,12 @@ def _closest_pnt_on_poly_(pnt, poly):
     poly : 2D ndarray array
         A sequence of XY pairs in clockwise order is expected.  The first and
         last points may or may not be duplicates, signifying sequence closure.
+    azimuth : boolean
+        - True, returns angles relative to `North`, clockwise from 0 to 360.
+        - False, returns angles relative to the x-axis.
+
+        x-axis based angles are counterclockwise ranging from -180 to 180 with
+        0 E, 90 N, +/-180 W and -90 S
 
     Requires
     --------
@@ -438,12 +463,14 @@ def _closest_pnt_on_poly_(pnt, poly):
         xy = (np.array([dx, dy]) * u) + [x1, y1]  # noqa
         return xy
 
-    def _line_dir_(orig, dest):
+    def _line_dir_(orig, dest, azimuth):
         """Mini line direction function."""
         orig = np.atleast_2d(orig)
         dest = np.atleast_2d(dest)
         dxy = dest - orig
         ang = np.degrees(np.arctan2(dxy[:, 1], dxy[:, 0]))
+        if azimuth:  # if True, correct to North, otherwise return the angle
+            ang = np.mod((450.0 - ang), 360.)
         return ang
     #
     pnt = np.asarray(pnt)
@@ -465,17 +492,18 @@ def _closest_pnt_on_poly_(pnt, poly):
     d2 = np.linalg.norm(n2 - pnt)
     if d1 <= d2:
         dest = [n1[0], n1[1]]
-        ang = _line_dir_(pnt, dest)
-        ang = np.mod((450.0 - ang), 360.)
+        ang = _line_dir_(pnt, dest, azimuth)  # 2025-02-25 added orientation
         r = (pnt[0], pnt[1], n1[0], n1[1], d1.item(), ang.item())
         return r
     dest = [n2[0], n2[1]]
-    ang = _line_dir_(pnt, dest)
-    ang = np.mod((450.0 - ang), 360.)
+    ang = _line_dir_(pnt, dest, azimuth)  # 2025-02-25 added orientation
     r = (pnt[0], pnt[1], n2[0], n2[1], d2.item(), ang.item())
     return r
 
 
+# ---- ---------------------------
+# ---- (1a) distance functions
+#
 def on_line_chk(start, end, xy, tolerance=1.0e-12):
     """Perform a distance check of whether a point is on a line.
 
@@ -520,21 +548,6 @@ def on_line_chk(start, end, xy, tolerance=1.0e-12):
     return chk, []  # -- not on line
 
 
-def find_closest(a, pnt):
-    """Find the closest point within a Geo array, its index and distance.
-
-    See Also
-    --------
-    `closest_pnt_on_poly` is used for point on poly* features and includes
-    any required projection onto their edges for the new point feature.
-
-    `_pnt_on_segment_` is similar but does point placement.
-    """
-    dist = _e_2d_(a, pnt)
-    idx = np.argmin(dist)
-    return np.asarray(a[idx]), idx, dist[idx]
-
-
 def eucl_dist(a, b, metric='euclidean'):
     """Distance calculation for 1D, 2D and 3D points using einsum.
 
@@ -573,6 +586,244 @@ def eucl_dist(a, b, metric='euclidean'):
         dist_arr = np.sqrt(dist_arr)
     dist_arr = np.squeeze(dist_arr)
     return dist_arr
+
+
+# ---- ---------------------------
+# ---- (1b) distance workflows
+#
+# normally involving:
+#    _closest_pnt_on_poly_
+#    _pnt_on_segment_
+
+def dist_array(a, centroid=True, as_table=True, prn=False):
+    """Centroid to centroid distance for polygons.
+
+    Parameters
+    ----------
+    a : array_like
+        A Geo array
+    centroid : boolean
+        True uses centroids, False uses center values of x,y shape pairs.
+    as_table : boolean
+        return a structured array as a from-to-distance table
+
+    Requires
+    --------
+    - eucl_dist
+    - npg_prn.prn_tbl
+    - npg_prn.prn_q
+
+    Notes
+    -----
+    Centroid use is slower, as is structured table output::
+
+      107 μs : dist_array(a, centroid=False, as_table=False, prn=False)
+      204 μs : dist_array(a, centroid=False, as_table=True, prn=False)
+      521 μs : dist_array(a, centroid=True, as_table=True, prn=False)
+    """
+    if not hasattr(a, 'IFT'):
+        print("\nGeo array required.")
+        return
+    ids = a.IDs
+    if centroid:
+        cents = a.centroids()
+    else:
+        cents = a.centers()
+    dist_arr = eucl_dist(cents, cents, metric='euclidean')  # use `eucl_dist`
+    if as_table:
+        upper_tri = np.triu(dist_arr)
+        f_t_ = np.nonzero(upper_tri)
+        f_t_ = np.array(f_t_).T
+        ft_ids = np.array([ids[i] for i in f_t_])
+        vals = [upper_tri[i, j] for i, j in ft_ids]
+        dt = [('From_id', '<i4'), ('To_id', '<i4'), ('Dist', '<f8')]
+        tbl = np.empty((ft_ids.shape[0],), dtype=dt)
+        tbl['From_id'] = ft_ids[:, 0]
+        tbl['To_id'] = ft_ids[:, 1]
+        tbl['Dist'] = vals
+        if prn:
+            prn_tbl(tbl)  # `npg_prn.prn_tbl` function
+        return tbl
+    if prn:
+        prn_q(dist_arr)  # `npg_prn.prn_q` function
+    return dist_arr
+
+
+def find_closest(a, pnt):
+    """Find the closest point within a Geo array, its index and distance.
+
+    See Also
+    --------
+    `closest_pnt_on_poly` is used for point on poly* features and includes
+    any required projection onto their edges for the new point feature.
+
+    `_pnt_on_segment_` is similar but does point placement.
+    """
+    dist = _e_2d_(a, pnt)
+    idx = np.argmin(dist)
+    return np.asarray(a[idx]), idx, dist[idx]
+
+
+def pnts_on_poly(pnts, poly):
+    """Run multiple `_closest_pnt_on_poly_`."""
+    result = []
+    for p in pnts:
+        result.append(_closest_pnt_on_poly_(p, poly))
+    result = np.asarray(result)
+    dt = [('X0', '<f8'), ('Y0', '<f8'), ('X1', '<f8'), ('Y1', '<f8'),
+          ('Dist', '<f8'), ('Angle', '<f8')]
+    z = np.zeros((len(result),), dtype=dt)
+    names = z.dtype.names
+    for i, n in enumerate(names):
+        z[n] = result[:, i]
+    return z
+
+
+def near_analysis(a, pnts, azimuth=True):
+    """Perform a `near` analysis between polygons and points.
+
+    Parameters
+    ----------
+    a : array_like
+        The polygon arrays.  Normally the outer ring of a geo array.
+    pnts : array_like
+        The pnts of interest to find the `near` distance, direction and
+        location on the polygons.
+    azimuth : boolean
+        - True, returns angles relative to `North`, clockwise from 0 to 360.
+        - False, returns angles relative to the x-axis.
+
+        x-axis based angles are counterclockwise ranging from -180 to 180 with
+        0 E, 90 N, +/-180 W and -90 S
+
+    Returns
+    -------
+    A table of results with spatial parameters and geometry returned.
+
+    See Also
+    --------
+    ` n_near ` in `npg.npg_analysis`  if you are interested in closest-point
+    analysis specifically
+
+    Notes
+    -----
+    For plotting::
+
+        data = [[poly_a.bits, 2, 'red', '.', True ],
+                [pnts_, 0, 'black', 'o', False]]
+
+        plot_mixed(data, title="", invert_y=False, ax_lbls=['X', 'Y'])
+
+    """
+
+    def geo_near(a, pnts):
+        """Near for geo array."""
+        result = []
+        id_pntply = []
+        for cn0, p in enumerate(pnts):
+            z0, idx_, dis_ = find_closest(a, p)  # find the closest polygon
+            w = np.nonzero((a.Fr <= idx_) & (idx_ < a.To))[0][0]  # get the id
+            f_, t_ = a.FT[w]  # Get the from-to ids
+            ply_ = a[f_: t_]  # the bit slice from the geo array == a.bits[w]
+            r = _closest_pnt_on_poly_(p, ply_, azimuth)
+            # r = x0, y0, x1, y1, dis, ang
+            result.append(r)
+            id_pntply.append([cn0, w])
+        return result, id_pntply
+
+    def lists_near(a, pnts):
+        """Near for lists of polys."""
+        result = []
+        id_pntply = []
+        tmp = [0] + [len(i) for i in a]  # need a `0` to start cumsum
+        a_len = np.cumsum(tmp)
+        FT = np.concatenate((a_len[:-1][:, None], a_len[1:][:, None]), axis=1)
+        Fr = FT[:, 0]
+        To = FT[:, 1]
+        A = np.concatenate(a, axis=0)  # concatenate them all
+        for cn0, p in enumerate(pnts):
+            z0, idx_, dis_ = find_closest(A, p)  # find the closest polygon
+            w = np.nonzero((Fr <= idx_) & (idx_ < To))[0][0]  # get the id
+            f_, t_ = FT[w]  # Get the from-to ids
+            ply_ = a[f_: t_]  # the bit slice from the geo array == a.bits[w]
+            r = _closest_pnt_on_poly_(p, ply_, azimuth)
+            result.append(r)
+            id_pntply.append([cn0, w])
+        return result, id_pntply
+    #
+    # --
+    isGeo = True if hasattr(a, 'IFT') else False  # Geo array check
+    #
+    if isGeo:
+        result, id_pntply = geo_near(a, pnts)  # use geo array `near`
+    else:
+        result, id_pntply = lists_near(a, pnts)  # emulate it for lists
+    #
+    zz = np.array(result)  # just make an array out of the results
+    id_pntply = np.array(id_pntply, dtype='int')
+    #
+    dt = [('pntID', '<i4'), ('plyID', '<i4'),
+          ('X0', '<f8'), ('Y0', '<f8'),
+          ('X1', '<f8'), ('Y1', '<f8'),
+          ('Dist', '<f8'), ('Angle', '<f8')]
+    z = np.zeros((len(result),), dtype=dt)
+    names = z.dtype.names
+    z['pntID'] = id_pntply[:, 0]
+    z['plyID'] = id_pntply[:, 1]
+    for i, n in enumerate(names[2:]):
+        z[n] = zz[:, i]
+    # -- use  prn_tbl(z)  to view the results
+    return z, id_pntply
+
+
+def spyder_diagram(pnts, arr, centroid=False):
+    """Create an origin destination diagram from `pnts` to `arr`.
+
+    Parameters
+    ----------
+    pnts : array_like
+        The origin points.
+    arr : array_like
+        The destination geometry.
+        A Geo array or list of lists or arrays.  If this geometry represents
+        poly* features, you can specify whether to use the centroid or the
+        whole shape using the `centroid` parameter.
+    centroid : boolean
+       True, will use the centroid if polygons, other the center if polyline.
+
+    plot_segments(zz[:, :4])
+    """
+    if hasattr(arr, 'IFT'):
+        if arr.K == 2:
+            if centroid:
+                to_geom = arr.centroids()
+            else:
+                to_geom = arr.outer_rings(asGeo=False)
+        elif arr.K == 1:
+            if centroid:
+                to_geom = arr.centers(False)
+        ids = arr.IDs  # geometry ids
+    else:
+        ids = np.arange(0, len(arr))
+    #
+    result = []
+    id_pntply = []
+    for c0, p in enumerate(pnts):
+        sub = []
+        for c1, t_g in enumerate(to_geom):
+            id_pntply.append([c0, ids[c1]])
+            sub.append(_closest_pnt_on_poly_(p, t_g))
+        result.append(np.array(sub))
+    #
+    id_pntply = np.array(id_pntply, dtype='int')
+    zz = np.concatenate(result, axis=0)  # make an array out of the results
+    dt = [('X0', '<f8'), ('Y0', '<f8'), ('X1', '<f8'), ('Y1', '<f8'),
+          ('Dist', '<f8'), ('Angle', '<f8')]
+    spy = np.zeros((zz.shape[0],), dtype=dt)
+    names = spy.dtype.names
+    for i, n in enumerate(names):
+        spy[n] = zz[:, i]
+    return spy
 
 
 # ---- ---------------------------
@@ -677,10 +928,13 @@ def densify_by_factor(a, factor=2):
     c = np.zeros((n, 2))
     c[:, 0] = c0
     c[:, 1] = c1
+    # check for, and remove duplicate end points if it is present.
+    if (c[-2] == c[-1]).all():
+        return c[:-1]
     return c
 
 
-def densify_by_distance(a, spacing):
+def densify_by_distance(a, spacing, asGeo=True):
     r"""Return the wrapper for `pnts_on_line`.
 
     Example
@@ -720,6 +974,8 @@ def densify_by_distance(a, spacing):
 
 def simplify(arr, tol=1e-6):
     """Remove redundant points on a poly perimeter."""
+    if arr.base is not None:
+        arr = arr.base  # get the base of the array
     x1, y1 = arr[:-2].T
     x2, y2 = arr[1:-1].T
     x3, y3 = arr[2:].T
@@ -819,11 +1075,13 @@ def offset_buffer(poly, buff_dist=1, keep_holes=False, asGeo=False):
         bit = np.array(bit)
         for i in range(bit.shape[0] - 1):
             x1, y1, x2, y2 = *bit[i], *bit[i + 1]
-            r = buff_dist / np.hypot(x2 - x1, y2 - y1)
-            vx, vy = (x2 - x1) * r, (y2 - y1) * r
-            pnt0 = (x1 - vy, y1 + vx)
-            pnt1 = (x2 - vy, y2 + vx)
-            ft_.append([pnt0, pnt1])
+            hypot_ = np.hypot(x2 - x1, y2 - y1)
+            if hypot_ != 0.0:
+                r = buff_dist / hypot_
+                vx, vy = (x2 - x1) * r, (y2 - y1) * r
+                pnt0 = (x1 - vy, y1 + vx)
+                pnt1 = (x2 - vy, y2 + vx)
+                ft_.append([pnt0, pnt1])
         f_t = np.array(ft_)
         z = list(zip(f_t[:-1], f_t[1:]))
         z.append([z[-1][-1], z[0][0]])
@@ -871,6 +1129,8 @@ def offset_buffer(poly, buff_dist=1, keep_holes=False, asGeo=False):
                 final.append(b)
         return final
     # --
+    # incorporate the error check
+    # with np.errstate(divide='ignore')
     # Buffer Geo arrays or ndarray
     if npGeo.is_Geo(poly):
         final = _buffer_Geo_(poly, buff_dist, keep_holes)
@@ -1171,21 +1431,6 @@ def pnts_in_pnts(pnts, geo, just_common=True):
             return uniq, common
         return None, common
     return pnts, None
-
-
-def pnts_on_poly(pnts, poly):
-    """Run multiple `_closest_pnt_on_poly_`."""
-    result = []
-    for p in pnts:
-        result.append(_closest_pnt_on_poly_(p, poly))
-    result = np.asarray(result)
-    dt = [('X0', '<f8'), ('Y0', '<f8'), ('X1', '<f8'), ('Y1', '<f8'),
-          ('Dist', '<f8'), ('Angle', '<f8')]
-    z = np.zeros((len(result),), dtype=dt)
-    names = z.dtype.names
-    for i, n in enumerate(names):
-        z[n] = result[:, i]
-    return z
 
 
 # ---- ---------------------------

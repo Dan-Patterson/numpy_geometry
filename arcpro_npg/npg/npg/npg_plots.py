@@ -174,7 +174,7 @@ def subplts(plots=1, by_col=True, max_rc=4):
     return row_col
 
 
-def scatter_params(plt, fig, ax, ax_lbls=None, title=None):
+def scatter_params(plt, fig, ax, title=None, ax_lbls=None, ):
     """Assign default parameters for plots.
 
     Notes

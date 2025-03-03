@@ -12,7 +12,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2023-10-09
+    2025-02-17
 
 Purpose
 -------
@@ -720,7 +720,7 @@ def toolbox_info(t_box):
 
     Notes
     -----
-    t_box = "C:/arcpro_npg/npGeom_32.atbx"
+    t_box = "C:/temp/npGeom_32.atbx"
     """
     def _hdr_(hdr_n):
         """Format the header."""
@@ -749,28 +749,28 @@ def toolbox_info(t_box):
         for k1 in v_keys:
             v1 = v[k1]
             msg += "\n  " + frmt1.format(k1, v1)
-        # for k1 in v_keys:
-        #     pth = "{}/{}".format(t_box, k1)
-        #     t_0 = _utbx.getToolProps(pth, '*')
-        #     tool_keys = list(t_0.keys())
-        #     msg += "\nTools and Properties"
-        #     msg += "\n--Tool : {!s:<}\n--Toolset : {!s:}".format(k1, v[k1])
-            # for k2 in tool_keys:
-            #     if k2 != 'params':
-            #         msg += "  {!s:}  : {!s}\n".format(k2, t_0[k2])
-            #     elif k2 == 'params':
-            #         for i in t_0['params']:
-            #             z1 = [str(j) if j != '' else 'None'
-            #                   for j in [i.name, i.displayName, i.direction,
-            #                   i.datatype, i.parameterType, i.enabled,
-            #                   i.category, i.symbology, i.multiValue]
-            #                   ]
-            #         msg += "--Parameters\n"
-            #         txt = "\n".join(["  {!s:<} : {!s:}".format(*j)
-            #                           for j in list(zip(z0, z1))])
-            #         msg += "parameter"
-            #     else:
-            #         msg += "unknown"
+        for k1 in v_keys:
+            pth = "{}/{}".format(t_box, k1)
+            t_0 = _utbx.getToolProps(pth, '*')
+            tool_keys = list(t_0.keys())
+            msg += "\nTools and Properties"
+            msg += "\n--Tool : {!s:<}\n--Toolset : {!s:}".format(k1, v[k1])
+            for k2 in tool_keys:
+                if k2 != 'params':
+                    msg += "  {!s:}  : {!s}\n".format(k2, t_0[k2])
+                elif k2 == 'params':
+                    for i in t_0['params']:
+                        z1 = [str(j) if j != '' else 'None'
+                              for j in [i.name, i.displayName, i.direction,
+                              i.datatype, i.parameterType, i.enabled,
+                              i.category, i.symbology, i.multiValue]
+                              ]
+                    msg += "--Parameters\n"
+                    txt = "\n".join(["  {!s:<} : {!s:}".format(*j)
+                                      for j in list(zip(z0, z1))])
+                    msg += "parameter"
+                else:
+                    msg += "unknown"
         return msg
 
 # ----------------------------------------------------------------------

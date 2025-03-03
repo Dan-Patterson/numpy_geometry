@@ -28,7 +28,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2024-03-28
+    2025-02-17
 
 Purpose
 -------
@@ -81,7 +81,8 @@ from npg.npg_bool_hlp import p_ints_p
 from npg.npg_bool_ops import union_adj
 # from npg.npg_pip import np_wn
 # import npg_geom_hlp
-from npg.npg_geom_hlp import _to_lists_, _in_LBRT_
+from npg.npg_geom_hlp import _in_LBRT_
+from npg.npg_helpers import _to_lists_
 
 # -- optional imports
 # from numpy.lib.recfunctions import structured_to_unstructured as stu

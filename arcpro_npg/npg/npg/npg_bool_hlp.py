@@ -53,23 +53,37 @@ import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view as swv
 import npg
 from npg.npGeo import roll_arrays
-from npg_geom_hlp import sort_segment_pairs
+from npg.npg_geom_hlp import sort_segment_pairs
 from npg.npg_plots import plot_polygons, plot_2d  # noqa
 
-ft = {"bool": lambda x: repr(x.astype(np.int32)),
-      "float_kind": '{: 6.2f}'.format}
-np.set_printoptions(
-    edgeitems=10, linewidth=120, precision=3, suppress=True, threshold=200,
-    formatter=ft
-)
 
 script = sys.argv[0]
 
-__all__ = ['add_intersections', 'prep_overlay']
-__helpers__ = [
-    '_add_pnts_', 'del_seq_pnts', '_roll_', '_w_', '_wn_clip_', '_node_type_'
+__all__ = [
+    'prep_overlay',                   # (2) prepare for boolean operations
+    'add_intersections',              # (3) add intersection points
+    'segment_intersections',          # (4) segment intersections
+    'find_sequence',                  # (5) sequences
+    'sequences'
 ]
-__imports__ = ['roll_arrays']
+
+__helpers__ = [
+    '_add_pnts_',                      # (1) private helpers
+    'del_seq_pnts',
+    '_roll_',
+    'p_ints_p',
+    '_w_',                             # (2) prepare for boolean operations
+    '_wn_clip_',
+    '_node_type_',
+    'seg_prep_'                        # (4) segment intersections
+]
+__imports__ = [
+    'swv',                      # np.lib.stride_tricks, sliding window view
+    'roll_arrays',              # npGeo
+    'sort_segment_pairs',       # npg_geom_hlp
+    'plot_polygons',            # npg_plots
+    'plot_2d'
+]
 
 
 # ---- ---------------------------
@@ -152,7 +166,7 @@ def _del_seq_pnts_(arr, poly=True):
 
     See Also
     --------
-    `uniq_2d` above, which can be used in situations where you genuine
+    `npg_helpers.uniq_2d` above, which can be used in situations where genuine
     uniqueness is desired.
     """
     # -- like np.unique but not sorted
@@ -249,7 +263,7 @@ def p_ints_p(poly0, poly1):
     a_num = p32_x[:, None] * p02[..., 1] - p32_y[:, None] * p02[..., 0]
     b_num = p10_x * p02[..., 1] - p10_y * p02[..., 0]
     #
-    with np.errstate(all='ignore'):  # divide='ignore', invalid='ignore'):
+    with np.errstate(divide='ignore'):  # all='ignore', invalid='ignore'):
         u_a = a_num / d_nom
         u_b = b_num / d_nom
         z0 = np.logical_and(u_a >= 0., u_a <= 1.)
@@ -349,7 +363,7 @@ def _wn_clip_(pnts, poly, all_info=True):
 
     def _xsect_(a_num, b_num, denom, x1_x0, y1_y0, x0, y0):
         """Return the intersections and their id values."""
-        with np.errstate(all="ignore"):  # ignore all errors
+        with np.errstate(divide='ignore'):  # all='ignore', invalid='ignore'):
             u_a = (a_num / denom) + 0.0
             u_b = (b_num / denom) + 0.0
             z0 = np.logical_and(u_a >= 0., u_a <= 1.)  # np.isfinite(u_a)`
@@ -750,7 +764,7 @@ def _seg_prep_(a, b, all_info=False):
     """
     def _xsect_(a_num, b_num, denom, x1_x0, y1_y0, x0, y0):
         """Return the intersections and their id values."""
-        with np.errstate(all="ignore"):  # ignore all errors
+        with np.errstate(divide='ignore'):  # all='ignore', invalid='ignore'):
             u_a = (a_num / denom) + 0.0
             u_b = (b_num / denom) + 0.0
             z0 = np.logical_and(u_a >= 0., u_a <= 1.)  # np.isfinite(u_a)`
@@ -803,6 +817,7 @@ def segment_intersections(a, b):
     Requires
     --------
     `npg_geom_hlp._sort_segment_pairs`
+
     Notes
     -----
     If the geometry is composed of multi-segments, they are devolved into two
@@ -818,7 +833,7 @@ def segment_intersections(a, b):
 # ---- (5) sequences
 #
 def find_sequence(a, b):
-    """Return the indices of `a` sequence within the array 1d array `b`.
+    """Return the indices of sequence `a` within the 1d array `b`.
 
     Parameters
     ----------
@@ -933,32 +948,6 @@ def sequences(data, stepsize=0):
 # ---- ---------------------------
 # ---- (6) extras
 #
-def prePC(i0_, i1_, cN, j0_, j1_, pN, pinside, cinside):
-    """Determine pre `p` and `c` points."""
-    preP, preC = [], []
-    i1_ = 0 if i1_ in [i1_, cN] else i1_  # clp first/last point check
-    j1_ = 0 if j1_ in [j1_, pN] else j1_  # poly first/last point check
-    #
-    # -- add preceeding pinside points
-    if j0_ > 0 and j1_ < j0_:
-        preP = [m for m in range(j1_, j0_ + 1) if m in pinside]
-    # -- add preceeding cinside points
-    if i0_ > 0 and i1_ < i0_:
-        preC = [m for m in range(i1_, i0_ + 1) if m in cinside]
-    return preP, preC
-
-
-def postPC(inC_0, cN, inP_0, pN, cinside, pinside):
-    """Determine pre `p` and `c` points."""
-    preC, preP = [], []
-    # -- add trailing cinside points
-    if inC_0 != 0:
-        preC = [m for m in range(inC_0, cN + 1) if m in cinside]
-    # -- add trailing pinside points
-    if inP_0 != 0:
-
-        preP = [m for m in range(inP_0, pN + 1) if m in pinside]
-    return preC, preP
 
 
 # ---- ---------------------------

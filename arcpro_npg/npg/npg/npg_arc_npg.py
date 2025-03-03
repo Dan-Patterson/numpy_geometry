@@ -54,7 +54,7 @@ Using da.SearchCursor to project data::
 Convert point array to point featureclass::
 
     # pl_n is a Nx2 numpy array
-    pl_ns = npg.npg_geom_ops._view_as_struct_(pl_n + [300000, 5000000])
+    pl_ns = npg.npg_helpers._view_as_struct_(pl_n + [300000, 5000000])
     SR = r'NAD 1983 CSRS MTM  9'
     fc = r"C:\arcpro_npg\Project_npg\npgeom.gdb\edgy1_allpnts"
     NumPyArrayToFeatureClass(pl_ns, fc, ["f0", "f1"], SR)

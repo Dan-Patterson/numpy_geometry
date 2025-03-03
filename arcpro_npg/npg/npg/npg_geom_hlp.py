@@ -16,7 +16,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2024-11-03
+    2025-02-17
 
 Purpose
 -------
@@ -84,34 +84,73 @@ script = sys.argv[0]  # print this should you need to locate the script
 nums = 'efdgFDGbBhHiIlLqQpP'
 
 # -- See script header
+#
+# ---- __all__, __helpers__
 __imports__ = ['uts', 'prn_tbl']
 
 __all__ = [
-    'a_eq_b', 'cartesian_product', 'coerce2array', 'classify_pnts',
-    'common_pnts', 'compare_geom', 'compare_segments', 'del_seq_dups',
-    'dist_angle_sort', 'flat', 'interweave', 'keep_geom', 'multi_check',
-    'geom_angles', 'project_pnt_to_line', 'radial_sort', 'reclass_ids',
-    'remove_geom', 'segment_angles', 'shape_finder', 'sort_segment_pairs',
-    'sort_xy', 'stride_2d', 'swap_segment_pnts', 'uniq_1d', 'uniq_2d'
-    ]
+    'geom_angles',                     # (4) Geo / bdarray stuff
+    'segment_angles',
+    'a_eq_b',                          # (5) compare, remove, keep geometry
+    'close_pnts',
+    'classify_pnts',
+    'common_pnts',
+    'compare_segments',
+    'compare_geom',
+    'keep_geom',
+    'remove_geom',
+    'del_seq_dups',
+    'multi_check',
+    'sort_xy',                         # (6) sort coordinates
+    'swap_segment_pnts',
+    'sort_segment_pairs',
+    'dist_angle_sort',
+    'radial_sort',
+    'interweave',                      # (7) others functions
+    'shape_finder',
+    'coerce2array',
+    'flat',
+    'project_pnt_to_line',
+    'reclass_ids',
+]
 
 __helpers__ = [
-    '_angles_3pnt_', '_area_centroid_', '_bit_area_', '_bit_check_',
-    '_bit_crossproduct_', '_bit_length_', '_bit_min_max_',
-    '_bit_segment_angles_', '_clean_segments_', '_close_pnts_', '_from_north_',
-    '_from_to_pnts_', '_from_xaxis_', '_get_base_', '_in_LBRT_', '_in_extent_',
-    '_is_ccw_', '_is_clockwise_', '_is_convex_', '_is_right_side',
-    '_is_turn', '_isin_2d_', '_iterate_', '_od_angles_dist_', '_perp_',
-    '_pnts_in_extent_', '_rotate_', '_scale_', '_to_lists_', '_trans_rot_',
-    '_translate_'
-    ]
+    '_get_base_',                      # (1) Geo Helpers
+    '_bit_check_',
+    '_from_to_pnts_',
+    '_is_clockwise_',                  # (2) Condition checking
+    '_is_ccw_',
+    '_is_convex_',
+    '_is_turn',
+    '_is_right_side',
+    '_in_extent_',
+    '_in_LBRT_',
+    '_pnts_in_extent_',
+    '_clean_segments_',                # (3) Geometry helpers
+    '_bit_area_',
+    '_bit_crossproduct_',
+    '_bit_min_max_',
+    '_bit_length_',
+    '_bit_segment_angles_'
+    '_angles_3pnt_',
+    '_area_centroid_',
+    '_from_north_',
+    '_from_xaxis_',
+    '_od_angles_dist_',
+    '_rotate_',
+    '_scale_',
+    '_translate_',
+    '_trans_rot_',
+    '_perp_'
+    # not classes
+    '_iterate_'
+]
 
-# ---- core bit functions
 
 # __all__ = __helpers__ + __all__
-
-
+#
 # ---- ---------------------------
+# ---- core bit functions
 # ---- (1) Geo Helpers
 #
 def _get_base_(a):
@@ -131,6 +170,7 @@ def _bit_check_(a, just_outer=False):
         rings as desired.
     just_outer : boolean
         True, removes holes from the geometry.
+
     """
     if hasattr(a, "IFT"):
         if just_outer:
@@ -167,35 +207,6 @@ def _from_to_pnts_(a, as_pairs=False):
     return np.concatenate((a[:-1], a[1:]), axis=1)
 
 
-def _to_lists_(a, outer_only=True):
-    """Return list or list of lists for a Geo or ndarray.
-
-    Parameters
-    ----------
-    a : array-like
-        Either a Geo array or ndarray.
-    outer_only : boolean
-        True, returns the outer-rings of a Geo array.  False, returns the bit.
-
-    See Also
-    --------
-    `Geo_to_lists`, `Geo_to_arrays` if you want to maintain the potentially
-    nested structure of the geometry.
-    """
-    if hasattr(a, "IFT"):
-        if outer_only:
-            return a.outer_rings(False)  # a.bits
-        return a.bits
-    if isinstance(a, np.ndarray):
-        if a.dtype.kind == 'O':
-            return a
-        if a.ndim == 2:
-            return [a]
-        if a.ndim == 3:
-            return list(a)
-    return a  # a list already
-
-
 # ---- ---------------------------
 # ---- (2) Condition checking
 #
@@ -213,43 +224,6 @@ def _is_convex_(a, is_closed=True):
     """Return whether a polygon is convex."""
     check = _bit_crossproduct_(a, is_closed)  # cross product
     return np.all(check >= 0)
-
-
-def _isin_2d_(a, b, as_integer=False):
-    """Perform a 2d `isin` check for 2 arrays.
-
-    Parameters
-    ----------
-    a, b : arrays
-        The arrays to compare.
-    as_integer : boolean
-        False, returns a list of booleans.  True, returns an integer array
-        which may useful for some operations.
-
-    Example
-    -------
-    >>> a = np.array([[ 5.00,  10.00], [ 5.00,  12.00], [ 6.00,  12.00],
-                      [ 8.00,  12.00], [ 8.00,  11.00], [ 5.00,  10.00]])
-    >>> b = np.array([[ 5.00,  12.00], [ 5.00,  15.00], [ 7.00,  14.00],
-                      [ 6.00,  12.00], [ 5.00,  12.00]])
-    >>> w0 = (a[:, None] == b).all(-1).any(-1)
-    array([0, 1, 1, 0, 0, 0])
-    >>> a[w0]
-    array([[ 5.00,  12.00], [ 6.00,  12.00]])
-    >>> w1 = (b[:, None] == a).all(-1).any(-1)
-    >>> b[w1]
-    array([[ 5.00,  12.00], [ 6.00,  12.00], [ 5.00,  12.00]])
-
-    Reference
-    ---------
-    `<https://stackoverflow.com/a/51352806/6828711>`_.
-    """
-    a = _get_base_(a)
-    b = _get_base_(b)
-    out = (a[:, None] == b).all(-1).any(-1)
-    if as_integer:
-        return out.astype('int')
-    return out.tolist()
 
 
 def _is_turn(p0, p1=None, p2=None, tol=1e-6):
@@ -385,7 +359,9 @@ def _pnts_in_extent_(pnts, extent=None, return_index=False):
         return None
     idx = np.all(np.logical_and(LB < pnts, pnts <= RT), axis=1)
     if return_index:
-        return idx.base
+        if idx.base is not None:
+            return idx.base
+        return idx
     return np.all(idx)
 
 
@@ -409,8 +385,9 @@ def _clean_segments_(a, tol=1e-06):
     - Extraneous points can exist along a segment.
           [[0,0], [2, 2], [5, 5], [7, 7]]  # extra points not needed for line.
     """
-    cross_pr, ba, bc = _bit_crossproduct_(a, extras=True)
-    whr = np.nonzero(np.abs(cross_pr) > tol)[0]
+    cr, ba, bc = _bit_crossproduct_(a, extras=True)
+    # -- avoid duplicating the 1st point (0).
+    whr = [i for i in np.nonzero(np.abs(cr) > tol)[0] if i != 0]
     vals = np.concatenate((a[0][None, :], a[whr], a[-1][None, :]), axis=0)
     return vals
 
@@ -430,14 +407,21 @@ def _bit_area_(a):
 
 
 def _bit_crossproduct_(a, is_closed=True, extras=False):
-    """Cross product.  Used by `is_convex` and `_angles_3pnt_`."""
+    """Cross product.  Used by `is_convex` and `_angles_3pnt_`.
+
+    np.cross for 2D arrays was deprecated in numpy 2.0, use `cross_2d`
+    """
+    def cross2d(x, y):
+        return x[..., 0] * y[..., 1] - x[..., 1] * y[..., 0]
+
     a = _get_base_(a)
     if is_closed:
         if np.allclose(a[0], a[-1]):  # closed loop, remove dupl.
             a = a[:-1]
     ba = a - np.concatenate((a[-1][None, :], a[:-1]), axis=0)
     bc = a - np.concatenate((a[1:], a[0][None, :]), axis=0)
-    cr = np.cross(ba, bc) + 0.0
+    # cr = np.cross(ba, bc) + 0.0  # deprecated
+    cr = cross2d(ba, bc)
     if extras:
         return cr, ba, bc
     return cr
@@ -710,57 +694,6 @@ def _perp_(a):
 # ---- ---------------------------
 # ---- (4) Geo / ndarray stuff
 #
-def uniq_1d(arr):
-    """Return mini `unique` 1D."""
-    mask = np.empty(arr.shape, dtype=np.bool_)
-    mask[:1] = True
-    a_copy = np.sort(arr)
-    mask[1:] = a_copy[1:] != a_copy[:-1]
-    return a_copy[mask]
-
-
-def uniq_2d(arr, return_sorted=False):  # *** keep but slower than unique
-    """Return mini `unique` for 2D coordinates.  Derived from np.unique.
-
-    Notes
-    -----
-    For returning in the original order this is equivalent to::
-
-        u, idx = np.unique(x_pnts, return_index=True, axis=0)
-        x_pnts[np.sort(idx)]
-
-    References
-    ----------
-    `NumPy unique
-    <https://github.com/numpy/numpy/blob/v1.24.0/numpy/lib/
-    arraysetops.py#L138-L320>`_.
-    """
-    def _reshape_uniq_(uniq, dt, shp):
-        n = len(uniq)
-        uniq = uniq.view(dt)
-        uniq = uniq.reshape(n, *shp[1:])
-        uniq = np.moveaxis(uniq, 0, 0)
-        return uniq
-
-    shp = arr.shape
-    dt = arr.dtype
-    st_arr = arr.view(dt.descr * shp[1])
-    ar = st_arr.flatten()
-    if return_sorted:
-        perm = ar.argsort(kind='mergesort')
-        aux = ar[perm]
-    else:  # removed ar.sort()
-        aux = ar
-    mask = np.empty(aux.shape, dtype=np.bool_)
-    mask[:1] = True
-    mask[1:] = aux[1:] != aux[:-1]
-    ret = aux[mask]
-    uniq = _reshape_uniq_(ret, dt, shp)
-    if return_sorted:  # return_index in unique
-        return uniq, perm[mask]
-    return uniq
-
-
 def geom_angles(a, fromNorth=False):
     """Polyline/segment angles.
 
@@ -834,7 +767,7 @@ def a_eq_b(a, b, atol=1.0e-8, rtol=1.0e-5, return_pnts=False):
     return w.squeeze()
 
 
-def _close_pnts_(a, b, tol=.0001, ret_whr=True):
+def close_pnts(a, b, tol=.0001, ret_whr=True):
     """Alternate to `a_eq_b`. Returns indices or common points within `tol`."""
     ba = np.abs(b - a[:, None])
     whr = (ba.sum(axis=-1, keepdims=True) < tol).any(-1)
@@ -1060,16 +993,16 @@ def del_seq_dups(arr, poly=True):
     """
     # -- like np.unique but not sorted
     shp_in, dt_in = arr.shape, arr.dtype
-    # ar = np.ascontiguousarray(ar)
+    # -- view data, reshape to (N,)
     dt = [('f{i}'.format(i=i), dt_in) for i in range(arr.shape[1])]
-    tmp = arr.view(dt).squeeze()  # -- view data and reshape to (N,)
+    tmp = arr.view(dtype=dt, type=np.ndarray).squeeze()
     # -- mask and check for sequential equality.
     mask = np.empty((shp_in[0],), np.bool_)
     mask[0] = True
     mask[1:] = tmp[:-1] != tmp[1:]
     # wh_ = np.nonzero(mask)[0]
     # sub_arrays = np.array_split(arr, wh_[wh_ > 0])
-    tmp = arr[mask]  # -- slice the original array sequentially unique points
+    tmp = arr.base[mask]  # -- slice original array sequentially unique points
     if poly:  # -- polygon source check
         if not (tmp[0] != tmp[-1]).all(-1):
             arr = np.concatenate((tmp, tmp[0, None]), axis=0)
@@ -1219,7 +1152,7 @@ def sort_segment_pairs(a):
 
 
 def dist_angle_sort(a, sort_point=None, close_poly=True):
-    """Return a radial and distance sort of points relative to point.
+    """Return a radial and distance sort of points relative to `sort_point`.
 
     Parameters
     ----------
@@ -1287,7 +1220,7 @@ def radial_sort(a, extent_center=True, close_poly=True, clockwise=True):
 # ---- (7) others functions
 #
 def interweave(arr, as_3d=False):
-    """Weave an arrays to produce from-to pairs.  Returns a copy.
+    """Weave an array to produce from-to pairs.  Returns a copy.
 
      >>> np.array(list(zip(arr[:-1], arr[1:])))  # returns a copy
 
@@ -1303,70 +1236,6 @@ def interweave(arr, as_3d=False):
     if as_3d:
         return fr_to.reshape((-1, 2, 2))  # for ndim=3d
     return fr_to
-
-
-def stride_2d(a, win=(2, 2), stepby=(1, 1)):
-    """Provide a 2D sliding/moving view of an 2D array.
-
-    Parameters
-    ----------
-    a : 2D array
-    win : tuple
-        Window size in terms of rows and columns.
-    stepby : tuple
-        The steps to take in the X and Y direction along the array.
-
-    Notes
-    -----
-    You can ravel a 2D array to facilitate moving from row to row.  See the
-    examples.  Alternately, you can use moving blocks to obtain things like
-    statistical parameters on `raster` data.
-
-    This function is coming in version 1.20 in numpy.lib.stride_tricks.py::
-
-        sliding_window_view(x, window_shape, axis=None, *,
-                            subok=False, writeable=False):
-
-    Example
-    -------
-    Create from-to points::
-
-        # -- produces a `view` and not a copy
-        >>> a = np.array([[0, 1], [2, 3], [4, 5]])
-        >>> stride_2d(a.ravel(), win=(4,), stepby=(2,))
-
-        array([[0, 1, 2, 3],
-               [2, 3, 4, 5]])
-
-        # -- alternatives, but they produce copies
-        >>> np.concatenate((a[:-1], a[1:]), axis=1)
-        >>> np.asarray(list(zip(a[:-1], a[1:])))
-
-        # -- concatenate is faster, with 500 points in `s`.
-        %timeit stride_2d(s.ravel(), win=(4,), stepby=(2,))
-        21.7 µs ± 476 ns per loop (mean ± std. dev. of 7 runs, 10000 loops
-
-        %timeit np.concatenate((s[:-1], s[1:]), axis=1)
-        8.41 µs ± 158 ns per loop (mean ± std. dev. of 7 runs, 100000 loops
-
-    A different stride::
-
-        >>> stride_2d(b, win=(2, 2), stepby=(1, 1))
-        array([[[0, 1],
-                [2, 3]],
-
-               [[2, 3],
-                [4, 5]]])
-
-    """
-    from numpy.lib.stride_tricks import as_strided
-    shp = np.array(a.shape)    # array shape 2D (r, c) or 3D (d, r, c)
-    win_shp = np.array(win)    # window    (4,) (3, 3) or    (1, 3, 3)
-    ss = np.array(stepby)      # step by   (2,) (1, 1) or    (1, 1, 1)
-    newshape = tuple(((shp - win_shp) // ss) + 1) + tuple(win_shp)
-    newstrides = tuple(np.array(a.strides) * ss) + a.strides
-    a_s = as_strided(a, shape=newshape, strides=newstrides, subok=True)
-    return a_s.squeeze()
 
 
 def shape_finder(arr, start=0, prn=False, structured=True):
@@ -1599,48 +1468,6 @@ def reclass_ids(vals=None):
     # args = [dedent(recl_ids.__doc__), a.reshape(-1, 1), final.reshape(-1, 1)]
     # print(dedent(frmt).format(*args))
     return final['Order']  # a, final
-
-
-def cartesian_product(sequences):
-    """Construct an index grid using 1D array_like sequences.
-
-    arrays : array_like
-        At least 2 array_like sequences to form the indices/product.
-
-    Example
-    -------
-    >>> cartesian_product([[0, 1]), [0, 1, 2]])
-    ...array([[0, 0],
-    ...       [0, 1],
-    ...       [0, 2],
-    ...       [1, 0],
-    ...       [1, 1],
-    ...       [1, 2]])
-    >>> cartesian_product([[0], [2, 3], [5, 4]])
-    ...array([[0, 2, 5],
-    ...       [0, 2, 4],
-    ...       [0, 3, 5],
-    ...       [0, 3, 4]])
-
-    Reference
-    ---------
-    `<https://stackoverflow.com/questions/11144513/cartesian-product-of-x-and
-    -y-array-points-into-single-array-of-2d-points>`_.
-    """
-    arrays = [np.array(i) for i in sequences]
-    len_ = len(arrays)
-    dtype = np.result_type(*arrays)
-    arr = np.empty([len(a) for a in arrays] + [len_], dtype=dtype)
-    for i, a in enumerate(np.ix_(*arrays)):
-        arr[..., i] = a
-    return arr.reshape(-1, len_)
-
-
-def _iterate_(N, n):
-    """Return combinations for array lengths."""
-    import itertools
-    combos = itertools.combinations(np.arange(N), n)
-    return list(combos)
 
 
 # ===========================================================================
