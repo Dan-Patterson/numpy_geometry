@@ -16,9 +16,9 @@ Developed in ArcGIS Pro <= 3.4, python <= 3.12 and numpy > 2.0
 
 **NOTE**
 
-arcpy for Pro 3.4 and numpy >= 2.x cannot be used together.
-It may be some time before arcpy is updated to use newer versions of the numpy stack.  
-I will continue to develop the python/numpy side of things but I will no longer support anything requiring numpy (etc) < 2.0
+**arcpy for Pro 3.4 and numpy >= 2.x cannot be used together.**
+**It may be some time before arcpy is updated to use newer versions of the numpy stack.**  
+**I will continue to develop the python/numpy side of things but I will no longer support anything requiring numpy (etc) < 2.0**
 
 These demo scripts and the toolbox show how numpy and arcpy can play nice together and generate geometries that are normally only available at the ArcGIS Pro Advanced level.  The tools are already provided to do this, but less attention is paid to the attributes.
 
