@@ -12,7 +12,13 @@
 
 **New home base for Free Tools**
 
-Developed in ArcGIS Pro <= 3.4, python <= 3.11 and numpy <= 1.24.
+Developed in ArcGIS Pro <= 3.4, python <= 3.12 and numpy > 2.0
+
+**NOTE**
+
+arcpy for Pro 3.4 and numpy >= 2.x cannot be used together.
+It may be some time before arcpy is updated to use newer versions of the numpy stack.  
+I will continue to develop the python/numpy side of things but I will no longer support anything requiring numpy (etc) < 2.0
 
 These demo scripts and the toolbox show how numpy and arcpy can play nice together and generate geometries that are normally only available at the ArcGIS Pro Advanced level.  The tools are already provided to do this, but less attention is paid to the attributes.
 
@@ -52,6 +58,13 @@ a simple conversion of the geometry type, no fancy intersection and overlap stuf
 You get what you pay for, but the widest use is probably the simplest.
 
 ----
+## 2025-03-op update ##
+The big split is done.  I am now working with NumPy > 2.0.  
+
+So Arcgis Pro and arcpy specific functionality will no longer be supported until such time as the required NumPy and related stack packages are met.
+Get your data into array format and you can use geojson as an interchange format if you need to map within Pro.
+
+
 ## 2024-07-29 update ##
 Additions and modifications.  
 
