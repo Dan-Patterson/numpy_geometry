@@ -77,6 +77,7 @@ See the **geonumeracy** repository for more examples of numpy geometry functions
 
 *2025*
 
+- [Buffers revisited](https://community.esri.com/t5/python-blog/buffers-revisited/ba-p/1599281)
 - [Polygon intersections](https://community.esri.com/t5/python-blog/polygon-intersections/ba-p/1585839)
 - [Intersections](https://community.esri.com/t5/python-blog/intersections/ba-p/1585828)
 
