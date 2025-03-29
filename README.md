@@ -77,6 +77,8 @@ See the **geonumeracy** repository for more examples of numpy geometry functions
 
 *2025*
 
+- [Clean polygons boundaries](https://community.esri.com/t5/python-blog/clean-polygons-boundaries/ba-p/1600683)
+- [Einsum in geometry](https://community.esri.com/t5/python-snippets-blog/bg-p/python-snippetsblog-board)
 - [Buffers revisited](https://community.esri.com/t5/python-blog/buffers-revisited/ba-p/1599281)
 - [Polygon intersections](https://community.esri.com/t5/python-blog/polygon-intersections/ba-p/1585839)
 - [Intersections](https://community.esri.com/t5/python-blog/intersections/ba-p/1585828)
