@@ -14,7 +14,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2023-10-09
+    2025-03-04
 
 Purpose
 -------
@@ -86,7 +86,7 @@ import numpy as np
 
 from npg import npg_plots  # noqa
 from npg.npGeo import arrays_to_Geo
-from npg.npg_geom_hlp import _to_lists_
+from npg.npg_helpers import _to_lists_
 from npg.npg_bool_ops import merge_  # noqa
 from npg.npg_plots import plot_mixed, plot_polygons    # noqa # plot_2d, 
 
@@ -479,7 +479,7 @@ def circle_sectors(radius=10,
 
 
 def circ_3p(p, q, r):
-    """Return a three point circle center and radius.
+    """Return a three point circle, center and radius.
 
     A check is made for three points on a line.
     """

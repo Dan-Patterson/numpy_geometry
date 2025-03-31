@@ -21,7 +21,7 @@ Author :
     Dan_Patterson@carleton.ca
 
 Modified :
-    2024-03-18
+    2025-02-25
 
 Purpose
 -------
@@ -76,12 +76,6 @@ FLOATS = np.typecodes['AllFloat']  # np.typecodes.keys() to see all keys
 INTS = np.typecodes['AllInteger']
 NUMS = FLOATS + INTS
 
-
-ft = {'bool': lambda x: repr(x.astype(np.int32)),
-      'float_kind': '{: 6.2f}'.format}
-np.set_printoptions(
-    edgeitems=10, linewidth=160, precision=2, suppress=True,
-    threshold=100, formatter=ft)
 
 __all__ = [
     'dtype_info', 'load_geo', 'load_geo_attr', 'save_geo', 'load_txt',
@@ -366,7 +360,7 @@ def save_txt(a, name="arr.txt", sep=",", dt_hdr=True):
     if a.dtype.names is not None:
         a_names = ", ".join(a.dtype.names)
         hdr = ["", a_names][dt_hdr]  # use "" or names from input array
-    s = np.array(a.tolist(), dtype=np.unicode_)
+    s = np.array(a.tolist(), dtype=np.str_)  # unicode_) for versions < 2.0
     widths = [max([len(i) for i in s[:, j]])
               for j in range(s.shape[1])]
     frmt = sep.join(["%{}s".format(i) for i in widths])

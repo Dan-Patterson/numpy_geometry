@@ -87,13 +87,56 @@ np.set_printoptions(
 script = sys.argv[0]  # print this should you need to locate the script
 
 __all__ = [
-    '_is_right_side', 'crossing_num', 'winding_num', '_partition_', 'np_wn',
-    'pnts_in_Geo'
+    '_is_right_side', '_side_',  'crossing_num', 'winding_num', '_partition_',
+    'np_wn', 'pnts_in_Geo'
 ]
 
 
 # ---- single use helpers
 #
+def _side_(pnts, poly):  # ** not used
+    r"""Return points inside, outside or equal/crossing a convex poly feature.
+
+    Returns
+    -------
+    r       the equation value array
+    in_     the points based on the winding number
+    inside  (r < 0)
+    outside (r > 0)
+    equal_  (r == 0) 
+
+    Notes
+    -----
+    See `_wn_clip_` as another option to return more information.
+
+    >>> `r` == diff_ in _wn_ used in chk3
+    >>> `r` == t_num = a_0 - a_1 ... in previous equations
+    >>> r_lt0 = r < 0, r_gt0 = ~r_lt0, to yield =>  (r_lt0 * -1) - (r_gt0 + 0)
+    >>> (r < 0).all(-1)  # just the boolean locations
+    ... array([0, 0, 1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0])
+    >>> (r < 0).all(-1).nonzero()[0]  # the index numbers
+    ... array([2, 3, 4, 6, 7], dtype=int64)
+    """
+    if pnts.ndim < 2:
+        pnts = np.atleast_2d(pnts)
+    x0, y0 = pnts.T
+    x2, y2 = poly[:-1].T  # poly segment start points
+    x3, y3 = poly[1:].T   # poly segment end points
+    r = (x3 - x2) * (y0[:, None] - y2) - (y3 - y2) * (x0[:, None] - x2)
+    # -- from _wn_, winding numbers for concave/convex poly
+    chk1 = ((y0[:, None] - y2) >= 0.)
+    chk2 = (y0[:, None] < y3)
+    chk3 = np.sign(r).astype(int)
+    pos = (chk1 & chk2 & (chk3 > 0)).sum(axis=1, dtype=int)
+    neg = (~chk1 & ~chk2 & (chk3 < 0)).sum(axis=1, dtype=int)
+    wn_vals = pos - neg
+    in_ = pnts[np.nonzero(wn_vals)]
+    inside = pnts[(r < 0).all(axis=-1)]  # all must be True along row, convex
+    outside = pnts[(r > 0).any(-1)]      # any must be True along row
+    equal_ = pnts[(r == 0).any(-1)]      # ditto
+    return r, in_, inside, outside, equal_
+
+
 def _is_right_side(p, strt, end):
     """Determine if point (p) is `inside` a line segment (strt-->end).
 
@@ -216,6 +259,7 @@ def winding_num(pnts, poly, batch=False):
                 if _is_right_side(p, poly[i - 1], poly[i]) < 0:
                     w -= 1
         return w
+
     if batch:
         w = [cal_w(p, poly) for p in pnts]
         return pnts[np.nonzero(w)], w
@@ -269,7 +313,7 @@ def _partition_(pnts, geo, return_remainder=False):
     return in_pnts
 
 
-def np_wn(pnts, poly, return_winding=False):
+def np_wn(pnts, poly, return_winding=False, extras=False):
     """Return points in polygon using a winding number algorithm in numpy.
 
     Parameters
@@ -288,9 +332,9 @@ def np_wn(pnts, poly, return_winding=False):
 
     Notes
     -----
-    The polygon is represented as from-to pairs (`fr_`, `to_`).  Their x, y
+    The polygon is represented as from-to pairs (`fr_`, `to_`).  Their x,y
     values are obtained by translation and splitting (x0, y0, x1, y1).
-    The input points are processing in a similar fashion (pnts --> x, y).
+    The input points are processed in a similar fashion (pnts --> x, y).
     The `winding number` is determined for all points at once for the given
     polygon.
 
@@ -305,6 +349,15 @@ def np_wn(pnts, poly, return_winding=False):
     >>> out_ = [np_wn(points, poly) for poly in polygons]
     >>> final = np.unique(np.vstack(out_), axis=0)  # points only
 
+    Inclusion checks
+    ----------------
+    on the perimeter is deemed `out`
+        chk1 (y_y0 > 0.0)  changed from >=
+        chk2 np.less is ok
+        chk3 leave
+        pos  leave
+        neg  chk3 <= 0  to keep all points inside poly on edge included
+
     References
     ----------
     `<https://github.com/congma/polygon-inclusion/blob/master/
@@ -314,18 +367,25 @@ def np_wn(pnts, poly, return_winding=False):
     x1, y1 = poly[1:].T   # polygon `to` coordinates
     x, y = pnts.T         # point coordinates
     y_y0 = y[:, None] - y0
+    y_y1 = y[:, None] - y1
     x_x0 = x[:, None] - x0
+    # -- diff = np.sign(np.einsum("ikj, kj -> ij", pnts[:, None], poly[:-1]))
     diff_ = ((x1 - x0) * y_y0 - (y1 - y0) * x_x0) + 0.0  # einsum originally
-    chk1 = (y_y0 >= 0.0)  # -- note this affects top point inclusion! try >
-    chk2 = np.less(y[:, None], y1)  # pnts[:, 1][:, None], poly[1:, 1])
+    chk1 = (y_y0 >= 0.0)  # -- top and bottom point inclusion!   try `>`
+    chk2 = (y_y1 < 0.0)  # was  chk2 = np.less(y[:, None], y1)  try `<`
     chk3 = np.sign(diff_).astype(np.int32)
     pos = (chk1 & chk2 & (chk3 > 0)).sum(axis=1, dtype=int)
-    neg = (~chk1 & ~chk2 & (chk3 < 0)).sum(axis=1, dtype=int)
+    neg = (~chk1 & ~chk2 & (chk3 < 0)).sum(axis=1, dtype=int)  # -- <= ??
     wn = pos - neg
-    out_ = pnts[np.nonzero(wn)]
+    in_ = pnts[np.nonzero(wn)]
+    if extras:
+        eq_ids = np.isin(pnts, poly).all(-1).nonzero()[0]  # equal
+        extra_info = ["equal pnt ids", eq_ids]
     if return_winding:
-        return out_, wn
-    return out_
+        if extras:
+            return in_, wn, extra_info
+        return in_, wn
+    return in_
 
 
 def pnts_in_Geo(pnts, geo, stacked=True):

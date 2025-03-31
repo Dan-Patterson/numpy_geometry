@@ -9,7 +9,7 @@ The Geo class is a subclass of numpy's ndarray.  Properties that are related
 to geometry have been assigned and methods developed to return geometry
 properties.
 
-Modified = "2024-08-01"
+Modified = "2025-03-01"
 
 ----
 
@@ -34,10 +34,13 @@ from npg import npg_geom_hlp, npg_io, npg_prn  # npg_create
 from npg import npg_min_circ as sc  # requires scipy
 
 from npg.npg_geom_hlp import (
-    _angles_3pnt_, _area_centroid_, _bit_area_, _bit_crossproduct_,
+    _area_centroid_, _bit_area_, _bit_crossproduct_,
     _clean_segments_, _bit_min_max_, _bit_length_, _rotate_, geom_angles,
-    uniq_1d
 )
+
+from npg.npg_maths import _angles_3pnt_
+
+from npg.npg_helpers import uniq_1d
 
 from npg.npgDocs import (
     Geo_hlp, shapes_doc, parts_doc, outer_rings_doc, inner_rings_doc,
@@ -48,7 +51,7 @@ from npg.npgDocs import (
 
 np.set_printoptions(
     edgeitems=10, linewidth=120, precision=2, suppress=True, threshold=200,
-    legacy='1.21',
+    legacy='1.25',
     formatter={"bool": lambda x: repr(x.astype(np.int32)),
                "float_kind": '{: 6.2f}'.format}
     )
@@ -62,10 +65,20 @@ NUMS = FLOATS + INTS
 TwoPI = np.pi * 2.0
 
 __all__ = [
-    'Geo', 'roll_coords', 'roll_arrays', 'array_IFT', 'arrays_to_Geo',
-    'Geo_to_arrays', 'Geo_to_lists', '_fill_float_array',
-    'remove_seq_dupl', 'check_geometry', 'is_Geo', 'reindex_shapes',
-    'dirr'
+    'Geo',                             # (1) ... Geo class
+    'roll_coords',                     # (2) Create Geo
+    'roll_arrays',
+    'array_IFT',
+    'arrays_to_Geo',
+    'Geo_to_arrays',                   # (3) Geo to arrays/lists
+    'Geo_to_lists',
+    '_fill_float_array',
+    'remove_seq_dupl',                 # (4) check/fix functions
+    'check_geometry',
+    'clean_polygons',
+    'is_Geo',
+    'reindex_shapes',
+    'dirr'                             # (5) other functions
 ]
 
 
@@ -79,7 +92,6 @@ class Geo(np.ndarray):
     `npg.arrays_to_Geo`, `npg.array_IFT` and `npg.roll_coords`.
     See `npg.npg_arc_npg` and `npg.npg_io` for methods to acquire the ndarrays
     needed from other data sources.
-
     """
 
     __name__ = "npGeo"
@@ -178,9 +190,9 @@ class Geo(np.ndarray):
         self.SVG = getattr(src_arr, 'SVG', None)
         return self
 
-    def __array_wrap__(self, out_arr, context=None):
-        """Wrap it up."""
-        return np.ndarray.__array_wrap__(self, out_arr, context)
+    def __array_wrap__(self, out_arr, context=None, return_scalar=False):
+        """Wrap it up.  return_scalar=... added in numpy 2.0."""
+        return np.ndarray.__array_wrap__(self, out_arr, context, return_scalar)
 
     # ---- End of class definition
     # ----  ----------------------
@@ -1680,7 +1692,8 @@ def array_IFT(in_arrays, kind=2, shift_to_origin=False):
     u, i, cnts = np.unique(ids, True, return_counts=True)
     pnt_nums = np.concatenate([np.arange(i) for i in cnts])
     IFT = np.array(list(zip(ids, frum, too, CL, part, pnt_nums)))
-    extent = np.array([np.min(a_stack, axis=0), np.max(a_stack, axis=0)])
+    extent = np.array([np.min(a_stack, axis=0),
+                       np.max(a_stack, axis=0)], dtype='float')
     if shift_to_origin:
         a_stack = a_stack - extent[0]
     # recheck clockwise values for the array
@@ -1727,9 +1740,10 @@ def arrays_to_Geo(in_arrays, kind=2, info=None, to_origin=False):
     a_2d, ift, extent = array_IFT(in_arrays,
                                   kind=kind,
                                   shift_to_origin=to_origin)
+    a_2d = a_2d.astype(np.float64)  # see Notes
     a_2d[:, 0] = np.round(a_2d[:, 0], 3)  # -- added round 2024-12-04
     a_2d[:, 1] = np.round(a_2d[:, 1], 3)
-    a_2d = a_2d.astype(np.float64)  # see Notes
+    # a_2d = a_2d.astype(np.float64)  # moved up a few linesround has
     rows, cols = ift.shape
     z0 = np.full((rows, 6), fill_value=-1, dtype=ift.dtype)
     z0[:, :cols] = ift
@@ -1944,6 +1958,9 @@ def check_geometry(g):
         """Counterclockwise.  Used by `check_geometry."""
         return 0 if _bit_area_(a) > 0. else 1
 
+    if not hasattr(g, 'IFT'):
+        print("\n A Geo array is required, yours is a {}".format(type(g)))
+        return None
     ift = g.IFT
     c0 = g.To[-1]
     c1 = g.shape
@@ -1978,6 +1995,8 @@ def clean_polygons(g, tol=1e-06, asGeo=True):
     if hasattr(g, "IFT"):
         g = g.bits
         K = g.K
+    elif isinstance(g, np.ndarray):
+        g = [g]
     out = [_clean_segments_(a, tol=1e-06) for a in g]
     if asGeo:
         return arrays_to_Geo(out, K, info='clean polygons', to_origin=False)

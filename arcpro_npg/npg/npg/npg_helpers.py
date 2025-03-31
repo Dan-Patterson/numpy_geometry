@@ -36,17 +36,13 @@ import npg  # noqa
 script = sys.argv[0]
 
 __all__ = [
-    'cross2d',                         # (2) main functions
-    'cartesian_product',
+    'cartesian_product',               # (2) main functions
     'remove_seq_dupl',
-    'running_count',
     'separate_string_number',
     'sequences',
     'stride_2d',
     'uniq_1d',
     'uniq_2d',
-    'n_largest',                       # (3) size-based functions
-    'n_smallest',
     'flatten',
     'unpack'
 ]
@@ -177,14 +173,6 @@ def _view_as_struct_(a, return_all=False):
 # ---- (2) main functions
 #
 #
-def cross2d(x, y):
-    """Replace `np.cross` with this for 2D vectors (deprecated in NumPy 2.0).
-
-    x, y : array_like
-        2D vectors
-    """
-    return x[..., 0] * y[..., 1] - x[..., 1] * y[..., 0]
-
 
 def cartesian_product(sequences):
     """Construct an index grid using 1D array_like sequences.
@@ -235,60 +223,6 @@ def remove_seq_dupl(a):
     uni = np.ascontiguousarray(uni)
     return uni
 
-
-def running_count(a, to_label=False):
-    """Perform a running count on a 1D array.
-
-    The order number of the value in the sequence is returned.
-
-    Parameters
-    ----------
-    a : array
-        1D array of values, int, float or string
-    to_label : boolean
-        Return the output as a concatenated string of value-sequence numbers if
-        True, or if False, return a structured array with a specified dtype.
-
-    Examples
-    --------
-    >>> a = np.random.randint(1, 10, 10)
-    >>> #  [3, 5, 7, 5, 9, 2, 2, 2, 6, 4] #
-    >>> running_count(a, False)
-    array([(3, 1), (5, 1), (7, 1), (5, 2), (9, 1), (2, 1), (2, 2),
-           (2, 3), (6, 1), (4, 1)],
-          dtype=[('Value', '<i4'), ('Count', '<i4')])
-    >>> running_count(a, True)
-    array(['3_001', '5_001', '7_001', '5_002', '9_001', '2_001', '2_002',
-           '2_003', '6_001', '4_001'],
-          dtype='<U5')
-
-    >>> b = np.array(list("zabcaabbdedbz"))
-    >>> #  ['z', 'a', 'b', 'c', 'a', 'a', 'b', 'b', 'd', 'e', 'd','b', 'z'] #
-    >>> running_count(b, False)
-    array([('z', 1), ('a', 1), ('b', 1), ('c', 1), ('a', 2), ('a', 3),
-           ('b', 2), ('b', 3), ('d', 1), ('e', 1), ('d', 2), ('b', 4),
-           ('z', 2)], dtype=[('Value', '<U1'), ('Count', '<i4')])
-    >>> running_count(b, True)
-    array(['z_001', 'a_001', 'b_001', 'c_001', 'a_002', 'a_003', 'b_002',
-           'b_003', 'd_001', 'e_001', 'd_002', 'b_004', 'z_002'], dtype='<U5')
-    """
-    dt = [('Value', a.dtype.str), ('Count', '<i4')]
-    N = a.shape[0]  # used for padding
-    z = np.zeros((N,), dtype=dt)
-    idx = a.argsort(kind='mergesort')
-    s_a = a[idx]
-    neq = np.where(s_a[1:] != s_a[:-1])[0] + 1
-    run = np.ones(a.shape, int)
-    run[neq[0]] -= neq[0]
-    run[neq[1:]] -= np.diff(neq)
-    out = np.empty_like(run)
-    out[idx] = run.cumsum()
-    z['Value'] = a
-    z['Count'] = out
-    if to_label:
-        pad = int(round(np.log10(N)))
-        z = np.array(["{}_{:0>{}}".format(*i, pad) for i in list(zip(a, out))])
-    return z
 
 
 def separate_string_number(string, as_list=False):
@@ -520,53 +454,6 @@ def uniq_2d(arr, return_sorted=False):  # *** keep but slower than unique
     if return_sorted:  # return_index in unique
         return uniq, perm[mask]
     return uniq
-
-
-# ---- (3) size-based .... n largest, n_smallest
-#
-def n_largest(a, num=1, col_sort=True):
-    """Return the`num` largest entries in an array.
-
-    The results are either:
-        - by row, sorted by column
-        - by column, sorted by row
-
-    Parameters
-    ----------
-    a : ndarray
-        Array dimensions <=3 supported
-    num : integer
-        The number of elements to return
-    col_sort : boolean
-        True to determine by column.
-    """
-    assert a.ndim <= 2, "Only arrays with ndim <=2 supported"
-    num = min(num, a.shape[-1])
-    _axis_ = 0 if col_sort else 1
-    if a.ndim == 1:
-        b = np.sort(a)[-num:]
-    elif a.ndim == 2:
-        b = np.sort(a, axis=_axis_)[-num:]
-    else:
-        return None
-    return b
-
-
-def n_smallest(a, num=1, col_sort=True):
-    """Return the `num` smallest entries in an array.
-
-    see `n_largest` for parameter description
-    """
-    assert a.ndim <= 3, "Only arrays with ndim <=3 supported"
-    num = min(num, a.shape[-1])
-    _axis_ = 0 if col_sort else 1
-    if a.ndim == 1:
-        b = np.sort(a)[:num]
-    elif a.ndim == 2:
-        b = np.sort(a, axis=_axis_)[:num]
-    else:
-        return None
-    return b
 
 
 def flatten(a_list, flat_list=None):

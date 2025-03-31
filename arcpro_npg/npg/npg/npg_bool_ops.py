@@ -1073,16 +1073,11 @@ def polygon_overlay(ply_a, ply_b):
     #
     # works for
     #
-    # (p00, c00), (c00, p00) : wrap_ code : one_overlay_ :
-    #                                     : 2 x_pnts on line
-    # (p00, c01), (c01, p00) : wrap_ code :
-    #                                     : 2 x_pnts, cuts go out and in
-    # (p00, c02), (c02, p00) : wrap_ code :
-    #                                     : 4 x_pnts, double in/out cuts
-    # (p00, c03), (c03, p00) : wrap_ code :
-    #                                     : 4 x_pnts, extra point on line
-    # (p01, c00), (c00, p01) : wrap_ code :
-    #                                     : 4 x_pnts, v-intersection
+    # (p00, c00), (c00, p00) : wrap_ code : one_overlay_ :2 x_pnts on line
+    # (p00, c01), (c01, p00) : wrap_ code : 2 x_pnts, cuts go out and in
+    # (p00, c02), (c02, p00) : wrap_ code : 4 x_pnts, double in/out cuts
+    # (p00, c03), (c03, p00) : wrap_ code : 4 x_pnts, extra point on line
+    # (p01, c00), (c00, p01) : wrap_ code : 4 x_pnts, v-intersection
     # (p01, c01), (c01, p01) : wrap_ code :
     # (p01, c02), (c02, p01) : wrap_ code :
     # (p01, c03), (c03, p01) : wrap_ code :
@@ -1094,9 +1089,10 @@ def polygon_overlay(ply_a, ply_b):
     # (p03, c01), (c01, p03) : wrap_ code : one_overlay_
     # (p03, c02), (c02, p03) : wrap_ code : one_overlay_
     # (p03, c03), (c03, p03) : wrap_ code : one_overlay_
-    # (pl_, cl_)             : wrap_ code
-    # (edgy1, eclip)         : wrap_ code
+    # (pl_, cl_)             : wrap_ code :
+    # (edgy1, eclip)         : wrap_ code :
     # (B, K), (K, B)         : wrap_ code : _in_out_on_
+    # (d0_, d1_)             : wrap_ code : or nx_overlay
 
     # (A, C), (C, A) : used _in_out_   or nx_overlay
     # last worked above

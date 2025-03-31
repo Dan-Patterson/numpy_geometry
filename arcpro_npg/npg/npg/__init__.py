@@ -20,7 +20,7 @@ Author :
 - Dan_Patterson@carleton.ca
 - https://github.com/Dan-Patterson
 
-Modified : 2024-05-04
+Modified : 2025-03-11
     Creation date during 2019 as part of ``arraytools``.
 
 Purpose
@@ -94,9 +94,9 @@ import numpy as np
 # ---- import for npg
 # import npg
 
-from . import npgDocs, npGeo, npg_geom_hlp, npg_geom_ops
-from . import npg_bool_hlp, npg_bool_ops
-from . import npg_min_circ, npg_overlay, npg_analysis
+from . import npgDocs, npGeo, npg_geom_hlp, npg_geom_ops, npg_helpers
+from . import npg_bool_hlp, npg_bool_ops, npg_buffer
+from . import npg_min_circ, npg_overlay, npg_analysis, npg_maths
 from . import npg_setops, npg_io, npg_table, npg_create, npg_utils
 from . import npg_pip, npg_prn  # noqa
 # --
@@ -106,8 +106,11 @@ from . import npg_pip, npg_prn  # noqa
 from . npGeo import *  # noqa
 from . npg_geom_hlp import *  # noqa
 from . npg_geom_ops import *  # noqa
+from . npg_buffer import *  # noqa
+from . npg_helpers import *  # noqa
 from . npg_bool_hlp import *  # noqa
 from . npg_bool_ops import *  # noqa
+from . npg_maths import *  # noqa
 from . npg_clip_split import clip_poly, split_poly  # noqa
 from . npg_io import *  # noqa
 
@@ -127,8 +130,9 @@ from . npg_io import *  # noqa
 # ---- define __all__
 __all__ = [
     'npgDocs', 'npGeo', 'npg_io', 'npg_geom_ops', 'npg_geom_hlp',
-    'npg_bool_hlp', 'npg_bool_ops',
-    'npg_overlay', 'npg_table', 'npg_create', 'npg_analysis', 'npg_utils',
+    'npg_helpers', 'npg_bool_hlp', 'npg_bool_ops', 'npg_buffer',
+    'npg_overlay',
+    'npg_table', 'npg_create', 'npg_analysis', 'npg_maths', 'npg_utils',
     'npg_setops',  'npg_min_circ'
 ]
 
@@ -144,12 +148,16 @@ __all__.extend(npg_geom_ops.__all__)
 __all__.extend(npg_geom_hlp.__all__)
 __all__.extend(npg_bool_ops.__all__)
 __all__.extend(npg_bool_hlp.__all__)
+__all__.extend(npg_buffer.__all__)
+__all__.extend(npg_maths.__all__)
 __all__.sort()
 
 __helpers__.extend(npg_geom_hlp.__helpers__)
 __helpers__.extend(npg_geom_ops.__helpers__)
 __helpers__.extend(npg_bool_ops.__helpers__)
 __helpers__.extend(npg_bool_hlp.__helpers__)
+__helpers__.extend(npg_buffer.__helpers__)
+__helpers__.extend(npg_maths.__helpers__)
 __helpers__.sort()
 
 """

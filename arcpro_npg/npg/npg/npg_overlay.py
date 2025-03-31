@@ -44,6 +44,10 @@ References
 `Paul Bourke geometry
 <http://paulbourke.net/geometry/pointlineplane/>`_.
 
+`Web link on intersections
+`<https://stackoverflow.com/questions/79409653
+/how-to-efficiently-check-if-two-line-segments-intersect>`_.
+
 **Dissolve**
 
 Folder path::
@@ -99,53 +103,17 @@ script = sys.argv[0]  # print this should you need to locate the script
 
 
 __all__ = [
-    'pnt_segment_info',
     'intersections',
     'intersects',
     'line_crosses', 'in_out_crosses', 'crossings',
     'left_right_pnts', 'line_side', '_line_crossing_'
 ]
-__helpers__ = ['_intersect_', '_adj_within_']
+__helpers__ = ['_intersect_']
 
 
 # ---- ---------------------------
 # ---- (1) helpers/mini functions
 #
-def _adj_within_(a, full=False):
-    """Determine adjacency within a Geo array's outer rings.
-
-    Parameters
-    ----------
-    a : Geo array
-    full : boolean
-        True, returns a full report of the shapes being compared (f_shp, t_shp)
-        and the input point ids.  The common points are returned from t_shp and
-        their point and polygon id values.
-        False, simply returns the adjacent polygon ids (f_shp, t_shp).
-
-    Returns
-    -------
-    Two arrays, the adjacency information and the outer_rings.
-    """
-    out = []
-    ids = a.shp_pnt_ids
-    fr_to = a.FT
-    f_shps = a.IDs
-    arr = a.XY
-    for i, f_t in enumerate(fr_to[:-1]):
-        f_shp = f_shps[i]
-        f, t = f_t
-        w = (arr[f:t][:, None] == arr[t:]).any(0).all(-1)  # .tolist()
-        if np.sum(w) > 0:
-            pnt_shp = ids[t:][w]
-            t_shp = np.unique(pnt_shp[:, 1])  # t_shp = pnt_shp[0][1]
-            if full:
-                common = arr[t:][w]
-                out.append([[f_shp] + t_shp.tolist(), f_t, common, pnt_shp])
-            else:
-                out.append(np.asarray([f_shp] + t_shp.tolist()))
-    return out
-
 
 def _intersect_(p0, p1, p2, p3):
     """Return the intersection of two segments.
@@ -174,6 +142,9 @@ def _intersect_(p0, p1, p2, p3):
 
     `<https://en.wikipedia.org/wiki/Intersection_(Euclidean_geometry)>`_.
 
+    `<https://stackoverflow.com/questions/79409653
+    /how-to-efficiently-check-if-two-line-segments-intersect>`_.
+
     """
     null_pnt = np.array([np.nan, np.nan])
     x0, y0 = p0
@@ -198,30 +169,6 @@ def _intersect_(p0, p1, p2, p3):
     x = x0 + t * p10_x
     y = y0 + t * p10_y
     return (True, np.array([x, y]))
-
-
-def pnt_segment_info(arr):
-    """Return point segmentation information.
-
-    Notes
-    -----
-    p_ids : Nx2 Geo array
-        The first column is the point number and the second column is the
-        feature they belong to.  The point IDs are in the sequence order of
-        the poly feature construction.  This information is used to determine
-        where duplicates occur and to what features they belong.
-    """
-    uni, idx, inv, cnts = np.unique(arr, True, True, True, axis=0)
-    # index = sorted(idx)
-    p_ids = arr.pnt_indices()  # get the point IDs, they will not be sorted
-    out = []
-    uni_cnts = np.unique(cnts).tolist()
-    for i in uni_cnts:
-        sub0 = uni[cnts == i]
-        sub1 = idx[cnts == i]
-        sub2 = p_ids[sub1]
-        out.append([i, sub0, sub1, sub2])
-    return out
 
 
 # ---- ---------------------------
@@ -312,7 +259,7 @@ def intersects(args):
         ln = np.array([[50, -10], [50, 100]])
         print("line {}".format(ln.ravel()))
         for i, j in enumerate(segs):
-            r = intersects(ln, j)
+            r = intersects([ln, j])
             print("{}..{}".format(j.ravel(), r))
         ...
         line [ 50 -10  50 100]
@@ -329,6 +276,10 @@ def intersects(args):
 
     `<https://scicomp.stackexchange.com/questions/8895/vertical-and-horizontal
     -segments-intersection-line-sweep>`_.
+
+    `<https://stackoverflow.com/questions/79409653
+    /how-to-efficiently-check-if-two-line-segments-intersect>`_.
+
     """
     msg = "A list/array representing 4 points required"
     if len(args) == 2:
@@ -454,13 +405,15 @@ def in_out_crosses(*args):
     - -1 end point is inside.
 
     """
-    msg = "\nPass 2, 2-pnt lines or 4 points to the function.\n"
+    msg = "\nPass 2, 2-pnt lines, 4 points or 8 coordinates to the function.\n"
     args = np.asarray(args)
     if np.size(args) == 8:
         if len(args) == 2:  # two lines
             p0, p1, p2, p3 = *args[0], *args[1]
         elif len(args) == 4:  # four points
             p0, p1, p2, p3 = args
+        elif len(args) == 8:
+            p0, p1, p2, p3 = args.reshape(4, 2)
         else:
             print(msg)
             return None
@@ -500,7 +453,7 @@ def crossings(geo, clipper):
         p2, p3 = p2s[j], p3s[j]
         for i in range(n):
             p0, p1 = p0s[i], p1s[i]
-            crosses_.append(intersects(p0, p1, p2, p3))  # this seems to work
+            crosses_.append(intersects([p0, p1, p2, p3]))  # this seems to work
     return crosses_
 
 

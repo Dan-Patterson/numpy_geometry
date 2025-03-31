@@ -54,6 +54,7 @@ from numpy.lib.stride_tricks import sliding_window_view as swv
 import npg
 from npg.npGeo import roll_arrays
 from npg.npg_geom_hlp import sort_segment_pairs
+from npg.npg_pip import np_wn
 from npg.npg_plots import plot_polygons, plot_2d  # noqa
 
 
@@ -263,7 +264,7 @@ def p_ints_p(poly0, poly1):
     a_num = p32_x[:, None] * p02[..., 1] - p32_y[:, None] * p02[..., 0]
     b_num = p10_x * p02[..., 1] - p10_y * p02[..., 0]
     #
-    with np.errstate(divide='ignore'):  # all='ignore', invalid='ignore'):
+    with np.errstate(divide='ignore', invalid='ignore'):  # all='ignore'):
         u_a = a_num / d_nom
         u_b = b_num / d_nom
         z0 = np.logical_and(u_a >= 0., u_a <= 1.)
@@ -310,7 +311,7 @@ def _w_(a, b, all_info=False):
     b_0 = y0_y2 * x1_x0
     b_1 = y1_y0 * x0_x2
     #
-    a_num = (a_0 - a_1) + 0.0  # signed distance diff_ in npg.pip.wn_np
+    a_num = (a_0 - a_1) + 0.0  # signed distance diff_ in npg.pip.np_wn
     b_num = (b_0 - b_1) + 0.0
     #
     # pnts in poly
@@ -363,7 +364,7 @@ def _wn_clip_(pnts, poly, all_info=True):
 
     def _xsect_(a_num, b_num, denom, x1_x0, y1_y0, x0, y0):
         """Return the intersections and their id values."""
-        with np.errstate(divide='ignore'):  # all='ignore', invalid='ignore'):
+        with np.errstate(divide='ignore', invalid='ignore'):  # all='ignore'):
             u_a = (a_num / denom) + 0.0
             u_b = (b_num / denom) + 0.0
             z0 = np.logical_and(u_a >= 0., u_a <= 1.)  # np.isfinite(u_a)`
@@ -627,7 +628,10 @@ def add_intersections(
         p_neq = sorted(list(set(p_ids).difference(set(id_))))
         p_neq = np.array(p_neq)  # convert to array
         z = p0_[p_neq]  # check the points not on, but may be in or out
-        p_w = _w_(z, p1_, False)  # use _w_ from _wn_clip_
+        # -- error if z is only 1 point !!!
+        # p_w = _w_(z, p1_, False)  # original
+        p_w = np_wn(z, p1_, False)  # use _w_ from _wn_clip_
+        #
         p_i = np.nonzero(p_w)[0]
         p_o = np.nonzero(p_w + 1)[0]
         p_in = p_neq[p_i]   # in ids
@@ -764,7 +768,7 @@ def _seg_prep_(a, b, all_info=False):
     """
     def _xsect_(a_num, b_num, denom, x1_x0, y1_y0, x0, y0):
         """Return the intersections and their id values."""
-        with np.errstate(divide='ignore'):  # all='ignore', invalid='ignore'):
+        with np.errstate(divide='ignore', invalid='ignore'):  # all='ignore'
             u_a = (a_num / denom) + 0.0
             u_b = (b_num / denom) + 0.0
             z0 = np.logical_and(u_a >= 0., u_a <= 1.)  # np.isfinite(u_a)`
@@ -798,7 +802,7 @@ def _seg_prep_(a, b, all_info=False):
     b_1 = y1_y0 * x0_x2
     #
     # numerators and denom of determinant
-    a_num = (a_0 - a_1) + 0.0  # signed distance diff_ in npg.pip.wn_np
+    a_num = (a_0 - a_1) + 0.0  # signed distance diff_ in npg.pip.np_wn
     b_num = (b_0 - b_1) + 0.0
     denom = (x1_x0 * y3_y2) - (y1_y0 * x3_x2) + 0.0
     whr, x_pnts = _xsect_(a_num, b_num, denom, x1_x0, y1_y0, x0, y0)

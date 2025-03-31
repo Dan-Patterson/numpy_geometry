@@ -86,6 +86,7 @@ nums = 'efdgFDGbBhHiIlLqQpP'
 # -- See script header
 #
 # ---- __all__, __helpers__
+#
 __imports__ = ['uts', 'prn_tbl']
 
 __all__ = [
@@ -94,6 +95,7 @@ __all__ = [
     'a_eq_b',                          # (5) compare, remove, keep geometry
     'close_pnts',
     'classify_pnts',
+    'pnt_segment_info',
     'common_pnts',
     'compare_segments',
     'compare_geom',
@@ -110,19 +112,18 @@ __all__ = [
     'shape_finder',
     'coerce2array',
     'flat',
-    'project_pnt_to_line',
     'reclass_ids',
 ]
 
 __helpers__ = [
     '_get_base_',                      # (1) Geo Helpers
+    '_adj_within_',
     '_bit_check_',
     '_from_to_pnts_',
     '_is_clockwise_',                  # (2) Condition checking
     '_is_ccw_',
     '_is_convex_',
     '_is_turn',
-    '_is_right_side',
     '_in_extent_',
     '_in_LBRT_',
     '_pnts_in_extent_',
@@ -132,10 +133,11 @@ __helpers__ = [
     '_bit_min_max_',
     '_bit_length_',
     '_bit_segment_angles_'
+    '_angle_between_',
     '_angles_3pnt_',
     '_area_centroid_',
-    '_from_north_',
-    '_from_xaxis_',
+    '_angles_from_north_',
+    '_angles_from_xaxis_',
     '_od_angles_dist_',
     '_rotate_',
     '_scale_',
@@ -153,11 +155,71 @@ __helpers__ = [
 # ---- core bit functions
 # ---- (1) Geo Helpers
 #
+def _clean_segments_(a, tol=1e-06):
+    """Remove overlaps and extra points on poly* segments. In `npg_geom_hlp`.
+
+    Parameters
+    ----------
+    a : array
+        The input array or a bit from a Geo array.
+    tol : float
+        The tolerance for determining whether a point deviates from a line.
+
+    Notes
+    -----
+    - Segments along a straight line can overlap (a construction error).
+          [[0,0], [5, 5], [2, 2], [7, 7]]  # points out of order
+    - Extraneous points can exist along a segment.
+          [[0,0], [2, 2], [5, 5], [7, 7]]  # extra points not needed for line.
+    """
+    cr, ba, bc = _bit_crossproduct_(a, extras=True)
+    # -- avoid duplicating the 1st point (0).
+    whr = [i for i in np.nonzero(np.abs(cr) > tol)[0] if i != 0]
+    vals = np.concatenate((a[0][None, :], a[whr], a[-1][None, :]), axis=0)
+    return vals
+
+
 def _get_base_(a):
     """Return the base array of a Geo array.  Shave off microseconds."""
     if hasattr(a, "IFT"):
         return a.XY
     return a
+
+
+def _adj_within_(a, full=False):
+    """Determine adjacency within a Geo array's outer rings.
+
+    Parameters
+    ----------
+    a : Geo array
+    full : boolean
+        True, returns a full report of the shapes being compared (f_shp, t_shp)
+        and the input point ids.  The common points are returned from t_shp and
+        their point and polygon id values.
+        False, simply returns the adjacent polygon ids (f_shp, t_shp).
+
+    Returns
+    -------
+    Two arrays, the adjacency information and the outer_rings.
+    """
+    out = []
+    ids = a.shp_pnt_ids
+    fr_to = a.FT
+    f_shps = a.IDs
+    arr = a.XY
+    for i, f_t in enumerate(fr_to[:-1]):
+        f_shp = f_shps[i]
+        f, t = f_t
+        w = (arr[f:t][:, None] == arr[t:]).any(0).all(-1)  # .tolist()
+        if np.sum(w) > 0:
+            pnt_shp = ids[t:][w]
+            t_shp = np.unique(pnt_shp[:, 1])  # t_shp = pnt_shp[0][1]
+            if full:
+                common = arr[t:][w]
+                out.append([[f_shp] + t_shp.tolist(), f_t, common, pnt_shp])
+            else:
+                out.append(np.asarray([f_shp] + t_shp.tolist()))
+    return out
 
 
 def _bit_check_(a, just_outer=False):
@@ -209,7 +271,7 @@ def _from_to_pnts_(a, as_pairs=False):
 
 # ---- ---------------------------
 # ---- (2) Condition checking
-#
+# ---- (a) angles, orientation, sidedness
 def _is_clockwise_(a):
     """Return whether the sequence (polygon) is clockwise oriented or not."""
     return 1 if _bit_area_(a) > 0. else 0
@@ -218,12 +280,6 @@ def _is_clockwise_(a):
 def _is_ccw_(a):
     """Counterclockwise."""
     return 0 if _bit_area_(a) > 0. else 1
-
-
-def _is_convex_(a, is_closed=True):
-    """Return whether a polygon is convex."""
-    check = _bit_crossproduct_(a, is_closed)  # cross product
-    return np.all(check >= 0)
 
 
 def _is_turn(p0, p1=None, p2=None, tol=1e-6):
@@ -259,31 +315,14 @@ def _is_turn(p0, p1=None, p2=None, tol=1e-6):
     return out
 
 
-def _is_right_side(p, strt, end):
-    """Determine if a point (p) is `inside` a line segment (strt-->end).
-
-    Parameters
-    ----------
-    p, strt, end : array-like
-        X,Y coordinates of the subject point and the start and end of the line.
-
-    See Also
-    --------
-    line_crosses, in_out_crosses
-
-    Notes
-    -----
-    A point is on the inside (right-side) if `position` is negative.  This
-    assumes polygons are oriented clockwise.
-
-    position = sign((Bx - Ax) * (Y - Ay) - (By - Ay) * (X - Ax))
-
-    So in essence, the reverse of _is_left_side with the outcomes reversed ;).
-    """
-    x, y, x0, y0, x1, y1 = *p, *strt, *end
-    return ((x1 - x0) * (y - y0) - (y1 - y0) * (x - x0)) + 0.0
+def _is_convex_(a, is_closed=True):
+    """Return whether a polygon is convex."""
+    check = _bit_crossproduct_(a, is_closed)  # cross product
+    return np.all(check >= 0)
 
 
+# ---- (b) location, position, shape
+#
 def _in_extent_(pnts, extent):
     """Return points in, or on the line of an extent. See `_in_LBRT_` also.
 
@@ -366,30 +405,113 @@ def _pnts_in_extent_(pnts, extent=None, return_index=False):
 
 
 # ---- ---------------------------
-# ---- (3) Geometry helpers
+# ---- (3) geometry helpers
 #
-def _clean_segments_(a, tol=1e-06):
-    """Remove overlaps and extra points on poly* segments.
 
-    Parameters
-    ----------
-    a : array
-        The input array or a bit from a Geo array.
-    tol : float
-        The tolerance for determining whether a point deviates from a line.
+
+def _angle_between_(p0, cent, p1, in_degrees=False):
+    """Return angle between two vectors emminating from the center.
+
+    Parameter
+    ---------
+    p0, cent, p1 : array_like
+        These are two point coordinates forming an angle p0 -> cent -> p1
 
     Notes
     -----
-    - Segments along a straight line can overlap (a construction error).
-          [[0,0], [5, 5], [2, 2], [7, 7]]  # points out of order
-    - Extraneous points can exist along a segment.
-          [[0,0], [2, 2], [5, 5], [7, 7]]  # extra points not needed for line.
+    The vectors are created from the three points, cent -> p0 and cent -> p1
+    This works::
+
+        a = np.array([[2.,0], [0., 0], [10., 10.]])
+        p0, cent, p1 = a
+        angle_between(p0, cent, p1, in_degrees=False)
+        0.7853981633974485
+        angle_between(p0, cent, p1, in_degrees=True)
+        45.000000000000014
+
+    Note:  use np.degrees(angle).item() to get a python number.
+
+    https://community.esri.com/t5/spatial-data-science
+    -questions/how-to-identify-polygons-with-approximate-right/m-p/752828
+        ba = p1 - p0     p1 is the center
+        bc = p1 - p2
+        cr = np.cross(ba, bc)
+        dt = np.dot(ba, bc)
+        ang = np.arctan2(np.linalg.norm(cr), dt)
     """
-    cr, ba, bc = _bit_crossproduct_(a, extras=True)
-    # -- avoid duplicating the 1st point (0).
-    whr = [i for i in np.nonzero(np.abs(cr) > tol)[0] if i != 0]
-    vals = np.concatenate((a[0][None, :], a[whr], a[-1][None, :]), axis=0)
-    return vals
+    v0 = np.array(p0) - np.array(cent)  # center to p0
+    v1 = np.array(p1) - np.array(cent)  # center to p1
+    angle = np.atan2(np.linalg.det([v0, v1]), np.dot(v0, v1))
+    if in_degrees:
+        angle = np.degrees(angle)
+    return angle
+
+
+def _angles_from_north_(angles):
+    """Convert x-axis based angles to North-based, ergo clockwise.
+
+    Parameters
+    ----------
+    angles : numbers, array-like
+        x-axis based angles are counterclockwise ranging from -180 to 180 with
+        0 E, 90 N, +/-180 W and -90 S
+
+    See Also
+    --------
+    `_angles_from_xaxis_` for discussion.
+    """
+    return np.mod((450.0 - angles), 360.)
+
+
+def _angles_from_xaxis_(angles):
+    """Convert North referenced angles to x-axis based angles.
+
+    Parameters
+    ----------
+    angles : numbers, array-like
+        North-based angles, clockwise 0 to 360 degrees.
+
+    Returns
+    -------
+    Angles relative to the x-axis (-180 - 180) which are counterclockwise.
+
+    Example::
+
+        >>> a = np.arange(180., -180 - 45, -45, dtype=np.float64)
+        >>> a
+        >>> array([ 180., 135., 90., 45., 0., -45., -90., -135., -180.])
+        >>> b = (-a + 90.) % 360.
+        >>> b
+        >>> array([ 270., 315., 0., 45., 90., 135., 180., 225., 270.])
+    """
+    return np.mod(-angles + 90., 360.)
+
+
+def _area_centroid_(a):
+    r"""Calculate area and centroid for a singlepart polygon, `a`.
+
+    This is also used to calculate area and centroid for a Geo array's parts.
+
+    Notes
+    -----
+    For multipart shapes, just use this syntax:
+
+    >>> # rectangle with hole
+    >>> a0 = np.array([[[0., 0.], [0., 10.], [10., 10.], [10., 0.], [0., 0.]],
+                      [[2., 2.], [8., 2.], [8., 8.], [2., 8.], [2., 2.]]])
+    >>> [_area_centroid_(i) for i in a0]
+    >>> [(100.0, array([ 5.00,  5.00])), (-36.0, array([ 5.00,  5.00]))]
+    """
+    a = _get_base_(a)
+    x0, y1 = (a.T)[:, 1:]
+    x1, y0 = (a.T)[:, :-1]
+    e0 = np.einsum('...i,...i->...i', x0, y0)
+    e1 = np.einsum('...i,...i->...i', x1, y1)
+    t = e1 - e0
+    area = np.sum((e0 - e1) * 0.5)
+    x_c = np.sum((x1 + x0) * t, axis=0) / (area * 6.0)
+    y_c = np.sum((y1 + y0) * t, axis=0) / (area * 6.0)
+    return area, np.asarray([-x_c, -y_c])
 
 
 def _bit_area_(a):
@@ -407,9 +529,13 @@ def _bit_area_(a):
 
 
 def _bit_crossproduct_(a, is_closed=True, extras=False):
-    """Cross product.  Used by `is_convex` and `_angles_3pnt_`.
+    """Cross product.
 
-    np.cross for 2D arrays was deprecated in numpy 2.0, use `cross_2d`
+    Used by `is_convex`, `_angles_3pnt_` and `_clean_segments_`.
+
+    .. note::
+
+        np.cross for 2D arrays was deprecated in numpy 2.0, use `cross_2d`
     """
     def cross2d(x, y):
         return x[..., 0] * y[..., 1] - x[..., 1] * y[..., 0]
@@ -445,6 +571,13 @@ def _bit_segment_angles_(a, fromNorth=False):
     """Geo array, object or ndarray segment angles for polygons or polylines.
 
     Used by `segment_angles` and `min_area_rect`.
+
+    Example
+    -------
+    # clockwise oriented connected segments
+    a = np.array([[  2.00,   0.00], [  1.00,   0.00], [  0.00,   1.00]])
+    _bit_segment_angles_(a,False)  # -- array([ 180.00,  135.00])
+    _bit_segment_angles_(a,True)   # -- array([ 270.00,  315.00])
     """
     a = _get_base_(a)
     dxy = a[1:] - a[:-1]
@@ -452,154 +585,6 @@ def _bit_segment_angles_(a, fromNorth=False):
     if fromNorth:
         ang = np.mod((450.0 - ang), 360.)
     return ang
-
-
-def _angles_3pnt_(a, inside=True, in_deg=True):
-    """Worker for Geo `polygon_angles`, `geom_angles` and `min_area_rect`.
-
-    Sequential points, a, b, c for the first bit in a shape, so interior holes
-    are removed in polygons and the first part of a multipart shape is used.
-    Use multipart_to_singlepart if you want to  process that type.
-
-    Parameters
-    ----------
-    inside : boolean
-        True, for interior angles for polygons ordered clockwise.  Equivalent
-        to `right-side` for polylines.
-    in_deg : boolean
-        True for degrees, False for radians.
-
-    Notes
-    -----
-    Sum of interior angles of a polygon with `n` edges::
-
-        (n − 2)π radians or (n − 2) × 180 degrees
-        n = number of unique vertices
-
-    | euler`s formula
-    | number of faces + number of vertices - number of edges = 2
-    | rectangle : 1 + 5 - 4 = 2
-    | triangle  : 1 + 4 - 3 = 2
-    """
-    if np.allclose(a[0], a[-1]):                 # closed loop, remove dupl.
-        a = a[1:]  # a[:-1] 2024-10-20 changes to get 1st angle correct
-    cr, ba, bc = _bit_crossproduct_(a, is_closed=False, extras=True)
-    dt = np.einsum('ij,ij->i', ba, bc)
-    ang = np.arctan2(cr, dt)
-    TwoPI = np.pi * 2.
-    if inside:
-        angles = np.where(ang < 0., ang + TwoPI, ang)
-    else:
-        angles = np.where(ang > 0., TwoPI - ang, ang)
-    if in_deg:
-        angles = np.degrees(angles)
-    return angles
-
-
-def _area_centroid_(a):
-    r"""Calculate area and centroid for a singlepart polygon, `a`.
-
-    This is also used to calculate area and centroid for a Geo array's parts.
-
-    Notes
-    -----
-    For multipart shapes, just use this syntax:
-
-    >>> # rectangle with hole
-    >>> a0 = np.array([[[0., 0.], [0., 10.], [10., 10.], [10., 0.], [0., 0.]],
-                      [[2., 2.], [8., 2.], [8., 8.], [2., 8.], [2., 2.]]])
-    >>> [_area_centroid_(i) for i in a0]
-    >>> [(100.0, array([ 5.00,  5.00])), (-36.0, array([ 5.00,  5.00]))]
-    """
-    a = _get_base_(a)
-    x0, y1 = (a.T)[:, 1:]
-    x1, y0 = (a.T)[:, :-1]
-    e0 = np.einsum('...i,...i->...i', x0, y0)
-    e1 = np.einsum('...i,...i->...i', x1, y1)
-    t = e1 - e0
-    area = np.sum((e0 - e1) * 0.5)
-    x_c = np.sum((x1 + x0) * t, axis=0) / (area * 6.0)
-    y_c = np.sum((y1 + y0) * t, axis=0) / (area * 6.0)
-    return area, np.asarray([-x_c, -y_c])
-
-
-def _from_north_(angles):
-    """Convert x-axis based angles to North-based, ergo clockwise.
-
-    Parameters
-    ----------
-    angles : numbers, array-like
-        x-axis based angles are counterclockwise ranging from -180 to 180 with
-        0 E, 90 N, +/-180 W and -90 S
-
-    See Also
-    --------
-    `_from_xaxis_` for discussion.
-    """
-    return np.mod((450.0 - angles), 360.)
-
-
-def _from_xaxis_(angles):
-    """Convert North referenced angles to x-axis based angles.
-
-    Parameters
-    ----------
-    angles : numbers, array-like
-        North-based angles, clockwise 0 to 360 degrees.
-
-    Returns
-    -------
-    Angles relative to the x-axis (-180 - 180) which are counterclockwise.
-
-    Example::
-
-        >>> a = np.arange(180., -180 - 45, -45, dtype=np.float64)
-        >>> a
-        >>> array([ 180., 135., 90., 45., 0., -45., -90., -135., -180.])
-        >>> b = (-a + 90.) % 360.
-        >>> b
-        >>> array([ 270., 315., 0., 45., 90., 135., 180., 225., 270.])
-    """
-    return np.mod(-angles + 90., 360.)
-
-
-def _od_angles_dist_(arr, is_polygon=True):
-    """Return origin-destination angles and distances.
-
-    Parameters
-    ----------
-    is_polygon : boolean
-        The first and last point are sliced off.  The first point is used
-        as the origin and the last is a duplicate of the first.
-
-    Notes
-    -----
-    The pnts array is rotated to the LL of the extent.  The first point is
-    used as the origin and is sliced off of the remaining list.  If
-    `is_polygon` is True, then the duplicated last point will be removed.
-    """
-    def _e_2d_(a, p):
-        """See npg_helpers `_e_2d_`."""
-        diff = a - p[None, :]
-        return np.sqrt(np.einsum('ij,ij->i', diff, diff))
-
-    def _LL_(arr):
-        """Return the closest point to the lower left of the array."""
-        LL = np.min(arr, axis=0)
-        idx = np.argmin(_e_2d_(arr, LL))
-        return idx
-
-    num = _LL_(arr)
-    min_f = arr[num]
-    arr_ordered = np.concatenate((arr[num:-1], arr[:num], [arr[num]]), axis=0)
-    if is_polygon:
-        arr = arr_ordered[1:-1]
-    else:
-        arr = arr_ordered[1:]
-    dxdy = arr - min_f
-    ang = np.degrees(np.arctan2(dxdy[:, 1], dxdy[:, 0]))
-    dist = _e_2d_(arr, min_f)
-    return arr_ordered, ang, dist
 
 
 def _rotate_(a, R, as_group):
@@ -692,7 +677,7 @@ def _perp_(a):
 
 
 # ---- ---------------------------
-# ---- (4) Geo / ndarray stuff
+# ---- (4) Geo / ndarray functions
 #
 def geom_angles(a, fromNorth=False):
     """Polyline/segment angles.
@@ -727,6 +712,45 @@ def segment_angles(a, fromNorth=False):
     a = _bit_check_(a, just_outer=False)
     ang = [_bit_segment_angles_(i, fromNorth) for i in a]
     return ang
+
+
+def _od_angles_dist_(arr, is_polygon=True):
+    """Return origin-destination angles and distances.
+
+    Parameters
+    ----------
+    is_polygon : boolean
+        The first and last point are sliced off.  The first point is used
+        as the origin and the last is a duplicate of the first.
+
+    Notes
+    -----
+    The pnts array is rotated to the LL of the extent.  The first point is
+    used as the origin and is sliced off of the remaining list.  If
+    `is_polygon` is True, then the duplicated last point will be removed.
+    """
+    def _e_2d_(a, p):
+        """See npg_help `_e_2d_`."""
+        diff = a - p[None, :]
+        return np.sqrt(np.einsum('ij,ij->i', diff, diff))
+
+    def _LL_(arr):
+        """Return the closest point to the lower left of the array."""
+        LL = np.min(arr, axis=0)
+        idx = np.argmin(_e_2d_(arr, LL))
+        return idx
+
+    num = _LL_(arr)
+    min_f = arr[num]
+    arr_ordered = np.concatenate((arr[num:-1], arr[:num], [arr[num]]), axis=0)
+    if is_polygon:
+        arr = arr_ordered[1:-1]
+    else:
+        arr = arr_ordered[1:]
+    dxdy = arr - min_f
+    ang = np.degrees(np.arctan2(dxdy[:, 1], dxdy[:, 0]))
+    dist = _e_2d_(arr, min_f)
+    return arr_ordered, ang, dist
 
 
 # ---- ---------------------------
@@ -809,6 +833,30 @@ def classify_pnts(a):
     eq_2 = np.sort(np.asarray(list(eq_2)))
     gt_2 = np.sort(np.asarray(list(gt_2)))
     return ft, eq_1, eq_2, gt_2  # rem_strt
+
+
+def pnt_segment_info(arr):
+    """Return point segmentation information.
+
+    Notes
+    -----
+    p_ids : Nx2 Geo array
+        The first column is the point number and the second column is the
+        feature they belong to.  The point IDs are in the sequence order of
+        the poly feature construction.  This information is used to determine
+        where duplicates occur and to what features they belong.
+    """
+    uni, idx, inv, cnts = np.unique(arr, True, True, True, axis=0)
+    # index = sorted(idx)
+    p_ids = arr.pnt_indices()  # get the point IDs, they will not be sorted
+    out = []
+    uni_cnts = np.unique(cnts).tolist()
+    for i in uni_cnts:
+        sub0 = uni[cnts == i]
+        sub1 = idx[cnts == i]
+        sub2 = p_ids[sub1]
+        out.append([i, sub0, sub1, sub2])
+    return out
 
 
 def common_pnts(pnts, self, remove_common=True):
@@ -1416,20 +1464,6 @@ def flat(lst):
                     r = r + flat(i)
         return r
     return _flat(lst, [])
-
-
-def project_pnt_to_line(x1, y1, x2, y2, xp, yp):
-    """Project a point on to a line to get the perpendicular location."""
-    x12 = x2 - x1
-    y12 = y2 - y1
-    dotp = x12 * (xp - x1) + y12 * (yp - y1)
-    dot12 = x12 * x12 + y12 * y12
-    if dot12:
-        coeff = dotp / dot12
-        lx = x1 + x12 * coeff
-        ly = y1 + y12 * coeff
-        return lx, ly
-    return None
 
 
 def reclass_ids(vals=None):

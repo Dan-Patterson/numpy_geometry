@@ -130,8 +130,8 @@ from scipy.spatial import Delaunay
 # import npGeo
 from npg import npGeo, npg_geom_hlp, npg_pip  # noqa
 from npg.npg_helpers import _view_as_struct_
-from npg.npg_geom_hlp import (
-    _angles_3pnt_, _bit_area_, _bit_min_max_, _get_base_, _in_extent_)
+from npg.npg_geom_hlp import (_bit_min_max_, _get_base_)
+from npg.npg_maths import _angles_3pnt_
 from npg.npg_pip import np_wn
 from npg.npg_prn import prn_q, prn_tbl
 
@@ -160,14 +160,11 @@ __all__ = [
     'densify_by_factor',               # (3) densify/simplify
     'densify_by_distance',
     'simplify',
-    'scale_by_area',                   # (4) buffer, scale
-    'offset_buffer',
-    '_ch_',                            # (5) convex hulls
+    '_ch_',                            # (4) convex hulls
     '_ch_scipy_',
     '_ch_simple_',
     'mabr',                            # (6) mabr
     'triangulate_pnts',                # (7) triangulation
-
     'polys_to_unique_pnts',            # (8) poly* conversion
     'polys_to_segments',
     'segments_to_polys',
@@ -207,7 +204,7 @@ __imports__ = [
 
 
 # ---- ---------------------------
-# ---- (1) distance helpers
+# ---- (1) helpers
 #
 def _e_2d_(a, p):
     """Array points, `a`,  to point `p`, distance.
@@ -401,9 +398,9 @@ def _pnt_on_segment_(pnt, seg):
     def cross2d(x, y):
         return x[..., 0] * y[..., 1] - x[..., 1] * y[..., 0]
 
-    >>> d = np.linalg.norm(np.cross(p1-p0, p0-p))/np.linalg.norm(p1-p0)
+    >>> d = np.linalg.norm(np.cross(p1 - p0, p0 - p))/np.linalg.norm(p1 - p0)
     >>> # becomes
-    >>> d = np.linalg.norm(cross2d(p1-p0, p0-p))/np.linalg.norm(p1-p0)
+    >>> d = np.linalg.norm(cross2d(p1 - p0, p0 - p))/np.linalg.norm(p1 - p0)
     """
     x0, y0, x1, y1, dx, dy = *pnt, *seg[0], *(seg[1] - seg[0])
     dist_ = dx * dx + dy * dy  # squared length
@@ -502,7 +499,7 @@ def _closest_pnt_on_poly_(pnt, poly, azimuth=True):
 
 
 # ---- ---------------------------
-# ---- (1a) distance functions
+# ---- (2) distance functions
 #
 def on_line_chk(start, end, xy, tolerance=1.0e-12):
     """Perform a distance check of whether a point is on a line.
@@ -576,10 +573,11 @@ def eucl_dist(a, b, metric='euclidean'):
     """
     a = np.atleast_2d(a)
     b = np.atleast_2d(b)
-    if a.ndim >= 2:
-        a = a[:, np.newaxis]  # see old version above
-    if b.ndim > 2:
-        b = b[:, np.newaxis]  # ditto
+    # -- Note subtle difference:  a.ndim >= 2 versus >b.ndim > 2
+    if a.ndim >= 2:  # -- see above
+        a = a[:, np.newaxis]
+    if b.ndim > 2:  # -- see above
+        b = b[:, np.newaxis]
     diff = a - b
     dist_arr = np.einsum('ijk,ijk->ij', diff, diff)
     if metric[:1] == 'e':
@@ -589,7 +587,7 @@ def eucl_dist(a, b, metric='euclidean'):
 
 
 # ---- ---------------------------
-# ---- (1b) distance workflows
+# ---- (3) distance workflows
 #
 # normally involving:
 #    _closest_pnt_on_poly_
@@ -827,7 +825,7 @@ def spyder_diagram(pnts, arr, centroid=False):
 
 
 # ---- ---------------------------
-# ---- (2) extent functions
+# ---- (4) extent functions
 #
 def pnts_to_extent(a, as_pair=False):
     """Return the extent of a geometry. (Left, Bottom, Right, Top).
@@ -898,7 +896,7 @@ def extent_to_poly(extent, kind=2):
 
 
 # ---- ---------------------------
-# ---- (3) densify/simplify
+# ---- (5) densify/simplify
 #
 def densify_by_factor(a, factor=2):
     """Densify a 2D array using np.interp.
@@ -986,164 +984,8 @@ def simplify(arr, tol=1e-6):
     return keep
 
 
-# ---- ---------------------------
-# ---- (4) buffer, scale
-#
-def scale_by_area(poly, factor=1, asGeo=False):
-    """Scale a polygon geometry by its area.
-
-    Parameters
-    ----------
-    a : ndarray
-        A polygon represented by an ndarray.
-    factor : number
-        Positive scaling as an integer or decimal number.
-
-    Requires
-    --------
-    `is_Geo` from npGeo and `_bit_area_` from npg_geom_hlp.
-
-    Notes
-    -----
-    - Translate to the origin of the unique points in the polygon.
-    - Determine the initial area.
-    - Scale the coordinates.
-    - Shift back to the original center.
-    """
-    def _area_scaler_(a, factor):
-        """Do the work."""
-        if factor <= 0.0:
-            return None
-        a = np.array(a)
-        cent = np.mean(np.unique(a, axis=0), axis=0)
-        shifted = a - cent
-        area_ = _bit_area_(shifted)
-        alpha = np.sqrt(factor * area_ / area_)
-        scaled = shifted * [alpha, alpha]
-        return scaled + cent
-    # --
-    if npGeo.is_Geo(poly):
-        if poly.K != 2:
-            print("\n Polygon geo array required.")
-            return None
-        final = [_area_scaler_(a, factor) for a in poly.bits]
-    else:
-        final = _area_scaler_(poly, factor)
-    if asGeo:
-        a_stack, ift, extent = npGeo.array_IFT(final, shift_to_origin=False)
-        return npGeo.Geo(a_stack, IFT=ift, Kind=2, Extent=extent, Info=None)
-    return final
-
-
-def offset_buffer(poly, buff_dist=1, keep_holes=False, asGeo=False):
-    """Buffer singlepart polygons with squared ends.
-
-    Parameters
-    ----------
-    poly : ndarray
-        The poly feature to buffer in the form of an ndarray.
-    buff_dist : number
-        The offset/buffer distance.  Positive for expansion, negative for
-        contraction.
-
-    Returns
-    -------
-    A buffer without rounded corners.
-
-    Notes
-    -----
-    If you want rounded corners, use something else.
-    Singlepart shapes supported with or without holes.
-    """
-    def intersection(p0, p1, p2, p3):
-        """Line intersections."""
-        x1, y1, x2, y2, x3, y3, x4, y4 = *p0, *p1, *p2, *p3
-        dx1, dy1, dx2, dy2 = x2 - x1, y2 - y1, x4 - x3, y4 - y3
-        a = x1 * y2 - x2 * y1
-        b = x3 * y4 - x4 * y3
-        c = dy1 * dx2 - dy2 * dx1
-        if abs(c) > 1e-12:
-            n1 = (a * dx2 - b * dx1) / c
-            n2 = (a * dy2 - b * dy1) / c
-            return (n1, n2)
-        return (x2, y2)
-
-    def _buff_(bit, buff_dist=1):
-        """Offset line."""
-        ft_ = []
-        segs = []
-        bit = np.array(bit)
-        for i in range(bit.shape[0] - 1):
-            x1, y1, x2, y2 = *bit[i], *bit[i + 1]
-            hypot_ = np.hypot(x2 - x1, y2 - y1)
-            if hypot_ != 0.0:
-                r = buff_dist / hypot_
-                vx, vy = (x2 - x1) * r, (y2 - y1) * r
-                pnt0 = (x1 - vy, y1 + vx)
-                pnt1 = (x2 - vy, y2 + vx)
-                ft_.append([pnt0, pnt1])
-        f_t = np.array(ft_)
-        z = list(zip(f_t[:-1], f_t[1:]))
-        z.append([z[-1][-1], z[0][0]])
-        z = np.array(z)
-        for i, j in z:
-            x_tion = intersection(i[0], i[1], j[0], j[1])
-            segs.append(x_tion)  # np.array([i[0], middle]))
-        frst = np.atleast_2d(segs[-1])
-        final = np.concatenate((frst, np.array(segs)), axis=0)
-        return final
-
-    def _buffer_array_(poly, buff_dist):
-        """Perform the buffering."""
-        p0 = poly[:-1]
-        p1 = poly[1:]
-        diff = p1 - p0
-        r = buff_dist / np.sqrt(np.einsum('ij,ij->i', diff, diff))
-        vy_vx = (diff * r[:, None] * [1, -1])[:, ::-1]
-        pnts0 = p0 + vy_vx
-        pnts1 = p1 + vy_vx
-        fr_to = np.concatenate((pnts0, pnts1), axis=1).reshape(-1, 2, 2)
-        z = list(zip(fr_to[:-1], fr_to[1:]))
-        z.append([z[-1][-1], z[0][0]])
-        z = np.array(z)
-        segs = [intersection(i[0], i[1], j[0], j[1]) for i, j in z]
-        frst = np.atleast_2d(segs[-1])
-        return np.concatenate((frst, np.array(segs)), axis=0)
-
-    def _buffer_Geo_(poly, buff_dist, keep_holes):
-        """Move the Geo array buffering separately."""
-        arr = poly.bits
-        cw = poly.CL
-        final = []
-        for i, a in enumerate(arr):
-            if cw[i] == 0 and keep_holes:
-                buff_dist = -buff_dist
-                a = a[::-1]
-                ext = [np.min(a, axis=0), np.max(a, axis=0)]
-                b = _buff_(a, buff_dist)
-                in_check = _in_extent_(b, ext)
-                if in_check:   # print(buff_dist, a, b, in_check)
-                    final.append(b)
-            elif cw[i] == 1:   # print(buff_dist, a, b)
-                b = _buff_(a, buff_dist)
-                final.append(b)
-        return final
-    # --
-    # incorporate the error check
-    # with np.errstate(divide='ignore')
-    # Buffer Geo arrays or ndarray
-    if npGeo.is_Geo(poly):
-        final = _buffer_Geo_(poly, buff_dist, keep_holes)
-    else:
-        final = _buffer_array_(poly, buff_dist)
-    if asGeo:
-        a_stack, ift, extent = npGeo.array_IFT(final, shift_to_origin=False)
-        return npGeo.Geo(a_stack, IFT=ift, Kind=2, Extent=extent, Info=None)
-    return final  # fr_to, z, final
-
-
 # ---- ----------------------------
-# ---- (5) convex hulls
+# ---- (6) convex hulls
 #
 def _ch_scipy_(points):
     """Convex hull using scipy.spatial.ConvexHull.
@@ -1199,7 +1041,7 @@ def _ch_(points, threshold=50):
 
 
 # ---- ---------------------------
-# ---- (6) mabr (min. area bounding rectangle)
+# ---- (7) mabr (min. area bounding rectangle)
 #
 def mabr(polys, p_centers, p_angles):
     """Determine the minimum area bounding rectangle for polygons.
@@ -1263,7 +1105,7 @@ def mabr(polys, p_centers, p_angles):
 
 
 # ---- ---------------------------
-# ---- (7) triangulation, Delaunay helper
+# ---- (8) triangulation, Delaunay helper
 #
 def triangulate_pnts(pnts):
     """Triangulate the points and return the triangles.
@@ -1491,7 +1333,23 @@ def in_hole_check(pnts, geo):
 def which_quad(line):
     """Return the quadrant a vector lies in.
 
-    >>> q = _quad_(line)
+    Notes
+    -----
+    old school refresher::
+
+                 |
+              II |  I
+            -----------
+             III | IV
+                 |
+
+           I       II      III     IV
+    x,y :  (+,+)   (−,+)   (−,−)   (+,−)
+    sin    +       +       -       -
+    cos    +       -       -       +
+    tan    +       -       +       -
+
+    >>> q = which_quad(line)
     >>> if q in [2, 3]:
     >>>     line = line[::-1]
     """

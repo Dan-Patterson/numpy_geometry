@@ -174,7 +174,7 @@ def subplts(plots=1, by_col=True, max_rc=4):
     return row_col
 
 
-def scatter_params(plt, fig, ax, title=None, ax_lbls=None, ):
+def scatter_params(plt, fig, ax, title=None, ax_lbls=None):
     """Assign default parameters for plots.
 
     Notes
@@ -344,7 +344,7 @@ def plot_2d(pnts, label_pnts=False, connect=False,
     markers = ('o', 'v', '^', '<', '>', '8', 's', 'p', '*', 'h', 'H',
                'D', 'd', 'P', 'X')  # MarkerStyle.filled_markers
     # ---- set basic parameters ----
-    scatter_params(plt, fig, ax, ax_lbls,  title)
+    scatter_params(plt, fig, ax, title, ax_lbls)
     pnts, x_min, y_min, x_max, y_max = axis_mins_maxs(pnts)
     #
     plt.xlim(x_min, x_max)
@@ -415,7 +415,7 @@ def plot_3d(a):
 
 
 def plot_polygons(arr, outline=True, vertices=True,
-                  labels=None, random_colors=True):
+                  labels=False, random_colors=True):
     """Plot Geo array poly boundaries.
 
     Parameters
@@ -448,9 +448,9 @@ def plot_polygons(arr, outline=True, vertices=True,
         Note: to skips the last label for polygons, use
         zip(lbl[:-1], pnts[:-1, 0], pnts[:-1, 1])  **
         """
-        if lbl is None:
-            lbl = np.arange(len(pnts))
-        for label, xpt, ypt in zip(lbl[:], pnts[:, 0], pnts[:, 1]):
+        if lbl:
+            lable = np.arange(len(pnts))
+        for label, xpt, ypt in zip(lable[:], pnts[:, 0], pnts[:, 1]):
             plt.annotate(label, color=color_, xy=(xpt, ypt),
                          xytext=(offx, offy),
                          size=8, textcoords='offset points',
@@ -511,9 +511,9 @@ def plot_polygons(arr, outline=True, vertices=True,
     # --
         if vertices:
             _scatter(shape[:-1], plt, size=50, color=colors_[i], marker=".")
-        if labels is not None:
+        if labels:
             ox, oy = lbl_off[i]  # offset point labels
-            _label_pnts(shape, labels, plt, color_=colors_[i],
+            _label_pnts(shape[:-1], labels, plt, color_=colors_[i],
                         offx=ox, offy=oy)  # got rid of shape[:-1]
     plt.show()
     return plt
@@ -674,12 +674,23 @@ def plot_segments(a, title=None):
 
     """
     #
-    if a.ndim == 3:
-        pairs = a
-    elif a.shape[1] == 4:
-        pairs = a.reshape((-1, 2, 2))
+    def _chk_(a):
+        """Assemble the inputs."""
+        if a.ndim == 3:
+            pairs = a
+        elif a.shape[1] == 4:
+            pairs = a.reshape((-1, 2, 2))
+        else:
+            print("An Nx4 or an Nx2x2 array is expected")
+            pairs = None
+        return pairs
+    #
+    if isinstance(a, (list, tuple)):
+        vals = [_chk_(v) for v in a]
+        pairs = np.concatenate(vals, axis=0)
     else:
-        print("An Nx4 or an Nx2x2 array is expected")
+        pairs = _chk_(a)
+    #
     font1 = {'family': 'sans-serif',
              'weight': 'bold', 'size': 12}  # 'color': 'black',
     fig, ax = plt.subplots(1, 1)
