@@ -219,6 +219,101 @@ def rot_matrix(angle=0, nm_3=False):
 # ---- arc_sector, convex hull, circle ellipse, hexagons, rectangles,
 #      triangle, xy-grid --
 #
+def _arc_(p_st, cent, p_en, radius, deg_step=5., outside=True):
+    """Create an arc given start, end and center.  Radius is known.
+
+    For testing ::
+
+        p_st, cent, p_en = outers[X][1:4]   replace X with id
+        radius, deg_step = 1.0, 22.5
+
+    np.pi = 3.141592653589793
+    np.pi/2. = 1.5707963267948966
+
+    in 2d, cross(a, b) is = ax*by-ay*bx
+    atan2(cross(a,b)), dot(a,b))
+    #
+    def angle3pt(a, b, c, ang_360=False):
+        '''Counterclockwise angle in degrees by turning from a to c around b
+            Returns a float between 0.0 and 360.0'''
+        ang = np.degrees(
+            np.atan2(c[1]-b[1], c[0]-b[0]) - np.atan2(a[1]-b[1], a[0]-b[0]))
+        if ang_360:
+            return ang + 360 if ang < 0 else ang
+        return ang
+    """
+    def get_quad(c, s_e):
+        """Return quadrants of arc segments."""
+        x_, y_ = np.sign(np.diff([c, s_e], axis=0))[0]
+        # right
+        if x_ >= 0:
+            if y_ >= 0:  # upper
+                return 1
+            return 4
+        # left
+        if y_ >= 0:  # upper
+            return 2
+        return 3
+    #
+    # np.mod((450.0 - angles), 360.)
+    # trying with quadrants
+    st_quad = get_quad(cent, p_st)
+    en_quad = get_quad(cent, p_en)
+    #
+    # step_ = np.deg2rad(deg_step)
+    d0 = p_st - cent
+    d1 = p_en - cent
+    start = np.atan2(*d0[::-1])  # np.degrees(
+    stop = np.atan2(*d1[::-1])   # np.degrees(
+    start_deg = np.degrees(start)
+    stop_deg = np.degrees(stop)
+    # inner_angle = np.degrees(_angle_between_(p_st, cent, p_en))
+    # outer_angle = np.degrees(_angle_between_(p_en, cent, p_st))
+    angles = None
+    #
+    # 1
+    if st_quad == 1 and en_quad == 1:
+        if stop_deg == 0.:
+            f0 = np.arange(start_deg, stop_deg, -deg_step)
+            angles = np.deg2rad(f0)
+    elif st_quad == 1 and en_quad in [3, 4]:
+        f0 = np.arange(start_deg, 0, -deg_step)
+        f1 = np.arange(0, stop_deg, -deg_step)
+        angles = np.deg2rad(np.concatenate((f0, f1)))
+    # 2
+    elif st_quad == 2 and en_quad in [1, 4]:  # check
+        f0 = np.arange(start_deg, stop_deg, -deg_step)
+        angles = np.deg2rad(f0)
+    # 3
+    elif st_quad == 3 and en_quad in [1, 2]:
+        f0 = np.arange(-180., start_deg, deg_step)[::-1]
+        f1 = np.arange(180., stop_deg, -deg_step)
+        angles = np.deg2rad(np.concatenate((f0, f1)))
+    elif st_quad == 3 and en_quad == 3:
+        f0 = np.arange(start_deg, stop_deg, -deg_step)
+        angles = np.deg2rad(f0)
+    # 4
+    elif st_quad == 4 and en_quad in [1, 2]:  # and outer_angle > 180
+        if stop_deg == 0.:
+            f0 = np.arange(start_deg, stop_deg, deg_step)
+            angles = np.deg2rad(f0)
+        else:
+            f0 = np.arange(-180., start_deg, deg_step)
+            f1 = np.arange(0, stop_deg, deg_step)  # could be empty
+            angles = np.deg2rad(np.concatenate((f0, f1)))
+    #
+    if angles is None:
+        print("cent {}  :  st, en quad {}, {}".format(cent, st_quad, en_quad))
+        return []
+    else:
+        x_s = radius * np.cos(angles)         # X values
+        y_s = radius * np.sin(angles)         # Y values
+        pnts = cent + np.array([x_s, y_s]).T
+    # -- with 360 degree check
+    # # =================================================
+    return pnts
+
+
 def arc_(radius=10,
          start=0, stop=1, step=0.5,
          xc=0.0, yc=0.0,

@@ -406,7 +406,7 @@ def in_out_crosses(*args):
 
     """
     msg = "\nPass 2, 2-pnt lines, 4 points or 8 coordinates to the function.\n"
-    args = np.asarray(args)
+    args = np.asarray(args).squeeze()
     if np.size(args) == 8:
         if len(args) == 2:  # two lines
             p0, p1, p2, p3 = *args[0], *args[1]

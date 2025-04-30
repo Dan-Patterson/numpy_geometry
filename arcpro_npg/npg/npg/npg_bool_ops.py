@@ -6,7 +6,7 @@ npg_bool_ops
 ------------
 
 Modified :
-    2025-01-19
+    2025-04-25
 
 ** Boolean operations on poly geometry.
 
@@ -762,7 +762,13 @@ def wrap_(seq_srted, c_subs, p_subs, _in_, _out_, _on_):  # rgt_arr):
     w = np.where(np.diff(sp) != 0)[0] + 1
     tmp = np.array_split(np.array(seq_srted, dtype='O'),  w)
     #
-    pairs = [_order_(i) for i in tmp]
+    # pairs = [_order_(i) for i in tmp]  # error found cor cr1 and flipped
+    # -- or
+    pairs = []
+    for i in tmp:
+        if len(i) > 1:
+            pairs.append(_order_(i))
+    #
     segs_out = []
     clps = []
     _un_ = []
@@ -961,7 +967,7 @@ def polygon_overlay(ply_a, ply_b):
     z = pl_n[(cl_n != pl_n[:, None]).any(-1).all(-1)]
     _CP_ = np.concatenate((cl_n, z), axis=0)
     #
-    # plot_polygons(_CP_[frto[:, 0]], labels=frto[:, 0])
+    # plot_polygons(_CP_[frto[:, 0]], True, True, True, True)
     # --
     # ---- turns calculation
     #

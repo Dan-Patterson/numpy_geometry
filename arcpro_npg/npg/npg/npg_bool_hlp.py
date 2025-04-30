@@ -54,7 +54,7 @@ from numpy.lib.stride_tricks import sliding_window_view as swv
 import npg
 from npg.npGeo import roll_arrays
 from npg.npg_geom_hlp import sort_segment_pairs
-from npg.npg_pip import np_wn
+from npg.npg_pip import np_wn  # noqa
 from npg.npg_plots import plot_polygons, plot_2d  # noqa
 
 
@@ -629,8 +629,8 @@ def add_intersections(
         p_neq = np.array(p_neq)  # convert to array
         z = p0_[p_neq]  # check the points not on, but may be in or out
         # -- error if z is only 1 point !!!
-        # p_w = _w_(z, p1_, False)  # original
-        p_w = np_wn(z, p1_, False)  # use _w_ from _wn_clip_
+        p_w = _w_(z, p1_, False)  # original
+        # p_w = np_wn(z, p1_, False)  # use _w_ from _wn_clip_
         #
         p_i = np.nonzero(p_w)[0]
         p_o = np.nonzero(p_w + 1)[0]
@@ -806,7 +806,9 @@ def _seg_prep_(a, b, all_info=False):
     b_num = (b_0 - b_1) + 0.0
     denom = (x1_x0 * y3_y2) - (y1_y0 * x3_x2) + 0.0
     whr, x_pnts = _xsect_(a_num, b_num, denom, x1_x0, y1_y0, x0, y0)
-    return whr, x_pnts, a_num, b_num, denom  # wn_, denom, x0, y0, x1_x0, y1_y0
+    if all_info:
+        return whr, x_pnts, a_num, b_num, denom
+    return whr, x_pnts
 
 
 def segment_intersections(a, b):
@@ -815,7 +817,7 @@ def segment_intersections(a, b):
     Parameters
     ----------
     a, b : arrays
-        The Nx2 arrays to intersect.  Thes can represent polygon boundaries,
+        The Nx2 arrays to intersect.  These can represent polygon boundaries,
         polylines or two point line segments.
 
     Requires
@@ -829,9 +831,29 @@ def segment_intersections(a, b):
     """
     a_s, idx_a = sort_segment_pairs(a)
     b_s, idx_b = sort_segment_pairs(b)
-    whr, x_pnts, a_num, b_num, denom = _seg_prep_(a_s, b_s, all_info=False)
+    whr, x_pnts, a_num, b_num, denom = _seg_prep_(a_s, b_s, all_info=True)
     return whr, x_pnts
 
+
+def self_intersection_check(a):
+    """Return the results of a self intersection check.
+
+    Parameters
+    ----------
+    a : array_like
+    """
+    a_s, idx_a = sort_segment_pairs(a)
+    N_segs = a_s.shape[0] - 1
+    b_s = np.copy(a_s)
+    # idx_b = np.copy(b_s)
+    whr, x_pnts = _seg_prep_(a_s, b_s, all_info=False)
+    node_diff = np.abs(whr[:, 0] - whr[:, 1])
+    gt_1 = np.logical_and(node_diff > 1, node_diff != N_segs)
+    crosses = np.nonzero(gt_1)[0]  # gt_1 == True
+    if crosses.size > 0:
+        extra_cross = x_pnts[crosses]
+        return extra_cross, crosses, whr, x_pnts
+    return [], whr, x_pnts
 
 # ---- ---------------------------
 # ---- (5) sequences

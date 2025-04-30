@@ -307,13 +307,14 @@ def _is_pnt_on_line_(start, end, xy, tolerance=0.0):
     Notes
     -----
     `tolerance` is normally not needed unless you want to examine points
-    quite close to a segment.
+    quite close to a segment::
 
-    eps = 2**-52 = 2.220446049250313e-16
-    np.finfo(float).eps = 2.220446049250313e-16
-    np.finfo(float)
-    finfo(resolution=1e-15, min=-1.7976931348623157e+308,
-          max=1.7976931348623157e+308, dtype=float64)
+        eps = 2**-52 = 2.220446049250313e-16
+        np.finfo(float).eps = 2.220446049250313e-16
+        np.finfo(float)
+        finfo(resolution=1e-15, min=-1.7976931348623157e+308,
+              max=1.7976931348623157e+308, dtype=float64)
+
     """
     #
     def sq_dist(a, b):
@@ -567,9 +568,6 @@ def eucl_dist(a, b, metric='euclidean'):
     >>> a[:, np.newaxis]  # (5, 1, 2)
     >>> (np.prod(a.shape[:-1]), 1, a.shape[-1])  # (5, 1, 2)
 
-    See Also
-    --------
-    `arraytools` has more functions and documentation.
     """
     a = np.atleast_2d(a)
     b = np.atleast_2d(b)

@@ -68,6 +68,89 @@ __imports__ = []
 # ---- ---------------------------
 # ---- (1) private helpers
 #
+rot90 = np.array([[0, -1], [1, 0]], dtype='float')
+rot180 = np.array([[-1, 0], [0, -1]], dtype='float')
+rot270 =  np.array([[0, 1], [-1, 0]], dtype='float')  #noqa
+# -- rotations by angle
+# c, s = np.cos(angle), np.sin(angle)
+# rot = np.array(((c, s), (-s, c)))
+
+
+def flip_left_right(a, shift_back=True):
+    """Return an array flipped vertically.
+
+    Parameters
+    ----------
+    a :  array_like
+    shift_back : boolean
+        True, returns the array to the original x-axis baseline.  False, flips
+        along a line middle of the new y-values.
+    """
+    m = np.array([[-1, 0], [0, -1]], dtype='float')  # rotate 180
+    vals = a @ m
+    if shift_back:
+        mins_ = np.min(vals, axis=0)
+        vals = vals - mins_
+    return vals
+
+
+def flip_up_down(a, shift_back=True):
+    """Return an array flipped vertically.
+
+    Parameters
+    ----------
+    a :  array_like
+    shift_back : boolean
+        True, returns the array to the original x-axis baseline.  False, flips
+        along a line middle of the new y-values.
+    """
+    m = np.array([[1, 0], [0, -1]], dtype='float')
+    vals = a @ m
+    if shift_back:
+        mins_ = np.min(vals, axis=0)
+        vals[:, 1] -= mins_[1]
+        # print("not implemented")
+    return vals
+
+
+def _area_centroid_2(a):
+    r"""Calculate area and centroid for a singlepart polygon, `a`.
+
+    This is also used to calculate area and centroid for a Geo array's parts.
+
+    Notes
+    -----
+    For multipart shapes, just use this syntax:
+
+    >>> # rectangle with hole
+    >>> a0 = np.array([[[0., 0.], [0., 10.], [10., 10.], [10., 0.], [0., 0.]],
+                      [[2., 2.], [8., 2.], [8., 8.], [2., 8.], [2., 2.]]])
+    >>> [_area_centroid_(i) for i in a0]
+    >>> [(100.0, array([ 5.00,  5.00])), (-36.0, array([ 5.00,  5.00]))]
+    """
+    x0, y1 = (a.T)[:, 1:]
+    x1, y0 = (a.T)[:, :-1]
+    e0 = np.einsum('...i,...i->...i', x0, y0)
+    e1 = np.einsum('...i,...i->...i', x1, y1)
+    t = e1 - e0
+    area = np.sum((e0 - e1) * 0.5)
+    x_c = np.sum((x1 + x0) * t, axis=0) / (area * 6.0)
+    y_c = np.sum((y1 + y0) * t, axis=0) / (area * 6.0)
+    return area, np.asarray([-x_c, -y_c])
+
+
+def _trans_rot_2(a, angle=0.0, clockwise=False):
+    """Rotate shapes about their center or individually."""
+    if clockwise:
+        angle = -angle
+    angle = np.radians(angle)
+    c, s = np.cos(angle), np.sin(angle)
+    R = np.array(((c, s), (-s, c)))
+    # cent = np.mean(np.unique(a, axis=0), axis=0)
+    area_, cent = _area_centroid_2(a)
+    return np.einsum('ij,jk->ik', a - cent, R) + cent
+
+
 def _arc_mini_(p_st, cent, p_en, radius=1., step=5.0, outside=True):
     """Create arc from a mini circle.  A circle center of 0,0 is used."""
     #
@@ -148,18 +231,13 @@ def _angles_3pnt_(a, inside=True, in_deg=True):
     | rectangle : 1 + 5 - 4 = 2
     | triangle  : 1 + 4 - 3 = 2
     """
-    # if np.allclose(a[0], a[-1]):                 # closed loop, remove dupl.
-    #     a = a[1:]  # a[:-1] 2024-10-20 changes to get 1st angle correct
-    # ba = a - np.concatenate((a[-1][None, :], a[:-1]), axis=0)
-    # bc = a - np.concatenate((a[1:], a[0][None, :]), axis=0)
-    # cr = cross_product_2d(ba, bc)
     #
     if np.allclose(a[0], a[-1]):                 # closed loop, remove dupl.
         a = a[:-1]
-    ba = a - np.concatenate((a[-1][None, :], a[:-1]), axis=0)
-    bc = a - np.concatenate((a[1:], a[0][None, :]), axis=0)
-    cr = cross_product_2d(ba, bc)
-    dt = np.einsum('ij,ij->i', ba, bc)
+    ba = a - np.concatenate((a[-1][None, :], a[:-1]), axis=0)  # centre - start
+    bc = a - np.concatenate((a[1:], a[0][None, :]), axis=0)  # centre - end
+    cr = cross_product_2d(ba, bc)       # -- use cross_product_2d for `cross`
+    dt = np.einsum('ij,ij->i', ba, bc)  #
     ang = np.arctan2(cr, dt)
     TwoPI = np.pi * 2.
     if inside:
@@ -208,6 +286,37 @@ def _angle_between_(p0, cent, p1, inside=True, in_degrees=False):
 
 # ---- ---------------------------
 # ---- (2) geom private helpers
+def _offset_segment_(poly, value=1.):
+    """Return offset polygon segments by a finite value.
+
+    Notes
+    -----
+    This can be combined with `resizing` using the following syntax::
+
+        pairs = offsets.reshape(-1, 2, 2)  # the results from this function
+        r = [_resize_segment_(
+                i, absolute=True,
+                value=2.,
+                direction=0,
+                keep_all=True)
+             for i in pairs
+             ]
+        segs = [np.concatenate((i[:-1], i[1:]), axis=1) for i in r]
+        # plot_segments(segs)  optional function
+
+    You can resize after offsetting or visa versa
+    """
+    dxdy = poly[1:] - poly[:-1]
+    r = value / np.sqrt(np.einsum('ij,ij->i', dxdy, dxdy))
+    rr = np.concatenate((r[:, None], -r[:, None]), axis=1)
+    dx_dy = dxdy * rr
+    dy_dx = dx_dy[:, [1, 0]]  # -- swap order yielding dy, dx
+    pnt0 = poly[:-1] + dy_dx     # new start and end points for offset segments
+    pnt1 = poly[1:] + dy_dx      #
+    # -- offset segments
+    offsets = np.concatenate((pnt0, pnt1), axis=1)
+    return offsets
+
 
 def _resize_segment_(a, absolute=True, value=1, direction=0, keep_all=True):
     """Return a line segment scaled by a finite distance in a chosen direction.
@@ -444,40 +553,57 @@ def circ_circ_intersection(c0, r0, c1, r1, return_arcs=False, step=1):
         result += [c0c1]  # put c0c1 into a list
         plot_polylines(result)
     """
-    c0 = np.array(c0)
-    c1 = np.array(c1)
-    x0, y0 = c0
-    x1, y1 = c1
-    d = ((x1 - x0)**2 + (y1 - y0)**2)**0.5  # -- x**0.5 = np.sqrt(x)
-    if d > r0 + r1:  # distance greater than combined radius, non-intersecting
+    def _e_2d_(a, p):
+        """Return arc,`a` start-end point distance to point `p`."""
+        diff = a - p[None, :]
+        return np.sqrt(np.einsum('ij,ij->i', diff, diff))
+
+    def _fix_(arc, p_st, en):
+        """Check arc st end pnts."""
+        _d0, _d1 = _e_2d_(arc[[0, -1]], p_st)
+        if _d0 < _d1:  # or to_ to  np.array([p_en, p_st]) for polygons
+            fr_, to_ = p_st[None, :], p_en[None, ]  # see above
+        else:
+            to_, fr_ = p_st[None, :], p_en[None, ]
+        return np.concatenate((fr_, arc, to_), axis=0)
+    #
+    x0, y0 = c0 = np.array(c0)
+    x1, y1 = c1 = np.array(c1)
+    dx, dy = c1 - c0
+    d = (dx**2 + dy**2)**0.5  # -- centre-centre distance x**0.5 = np.sqrt(x)
+    # -- cases
+    if d > r0 + r1:           # non-intersecting, `d` > combined radii
         return []
-    if d < abs(r0 - r1):  # one circle within other
+    if d < abs(r0 - r1):      # one circle within other
         return []
-    if d == 0 and r0 == r1:  # coincident circles
+    if d == 0 and r0 == r1:   # coincident circles
         return []
+    #
+    # -- intersections exist -- see image in reference  --
+    #    x2 = x0 + a * dx / d   and    y2 = y0 + a * dy / d
+    #    h_dx_d = h * dx / d    and    h_dy_d = h * dy / d
+    #
     a = (r0**2 - r1**2 + d**2) / (2.0 * d)
     h = (r0**2 - a**2)**0.5  # -- equal to np.sqrt(r0**2 - a**2)
-    dx, dy = c1 - c0
-    x2 = x0 + a * dx / d  # x2,y2 is the chord midpoint
-    y2 = y0 + a * dy / d  # x2,y2 = c0 + a*(c1 - c0)/d
-    # -- see image in reference
-    h_dx_d = h * dx / d
-    h_dy_d = h * dy / d
-    x3 = x2 + h_dy_d  # h * dy / d  # x3, x4 are the intersection pnts
-    y3 = y2 - h_dx_d  # h * dx / d  # mirrored along the chord at the
-    x4 = x2 - h_dy_d  # h * dy / d  # intersection points
-    y4 = y2 + h_dx_d  # h * dx / d
+    #
+    x2, y2 = c0 + (c1 - c0) * a/d     # the chord midpoint
+    h_dx_d, h_dy_d = (c1 - c0) * h/d
+    #   the intersection pnts mirrored along the chord
+    x3 = x2 + h_dy_d
+    y3 = y2 - h_dx_d
+    x4 = x2 - h_dy_d
+    y4 = y2 + h_dx_d
     x_pnts = np.array([[x3, y3], [x4, y4]])
-    if return_arcs:
-        if x_pnts.size == 4:
-            p_st, p_en = x_pnts
-            arc0 = _arc_mini_(p_st, c0, p_en, radius=r0, step=step)
-            arc1 = _arc_mini_(p_en, c1, p_st, radius=r1, step=step)
-            arc0 = np.concatenate(
-                (x_pnts[-1][None, :], arc0, x_pnts[0][None, :]), axis=0)
-            arc1 = np.concatenate(
-                (x_pnts[0][None, :], arc1, x_pnts[-1][None, :]), axis=0)
-            return [x_pnts, arc0, arc1]
+    # --
+    if return_arcs and x_pnts.size == 4:
+        p_st, p_en = x_pnts
+        arc0 = _arc_mini_(p_st, c0, p_en, radius=r0, step=step)
+        arc1 = _arc_mini_(p_en, c1, p_st, radius=r1, step=step)
+        # -- fix arcs
+        arc0 = _fix_(arc0, p_st, p_en)
+        arc1 = _fix_(arc1, p_st, p_en)
+        #
+        return [x_pnts, arc0, arc1]
     return x_pnts
 
 
@@ -497,7 +623,7 @@ def line_circ_intersection(c_cent, st_pnt, en_pnt, radius=1):
     r = radius
     x0, y0 = st_pnt
     x1, y1 = en_pnt
-
+    #
     cx = x0 - cx  # reorient to center
     cy = y0 - cy
     dx = x1 - x0
@@ -674,19 +800,21 @@ def running_count(a, to_label=False):
 
 
 # ---- (4)To incorporate
+#
 def _point_along_a_line(x0, y0, x1, y1, d):
-    """
-    Return the point on the line connecting (*x0*, *y0*) -- (*x1*, *y1*) whose
-    distance from (*x0*, *y0*) is *d*.
+    """Return a point on a line.
+
+    The point on the line connects (*x0*, *y0*) -- (*x1*, *y1*) with a
+    distance of *d* from (*x0*, *y0*).
     line 3155 in
     `<https://github.com/matplotlib/matplotlib/blob/v3.10.1/lib/matplotlib/
     patches.py#L1962`_.
     """
     dx, dy = x0 - x1, y0 - y1
-    ff = d / (dx * dx + dy * dy) ** .5
+    ff = d / (dx * dx + dy * dy)**0.5
     x2, y2 = x0 - ff * dx, y0 - ff * dy
-
     return x2, y2
+
 
 # ===========================================================================
 #

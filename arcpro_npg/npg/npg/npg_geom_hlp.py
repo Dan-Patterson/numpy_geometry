@@ -90,7 +90,7 @@ nums = 'efdgFDGbBhHiIlLqQpP'
 __imports__ = ['uts', 'prn_tbl']
 
 __all__ = [
-    'geom_angles',                     # (4) Geo / bdarray stuff
+    'geom_angles',                     # (4) Geo / ndarray stuff
     'segment_angles',
     'a_eq_b',                          # (5) compare, remove, keep geometry
     'close_pnts',
@@ -576,8 +576,8 @@ def _bit_segment_angles_(a, fromNorth=False):
     -------
     # clockwise oriented connected segments
     a = np.array([[  2.00,   0.00], [  1.00,   0.00], [  0.00,   1.00]])
-    _bit_segment_angles_(a,False)  # -- array([ 180.00,  135.00])
-    _bit_segment_angles_(a,True)   # -- array([ 270.00,  315.00])
+    _bit_segment_angles_(a, False)  # -- array([ 180.00,  135.00])
+    _bit_segment_angles_(a, True)   # -- array([ 270.00,  315.00])
     """
     a = _get_base_(a)
     dxy = a[1:] - a[:-1]
