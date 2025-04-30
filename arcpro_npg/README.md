@@ -16,6 +16,8 @@ Developed in ArcGIS Pro <= 3.4, python <= 3.12 and numpy > 2.0
 
 **NOTE**
 
+**I no longer have access to ArcGIS Pro so I am no longer actively developing or supporting anything that involves arcpy or arcgisscripting.**
+
 **arcpy for Pro 3.4 and numpy >= 2.x cannot be used together.**
 **It may be some time before arcpy is updated to use newer versions of the numpy stack.**  
 **I will continue to develop the python/numpy side of things but I will no longer support anything requiring numpy (etc) < 2.0**
@@ -58,12 +60,10 @@ a simple conversion of the geometry type, no fancy intersection and overlap stuf
 You get what you pay for, but the widest use is probably the simplest.
 
 ----
-## 2025-03-op update ##
-The big split is done.  I am now working with NumPy > 2.0.  
+## 2025-04-29 update ##
+The big split is done.  I am now working with Python 3.13 and NumPy > 2.0.  I also no longer have access to ArcGIS Pro.  The functionality within *npg* works with numpy arrays, so that part is still being developed.  Get your data into array format and you can use geojson as an interchange format if you need to map within Pro.
 
 So Arcgis Pro and arcpy specific functionality will no longer be supported until such time as the required NumPy and related stack packages are met.
-Get your data into array format and you can use geojson as an interchange format if you need to map within Pro.
-
 
 ## 2024-07-29 update ##
 Additions and modifications.  
