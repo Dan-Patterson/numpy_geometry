@@ -1,4 +1,4 @@
-# NumPy Geometry and FreeTools
+# NumPy Geometry
 
 ----
 
@@ -10,17 +10,13 @@
 <img src="images/FreeTools.png" align="right" width="500"/>
 <!--- arcpro_npg/images/FreeTools.png -->
 
-**New home base for Free Tools**
-
-Developed in ArcGIS Pro <= 3.4, python <= 3.12 and numpy > 2.0
-
 **NOTE**
 
-**I no longer have access to ArcGIS Pro so I am no longer actively developing or supporting anything that involves arcpy or arcgisscripting.**
+Initially developed using python <= 3.12 and numpy < 2.0 and ArcGIS Pro <= 3.4.
 
-**arcpy for Pro 3.4 and numpy >= 2.x cannot be used together.**
-**It may be some time before arcpy is updated to use newer versions of the numpy stack.**  
-**I will continue to develop the python/numpy side of things but I will no longer support anything requiring numpy (etc) < 2.0**
+I no longer have access to ArcGIS Pro so I am no longer actively developing or supporting anything that involves arcpy or arcgisscripting.
+
+Currently development is using python >= 3.13 and numpy > 2.0.  A major transition is denoted pre and post numpy 2.0.
 
 These demo scripts and the toolbox show how numpy and arcpy can play nice together and generate geometries that are normally only available at the ArcGIS Pro Advanced level.  The tools are already provided to do this, but less attention is paid to the attributes.
 
