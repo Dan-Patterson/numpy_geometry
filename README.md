@@ -29,7 +29,7 @@
 
 **NOTE**
 
-1 This is the main working repository for *arcpro_npg* aka, *Free_tools*.  I update that when major work is complete here.
+1 This is the main working repository for *arcpro_npg*.  I update that when major work is complete here.
 
 2 See the **Docs** folder for other documentation, or click on the links above.
 
@@ -46,26 +46,27 @@
       - images      : main documentation images
 
 ----
-A numpy geometry class and functions that work with arcpy and ESRI featureclasses is provided here to facilitate working with vector geometry using the ndarray as its base.
+A numpy geometry class and functions with a focus on polygon/polyline geometry.  Some methods for converting other geometry representations are provided, but limited to geojson and ESRI featureclasses.
+The current incarnation is restricted to 2D vector geometry using the NumPy ndarray as its base.
 
 This is a work in progress, so bear with me.  The intent of the Geo class is to treat the geometry of featureclasses as one entity.
 
 See **npGeo.py** in subsequent sections for details.
 
-Converting esri's arcpy geometry objects to array representations is contained in **npg_io.py**.\
+Converting geojson or esri's arcpy geometry objects to array representations is contained in **npg_io.py**.\
 Most approaches I have see so far tend to construct the geometric representations of geometries using some variant of arcpy cursors.
 
 When trying to work with numpy and the geometries, this creates problems since geometry is rarely a collection of simple shapes (eg. rectangles, circles, triangles).\
-Object arrays containing the coordinates are the norm.  An object array is created when the number of points per feature and/or feature part are not uniform.\
+Object arrays (aka ragged arrays) containing the coordinates are the norm.  An object array is created when the number of points per feature and/or feature part are not uniform.\
 For example, a square with a triangular hole in it, will have an outer ring, oriented clockwise consisting of a list of 5 points with the first and last point being the same.  The triangular hole will be represented by 4 points oriented counterclockwise.\
 Now that arrangement of points can be used to represent a polygon, a closed-loop polyline or a multipoint.\
 The same points can be used to represent 3 distinctly different geometric objects.
 
-What I set out to do was create a uniform 2D array of coordinates and a companion array which denotes the feature ID and the from-to point pairs.\
-This is similar to the FeatureClassToNumPy array approach, but that particular function and its inverse, are only useful for simple singlepart geometries.
+What I set out to do was create a uniform 2D array of coordinates and a companion array which denotes the feature ID and the from-to point pairs plus other useful information.\
+This is similar to esri's FeatureClassToNumPy array approach, but that particular function and its inverse, are only useful for simple singlepart geometries.
 
 I will document and build on these tools set with examples.\
-Generally, I am only working with featureclasses stored in a file geodatabase.\
+Generally, I am only working with featureclasses stored in a file geodatabase.  None of this web-based stuff.\
 There are tools to derive geometries from geojson format or other formats capable of generating array-like structures.
 
 ----
