@@ -1,6 +1,6 @@
 # Geo array basics
 
-<a href="url"><img src="../images/sq.png" align="right" height="auto" width="300" ></a>
+<a href="url"><img src="../images/sq2.png" align="right" height="auto" width="300" ></a>
 
 Import **npg** and take a subsample of some featureclass (in_fc) geometry objects (g).
 
