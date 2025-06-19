@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# noqa: D205, D400, F403
+# noqa: D205, D208, D400, F403
 r"""
 -----------
 npg_geom_hlp
@@ -13,10 +13,10 @@ Script :
     npg_geom_hlp.py
 
 Author :
-    Dan_Patterson@carleton.ca
+    `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-02-17
+    2025-06-01
 
 Purpose
 -------
@@ -116,9 +116,11 @@ __all__ = [
 ]
 
 __helpers__ = [
-    '_get_base_',                      # (1) Geo Helpers
-    '_adj_within_',
+    '_adj_within_',                    # (1) Geo Helpers
+    '_base_',
     '_bit_check_',
+    '_clean_segments_',
+    '_e_2d_',
     '_from_to_pnts_',
     '_is_clockwise_',                  # (2) Condition checking
     '_is_ccw_',
@@ -127,18 +129,16 @@ __helpers__ = [
     '_in_extent_',
     '_in_LBRT_',
     '_pnts_in_extent_',
-    '_clean_segments_',                # (3) Geometry helpers
+    '_angle_between_',                 # (3) Geometry helpers
+    '_angles_from_north_',
+    '_angles_from_xaxis_',
+    '_od_angles_dist_',
+    '_area_centroid_',
     '_bit_area_',
     '_bit_crossproduct_',
     '_bit_min_max_',
     '_bit_length_',
     '_bit_segment_angles_'
-    '_angle_between_',
-    '_angles_3pnt_',
-    '_area_centroid_',
-    '_angles_from_north_',
-    '_angles_from_xaxis_',
-    '_od_angles_dist_',
     '_rotate_',
     '_scale_',
     '_translate_',
@@ -149,43 +149,11 @@ __helpers__ = [
 ]
 
 
-# __all__ = __helpers__ + __all__
 #
 # ---- ---------------------------
 # ---- core bit functions
 # ---- (1) Geo Helpers
 #
-def _clean_segments_(a, tol=1e-06):
-    """Remove overlaps and extra points on poly* segments. In `npg_geom_hlp`.
-
-    Parameters
-    ----------
-    a : array
-        The input array or a bit from a Geo array.
-    tol : float
-        The tolerance for determining whether a point deviates from a line.
-
-    Notes
-    -----
-    - Segments along a straight line can overlap (a construction error).
-          [[0,0], [5, 5], [2, 2], [7, 7]]  # points out of order
-    - Extraneous points can exist along a segment.
-          [[0,0], [2, 2], [5, 5], [7, 7]]  # extra points not needed for line.
-    """
-    cr, ba, bc = _bit_crossproduct_(a, extras=True)
-    # -- avoid duplicating the 1st point (0).
-    whr = [i for i in np.nonzero(np.abs(cr) > tol)[0] if i != 0]
-    vals = np.concatenate((a[0][None, :], a[whr], a[-1][None, :]), axis=0)
-    return vals
-
-
-def _get_base_(a):
-    """Return the base array of a Geo array.  Shave off microseconds."""
-    if hasattr(a, "IFT"):
-        return a.XY
-    return a
-
-
 def _adj_within_(a, full=False):
     """Determine adjacency within a Geo array's outer rings.
 
@@ -222,6 +190,13 @@ def _adj_within_(a, full=False):
     return out
 
 
+def _base_(a):
+    """Return the base array of a Geo array.  Shave off microseconds."""
+    if hasattr(a, "IFT"):
+        return a.XY
+    return a
+
+
 def _bit_check_(a, just_outer=False):
     r"""Check for bits and convert if necessary.
 
@@ -246,6 +221,36 @@ def _bit_check_(a, just_outer=False):
     return a
 
 
+def _clean_segments_(a, tol=1e-06):
+    """Remove overlaps and extra points on poly* segments. In `npg_geom_hlp`.
+
+    Parameters
+    ----------
+    a : array
+        The input array or a bit from a Geo array.
+    tol : float
+        The tolerance for determining whether a point deviates from a line.
+
+    Notes
+    -----
+    - Segments along a straight line can overlap (a construction error).
+          [[0,0], [5, 5], [2, 2], [7, 7]]  # points out of order
+    - Extraneous points can exist along a segment.
+          [[0,0], [2, 2], [5, 5], [7, 7]]  # extra points not needed for line.
+    """
+    cr, ba, bc = _bit_crossproduct_(a, extras=True)
+    # -- avoid duplicating the 1st point (0).
+    whr = [i for i in np.nonzero(np.abs(cr) > tol)[0] if i != 0]
+    vals = np.concatenate((a[0][None, :], a[whr], a[-1][None, :]), axis=0)
+    return vals
+
+
+def _e_2d_(a, p):
+    """Return point to point distance for array (mini e_dist)."""
+    diff = a - p[None, :]
+    return np.sqrt(np.einsum('ij,ij->i', diff, diff))
+
+
 def _from_to_pnts_(a, as_pairs=False):
     """Convert polygon/polyline shapes to from-to points.
 
@@ -265,7 +270,7 @@ def _from_to_pnts_(a, as_pairs=False):
     The Geo method `od_pairs` returns the proper traversal removing possible
     connections between inner and outer rings.
     """
-    a = _get_base_(a)
+    a = _base_(a)
     return np.concatenate((a[:-1], a[1:]), axis=1)
 
 
@@ -282,14 +287,13 @@ def _is_ccw_(a):
     return 0 if _bit_area_(a) > 0. else 1
 
 
-def _is_turn(p0, p1=None, p2=None, tol=1e-6):
+def _is_turn(pnts, tol=1e-6):
     """Return whether 3 points create a right, or left turn or straight.
 
     Parameters
     ----------
-    p0, p1, p2 : points
-        p0 can be a 3 point array if p1 and p2 are None, otherwise specify
-        values for each point
+    pnts : points
+        pnts can be a 3 point array with a shape of (3, 2)
     tol : float
         The tolerance to accommadate floating point errors in calculations.
 
@@ -301,13 +305,14 @@ def _is_turn(p0, p1=None, p2=None, tol=1e-6):
 
     Notes
     -----
-    No error checking.  It is assumed you can provide an array of 3 points or
-    3 single points from an array.  Do any required conversion elsewhere.
+    No error checking.  It is assumed you can provide an array of 3 points.
+    Do any required conversion elsewhere.
     """
-    if len(p0) == 3:
-        x0, y0, x1, y1, x2, y2 = p0.ravel()
-    elif p1 is not None and p2 is not None:
-        x0, y0, x1, y1, x2, y2 = *p0, *p1, *p2
+    pnts = np.array(pnts)
+    if len(pnts) != 3:
+        print("\nThree points required.")
+        return None
+    x0, y0, x1, y1, x2, y2 = pnts.ravel()
     v = (x1 - x0) * (y2 - y0) - (y1 - y0) * (x2 - x0)
     v = 0 if abs(v) < tol else v
     # out = True if v < 0 else False
@@ -407,8 +412,6 @@ def _pnts_in_extent_(pnts, extent=None, return_index=False):
 # ---- ---------------------------
 # ---- (3) geometry helpers
 #
-
-
 def _angle_between_(p0, cent, p1, in_degrees=False):
     """Return angle between two vectors emminating from the center.
 
@@ -487,6 +490,41 @@ def _angles_from_xaxis_(angles):
     return np.mod(-angles + 90., 360.)
 
 
+def _od_angles_dist_(arr, is_polygon=True):
+    """Return origin-destination angles and distances.
+
+    Parameters
+    ----------
+    is_polygon : boolean
+        The first and last point are sliced off.  The first point is used
+        as the origin and the last is a duplicate of the first.
+
+    Notes
+    -----
+    The pnts array is rotated to the LL of the extent.  The first point is
+    used as the origin and is sliced off of the remaining list.  If
+    `is_polygon` is True, then the duplicated last point will be removed.
+    """
+
+    def _LL_(arr):
+        """Return the closest point to the lower left of the array."""
+        LL = np.min(arr, axis=0)
+        idx = np.argmin(_e_2d_(arr, LL))
+        return idx
+
+    num = _LL_(arr)
+    min_f = arr[num]
+    arr_ordered = np.concatenate((arr[num:-1], arr[:num], [arr[num]]), axis=0)
+    if is_polygon:
+        arr = arr_ordered[1:-1]
+    else:
+        arr = arr_ordered[1:]
+    dxdy = arr - min_f
+    ang = np.degrees(np.arctan2(dxdy[:, 1], dxdy[:, 0]))
+    dist = _e_2d_(arr, min_f)
+    return arr_ordered, ang, dist
+
+
 def _area_centroid_(a):
     r"""Calculate area and centroid for a singlepart polygon, `a`.
 
@@ -502,7 +540,7 @@ def _area_centroid_(a):
     >>> [_area_centroid_(i) for i in a0]
     >>> [(100.0, array([ 5.00,  5.00])), (-36.0, array([ 5.00,  5.00]))]
     """
-    a = _get_base_(a)
+    a = _base_(a)
     x0, y1 = (a.T)[:, 1:]
     x1, y0 = (a.T)[:, :-1]
     e0 = np.einsum('...i,...i->...i', x0, y0)
@@ -520,7 +558,7 @@ def _bit_area_(a):
     Negative areas are holes.  This is intentionally reversed from
     the `shoelace` formula.
     """
-    a = _get_base_(a)
+    a = _base_(a)
     x0, y1 = (a.T)[:, 1:]  # cross set up as follows
     x1, y0 = (a.T)[:, :-1]
     e0 = np.einsum('...i,...i->...i', x0, y0)  # 2024-03-28 modified
@@ -540,7 +578,7 @@ def _bit_crossproduct_(a, is_closed=True, extras=False):
     def cross2d(x, y):
         return x[..., 0] * y[..., 1] - x[..., 1] * y[..., 0]
 
-    a = _get_base_(a)
+    a = _base_(a)
     if is_closed:
         if np.allclose(a[0], a[-1]):  # closed loop, remove dupl.
             a = a[:-1]
@@ -555,14 +593,14 @@ def _bit_crossproduct_(a, is_closed=True, extras=False):
 
 def _bit_min_max_(a):
     """Extent of a sub-array in an object array."""
-    a = _get_base_(a)
+    a = _base_(a)
     a = np.atleast_2d(a)
     return np.concatenate((np.min(a, axis=0), np.max(a, axis=0)))
 
 
 def _bit_length_(a):
     """Calculate segment lengths of poly geometry."""
-    a = _get_base_(a)
+    a = _base_(a)
     diff = a[1:] - a[:-1]
     return np.sqrt(np.einsum('ij,ij->i', diff, diff))
 
@@ -579,7 +617,7 @@ def _bit_segment_angles_(a, fromNorth=False):
     _bit_segment_angles_(a, False)  # -- array([ 180.00,  135.00])
     _bit_segment_angles_(a, True)   # -- array([ 270.00,  315.00])
     """
-    a = _get_base_(a)
+    a = _base_(a)
     dxy = a[1:] - a[:-1]
     ang = np.degrees(np.arctan2(dxy[:, 1], dxy[:, 0]))
     if fromNorth:
@@ -623,7 +661,7 @@ def _rotate_(a, R, as_group):
 
 def _scale_(a, factor=1):
     """Scale a geometry equally."""
-    a = _get_base_(a)
+    a = _base_(a)
     cent = np.min(a, axis=0)
     shift_orig = a - cent
     scaled = shift_orig * [factor, factor]
@@ -644,7 +682,7 @@ def _translate_(a, dx=0, dy=0):
     -----
     >>> dx, dy = np.mean(a, axis=0)  # to center about the x,y origin.
     """
-    a = _get_base_(a)
+    a = _base_(a)
     if a.ndim == 1:
         a = a.reshape(1, a.shape[0], 2)
         return np.array([i + [dx, dy] for i in a])
@@ -653,7 +691,7 @@ def _translate_(a, dx=0, dy=0):
 
 def _trans_rot_(a, angle=0.0, clockwise=False):
     """Rotate shapes about their center or individually."""
-    a = _get_base_(a)
+    a = _base_(a)
     if clockwise:
         angle = -angle
     angle = np.radians(angle)
@@ -712,45 +750,6 @@ def segment_angles(a, fromNorth=False):
     a = _bit_check_(a, just_outer=False)
     ang = [_bit_segment_angles_(i, fromNorth) for i in a]
     return ang
-
-
-def _od_angles_dist_(arr, is_polygon=True):
-    """Return origin-destination angles and distances.
-
-    Parameters
-    ----------
-    is_polygon : boolean
-        The first and last point are sliced off.  The first point is used
-        as the origin and the last is a duplicate of the first.
-
-    Notes
-    -----
-    The pnts array is rotated to the LL of the extent.  The first point is
-    used as the origin and is sliced off of the remaining list.  If
-    `is_polygon` is True, then the duplicated last point will be removed.
-    """
-    def _e_2d_(a, p):
-        """See npg_help `_e_2d_`."""
-        diff = a - p[None, :]
-        return np.sqrt(np.einsum('ij,ij->i', diff, diff))
-
-    def _LL_(arr):
-        """Return the closest point to the lower left of the array."""
-        LL = np.min(arr, axis=0)
-        idx = np.argmin(_e_2d_(arr, LL))
-        return idx
-
-    num = _LL_(arr)
-    min_f = arr[num]
-    arr_ordered = np.concatenate((arr[num:-1], arr[:num], [arr[num]]), axis=0)
-    if is_polygon:
-        arr = arr_ordered[1:-1]
-    else:
-        arr = arr_ordered[1:]
-    dxdy = arr - min_f
-    ang = np.degrees(np.arctan2(dxdy[:, 1], dxdy[:, 0]))
-    dist = _e_2d_(arr, min_f)
-    return arr_ordered, ang, dist
 
 
 # ---- ---------------------------
@@ -941,8 +940,7 @@ def compare_segments(a, b, both_ways=True, invert=False, return_idx=False):
             ids_.append(idx_a_rev)
     if len(segs_) == 0:
         return [None, []]
-    else:
-        return [segs_, ids_]
+    return [segs_, ids_]
 
 
 def compare_geom(arr, look_for, unique=True, invert=False, return_idx=False):
@@ -1114,7 +1112,7 @@ def sort_xy(a, x_ascending=True, y_ascending=True, return_order=True):
         True returns the order and not the sorted points.  False returns the
         sorted points.
     """
-    a = _get_base_(a)
+    a = _base_(a)
     x_s = a[:, 0]
     y_s = a[:, 1]
     order = None
@@ -1212,11 +1210,6 @@ def dist_angle_sort(a, sort_point=None, close_poly=True):
 
     Useful for polygons.  First and last point equality is checked.
     """
-    def _e_2d_(a, p):
-        """Array points to point distance."""
-        diff = a - p[None, :]
-        return np.sqrt(np.einsum('ij,ij->i', diff, diff))
-
     a = np.array(a)
     min_f = np.array([np.min(a[:, 0]), np.min(a[:, 1])])
     dxdy = np.subtract(a, np.atleast_2d(min_f))
@@ -1248,7 +1241,7 @@ def radial_sort(a, extent_center=True, close_poly=True, clockwise=True):
         dist_arr = np.sqrt(np.einsum('ij,ij->i', diff, diff))
         return dist_arr
 
-    a = _get_base_(a)
+    a = _base_(a)
     uniq = np.unique(a, axis=0)
     if extent_center:
         cent = extent_cent(uniq)

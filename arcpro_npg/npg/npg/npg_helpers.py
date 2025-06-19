@@ -13,12 +13,10 @@ Script :
     npg_helpers.py
 
 Author :
-    Dan_Patterson@carleton.ca
-
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-02-17
+    2025-06-01
 
 Purpose
 -------
@@ -37,7 +35,7 @@ script = sys.argv[0]
 
 __all__ = [
     'cartesian_product',               # (2) main functions
-    'remove_seq_dupl',
+    'drop_seq_dupl',
     'separate_string_number',
     'sequences',
     'stride_2d',
@@ -209,7 +207,7 @@ def cartesian_product(sequences):
     return arr.reshape(-1, len_)
 
 
-def remove_seq_dupl(a):
+def drop_seq_dupl(a):
     """Remove sequential duplicates from an array.
 
     The array is stacked with the first value in the sequence to retain it.
@@ -222,7 +220,6 @@ def remove_seq_dupl(a):
         uni = np.vstack((a[0], uni))
     uni = np.ascontiguousarray(uni)
     return uni
-
 
 
 def separate_string_number(string, as_list=False):

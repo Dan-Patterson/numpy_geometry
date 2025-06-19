@@ -18,10 +18,10 @@ Script :
     .../npg/npg_io.py
 
 Author :
-    Dan_Patterson@carleton.ca
+    `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-02-25
+    2025-05-29
 
 Purpose
 -------
@@ -78,10 +78,21 @@ NUMS = FLOATS + INTS
 
 
 __all__ = [
-    'dtype_info', 'load_geo', 'load_geo_attr', 'save_geo', 'load_txt',
-    'save_txt', 'load_geojson', 'geo_to_geojson', 'geojson_to_geo', 'get_keys',
-    'prn_keys', '_len_check_', 'lists_to_arrays', 'nested_len'
-    ]
+    'dtype_info',                      # (1) in and out
+    'load_geo',
+    'load_geo_attr',
+    'save_geo',
+    'load_txt',
+    'save_txt',
+    'load_geojson',                    # (2) json section
+    'geo_to_geojson',
+    'geojson_to_geo',
+    'get_keys',
+    'prn_keys',
+    'len_check',
+    'lists_to_arrays',
+    'nested_len'
+]
 
 
 # ---- ---------------------------
@@ -231,7 +242,7 @@ def load_geo_attr(f_name, prn_info=False):
 
     Example
     -------
-    >>> f_name = "C:/arcpro_npg/data/ontario_attr.npz"
+    >>> f_name = "C:/arcpro_npg/data/npz_npy/ontario_attrib.npz"
     >>> names, arrs = load_geo_attr(f_name)
     >>> names  # ['arr', 'fields']
     >>> arr = arrs[names[0]]
@@ -241,24 +252,13 @@ def load_geo_attr(f_name, prn_info=False):
     --------
     `npg_arc_npg.attr_to_npz` which is used to create the .npz file.
     """
-    arrs = np.load(f_name)
-    names = arrs.files  # array names
-    if prn_info:
-        frmt0 = "\nLoading attributes from...  {}\n\nArrays include...{}"
-        print(frmt0.format(f_name, names))
-        frmt1 = "\n({}) name : {}"
-        for i, name in enumerate(names):
-            print(frmt1.format(i, name))
-        msg = """
-        To use :
-        >>> n0, n1 = names
-        >>> n0, n1
-        ... ('arrs', 'fields')
-        >>> arr = arrs[n0]
-        >>> flds = arrs[n1]
-        """
-        print(msg)
-    return names, arrs
+    if f_name[-3:] == "npz":
+        arrs = np.load(f_name)
+        names = arrs.files  # array names
+        return names, arrs
+    elif f_name[-3:] == "npy":
+        arr = np.load(f_name)
+        return arr
 
 
 def save_geo(g, f_name, folder):
@@ -564,7 +564,7 @@ def prn_keys(data, num=0):
             print(f2.format(*i))
 
 
-def _len_check_(arr):
+def len_check(arr):
     """Check iterator lengths."""
     arr = np.asarray(arr, dtype='O').squeeze()
     if arr.shape[0] == 1:
@@ -594,7 +594,7 @@ def lists_to_arrays(coords, out=[]):  # ** works
     """
     if isinstance(coords, (list, np.ndarray)):
         for sub in coords:
-            _is_, sze = _len_check_(sub)
+            _is_, sze = len_check(sub)
             if _is_:
                 arrs = [np.array(i) for i in sub]
                 out.append(np.asarray(arrs, dtype=np.float64).squeeze())

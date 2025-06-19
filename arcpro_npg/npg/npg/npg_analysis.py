@@ -10,7 +10,7 @@ Script :
     npg_analysis.py
 
 Author :
-    Dan_Patterson@carleton.ca
+    https://github.com/Dan-Patterson
 
 Modified :
     2023-11-03
@@ -57,7 +57,7 @@ __helpers__ = ['_dist_arr_', '_e_dist_']
 # __all__ = __helpers__ + __all__
 
 
-# ===========================================================================
+# ---- ---------------------------
 # ---- (1) distance related
 def closest_n(a, N=3, ordered=True):
     """See the `n_near` docstring."""
@@ -244,6 +244,7 @@ def n_spaced(L=0, B=0, R=10, T=10, min_space=1, num=10, verbose=True):
     return a0
 
 
+# ---- ---------------------------
 # ---- (2) intersection
 #
 def _x_sect_2(args):
@@ -337,6 +338,7 @@ def intersection_pnt(p0, p1, p2, p3):
     return arr * n3
 
 
+# ---- ---------------------------
 # ---- (3) k-nearest neighbors
 # knn0 used by concave hulls
 #
@@ -406,6 +408,7 @@ def knn0(p, pnts, k):
     return pnts[idx].tolist()
 
 
+# ---- ---------------------------
 # ---- (4) minimum spanning tree
 #
 def _dist_arr_(a, verbose=False):
@@ -550,6 +553,7 @@ def connect(a, dist_arr, edges):
 """
 
 
+# ---- ---------------------------
 # ---- (5) concave hull
 #
 def concave(points, k, pip_check=False):

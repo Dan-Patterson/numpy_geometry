@@ -9,7 +9,7 @@ Script :
     npg_min_circ.py  # Minimum area bounding circles
 
 Author :
-    Dan_Patterson@carleton.ca
+    `<https://github.com/Dan-Patterson>`_.
 
 Modified :
     2023-08-23

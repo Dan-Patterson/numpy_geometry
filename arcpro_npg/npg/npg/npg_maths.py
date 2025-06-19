@@ -13,12 +13,10 @@ Script :
     npg_maths.py
 
 Author :
-    Dan_Patterson@carleton.ca
-
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-03-11
+    2025-05-31
 
 Purpose
 -------
@@ -47,26 +45,38 @@ import npg  # noqa
 script = sys.argv[0]
 
 __all__ = [
-    'cross_product_2d',
-    'n_largest',                       # (3) size-based functions
+    'flip_left_right',                 # (2) geom helpers
+    'flip_up_down',
+    'cross_product_2d',                # (3) math helpers
+    'dot_product_2d',
+    'norm_2d',
+    'pnt_to_array_distances',
+    'project_pnt_to_line',
+    'circ_circ_intersection',          # (4) shape-based intersectons
+    'line_circ_intersection',
+    'segment_crossing',
+    'n_largest',                       # (5) counts or size-based functions
     'n_smallest',
     'running_count',
-    'pnt_to_array_distances',
-    'project_pnt_to_line',             # ( ) line methods
-    'segment_crossing'
 ]
 
 __helpers__ = [
+    '_area_centroid_2',                 # (1) geom private helpers
+    'trans_rot_2',
+    '_arc_mini_',
     '_angles_3pnt_',
     '_angle_between_',
-    '_pnt_on_segment_'
+    '_offset_segment_',
+    '_resize_segment_',
+    '_pnt_on_segment_',
+    '_point_along_a_line'
 ]
 
 __imports__ = []
 
 
 # ---- ---------------------------
-# ---- (1) private helpers
+# ---- (1) geom private helpers
 #
 rot90 = np.array([[0, -1], [1, 0]], dtype='float')
 rot180 = np.array([[-1, 0], [0, -1]], dtype='float')
@@ -76,43 +86,6 @@ rot270 =  np.array([[0, 1], [-1, 0]], dtype='float')  #noqa
 # rot = np.array(((c, s), (-s, c)))
 
 
-def flip_left_right(a, shift_back=True):
-    """Return an array flipped vertically.
-
-    Parameters
-    ----------
-    a :  array_like
-    shift_back : boolean
-        True, returns the array to the original x-axis baseline.  False, flips
-        along a line middle of the new y-values.
-    """
-    m = np.array([[-1, 0], [0, -1]], dtype='float')  # rotate 180
-    vals = a @ m
-    if shift_back:
-        mins_ = np.min(vals, axis=0)
-        vals = vals - mins_
-    return vals
-
-
-def flip_up_down(a, shift_back=True):
-    """Return an array flipped vertically.
-
-    Parameters
-    ----------
-    a :  array_like
-    shift_back : boolean
-        True, returns the array to the original x-axis baseline.  False, flips
-        along a line middle of the new y-values.
-    """
-    m = np.array([[1, 0], [0, -1]], dtype='float')
-    vals = a @ m
-    if shift_back:
-        mins_ = np.min(vals, axis=0)
-        vals[:, 1] -= mins_[1]
-        # print("not implemented")
-    return vals
-
-
 def _area_centroid_2(a):
     r"""Calculate area and centroid for a singlepart polygon, `a`.
 
@@ -120,12 +93,13 @@ def _area_centroid_2(a):
 
     Notes
     -----
+    **See npg.npg_geom_hlp  ... _area_centroid_ ** for the main
     For multipart shapes, just use this syntax:
 
     >>> # rectangle with hole
     >>> a0 = np.array([[[0., 0.], [0., 10.], [10., 10.], [10., 0.], [0., 0.]],
                       [[2., 2.], [8., 2.], [8., 8.], [2., 8.], [2., 2.]]])
-    >>> [_area_centroid_(i) for i in a0]
+    >>> [_area_centroid_2(i) for i in a0]
     >>> [(100.0, array([ 5.00,  5.00])), (-36.0, array([ 5.00,  5.00]))]
     """
     x0, y1 = (a.T)[:, 1:]
@@ -284,8 +258,6 @@ def _angle_between_(p0, cent, p1, inside=True, in_degrees=False):
     return angles
 
 
-# ---- ---------------------------
-# ---- (2) geom private helpers
 def _offset_segment_(poly, value=1.):
     """Return offset polygon segments by a finite value.
 
@@ -380,8 +352,88 @@ def _resize_segment_(a, absolute=True, value=1, direction=0, keep_all=True):
     return np.array(arr)
 
 
+def _pnt_on_segment_(pnt, seg):
+    """Orthogonal projection of a point onto a 2 point line segment.
+
+    Returns the intersection point, if the point is between the segment end
+    points, otherwise, it returns the distance to the closest endpoint.
+
+    Parameters
+    ----------
+    pnt : array-like
+        `x,y` coordinate pair as list or ndarray
+    seg : array-like
+        `from-to points`, of x,y coordinates as an ndarray or equivalent.
+
+    Notes
+    -----
+    >>> seg = np.array([[0, 0], [10, 10]])  # p0, p1
+    >>> p = [10, 0]
+    >>> pnt_on_seg(seg, p)
+    array([5., 5.])
+
+    Generically, with cross products and norms.
+
+    np.cross for 2D arrays was deprecated in NumPy 2.0 use
+
+    def cross2d(x, y):
+        return x[..., 0] * y[..., 1] - x[..., 1] * y[..., 0]
+
+    >>> d = np.linalg.norm(np.cross(p1 - p0, p0 - p))/np.linalg.norm(p1 - p0)
+    >>> # becomes
+    >>> d = np.linalg.norm(cross2d(p1 - p0, p0 - p))/np.linalg.norm(p1 - p0)
+    """
+    x0, y0, x1, y1, dx, dy = *pnt, *seg[0], *(seg[1] - seg[0])
+    dist_ = dx * dx + dy * dy  # squared length
+    u = ((x0 - x1) * dx + (y0 - y1) * dy) / dist_
+    u = max(min(u, 1), 0)
+    xy = np.array([dx, dy]) * u + [x1, y1]
+    d = xy - pnt
+    return xy, np.hypot(d[0], d[1])
+
+
 # ---- ---------------------------
-# ---- (3) private helpers
+# ---- (2) geom helpers
+def flip_left_right(a, shift_back=True):
+    """Return an array flipped vertically.
+
+    Parameters
+    ----------
+    a :  array_like
+    shift_back : boolean
+        True, returns the array to the original x-axis baseline.  False, flips
+        along a line middle of the new y-values.
+    """
+    m = np.array([[-1, 0], [0, -1]], dtype='float')  # rotate 180
+    vals = a @ m
+    if shift_back:
+        mins_ = np.min(vals, axis=0)
+        vals = vals - mins_
+    return vals
+
+
+def flip_up_down(a, shift_back=True):
+    """Return an array flipped vertically.
+
+    Parameters
+    ----------
+    a :  array_like
+    shift_back : boolean
+        True, returns the array to the original x-axis baseline.  False, flips
+        along a line middle of the new y-values.
+    """
+    m = np.array([[1, 0], [0, -1]], dtype='float')
+    vals = a @ m
+    if shift_back:
+        mins_ = np.min(vals, axis=0)
+        vals[:, 1] -= mins_[1]
+        # print("not implemented")
+    return vals
+
+
+# ---- ---------------------------
+# ---- (3) math helpers
+
 def cross_product_2d(a, b):
     """Replace `np.cross` with this for 2D vectors (deprecated in NumPy 2.0).
 
@@ -480,47 +532,7 @@ def project_pnt_to_line(x0, y0, x1, y1, xp, yp):
     return None
 
 
-def _pnt_on_segment_(pnt, seg):
-    """Orthogonal projection of a point onto a 2 point line segment.
-
-    Returns the intersection point, if the point is between the segment end
-    points, otherwise, it returns the distance to the closest endpoint.
-
-    Parameters
-    ----------
-    pnt : array-like
-        `x,y` coordinate pair as list or ndarray
-    seg : array-like
-        `from-to points`, of x,y coordinates as an ndarray or equivalent.
-
-    Notes
-    -----
-    >>> seg = np.array([[0, 0], [10, 10]])  # p0, p1
-    >>> p = [10, 0]
-    >>> pnt_on_seg(seg, p)
-    array([5., 5.])
-
-    Generically, with cross products and norms.
-
-    np.cross for 2D arrays was deprecated in NumPy 2.0 use
-
-    def cross2d(x, y):
-        return x[..., 0] * y[..., 1] - x[..., 1] * y[..., 0]
-
-    >>> d = np.linalg.norm(np.cross(p1 - p0, p0 - p))/np.linalg.norm(p1 - p0)
-    >>> # becomes
-    >>> d = np.linalg.norm(cross2d(p1 - p0, p0 - p))/np.linalg.norm(p1 - p0)
-    """
-    x0, y0, x1, y1, dx, dy = *pnt, *seg[0], *(seg[1] - seg[0])
-    dist_ = dx * dx + dy * dy  # squared length
-    u = ((x0 - x1) * dx + (y0 - y1) * dy) / dist_
-    u = max(min(u, 1), 0)
-    xy = np.array([dx, dy]) * u + [x1, y1]
-    d = xy - pnt
-    return xy, np.hypot(d[0], d[1])
-
-
-# ---- (2) shape-based intersections
+# ---- (4) shape-based intersections
 #
 def circ_circ_intersection(c0, r0, c1, r1, return_arcs=False, step=1):
     """Return circle-circle intersection points.
@@ -697,7 +709,7 @@ def segment_crossing(args):
     return None
 
 
-# ---- (3) counts or size-based .... n largest, n_smallest
+# ---- (5) counts or size-based .... n largest, n_smallest
 #
 def n_largest(a, num=1, col_sort=True):
     """Return the`num` largest entries in an array.

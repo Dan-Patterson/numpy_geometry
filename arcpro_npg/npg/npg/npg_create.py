@@ -11,7 +11,7 @@ Script :
     npg_create.py
 
 Author :
-    Dan_Patterson@carleton.ca
+    `<https://github.com/Dan-Patterson>`_.
 
 Modified :
     2025-03-04
@@ -98,90 +98,50 @@ np.ma.masked_print_option.set_display('-')  # change to a single -
 
 script = sys.argv[0]  # print this should you need to locate the script
 
-__all__ = ['code_grid', 'rot_matrix',
-           'arc_', 'arc_sector',
-           'circle', 'circle_mini', 'circle_ring', 'circ_3pa',
-           'circle_sectors',  'circ_3p',
-           'ellipse',
-           'hex_flat', 'hex_pointy',
-           'rectangle',
-           'triangle',
-           'mesh_xy',
-           'pyramid',
-           'pnt_from_dist_bearing',
-           'xy_grid',
-           'transect_lines',
-           'buffer_rings',
-           'spiral_archim', 'spiral_sqr', 'spiral_cw', 'spiral_ccw',
-           'base_spiral', 'to_spiral', 'from_spiral',
-           'repeat', 'mini_weave'
-           ]
+__all__ = [
+    'rot_matrix',                      # (1) helpers
+    'arc_',                            # (2) sector, circle related
+    'arc_sector',
+    'circle',
+    'circle_mini',
+    'circle_ring',
+    'circ_3pa',
+    'circle_sectors',
+    'circ_3p',
+    'ellipse',
+    'hex_flat',                        # (3) hexagons
+    'hex_pointy',
+    'rectangle',                       # (4) rectangles, squares, triangles
+    'triangle',
+    'code_grid',                       # (5) others
+    'mesh_xy',
+    'pyramid',
+    'pnt_from_dist_bearing',
+    'xy_grid',
+    'transect_lines',
+    'buffer_rings',
+    'spiral_archim',                   # (6) spirals
+    'spiral_sqr',
+    'spiral_cw',
+    'spiral_ccw',
+    'base_spiral',
+    'to_spiral',
+    'from_spiral',
+    'repeat',                          # (7) spirals
+    'mini_weave',
+]
+
+__helpers__ = [
+    '_arc_',
+]
 
 FLOATS = np.typecodes['AllFloat']
 INTS = np.typecodes['AllInteger']
 NUMS = FLOATS + INTS
 
 
-def code_grid(x_cols=1, y_rows=1,
-              zero_based=False,
-              shaped=True,
-              bottom_up=False
-              ):
-    """Produce spreadsheet like labelling, either zero or 1 based.
-
-    Parameters
-    ----------
-    cols, rows: integer
-        make sure that the numbers are 1 or more... no checks for this
-    zero-based: boolean
-        zero yields A0, A1   ones yields A1, A2
-    shaped: boolean
-        True will shape the output to conform to array shape to match the rows
-        and columns of the output
-    bottom_up: boolean
-        False is the default so that top_down conforms to array shapes
-
-    Notes
-    -----
-    - list('0123456789')  # string.digits
-    - import string .... string.ascii_uppercase
-
-    This use padding A01 to facilitate sorting.
-    If you want a different system change
-    >>> >>> "{}{}".format(UC[c], r)    # A1 to whatever, no padding
-    >>> "{}{:02.0f}".format(UC[c], r)  # A01 to ..99
-    >>> "{}{:03.0f}".format(UC[c], r)  # A001 to A999
-    >>> # etc
-
-    >>> c0 = code_grid(
-            cols=5, rows=3, zero_based=False, shaped=True, bottom_up=False
-            )
-    [['A01' 'B01' 'C01' 'D01' 'E01']
-     ['A02' 'B02' 'C02' 'D02' 'E02']
-     ['A03' 'B03' 'C03' 'D03' 'E03']]
-
-    See Also
-    --------
-    ``code_grid.py`` for more details
-    """
-    alph = list(" ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-    UC = [("{}{}").format(alph[i], alph[j]).strip()
-          for i in range(27)
-          for j in range(1, 27)]
-    z = [1, 0][zero_based]
-    rc = [1, 0][zero_based]
-    c = ["{}{:02.0f}".format(UC[c], r)    # pull in the column heading
-         for r in range(z, y_rows + rc)   # label in the row letter
-         for c in range(x_cols)]          # label in the row number
-    c = np.asarray(c)
-    if shaped:
-        c = c.reshape(y_rows, x_cols)
-        if bottom_up:
-            c = np.flipud(c)
-    return c
-
-
-# ---- helpers ---------------------------------------------------------------
+# ---- ---------------------------
+# ---- (1) helpers ------------------------------------------------------------
 #
 def rot_matrix(angle=0, nm_3=False):
     """Return the rotation matrix given a rotation angle.
@@ -216,7 +176,8 @@ def rot_matrix(angle=0, nm_3=False):
     return rm
 
 
-# ---- arc_sector, convex hull, circle ellipse, hexagons, rectangles,
+# ---- ---------------------------
+# ---- (2)  sector, circle related,
 #      triangle, xy-grid --
 #
 def _arc_(p_st, cent, p_en, radius, deg_step=5., outside=True):
@@ -622,7 +583,8 @@ def ellipse(x_radius=1.0, y_radius=1.0,
     return pnts
 
 
-# ---- hexagons --------------------------------------------------------------
+# ---- ---------------------------
+# ---- (3) hexagons
 #
 def hex_flat(dx=1, dy=1,
              x_cols=1, y_rows=1,
@@ -682,7 +644,8 @@ def hex_pointy(dx=1, dy=1,
     return hexs
 
 
-# ---- rectangles/squares, triangles -----------------------------------------
+# ---- ---------------------------
+# ---- (4) rectangles/squares, triangles
 #
 # The following all share the same parameter list.
 # x = cos(2kπ/n),y = sin(2kπ/n),k=1,2,3⋯n where ``n`` is the number of sides.
@@ -772,8 +735,68 @@ def triangle(dx=1, dy=1,
     return a
 
 
-# ---- others ---------------------------------------------------------------
+# ---- ---------------------------
+# ---- (5) others
 #
+def code_grid(x_cols=1, y_rows=1,
+              zero_based=False,
+              shaped=True,
+              bottom_up=False
+              ):
+    """Produce spreadsheet like labelling, either zero or 1 based.
+
+    Parameters
+    ----------
+    cols, rows: integer
+        make sure that the numbers are 1 or more... no checks for this
+    zero-based: boolean
+        zero yields A0, A1   ones yields A1, A2
+    shaped: boolean
+        True will shape the output to conform to array shape to match the rows
+        and columns of the output
+    bottom_up: boolean
+        False is the default so that top_down conforms to array shapes
+
+    Notes
+    -----
+    - list('0123456789')  # string.digits
+    - import string .... string.ascii_uppercase
+
+    This use padding A01 to facilitate sorting.
+    If you want a different system change
+    >>> >>> "{}{}".format(UC[c], r)    # A1 to whatever, no padding
+    >>> "{}{:02.0f}".format(UC[c], r)  # A01 to ..99
+    >>> "{}{:03.0f}".format(UC[c], r)  # A001 to A999
+    >>> # etc
+
+    >>> c0 = code_grid(
+            cols=5, rows=3, zero_based=False, shaped=True, bottom_up=False
+            )
+    [['A01' 'B01' 'C01' 'D01' 'E01']
+     ['A02' 'B02' 'C02' 'D02' 'E02']
+     ['A03' 'B03' 'C03' 'D03' 'E03']]
+
+    See Also
+    --------
+    ``code_grid.py`` for more details
+    """
+    alph = list(" ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+    UC = [("{}{}").format(alph[i], alph[j]).strip()
+          for i in range(27)
+          for j in range(1, 27)]
+    z = [1, 0][zero_based]
+    rc = [1, 0][zero_based]
+    c = ["{}{:02.0f}".format(UC[c], r)    # pull in the column heading
+         for r in range(z, y_rows + rc)   # label in the row letter
+         for c in range(x_cols)]          # label in the row number
+    c = np.asarray(c)
+    if shaped:
+        c = c.reshape(y_rows, x_cols)
+        if bottom_up:
+            c = np.flipud(c)
+    return c
+
+
 def mesh_xy(L=0, B=0, R=5, T=5, dx=1, dy=1, as_rec=True):
     """Create a mesh of coordinates within the specified X, Y ranges.
 
@@ -807,14 +830,14 @@ def mesh_xy(L=0, B=0, R=5, T=5, dx=1, dy=1, as_rec=True):
 
 
 def pyramid(core=9, steps=10, incr=(1, 1), posi=True):
-    """Create a pyramid.  See pyramid_demo.py."""
-    a = np.array([core])
+    """Create a pyramid.  This is a raster, not vector."""
+    a = np.array([core])  # start in the middle and pad outwards to form rings
     a = np.atleast_2d(a)
     for i in range(1, steps):
         val = core - i
         if posi and (val <= 0):
             val = 0
-        a = np.lib.pad(a, incr, "constant", constant_values=(val, val))
+        a = np.pad(a, incr, "constant", constant_values=(val, val))
     return a
 
 
@@ -892,7 +915,7 @@ def pnt_from_dist_bearing(orig=(0, 0), bearings=None, dists=None, prn=False):
 def xy_grid(x, y=None, top_left=True):
     """Create a 2D array of locations from x, y values.
 
-    The values need not  be uniformly spaced just sequential.
+    The values need not be uniformly spaced just sequential.
     Derived from `meshgrid` in References.
 
     Parameters
@@ -1090,7 +1113,8 @@ def buffer_rings(steps=[0, 1, 2], theta=5):
     return arrays_to_Geo(results)
 
 
-# ---- spirals ----------------------------------------------------------------
+# ---- ---------------------------
+# ---- (6) spirals
 #
 def spiral_archim(N, n, inward=False, clockwise=True):
     """Create an Archimedes spiral in the range 0 to N points with 'n' steps.
@@ -1222,9 +1246,10 @@ def from_spiral(A):
     A = np.array(A)
     return A.flat[base_spiral(*A.shape)].reshape(A.shape)
 
-# ---- end code section--------------------------------------
 
-
+# ---- ---------------------------
+# ---- (7) keep
+#
 def repeat(seed=None, corner=[0, 0], x_cols=1, y_rows=1, angle=0):
     """Create the array of pnts to pass to arcpy.
 

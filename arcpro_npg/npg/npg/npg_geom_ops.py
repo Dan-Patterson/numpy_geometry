@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# noqa: D205, D400, F403
+# noqa: D205, D208, D400, F403
 r"""
 ----------------------------------
 npg_geom_ops: Geometry focused methods
@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-02-26
+    2025-06-01
 
 Purpose
 -------
@@ -130,7 +130,7 @@ from scipy.spatial import Delaunay
 # import npGeo
 from npg import npGeo, npg_geom_hlp, npg_pip  # noqa
 from npg.npg_helpers import _view_as_struct_
-from npg.npg_geom_hlp import (_bit_min_max_, _get_base_)
+from npg.npg_geom_hlp import (_bit_min_max_, _base_, _e_2d_)
 from npg.npg_maths import _angles_3pnt_
 from npg.npg_pip import np_wn
 from npg.npg_prn import prn_q, prn_tbl
@@ -153,7 +153,7 @@ __all__ = [
     'find_closest',
     'pnts_on_poly',
     'near_analysis',
-    'spyder_diagram',
+    'spider_diagram',
     'pnts_to_extent',                  # (2) extent functions
     'common_extent',
     'extent_to_poly',
@@ -176,13 +176,12 @@ __all__ = [
 ]
 
 __helpers__ = [
-    '_e_2d_',                          # (1) distance helpers
-    '_dist_along_',
-    '_percent_along_',
-    '_is_pnt_on_line_',
-    '_add_pnts_on_line_',
-    '_pnt_on_segment_',
+    '_add_pnts_on_line_',              # (1) distance helpers
     '_closest_pnt_on_poly_',
+    '_dist_along_',
+    '_is_pnt_on_line_',
+    '_percent_along_',
+    '_pnt_on_segment_'
 ]
 
 __imports__ = [
@@ -194,8 +193,9 @@ __imports__ = [
     'npg.npg_prn'
     'np_wn',           # npg.npg_pip
     '_bit_area_',      # npg_geom_hlp
-    '_get_base_',
+    '_base_',
     '_bit_min_max_',
+    '_e_2d_',
     '_in_extent_',
     '_angles_3pnt_'
     'prn_q',           # npg.npg_prn
@@ -206,17 +206,6 @@ __imports__ = [
 # ---- ---------------------------
 # ---- (1) helpers
 #
-def _e_2d_(a, p):
-    """Array points, `a`,  to point `p`, distance.
-
-    Use to determine distance of a point to a segment or segments.
-    """
-    if hasattr(a, 'IFT'):
-        a = a.tolist()
-    diff = a - p[None, :]
-    return np.sqrt(np.einsum('ij,ij->i', diff, diff))
-
-
 def _dist_along_(a, dist=0):
     """Add a point along a poly feature at a distance from the start point.
 
@@ -241,7 +230,7 @@ def _dist_along_(a, dist=0):
     _percent_along_ : function
         Similar to this function but measures distance as a percentage.
     """
-    a = _get_base_(a)
+    a = _base_(a)
     dxdy = a[1:, :] - a[:-1, :]                        # coordinate differences
     leng = np.sqrt(np.einsum('ij,ij->i', dxdy, dxdy))  # segment lengths
     cumleng = np.concatenate(([0], np.cumsum(leng)))   # cumulative length
@@ -274,7 +263,7 @@ def _percent_along_(a, percent=0):
     --------
     Called by `pnt_on_poly`.
     """
-    a = _get_base_(a)
+    a = _base_(a)
     if percent > 1.:
         percent /= 100.
     dxdy = a[1:, :] - a[:-1, :]                        # coordinate differences
@@ -352,7 +341,7 @@ def _add_pnts_on_line_(a, spacing=1, is_percent=False):
     Called by `densify_by_distance`.
 
     """
-    a = _get_base_(a)
+    a = _base_(a)
     N = len(a) - 1                                    # segments
     dxdy = a[1:, :] - a[:-1, :]                       # coordinate differences
     leng = np.sqrt(np.einsum('ij,ij->i', dxdy, dxdy))  # segment lengths
@@ -620,7 +609,7 @@ def dist_array(a, centroid=True, as_table=True, prn=False):
     if not hasattr(a, 'IFT'):
         print("\nGeo array required.")
         return
-    ids = a.IDs
+    ids = a.U  # a.IDs  2025-05-23 changes to use shape
     if centroid:
         cents = a.centroids()
     else:
@@ -631,7 +620,8 @@ def dist_array(a, centroid=True, as_table=True, prn=False):
         f_t_ = np.nonzero(upper_tri)
         f_t_ = np.array(f_t_).T
         ft_ids = np.array([ids[i] for i in f_t_])
-        vals = [upper_tri[i, j] for i, j in ft_ids]
+        # -- changes from ft_ids to f_t_ because needs to be 0-based
+        vals = [upper_tri[i, j] for i, j in f_t_]  # ft_ids]
         dt = [('From_id', '<i4'), ('To_id', '<i4'), ('Dist', '<f8')]
         tbl = np.empty((ft_ids.shape[0],), dtype=dt)
         tbl['From_id'] = ft_ids[:, 0]
@@ -772,7 +762,7 @@ def near_analysis(a, pnts, azimuth=True):
     return z, id_pntply
 
 
-def spyder_diagram(pnts, arr, centroid=False):
+def spider_diagram(pnts, arr, centroid=False):
     """Create an origin destination diagram from `pnts` to `arr`.
 
     Parameters
@@ -785,9 +775,9 @@ def spyder_diagram(pnts, arr, centroid=False):
         poly* features, you can specify whether to use the centroid or the
         whole shape using the `centroid` parameter.
     centroid : boolean
-       True, will use the centroid if polygons, other the center if polyline.
+       True, will use the centroid if `arr` represents a polygon, other the
+       center `arr` represents a point cloud or polyline.
 
-    plot_segments(zz[:, :4])
     """
     if hasattr(arr, 'IFT'):
         if arr.K == 2:
@@ -842,7 +832,7 @@ def pnts_to_extent(a, as_pair=False):
     >>> ext = np.array([a[:, 0].min(), a[:, 1].min(),
     ...                 a[:, 0].max(), a[:, 1].max()])
     """
-    a = _get_base_(a)
+    a = _base_(a)
     ext = _bit_min_max_(a)
     if as_pair:
         ext = ext.reshape(2, 2)
@@ -851,8 +841,8 @@ def pnts_to_extent(a, as_pair=False):
 
 def common_extent(a, b):
     """Return the extent overlap for two polygons as L, B, R, T or None."""
-    a = _get_base_(a)
-    b = _get_base_(b)
+    a = _base_(a)
+    b = _base_(b)
     ext0 = np.concatenate((np.min(a, axis=0), np.max(a, axis=0)))
     ext1 = np.concatenate((np.min(b, axis=0), np.max(b, axis=0)))
     es = np.concatenate((ext0[None, :], ext1[None, :]), axis=0)

@@ -16,7 +16,7 @@ Script :
     .../npg/npg_prn.py
 
 Author :
-    Dan_Patterson@carleton.ca
+    `<https://github.com/Dan-Patterson>`_.
 
 Modified :
     2025-02-13
@@ -57,7 +57,7 @@ from numpy.lib.recfunctions import unstructured_to_structured as uts  #noqa
 # from npGeo import *
 
 
-# ---- Constants -------------------------------------------------------------
+# ---- Constants
 #
 script = sys.argv[0]  # print this should you need to locate the script
 
@@ -66,39 +66,38 @@ INTS = np.typecodes['AllInteger']
 NUMS = FLOATS + INTS
 
 
-ft = {'bool': lambda x: repr(x.astype(np.int32)),
-      'float_kind': '{: 7.2f}'.format}
 np.set_printoptions(
-    edgeitems=5, linewidth=120, precision=2, suppress=True, threshold=100,
-    formatter=ft)
+    edgeitems=10, linewidth=120, precision=2, suppress=True, threshold=200,
+    legacy='1.25',
+    formatter={"bool": lambda x: repr(x.astype(np.int32)),
+               "float_kind": '{: 6.2f}'.format}
+    )  # legacy=False or legacy='1.25'
+np.ma.masked_print_option.set_display('-')  # change to a single -
 
 __all__ = [
-    'prn_q', 'prn_', 'prn_tbl', 'prn_geo', 'prn_lists', 'prn_arrays',
-    'prn_as_obj', 'prn_Geo_shapes', '_svg'
-    ]
+    'prn_q',
+    'prn_',
+    'prn_tbl',
+    'prn_geo',
+    'prn_lists',
+    'prn_arrays',
+    'prn_as_obj',
+    'prn_Geo_shapes',
+    '_svg'
+]
 
-__helpers__ = ['_ckw_', '_col_format', 'col_hdr', 'ake_row_format']
-
-
-# ============================================================================
-# ---- (1) Print etc ---------------------------------------------------------
-# printing based on arraytools.frmts.py using prn_rec and dependencies
-
-def prn_q(a, edges=5, max_lines=25, width=120, decimals=2):
-    """Format an array so that it wraps.
-
-    An ndarray is changed to a structured array.
-    """
-    width = min(len(str(a[0])), width)
-    with np.printoptions(edgeitems=edges, threshold=max_lines, linewidth=width,
-                         precision=decimals, suppress=True, nanstr='-n-'):
-        print("\nArray fields/values...:")
-        if a.dtype.kind == 'V':
-            print("  ".join(a.dtype.names))
-        print(a)
+__helpers__ = [
+    '_ckw_',
+    '_col_format',
+    'col_hdr',
+    'make_row_format'
+]
 
 
+# ---- ---------------------------
+# ---- (1) print functions
 # ---- helpers
+
 # required for prn_tbl and prn_geo
 def _ckw_(a, name, deci):
     """Array `a` c(olumns) k(ind) and w(idth)."""
@@ -132,8 +131,6 @@ def _col_format(pairs, deci):
     return dts, form_width
 
 
-# ---- main print functions
-#
 def col_hdr(num=8):
     """Print numbers from 1 to 10*num to show column positions."""
     args = [(('{:<10}') * num).format(*'0123456789'),
@@ -243,7 +240,7 @@ def prn_(a, deci=2, width=120, prefix=". . "):
         print(out)
 
 
-def prn_tbl(a, rows_m=20, names=None, deci=2, width=75):
+def prn_tbl(a, rows_m=20, names=None, deci=2, width=88):
     """Print and format a structured array with a mixed dtype.
 
     Parameters
@@ -379,6 +376,21 @@ def prn_geo(a, rows_m=100, names=None, deci=2, width=75):
     # return row_frmt, hdr2  # uncomment for testing
 
 
+def prn_q(a, edges=5, max_lines=25, width=120, decimals=2):
+    """Format an array so that it wraps.
+
+    An ndarray is changed to a structured array.
+    """
+    width = min(len(str(a[0])), width)
+    with np.printoptions(edgeitems=edges, threshold=max_lines, linewidth=width,
+                         precision=decimals, suppress=True, nanstr='-n-'):
+        print("\nArray fields/values...:")
+        if a.dtype.kind == 'V':
+            print("  ".join(a.dtype.names))
+        print(a)
+
+
+# ---- ---------------------------
 # ----  (2) print & display Geo and ndarrays
 #
 def prn_lists(a, max_=None, prn_structure=False):

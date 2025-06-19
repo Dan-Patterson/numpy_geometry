@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# noqa: D205, D400, F403
+# noqa: D205, D208, D400, F403
 r"""
 ------------------------------------------------
 npg_geom_ops: Buffering geometry focused methods
@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-04-27
+    2025-06-01
 
 Purpose
 -------
@@ -42,21 +42,18 @@ import numpy as np
 
 from npg import npGeo  # noqa
 
-from npg.npg_bool_hlp import _del_seq_pnts_
+from npg.npg_bool_hlp import _del_seq_dupl_pnts_
 
-from npg.npg_geom_hlp import (_area_centroid_, _in_extent_,  # noqa
-                              _is_convex_, _bit_length_)  # noqa
+from npg.npg_geom_hlp import (_area_centroid_, _in_extent_) # noqa
 
 from npg.npg_geom_ops import _is_pnt_on_line_  # noqa
 
-from npg.npg_maths import (_angles_3pnt_, circ_circ_intersection,  # noqa
-                           line_circ_intersection)  # noqa
+from npg.npg_maths import _angles_3pnt_
 
 from npg.npg_pip import np_wn, _side_  # noqa
 
 from npg.npg_plots import plot_polygons, plot_segments, plot_polylines  # noqa
 
-# from npg.npg_prn import prn_q, prn_tbl
 
 # np.set_printoptions(
 #     edgeitems=10, linewidth=100, precision=2, suppress=True, threshold=200,
@@ -77,44 +74,24 @@ __all__ = [
 ]
 
 __helpers__ = [
-    '_e_2d_',                          # (1) general helpers
-    '_x_ings_',
+    '_x_ings_',                        # (1) general helpers
     '_offset_np_'
 ]
 
 __imports__ = [
-    'npGeo',             # npGeo and sub modules
-    'npg_geom_hlp',
-    'npg_pip',
-    'npg.npg_prn'
-    'np_wn', '_side_',   # npg.npg_pip
-    '_del_seq_pnts_',    # npg.npg_bool_hlp
-    '_area_centroid_',   # npg_geom_hlp
-    '_bit_area_',
-    '_get_base_',
-    '_bit_min_max_',
+    'npGeo',                # npGeo and sub modules
+    'np_wn', '_side_',      # npg.npg_pip
+    '_del_seq_dupl_pnts_',  # npg.npg_bool_hlp
+    '_area_centroid_',      # npg_geom_hlp
     '_in_extent_',
-    '_is_pnt_on_line_',  # npg_geom_ops
-    '_angles_3pnt_'      # npg_maths
-    'prn_q',             # npg.npg_prn
-    'prn_tbl'
+    '_is_pnt_on_line_',     # npg_geom_ops
+    '_angles_3pnt_'         # npg_maths
 ]
 
 
 # ---- ---------------------------
 # ---- (1) general helpers
 #
-def _e_2d_(a, p):
-    """Array points, `a`,  to point `p`, distance.
-
-    Use to determine distance of a point to a segment or segments.
-    """
-    if hasattr(a, 'IFT'):
-        a = a.tolist()
-    diff = a - p[None, :]
-    return np.sqrt(np.einsum('ij,ij->i', diff, diff))
-
-
 def on_line_chk(start, end, xy, tolerance=1.0e-12):
     """Perform a distance check of whether a point is on a line.
 
@@ -157,59 +134,6 @@ def on_line_chk(start, end, xy, tolerance=1.0e-12):
             return chk, [start, xy, d0]
         return chk, [xy, end, d1]  # -- closest to end
     return chk, []  # -- not on line
-
-
-# def _wn_(pnts, poly, return_winding=True, extras=False):
-#     """Return points in polygon using a winding number algorithm in numpy.
-
-#     See Also
-#     --------
-#     A direct copy of `npg_pip.np_wn` renamed and used for testing here.
-
-#     `_side_` from `npg_pip` is useful
-
-#     r, in_, inside, outside, equal_ = _side_(pnts, poly)
-
-#     Notes
-#     -----
-#     The following returns the indices of the points that are equal `w`.  This
-#     can be used to extract those points (or None)::
-
-#       w = np.nonzero((poly[:-1] == pnts[:, None]).all(-1).any(-1))[0]
-#       eq_ = pnts[w] if w.size != 0 else None
-
-#     Inclusion checks
-#     ----------------
-#     on the perimeter is deemed `out`
-#         chk1 (y_y0 > 0.0)  changed from >=
-#         chk2 np.less is ok
-#         chk3 leave
-#         pos  leave
-#         neg  chk3 <= 0  to keep all points inside poly on edge included
-#     """
-#     x0, y0 = poly[:-1].T  # polygon `from` coordinates
-#     x1, y1 = poly[1:].T   # polygon `to` coordinates
-#     x, y = pnts.T         # point coordinates
-#     y_y0 = y[:, None] - y0
-#     y_y1 = y[:, None] - y1
-#     x_x0 = x[:, None] - x0
-#     # -- diff = np.sign(np.einsum("ikj, kj -> ij", pnts[:, None], poly[:-1]))
-#     diff_ = ((x1 - x0) * y_y0 - (y1 - y0) * x_x0) + 0.0  # einsum originally
-#     chk1 = (y_y0 > 0.0)  # -- top and bottom point inclusion!   try `>`
-#     chk2 = (y_y1 < 0.0)  # was  chk2 = np.less(y[:, None], y1)  try `<`
-#     chk3 = np.sign(diff_).astype(np.int32)
-#     pos = (chk1 & chk2 & (chk3 > 0)).sum(axis=1, dtype=int)
-#     neg = (~chk1 & ~chk2 & (chk3 < 0)).sum(axis=1, dtype=int)  # -- <= ??
-#     wn = pos - neg
-#     in_ = pnts[np.nonzero(wn)]
-#     if extras:
-#         eq_ids = np.isin(pnts, poly).all(-1).nonzero()[0]  # equal
-#         extra_info = ["equal pnt ids", eq_ids]
-#     if return_winding:
-#         if extras:
-#             return in_, wn, extra_info
-#         return in_, wn
-#     return in_
 
 
 def _x_ings_(args):
@@ -267,12 +191,6 @@ def _offset_np_(poly, buff_dist=1.0, offset_check=False, as_segments=False):  #
 
     Notes
     -----
-    This is 4x faster than `_offset_` which can be used for lists or arrays
-    which delineate a polygon boundary.
-
-    `offset_check` impact in `_offset_np_` vs `_offset_`
-      - True  540 μs vs 660 μs
-      - False 50 μs vs 220 μs
     For history::
 
       dxdy = a[1:] - a[:-1]  # `a` is a polygon array of points
@@ -329,7 +247,7 @@ def _offset_np_(poly, buff_dist=1.0, offset_check=False, as_segments=False):  #
         tmp = np.concatenate((tmp[-1][None, :], tmp), axis=0)
         tmp = np.round(tmp, 6)  # try to address floating pnt issues
     #
-    new_pnts = _del_seq_pnts_(tmp, True)
+    new_pnts = _del_seq_dupl_pnts_(tmp, True)
     #
     new_segs = np.concatenate((new_pnts[:-1], new_pnts[1:]), axis=1)
     #
@@ -581,8 +499,8 @@ def rounded_buffer(poly, buff_dist=1.0, radius=1, step=5):
     if orig_ids.shape[0] != keep_ids.shape[0]:
         cents_ = cents_orig[keep_ids]
         angles_ = _angles_3pnt_(poly[keep_ids], inside=False, in_deg=True)
-        circ_ids = [keep_ids[i] for i in range(0, len(angles_))
-                    if angles_[i] > 0]
+        # circ_ids = [keep_ids[i] for i in range(0, len(angles_))
+        #             if angles_[i] > 0]
     else:
         cents_ = np.copy(cents_orig)
         angles_ = np.copy(angles_orig)
@@ -620,7 +538,6 @@ def rounded_buffer(poly, buff_dist=1.0, radius=1, step=5):
             else:
                 segs.append(np.array([p_st, p_en]))
         else:
-            # arccc = np.array([p_st, p_en])  # attempt at just joining chord
             arc = _a_(circ_pnts, p_st, cent, p_en,
                       radius=buff_dist, step=step, outside=True)
             if angles_[cnt - 1] > 0:
@@ -632,6 +549,8 @@ def rounded_buffer(poly, buff_dist=1.0, radius=1, step=5):
 
 
 """
+from npg.npg_maths import (_angles_3pnt_, circ_circ_intersection,  # noqa
+                           line_circ_intersection) 
 for n, i in enumerate(cs):
     c0 = cs[n-1]
     c1 = i
@@ -642,52 +561,6 @@ for n, i in enumerate(cs):
     out.append([[nodes[n-1], nodes[n]], cen, v])
 
 """
-# plot_polylines(segs
-# works up to here by producing arcs
-#
-# frst = segs[0][0][None, :]
-# segs.append(frst)
-
-
-def plot_buffs(a, label_pnts=False, as_segments=False):
-    """Plot the buffers.
-
-    Parameters
-    ----------
-    a : array_like
-        An ndarray or a list of arrays.
-    label_pnts : boolean
-        True to label the nodes or segments.
-    as_segments : boolean
-        True returns a segmented version of the contents of `a`.
-    """
-    if as_segments:
-        if isinstance(a, (list, tuple)):
-            s0 = [i for i in a if isinstance(i, np.ndarray)]
-            s1 = [np.concatenate((i[:-1], i[1:]), axis=1)
-                  for i in s0
-                  if i.shape[1] == 2]
-            s2 = np.concatenate(s1, axis=0)
-            plot_segments(s2)
-            return
-        if isinstance(a, np.ndarray):
-            if a.shape[1] == 2:
-                orig_segs = np.concatenate((a[:-1], a[1:]), axis=1)
-                plot_segments(orig_segs)
-            else:
-                plot_segments(a)
-            return
-    if len(a) == 1:
-        if label_pnts:
-            lbls = np.arange(0, a.shape[0])
-        else:
-            lbls = None
-        plot_polygons(a, outline=True, vertices=True, labels=lbls)
-
-
-# ---- keep for now
-#
-
 
 # ===========================================================================
 #

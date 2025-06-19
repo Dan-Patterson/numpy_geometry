@@ -13,11 +13,10 @@ and uses numpy enhancements.
 Script :
     npg_pip.py
 Author :
-    Dan_Patterson@carleton.ca
-
     `<https://github.com/Dan-Patterson>`_.
+
 Modified :
-    2022-11-07
+    2025-05-29
 
 Purpose
 -------
@@ -54,7 +53,10 @@ How to remove points from an array, if found in an array.  In the example below
 
 References
 ----------
-`<http://geomalgorithms.com/a03-_inclusion.html>`_.
+`<https://en.wikipedia.org/wiki/Point_in_polygon>`_.  ** general information
+
+`<https://web.archive.org/web/20131210180851/http://geomalgorithms.com/a03-
+_inclusion.html>`_.  ** original site usurped
 
 `<https://stackoverflow.com/questions/33051244/numpy-filter-points-within-
 bounding-box/33051576#33051576>`_.
@@ -87,12 +89,21 @@ np.set_printoptions(
 script = sys.argv[0]  # print this should you need to locate the script
 
 __all__ = [
-    '_is_right_side', '_side_',  'crossing_num', 'winding_num', '_partition_',
-    'np_wn', 'pnts_in_Geo'
+    'crossing_num',
+    'winding_num',
+    'np_wn',
+    'pnts_in_Geo'
+]
+
+__helpers__ = [
+    '_is_right_side',
+    '_side_',
+    '_partition_'
 ]
 
 
-# ---- single use helpers
+# ---- ---------------------------
+# ---- (1) single use helpers
 #
 def _side_(pnts, poly):  # ** not used
     r"""Return points inside, outside or equal/crossing a convex poly feature.
@@ -103,7 +114,7 @@ def _side_(pnts, poly):  # ** not used
     in_     the points based on the winding number
     inside  (r < 0)
     outside (r > 0)
-    equal_  (r == 0) 
+    equal_  (r == 0)
 
     Notes
     -----
@@ -230,7 +241,8 @@ def winding_num(pnts, poly, batch=False):
 
     References
     ----------
-    `<http://geomalgorithms.com/a03-_inclusion.html#wn_PnPoly()>`_.
+    `<https://web.archive.org/web/20131210180851/http://geomalgorithms.com/
+    a03-_inclusion.html> `_.
     """
     def _is_right_side(p, strt, end):
         """Determine if a point (p) is `inside` a line segment (strt-->end).
@@ -267,8 +279,8 @@ def winding_num(pnts, poly, batch=False):
         return cal_w(pnts, poly)
 
 
-# ----------------------------------------------------------------------------
-# ---- (1) ... points in polygons
+# ---- ---------------------------
+# ---- (2) ... points in polygons
 #
 def _partition_(pnts, geo, return_remainder=False):
     """Partition points into the first polygon they fall into.
@@ -379,8 +391,9 @@ def np_wn(pnts, poly, return_winding=False, extras=False):
     wn = pos - neg
     in_ = pnts[np.nonzero(wn)]
     if extras:
-        eq_ids = np.isin(pnts, poly).all(-1).nonzero()[0]  # equal
-        extra_info = ["equal pnt ids", eq_ids]
+        # eq_ids = np.isin(pnts, poly).all(-1).nonzero()[0]  # not correct
+        eq_ids = np.nonzero((pnts == poly[:, None]).all(-1))
+        extra_info = ["equal poly ids then pnt ids", eq_ids]
     if return_winding:
         if extras:
             return in_, wn, extra_info

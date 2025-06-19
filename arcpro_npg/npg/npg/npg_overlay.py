@@ -23,8 +23,6 @@ Script :
     npg_overlay.py
 
 Author :
-    Dan_Patterson@carleton.ca
-
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
@@ -81,7 +79,7 @@ import numpy as np
 # import npGeo
 # from npGeo import array_IFT, arrays_to_Geo, roll_coords
 # from npg import npGeo
-from npg.npg_bool_hlp import p_ints_p
+from npg.npg_bool_hlp import _p_ints_p_
 from npg.npg_bool_ops import union_adj
 # from npg.npg_pip import np_wn
 # import npg_geom_hlp
@@ -105,10 +103,17 @@ script = sys.argv[0]  # print this should you need to locate the script
 __all__ = [
     'intersections',
     'intersects',
-    'line_crosses', 'in_out_crosses', 'crossings',
-    'left_right_pnts', 'line_side', '_line_crossing_'
+    'line_crosses',
+    'in_out_crosses',
+    'crossings',
+    'left_right_pnts',
+    'line_side',
 ]
-__helpers__ = ['_intersect_']
+
+__helpers__ = [
+    '_intersect_',
+    '_line_crossing_'
+]
 
 
 # ---- ---------------------------
@@ -171,6 +176,47 @@ def _intersect_(p0, p1, p2, p3):
     return (True, np.array([x, y]))
 
 
+def _line_crossing_(clip_, poly):
+    """Determine if a line is `inside` another line segment.
+
+    Notes
+    -----
+    The original ***
+    See _line_cross_ in npg_clip ***
+
+    Multi-line implementation of line_crosses.
+    Used by ``z``.
+
+    points inside clipper
+    >>> w0.all(0).nonzero()[0]         # both on right of all segments
+    >>> (w1 == 1).any(0).nonzero()[0]  # start on right
+    >>> (w2 == 1).any(0).nonzero()[0]  # end on right
+    >>> (w3 == 1).any(0).nonzero()[0]  # both on left of all segments
+    """
+    x0s, y0s = poly[:-1].T   # x0s = poly[:-1, 0], y0s = poly[:-1, 1]
+    x1s, y1s = poly[1:]. T   # x1s = poly[1:, 0],  y1s = poly[1:, 1]
+    x2s, y2s = clip_[:-1].T  # x2s = clip_[:-1, 0], y2s = clip_[:-1, 1]
+    x3s, y3s = clip_[1:].T   # x3s = clip_[1:, 0],  y3s = clip_[1:, 1]
+    dcx = x3s - x2s
+    dcy = y3s - y2s
+    a_0 = (y0s - y2s[:, None]) * dcx[:, None]
+    a_1 = (x0s - x2s[:, None]) * dcy[:, None]
+    b_0 = (y1s - y2s[:, None]) * dcx[:, None]
+    b_1 = (x1s - x2s[:, None]) * dcy[:, None]
+    a = (a_0 <= a_1)
+    b = (b_0 <= b_1)
+    w0 = np.logical_and(a == 1, b == 1)   # both on right
+    z0 = np.where(w0 == 1, 2, 0)          # 2
+    w1 = np.logical_and(a == 1, b == 0)   # start on right
+    z1 = np.where(w1 == 1, 1, 0)          # 1
+    w2 = np.logical_and(a == 0, b == 1)   # end on right
+    z2 = np.where(w2 == 1, -1, 0)         # -1
+    w3 = np.logical_and(a == 0, b == 0)   # both on left
+    z3 = np.where(w3 == 1, -2, 0)         # -2
+    z = z0 + z1 + z2 + z3
+    return z, a, b
+
+
 # ---- ---------------------------
 # ---- (2) intersect geometry
 #  `p_ints_p` is the main function
@@ -220,7 +266,7 @@ def intersections(polys, overlays, outer_only=True, stacked=False):
         clip_extent = np.concatenate((np.min(ov, axis=0), np.max(ov, axis=0)))
         for j, p in enumerate(polys):
             if _in_LBRT_(p, clip_extent):
-                result = p_ints_p(p, ov)  # call to p_ints_p
+                result = _p_ints_p_(p, ov)  # call to _p_ints_p_
                 if result is not None:
                     output.append(result)
                     cl_info.append([i, j])
@@ -513,45 +559,6 @@ def line_side(pnts, line=None):
     return np.sign(np.int32((BAx * YAy - BAy * XAx) + 0.0))  # -- ref 2
 
 
-def _line_crossing_(clip_, poly):
-    """Determine if a line is `inside` another line segment.
-
-    Notes
-    -----
-    The original ***
-    See _line_cross_ in npg_clip ***
-
-    Multi-line implementation of line_crosses.
-    Used by ``z``.
-
-    points inside clipper
-    >>> w0.all(0).nonzero()[0]         # both on right of all segments
-    >>> (w1 == 1).any(0).nonzero()[0]  # start on right
-    >>> (w2 == 1).any(0).nonzero()[0]  # end on right
-    >>> (w3 == 1).any(0).nonzero()[0]  # both on left of all segments
-    """
-    x0s, y0s = poly[:-1].T   # x0s = poly[:-1, 0], y0s = poly[:-1, 1]
-    x1s, y1s = poly[1:]. T   # x1s = poly[1:, 0],  y1s = poly[1:, 1]
-    x2s, y2s = clip_[:-1].T  # x2s = clip_[:-1, 0], y2s = clip_[:-1, 1]
-    x3s, y3s = clip_[1:].T   # x3s = clip_[1:, 0],  y3s = clip_[1:, 1]
-    dcx = x3s - x2s
-    dcy = y3s - y2s
-    a_0 = (y0s - y2s[:, None]) * dcx[:, None]
-    a_1 = (x0s - x2s[:, None]) * dcy[:, None]
-    b_0 = (y1s - y2s[:, None]) * dcx[:, None]
-    b_1 = (x1s - x2s[:, None]) * dcy[:, None]
-    a = (a_0 <= a_1)
-    b = (b_0 <= b_1)
-    w0 = np.logical_and(a == 1, b == 1)   # both on right
-    z0 = np.where(w0 == 1, 2, 0)          # 2
-    w1 = np.logical_and(a == 1, b == 0)   # start on right
-    z1 = np.where(w1 == 1, 1, 0)          # 1
-    w2 = np.logical_and(a == 0, b == 1)   # end on right
-    z2 = np.where(w2 == 1, -1, 0)         # -1
-    w3 = np.logical_and(a == 0, b == 0)   # both on left
-    z3 = np.where(w3 == 1, -2, 0)         # -2
-    z = z0 + z1 + z2 + z3
-    return z, a, b
 
 
 # ---- Final main section ----------------------------------------------------

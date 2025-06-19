@@ -17,7 +17,6 @@ Script :
 
 Author :
     Dan Patterson
-- Dan_Patterson@carleton.ca
 - https://github.com/Dan-Patterson
 
 Modified : 2025-03-11
@@ -129,17 +128,37 @@ from . npg_io import *  # noqa
 
 # ---- define __all__
 __all__ = [
-    'npgDocs', 'npGeo', 'npg_io', 'npg_geom_ops', 'npg_geom_hlp',
-    'npg_helpers', 'npg_bool_hlp', 'npg_bool_ops', 'npg_buffer',
+    'npgDocs',
+    'npGeo',
+    'npg_io',
+    'npg_geom_ops',
+    'npg_geom_hlp',
+    'npg_helpers',
+    'npg_bool_hlp',
+    'npg_bool_ops',
+    'npg_buffer',
     'npg_overlay',
-    'npg_table', 'npg_create', 'npg_analysis', 'npg_maths', 'npg_utils',
-    'npg_setops',  'npg_min_circ'
+    'npg_table',
+    'npg_create',
+    'npg_analysis',
+    'npg_maths',
+    'npg_utils',
+    'npg_setops',
+    'npg_min_circ'
 ]
 
 __helpers__ = [
-    'npGeo_doc', 'Geo_hlp', 'array_IFT_doc', 'dirr_doc', 'shapes_doc',
-    'parts_doc', 'outer_rings_doc', 'inner_rings_doc', 'get_shapes_doc',
-    'sort_by_extent_doc', 'radial_sort_doc'
+    'npGeo_doc',
+    'Geo_hlp',
+    'array_IFT_doc',
+    'dirr_doc',
+    'shapes_doc',
+    'parts_doc',
+    'outer_rings_doc',
+    'inner_rings_doc',
+    'get_shapes_doc',
+    'sort_by_extent_doc',
+    'radial_sort_doc'
 ]
 
 __all__.extend(npgDocs.__all__)

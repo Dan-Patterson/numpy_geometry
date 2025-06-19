@@ -15,7 +15,7 @@ Script :
     npg_plots.py
 
 Author :
-    Dan_Patterson@carleton.ca
+    `<https://github.com/Dan-Patterson>`_.
 
 Modified :
     2024-12-13
@@ -79,13 +79,23 @@ np.ma.masked_print_option.set_display('-')
 script = sys.argv[0]
 
 __all__ = [
-    'plot_mixed', 'plot_2d', 'plot_3d', 'plot_polygons', 'plot_mesh',
+    'plot_mixed',
+    'plot_2d',
+    'plot_3d',
+    'plot_polygons',
+    'plot_mesh',
     'plot_mst'
-    ]
+]
 
-__helpers__ = ['axis_mins_maxs', '_get_cmap', 'subplts', 'scatter_params']
+__helpers__ = [
+    'axis_mins_maxs',
+    '_get_cmap',
+    'subplts',
+    'scatter_params'
+]
 
 
+# ---- ---------------------------
 # ---- (1) helper functions ----
 #
 def axis_mins_maxs(pnts):
@@ -202,6 +212,7 @@ def scatter_params(plt, fig, ax, title=None, ax_lbls=None):
     return None
 
 
+# ---- ---------------------------
 # ---- (2) plot types
 #
 def plot_mixed(data, title="Title", invert_y=False, ax_lbls=None):
@@ -415,7 +426,7 @@ def plot_3d(a):
 
 
 def plot_polygons(arr, outline=True, vertices=True,
-                  labels=False, random_colors=True):
+                  labels=None, random_colors=True):
     """Plot Geo array poly boundaries.
 
     Parameters
@@ -425,6 +436,11 @@ def plot_polygons(arr, outline=True, vertices=True,
         list of arrays can be provided
     outline : boolean
         True, returns the outline of the polygon.  False, fills the polygon.
+    vertices : boolean
+        True, plots segment vertices.
+    labels : None, True or array_like
+        None, does not plot id values.  `True` calculates the id values from
+        the geometry point count.  Otherwise, provide a list/array of values.
 
     References
     ----------
@@ -442,15 +458,20 @@ def plot_polygons(arr, outline=True, vertices=True,
         X, Y = p[:, 0], p[:, 1]
         plt.plot(X, Y, color='black', linestyle='solid', linewidth=1)
 
-    def _label_pnts(pnts, lbl, plt, color_='black', offx=2, offy=2):
+    def _label_pnts(pnts, lables, plt, color_='black', offx=2, offy=2):
         """Label the points.
 
         Note: to skips the last label for polygons, use
         zip(lbl[:-1], pnts[:-1, 0], pnts[:-1, 1])  **
         """
-        if lbl:
-            lable = np.arange(len(pnts))
-        for label, xpt, ypt in zip(lable[:], pnts[:, 0], pnts[:, 1]):
+        N = pnts.shape[0]
+        # M = labels.shape[0]
+        # print("pnts shape {} len labels {} ".format(N, labels.shape[0]))
+        if len(lables) > N:
+            lables = labels[:N]
+        elif len(labels) != N:
+            lables = np.arange(len(pnts))
+        for label, xpt, ypt in zip(lables[:], pnts[:, 0], pnts[:, 1]):
             plt.annotate(label, color=color_, xy=(xpt, ypt),
                          xytext=(offx, offy),
                          size=8, textcoords='offset points',
@@ -511,10 +532,15 @@ def plot_polygons(arr, outline=True, vertices=True,
     # --
         if vertices:
             _scatter(shape[:-1], plt, size=50, color=colors_[i], marker=".")
-        if labels:
+        if labels is not None:
             ox, oy = lbl_off[i]  # offset point labels
-            _label_pnts(shape[:-1], labels, plt, color_=colors_[i],
-                        offx=ox, offy=oy)  # got rid of shape[:-1]
+            if isinstance(labels, bool):
+                labels = np.arange(0, shape.shape[0])
+                _label_pnts(shape, labels, plt, color_=colors_[i],
+                            offx=ox, offy=oy)
+            elif isinstance(labels, (list, tuple, np.ndarray)):
+                _label_pnts(shape, labels, plt, color_=colors_[i],
+                            offx=ox, offy=oy)  # got rid of shape[:-1]
     plt.show()
     return plt
 
@@ -587,7 +613,7 @@ plt.show()
 """
 
 
-# ----------------------------------------------------------------------------
+# ---- ---------------------------
 # ---- (3) testing section ----
 def plot_polylines(a, title=None):
     """
@@ -701,7 +727,7 @@ def plot_segments(a, title=None):
     plt.grid(False)
     plt.rc('font', **font1)
     ax.set_aspect('equal', adjustable='box')
-    scatter_params(plt, fig, ax, title=title, ax_lbls=None)
+    scatter_params(plt, fig, ax, title=title, ax_lbls=None)  # scatter options
     #
     plt.scatter(pairs[:, 0, 0], pairs[:, 0, 1])
     mid_pnts = []
@@ -738,6 +764,42 @@ def plot_mst(a, pairs):
                      textcoords='offset points',
                      ha='left', va='bottom')
     plt.show()
+
+
+def plot_buffs(a, label_pnts=False, as_segments=False):
+    """Plot the buffers.
+
+    Parameters
+    ----------
+    a : array_like
+        An ndarray or a list of arrays.
+    label_pnts : boolean
+        True to label the nodes or segments.
+    as_segments : boolean
+        True returns a segmented version of the contents of `a`.
+    """
+    if as_segments:
+        if isinstance(a, (list, tuple)):
+            s0 = [i for i in a if isinstance(i, np.ndarray)]
+            s1 = [np.concatenate((i[:-1], i[1:]), axis=1)
+                  for i in s0
+                  if i.shape[1] == 2]
+            s2 = np.concatenate(s1, axis=0)
+            plot_segments(s2)
+            return
+        if isinstance(a, np.ndarray):
+            if a.shape[1] == 2:
+                orig_segs = np.concatenate((a[:-1], a[1:]), axis=1)
+                plot_segments(orig_segs)
+            else:
+                plot_segments(a)
+            return
+    if len(a) == 1:
+        if label_pnts:
+            lbls = np.arange(0, a.shape[0])
+        else:
+            lbls = None
+        plot_polygons(a, outline=True, vertices=True, labels=lbls)
 
 
 def _demo():

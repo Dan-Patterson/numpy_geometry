@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-# noqa: D205, D400, F403
+# noqa: D205, D208, D400, F403
 r"""
 ------------
 npg_bool_ops
 ------------
 
 Modified :
-    2025-04-25
+    2025-06-11
 
 ** Boolean operations on poly geometry.
 
@@ -35,8 +35,6 @@ Script :
     npg_bool_ops.py
 
 Author :
-    Dan_Patterson@carleton.ca
-
     `<https://github.com/Dan-Patterson>`_.
 
 """
@@ -53,9 +51,9 @@ import networkx as nx
 
 import npg  # noqa
 from npg import npGeo
-from npg.npGeo import roll_arrays  # noqa
+# from npg.npGeo import roll_arrays  # noqa
 # from npg.npg_pip import np_wn
-from npg.npg_bool_hlp import add_intersections, _del_seq_pnts_
+from npg.npg_bool_hlp import add_intersections, _del_seq_dupl_pnts_
 from npg.npg_geom_hlp import _bit_check_, _bit_area_  # _is_turn, _bit_length_
 from npg.npg_prn import prn_, prn_as_obj  # noqa
 
@@ -102,7 +100,7 @@ __imports__ = [
     'npGeo',                  # main import from npg
     'roll_arrays'             # npGeo
     'add_intersections',      # npg_bool_hlp
-    '_del_seq_pnts_',
+    '_del_seq_dupl_pnts_',
     '_bit_check_',            # npg_geom_hlp
     '_bit_area_',
     'prn_',                   # npg_prn
@@ -110,9 +108,9 @@ __imports__ = [
 ]
 
 
-# ---- (1) general helpers
+# ---- ---------------------------
+# ---- (1) private helpers
 #
-
 def _adjacent_(a, b):
     """Check adjacency between 2 polygon shapes on their edges.
 
@@ -198,6 +196,52 @@ def _cut_pairs_(arr, _in_, _out_):
     return c_segs, p_segs, bth
 
 
+def _union_op_(a, b):
+    """Union two polygon features with a dissolve of their shared edges.
+
+    Private helper for  `union`.
+
+    Returns
+    -------
+    Unioned polygon.
+    """
+    def _rem_geom_(ar, w_, main=True):
+        """Remove the geometry."""
+        N = ar.shape[0]
+        # -- condition the removal points
+        ids = np.arange(N)
+        rem = sorted(list(set(w_)))
+        keep = sorted(list(set(ids).difference(rem)))
+        chk = np.isin(rem, [0, N-1])
+        if chk.all():  # -- cannot split between last and first point
+            return None
+        if chk.any():  # -- remove duplicate start/end point
+            rem = rem[:-1]
+        # -- produce the remove list
+        if not (0 in rem):  # start point not in those to remove
+            bit = np.concatenate((ar[rem[-1]:], ar[:rem[0] + 1]), axis=0)
+            return bit
+        else:
+            return ar[keep]
+    # --
+    w0, w1 = np.nonzero((a[:, None] == b).all(-1))
+    if len(w0) == 0:
+        return None
+    z0 = _rem_geom_(a, w0, main=True)
+    if z0 is None:
+        return None
+    z1 = _rem_geom_(b, w1, main=False)
+    if z1 is None:
+        return None
+    out = np.concatenate((z0, z1), axis=0)
+    out = npg.roll_arrays(out)  # -- npg.roll_arrays
+    out = _del_seq_dupl_pnts_(out)  # -- npg.npg_bool_hlp
+    return out
+
+
+# ---- ---------------------------
+# ---- (1) general helpers
+#
 def orient_clockwise(geom):
     """Orient polygons so they are clockwise.
 
@@ -342,7 +386,7 @@ def renumber_pnts(cl_n, pl_n):
     # find where they are equal, r0 is basically clp ids, r1 is the ids
     # of where clp equals poly and poly ids outside and inside of clp
     r0, r1 = (new_ids == zz0[:, 0][:, None]).nonzero()
-    # -- zz1 are the relabelled points in pl_n, cl_n is first, pl_n is 2nd
+    # -- the relabelled points.  cl_n is first, pl_n is 2nd
     new_ids[r1] = zz0[:, 1]
     new_ids[(new_ids == N_c).nonzero()] = 0   # renumber N_c and N_c+N_p+1 to 0
     new_ids[(new_ids == N_c + N_p + 1).nonzero()] = 0
@@ -497,20 +541,28 @@ def tri_array(frto):
     return tri_s
 
 
-def rolling_match(seq_, extras=False):
+def rolling_match(seq_, _out_, _in_, extras=False):
     """Pair segments whose st-en values match to form closed-loops.
 
     Parameters
     ----------
     seq_ : array-like
         A list of arrays representing segment from-to id values.  There are
-        various sort values, but `seq_srted` from polygon_overlay can be used
-        or `seq_u` from sweep.
+        various sort values, but `seq_srted_2` from polygon_overlay can be used
+        or `seq_1` from sweep.  However, `seq_srted` worked for M, W whereas
+        `_2` version did not.
+
+    Notes
+    -----
+    To plot the geometry::
+
+        ge = [_CP_[i] for i in out]
     """
     out = []  # the ids that form a closed polygon
     whr = []  # the ids where the pairs match in seq_u
     jn = []
-    for cnt, r1 in enumerate(seq_[1:], 1):
+    u_l_ = [seq_[0]]
+    for cnt, r1 in enumerate(seq_[1:], 1):  # note, beginning at 1
         r0 = seq_[cnt - 1]
         r1 = seq_[cnt]
         f0, f1 = r0[[0, -1]]    # r0 pair st-en values
@@ -518,12 +570,13 @@ def rolling_match(seq_, extras=False):
         chk = list(dict.fromkeys([f0, f1, f2, f3]))  # preserve order
         # chk = list(set([f0, f1, f2, f3]))
         if len(chk) == 2:
-            whr.append([cnt - 1, cnt])
             if f0 == f2:
                 v = r0.tolist() + r1[::-1].tolist()
             else:
                 v = r0.tolist() + r1.tolist()
-            out.append(v)
+            if len(set(v)) > 2:
+                whr.append([cnt - 1, cnt])
+                out.append(v)
         if extras:
             #
             # new_u = [seq_u[i] for i in sum(whr, []) if len(seq_u[i]) == 2]
@@ -535,6 +588,8 @@ def rolling_match(seq_, extras=False):
                     jn.append(np.concatenate((r0[::-1], r1[::-1])))
                 else:
                     jn.extend([r0, r1])
+            else:
+                u_l_.append(r1)
     if extras:
         return out, whr, jn
     return out, whr
@@ -967,7 +1022,25 @@ def polygon_overlay(ply_a, ply_b):
     z = pl_n[(cl_n != pl_n[:, None]).any(-1).all(-1)]
     _CP_ = np.concatenate((cl_n, z), axis=0)
     #
-    # plot_polygons(_CP_[frto[:, 0]], True, True, True, True)
+    # -- plotting
+    """
+    # label cl_n
+    l0 = frto[:N_c, 0]
+    z0 = _CP_[l0]
+    plot_polygons(z0, True, True, labels=l0)
+
+    # label renumbered pl_n
+    l1 = frto[N_c:, 0]
+    z1 = _CP_[l1]
+    plot_polygons(z1, True, True, labels=l1)
+
+    plot_polygons([pl_n, cl_n], True, True, labels=frto[:, 0])
+    doesn't work fully
+    plot_polygons(_CP_, labels=np.arange(len(_CP_)))
+    plot_polygons(CP_, labels=frto[:, 0])
+    # this alternative does
+    plot_polygons([pl_n, cl_n], True, True, True)
+    """
     # --
     # ---- turns calculation
     #
@@ -989,26 +1062,34 @@ def polygon_overlay(ply_a, ply_b):
     p_ft_v[-1, 1] = 0  # set last `to` to 0
     #
     # ---- (6) get p_subs2 with renumbered id values
-    p_ft_v2 = np.concatenate((p_ft2, np.array(p_vals)[:, None]), axis=1)
-    p_ft_v2[-1, 1] = 0  # set last `to` to 0
+    # p_ft_v2 = np.concatenate((p_ft2, np.array(p_vals)[:, None]), axis=1)
+    # p_ft_v2[-1, 1] = 0  # set last `to` to 0
     #
     # ---- (7) generate combos and reclass p_on, p_in, p_out
-    combos = np.zeros((c_ft_v.shape[0], 8), dtype='int')
+    # -- "c_fr c_to v ... v  p_fr2 p_to2
+    combos = np.zeros((c_ft_v.shape[0], 6), dtype='int')
     combos[:, :3] = c_ft_v
-    combos[:, 3:6] = p_ft_v[:, [-1, 0, 1]]
-    combos[:, 6:] = p_ft2  # set final 2 columns of combos
+    combos[:, 3] = p_ft_v[:, -1]
+    combos[:, 4:] = p_ft2  # set final 2 columns of combos
+    #
+    # original
+    # -- "c_fr c_to v ... v  p_fr p_to p_fr_o, p_to_old"
+    # combos2 = np.zeros((c_ft_v.shape[0], 8), dtype='int')
+    # combos2[:, :3] = c_ft_v
+    # combos2[:, 3:6] = p_ft_v[:, [-1, 0, 1]]
+    # combos2[:, 6:] = p_ft2  # set final 2 columns of combos
     # #
     # # ---- (8) cut pairs is used for both
-    c_cut0, p_cut0, bth0 = _cut_pairs_(onConP[:, :2], c_in, c_out)  # 2
-    p_cut1, c_cut1, bth1 = _cut_pairs_(id_plcl, p_in, p_out)  # 3
-    c_cut = np.array(sorted(c_cut0 + c_cut1, key=lambda l:l[0]))  # noqa
-    p_cut = np.array(sorted(p_cut0 + p_cut1, key=lambda l:l[0]))  # noqa
+    # c_cut0, p_cut0, bth0 = _cut_pairs_(onConP[:, :2], c_in, c_out)  # 2
+    # p_cut1, c_cut1, bth1 = _cut_pairs_(id_plcl, p_in, p_out)  # 3
+    # c_cut = np.array(sorted(c_cut0 + c_cut1, key=lambda l:l[0]))  # noqa
+    # p_cut = np.array(sorted(p_cut0 + p_cut1, key=lambda l:l[0]))  # noqa
+    # #
+    # # -- now fix the places that equal to N_c, N_p to 0
+    # c_cut[c_cut == N_c] = 0
+    # p_cut[p_cut == N_p] = 0  # was N_p, should be N_c because first = last
     #
-    # -- now fix the places that equal to N_c, N_p to 0
-    c_cut[c_cut == N_c] = 0
-    p_cut[p_cut == N_p] = 0  # was N_p, should be N_c because first = last
-    #
-    # ---- (9) sorting section,  -- all sequences, and seq_srted creation
+    # ---- (8) sorting section,  -- all sequences, and seq_srted creation
     c_seq = [i[:, 0] for i in c_subs if i.size > 0]   # get the stuff needed
     p_seq = [i[:, 0] for i in p_subs if i.size > 0]
     all_seq = c_seq + p_seq  # -- see _all_ below
@@ -1021,19 +1102,18 @@ def polygon_overlay(ply_a, ply_b):
     #
     seq_srted = [all_seq[i] for i in xs_2_lex]  # all seqs sorted by min x
     #
+    # -- now an argsort may be needed
+    s_ = np.argsort([i[0] for i in seq_srted])
+    seq_srted_2 = [seq_srted[i] for i in s_]
+    #
+    # #
     # get in/out/on corrections and split the sequence to identify singletons
     #  This replicates `sequences.py`
     _out_ = np.concatenate((c_out, p_out))
     _in_ = np.concatenate((c_in, p_in))
     _on_ = np.unique(np.concatenate((c_on, p_on)))
-    # _io_ = sorted(sum([i.tolist() for i in [c_in, c_out, p_in, p_out]], []))
-    # z = np.array(_io_)
-    # _io_split = np.array_split(z,
-    #                            np.abs(
-    #                                np.nonzero((z[1:] - z[:-1]) != 1)[0]) + 1
-    #                            )
-    # _singles = [i[0] for i in _io_split if len(i) == 1]  # singles in or out
-    # _side = [ [i-1, i+1] for i in _singles]  # vals on either side of single
+    #
+    # frto_2 = np.concatenate((c_ft, p_ft2), axis=0)  # !!! keep
     #
     c_a, c_b, c_c = [len(i) for i in [c_out, c_on, c_in]]  # clp
     p_a, p_b, p_c = [len(i) for i in [p_out, p_on, p_in]]  # ply
@@ -1041,22 +1121,22 @@ def polygon_overlay(ply_a, ply_b):
     chk1 = c_a == 0
     chk2 = p_a == 0
     #
-    # -- check for no intersections or single intersections
-    # ---- no intersections ----
+    # ---- (10) process geometry ----
+    # ---- -- no intersections
     if chk0 == 0:
         geom = no_overlay_(p_a, c_a, N_p, N_c, ply_a, ply_b)
         return geom
-    # ---- single intersection ----
+    # ---- -- single intersection
     elif chk0 <= 2 and (chk1 or chk2):
         print("\n-- _one_overlay --")
         # -- returns the actual geometry
         geom = one_overlay_(chk0, chk1, c_on, p_on, pl_n, cl_n, ply_a, ply_b)
         return geom
     #
-    # ---- process geometry ----
-    # -- simple, but multiple intersections
-    if (c_ft == p_ft2).all():
-        result = wrap_(seq_srted, c_subs, p_subs, _in_, _out_, _on_)
+    # ---- -- simple, but multiple intersections
+    if (c_ft == p_ft2).all():  # -- 2025-06-06 use seq_srted_2 ... E, C case
+        result = wrap_(seq_srted_2, c_subs, p_subs, _in_, _out_, _on_)
+        # result = wrap_(seq_srted, c_subs, p_subs, _in_, _out_, _on_)
         segs_out, clip_geom, segs_in = result
         geom = []
         _add0 = [_CP_[i] for i in segs_out]
@@ -1065,12 +1145,18 @@ def polygon_overlay(ply_a, ply_b):
         _add1 = [_CP_[i] for i in segs_in]
         _add2 = [_CP_[i] for i in clip_geom]
         geom = _add0 + _add1 + _add2
-    # -- complex using networkx
-    else:
+    # ---- -- complex, use networkx
+    else:  # -- geom sorts lexicographically
+        # NOTE !!!! maybe frto_2 but not for E, A
+        # frto_2 = np.concatenate((c_ft, p_ft2), axis=0)
+        #
         result = nx_solve(frto)  # or wrap_
         tmp = [_CP_[i] for i in result]
-        geom = orient_clockwise(tmp)
-        geom = roll_arrays(geom)  # `roll_arrays` optional
+        t_mins = [np.min(i[:, 0]) for i in tmp]
+        s_1 = np.argsort(t_mins)
+        geom = [tmp[i] for i in s_1]
+        geom = orient_clockwise(geom)
+        # geom = npg.roll_arrays(geom)  # `roll_arrays` optional
         # optionally get the ID values back using
         #  [np.nonzero((g == _CP_[:, None]).all(-1).any(-1))[0].tolist()
         #   for g in geom]
@@ -1097,8 +1183,11 @@ def polygon_overlay(ply_a, ply_b):
     # (p03, c03), (c03, p03) : wrap_ code : one_overlay_
     # (pl_, cl_)             : wrap_ code :
     # (edgy1, eclip)         : wrap_ code :
-    # (B, K), (K, B)         : wrap_ code : _in_out_on_
+    # (B, K), (K, B)         : wrap_ code :
     # (d0_, d1_)             : wrap_ code : or nx_overlay
+    # E, C                   : wrap_ code : or nx_overlay  2025-06-06
+    # E, F                   : wrap_ code : or nx_overlay  2025-06-08
+    # M, W                   : nx_overlay  2025-06-09  current
 
     # (A, C), (C, A) : used _in_out_   or nx_overlay
     # last worked above
@@ -1181,209 +1270,115 @@ def overlay_to_geo(ply_a, ply_b, extras=False):
 
 # ---- (3) sweep algorithm testing ----
 #
-def sweep(_CP_, _in_, _on_, _out_, all_seq, all_st_en, frto):
+def sweep(_CP_, N_c,
+          c_out, p_out,
+          c_in, p_in,
+          all_seq,
+          all_st_en,
+          frto_2):
     """Sweep."""
-
-    def closeup(new, u_st_en, u_seq):
-        """Check to see if the segment is closed."""
-        n0, n1 = new[0], new[-1]
-        diff = n0 - n1
-        if abs(diff) == 1:  # -- check of diff of 1
-            to_add = n0 if diff > 0 else n1
-            new = new + [to_add]
-            return True, new
-        # -- now check the st_en
-        n_chk = np.array([[n0, n1], [n1, n0]])
-        #
-        w0 = (n_chk[0] == u_st_en).all(-1)
-        if w0.any(-1):  # chk0
-            w = np.nonzero(w0)[0]
-            new = new + u_seq[w[0]].tolist()
-            return True, new
-        #
-        w1 = (n_chk[1] == u_st_en).all(-1)
-        if w1.any(-1):  # chk1
-            new = new + [n0]
-            return True, new
-        return False, new
-
     # ---- Sweep implementation ----
     # ---- Get turn info.
-    rgt_arr, lft_arr, strg_arr, turns_arr = turns(frto, _CP_)
+    # rgt_arr, lft_arr, strg_arr, turns_arr = turns(frto, _CP_)
     #
     # ---- Sort sequence using x min for `_CP_`
     out = []
     for i in all_seq:
         v = _CP_[i]
-        out.append(np.min(v[:, 0]))
-    mn = np.argsort(out)
-    new_seq = [all_seq[i] for i in mn]
+        out.append([np.min(v[:, 0]), np.max(v[:, 1])])
+    out = np.array(out)
+    order = np.lexsort((-out[:, 1], out[:, 0]))  # ascending X, descending Y
+    seq_1 = [all_seq[i] for i in order]
     #
-    # ---- Remove sequential duplicates.
-    seq_u = [new_seq[0]]  # the first sequence
-    for cn, se1 in enumerate(new_seq[1:], 1):  # -- begin cycling in pairs
-        se0 = new_seq[cn - 1]
-        se1 = new_seq[cn]
-        if len(se0) == len(se1):  # compare lengths, if equal, compare values
-            chk = np.equal(se0, se1).any(-1).all(-1)
-            if not chk:           # append if different
-                seq_u.append(se1)
-        else:                     # lengths differ, hence they aren't the same
-            seq_u.append(se1)
-    # --
-    u_st_en = np.array([[i[0], i[-1]] for i in seq_u])  # the uniq st-en vals
+    # ---- Extract initial polygons with > 3 points.
+    u_st_en = np.array([[i[0], i[-1]] for i in seq_1])
+    zz = np.sort(u_st_en, axis=1)  # sort by row
+    u, idx, inv, cnts = np.unique(zz, True, True, True, axis=0)
+    # -- keep the above info for later
     #
-    # ---- Extract initial polygons.
-    #  `rolling_match` returns obvious polygons, usually outside points.
-    keep, whr = rolling_match(seq_u)
-    whr_ids = sum(whr, [])
-    used = [seq_u[i] for i in whr_ids if len(seq_u[i]) > 2]  # 3+ pnt segments
-    to_remove = [i for i in whr_ids if len(seq_u[i]) > 2]    # ditto
+    pairs = u[cnts == 2].tolist()
+    to_close = []
+    to_remove = []
+    keep = []
+    dump = np.concatenate((c_out, p_out, c_in, p_in))  # keep for now
+    for p in pairs:
+        rows = np.nonzero((zz == p).all(-1))[0]
+        p2 = ([seq_1[i] for i in rows])
+        chk = [np.isin(i, dump).any() for i in p2]  # was dump
+        if chk[0] and not chk[1]:  # -- one out/in, one on
+            to_remove.extend([p2[0]])
+        elif not chk[0] and chk[1]:  # -- one out/in, one on
+            to_remove.extend([p2[1]])
+        else:  # -- both out/in, so keep both just in case
+            keep.extend(p2)
+        if p2[0][0] == p2[1][-1]:
+            val = np.concatenate(p2)
+        else:
+            val = np.concatenate((p2[0], p2[1][::-1]))
+        to_close.append(val)
     #
-    # ---- Clean `seq_u` and `u_st_en`. ----
-    u_seq = [seq_u[i] for i in range(len(seq_u)) if i not in to_remove]
-    new_st_en = np.array([[i[0], i[-1]] for i in u_seq])
-    u_st_en = np.copy(new_st_en)  # -- replace the original u_st_en
-    seen = []
+    kp_ = [i for i in to_close if len(set(i)) > 2]
+    tmp = [_CP_[i] for i in kp_]
+    geom = [_del_seq_dupl_pnts_(i, True) for i in tmp]
+    geom = orient_clockwise(geom)
     #
-    # ---- Begin main cycle. ----
-    #   All arrays/list defined.`keep` and `used` defined above
-    for cn, seq_ in enumerate(u_st_en):  # missing 12,13,18,19 and 13,14,17,18
-        frst = u_st_en[cn]
-        seq = u_seq[cn]
-        # -- try it here
-        if cn > 0:
-            used.append(u_seq[cn - 1])
-        if len(used) > 0:
-            chk = [(seq == i[:, None]).any(-1).all(-1) for i in used]
-            if any(chk):  # or check up to the previous one. chk(:-1)
-                continue
-        new = seq.tolist()
-        st, en = new[0], new[-1]
-        w = np.nonzero((st == u_st_en) | (en == u_st_en))[0]
-        # ??? is it != cn BUT it must exclude 0, or the id for `used`
-        w = [i for i in w if i != cn]   # only keep the ids != `cn`
-        #
-        kys = [u_seq[i] for i in w]     # these are the keys as a list
-        kys_chk = np.array(u_st_en[w])  # `u_st_en` that meet the seg st-en
-        # -- Get the set of keys for the first segment
-        #   chk_, new = closeup(new, kys_chk, u_seq)  # not yet
-        chk_, w = bail(new, kys_chk)
-        if chk_:
-            kys = [kys[w[0]]]
-        else:  # -- sort by first id in keys or `l:min(l)` or `l:len(l)`
-            kys = sorted(kys, key=lambda l:l[0])  #noqa
-            # delete the ones that have been seen
-            for a_sc in seen:
-                for i in kys:
-                    seen_chk = (a_sc == i[:, None]).any(-1).all(-1)
-                    if seen_chk:
-                        kys.pop(0)
-            #
-        # -- see note at the end of secondary cycle about `used`
-        # if cn > 0:
-        #     used.append(u_seq[cn - 1])
-        #
-        # ---- Begin secondary cycle. ----
-        for cnt, k in enumerate(kys):
-            k = kys[cnt]
-            k0, k1 = k[0], k[-1]
-            # -- (1) if len(new) >= 3 and st, en differ by 1, close. triangle?
-            if (len(new) >= 3) and (abs(new[0] - new[-1]) == 1):
-                keep.append(new)
-                break
-            # -- (2) check to see if k forms a straight line or turn
-            if cnt > 0:
-                tmp = new[-2:]
-                a_chk = [i for i in k.tolist() if i not in tmp]
-                ang_chk = sum([tmp, a_chk], [])[:3]
-                t_ = np.nonzero(
-                    (ang_chk == turns_arr[:, :3][:, None]).all(-1).any(-1))[0]
-                # --
-                if len(t_) > 0:
-                    t_type = turns_arr[t_[0]][-1]
-                    if t_type == -1:  # -- right turn
-                        new = new + ang_chk[1:]
-                        continue
-                    elif t_type == 0:  # -- straight
-                        continue
-            #
-            # if len(set([k0, k1, st, en])) == 4:  # all uniq, closeup to next
-            #    continue    # this doesn't work for A, C first outside segs
-            #                # it bails too early and misses 8,9,10
-            # -- need to check  cn = 8 for frst (3,4 and k= (8,3))
-            # -- (3) check cross-cut
-            if len(k) == 2:  # -- added to check on k cross-cut
-                chk1 = [(k == i[-2:]).all(-1) for i in keep]
-                chk2 = [(k == i[:2]).all(-1) for i in keep]
-                if any(chk1[:-1] or any(chk2)):  # check up to the last **
-                    continue
-            if len(used) > 0:
-                chk = (frst == k[:, None]).any(-1).all(-1)
-                if chk:
-                    break
-                chk1 = (k <= min(seq)).all()
-                if chk1:  # -- see if all are <= min of the sequence A,C 0-3
-                    continue
-            #
-            # ---- Now... cycle through and see what matches k0, k1, st, en
-            if [k0, k1] == [en, st]:
-                new = new + k.tolist()
-                keep.append(new)
-                break
-            elif [k0, k1] == [st, en]:
-                new = k.tolist() + new
-                keep.append(new)
-                break
-            elif k0 == en:  # do start-en first
-                new = new + k.tolist()
-            elif k0 == st:
-                new = k.tolist()[::-1] + new
-            elif k1 == en:
-                new = new + k.tolist()[::-1]
-            elif k1 == st:
-                new = k.tolist() + new
-            # elif k0 == en:   not used
-            #
-            # used.append(kys[cnt])
-            # -- closeup checks
-            st, en = new[0], new[-1]  # new st, en values
-            #
-            to_add = []
-            used_st_en = np.array([[i[0], i[-1]] for i in used])
-            chk_, w = bail(new, used_st_en)
-            if chk_:
-                to_add = used[w[0]]
-                if len(to_add) > 2:
-                    chk_, w = bail(new, u_st_en)
-                    # to_add = u_st_en[w[0]]
-                    print("The check in to_add\n {}".format(keep))
-            else:
-                chk_, w = bail(new, u_st_en)
-                if chk_:
-                    to_add = u_seq[w[0]]  # it is u_seq not  u_st_en[w[0]]
-                    #  used.append(to_add)  # comment this out to fix A,C
-            if len(to_add) > 0:
-                seen.append(seq)  # maybe add the seq here if it is used
-                # used.append(seq)  # !!! 2025-02-12  added
-                keep.append(new + to_add.tolist())
-                print("keeping {}".format(keep[-1]))
-                break
-            # -- used isnt getting updated, so try adding it before the loop
+    # geom = roll_arrays(geom)
+    #
+    # ---- get triangles
+    #  using sorted set, unique and concatenate to add the first col to last
+    tri_s = tri_array(frto_2)
+    if len(tri_s) > 0:
+        tmp = tri_s[0]
+        tmp = [sorted(list(set(i))) for i in tmp]
+        id_s = np.unique(np.array(tmp), axis=0)
+        id_s = np.concatenate((id_s, id_s[:, 0][:, None]), axis=1)
+        tri_geom = [_CP_[i] for i in id_s]
+    #
+    # ---- get clipper
+    # Also add any ply pnts that are inside to `to_remove`
+    _in_ = np.concatenate((c_in, p_in))
+    clp_ids = []
+    for i in seq_1:
+        if len(i) == 2:
+            if abs(i[0] - i[-1]) not in [1, N_c - 1]:  # compare differences
+                to_remove.append(i)  # clp outside
+                clp_ids.append(np.sort(i))
+        elif len(i) > 2:
+            if np.all(i < N_c):
+                if np.isin(i, c_out).any():  # need to check c_out
+                    to_remove.append(i)  # clp outside
+                else:
+                    clp_ids.append(i)
+            elif np.isin(i, _in_).any():
+                if np.any(i > N_c):
+                    clp_ids.append(i[::-1])
+                    to_remove.append(i)
 
-    chk = np.nonzero((new[-2:] == rgt_arr[:, :2]).all(-1))[0]  # rgt turn seg
-    if len(chk) != 0:
-        to_add = rgt_arr[chk.squeeze()]
-        new.append(to_add[-1])
-
-    # ---- sort of stopped here
-
-    front, back = [], []
-    for k in kys:
-        if st in k:
-            front.append(k)
-        elif en in k:
-            back.append(k)
+    fst = [i[0] for i in clp_ids]
+    srt = np.argsort(fst)
+    tmp = [clp_ids[i] for i in srt]
+    kp_ids = np.concatenate(tmp)
+    tmp = _CP_[kp_ids]
+    clp_geom = _del_seq_dupl_pnts_(tmp)
+    #
+    # ---- piece together any remaining
+    #
+    # ---- Clean `seq_1` ----
+    # still needs work
+    clear = sorted(list(set(sum([i.tolist() for i in to_remove], []))))
+    #
+    seq_2 = []
+    for i in seq_1:
+        chk = np.isin(i, clear).all()
+        if not chk:
+            seq_2.append(i)
+    #
+    fst = [i[0] for i in seq_2]
+    srt = np.argsort(fst)
+    tmp = [seq_2[i] for i in srt]
+    #
+    # # ---- Begin main cycle. ----
+    #
 
 # ---- networkx algorithm is moved----
 
@@ -1507,47 +1502,6 @@ def split_at_intersections(ply_a, ply_b, as_array=True):
 # ---- ---------------------------
 # ---- (7) dissolve shared boundaries
 #
-def _union_op_(a, b):
-    """Union two polygon features with a dissolve of their shared edges.
-
-    Private helper for  `union`.
-
-    Returns
-    -------
-    Unioned polygon.
-    """
-    def _rem_geom_(ar, w_, main=True):
-        """Remove the geometry."""
-        N = ar.shape[0]
-        # -- condition the removal points
-        ids = np.arange(N)
-        rem = sorted(list(set(w_)))
-        keep = sorted(list(set(ids).difference(rem)))
-        chk = np.isin(rem, [0, N-1])
-        if chk.all():  # -- cannot split between last and first point
-            return None
-        if chk.any():  # -- remove duplicate start/end point
-            rem = rem[:-1]
-        # -- produce the remove list
-        if not (0 in rem):  # start point not in those to remove
-            bit = np.concatenate((ar[rem[-1]:], ar[:rem[0] + 1]), axis=0)
-            return bit
-        else:
-            return ar[keep]
-    # --
-    w0, w1 = np.nonzero((a[:, None] == b).all(-1))
-    if len(w0) == 0:
-        return None
-    z0 = _rem_geom_(a, w0, main=True)
-    if z0 is None:
-        return None
-    z1 = _rem_geom_(b, w1, main=False)
-    if z1 is None:
-        return None
-    out = np.concatenate((z0, z1), axis=0)
-    out = npg.roll_arrays(out)  # -- npg.roll_arrays
-    out = _del_seq_pnts_(out)  # -- npg.npg_bool_hlp
-    return out
 
 
 def union_adj(a, asGeo=False):
@@ -1581,12 +1535,12 @@ def union_adj(a, asGeo=False):
         is_last = i == last
         if ret is None:  # -- finished sub array
             tmp = npg.roll_arrays(a)  # -- npg.roll_arrays
-            tmp = _del_seq_pnts_(tmp)  # -- npg.npg_bool_hlp
+            tmp = _del_seq_dupl_pnts_(tmp)  # -- npg.npg_bool_hlp
             out.append(tmp)
             a = b[:]  # -- assign the last poly as the first and repeat
         elif is_last:
             tmp = npg.roll_arrays(ret)
-            tmp = _del_seq_pnts_(tmp)
+            tmp = _del_seq_dupl_pnts_(tmp)
             out.append(tmp)
         else:
             a = ret[:]

@@ -47,11 +47,26 @@ script = sys.argv[0]  # print this should you need to locate the script
 
 
 __all__ = [
-    'npGeo_doc', 'Geo_hlp', 'shapes_doc', 'parts_doc', 'outer_rings_doc',
-    'inner_rings_doc', 'get_shapes_doc', 'is_in_doc', 'bounding_circles_doc',
-    'convex_hulls_doc', 'extent_rectangles_doc', 'od_pairs_doc',
-    'pnt_on_poly_doc', 'sort_by_area_doc', 'radial_sort_doc',
-    'sort_by_extent_doc', 'array_IFT_doc', 'dirr_doc'
+    'npGeo_doc',
+    'Geo_hlp',
+    'shapes_doc',
+    'parts_doc',
+    'outer_rings_doc',
+    'inner_rings_doc',
+    'get_shapes_doc',
+    'is_in_doc',
+    'bounding_circles_doc',
+    'convex_hulls_doc',
+    'extent_rectangles_doc',
+    'od_pairs_doc',
+    'pnt_on_poly_doc',
+    'sort_by_area_doc',
+    'radial_sort_doc',
+    'sort_by_extent_doc',
+    'array_IFT_doc',
+    'dirr_doc',
+    'add_intersections_doc',
+    'prep_overlay_doc'
 ]
 
 
@@ -59,7 +74,6 @@ author_date = r"""
 
 Author :
     Dan Patterson
-- Dan_Patterson@carleton.ca
 - https://github.com/Dan-Patterson
 - Initial creation period 2019-05 onward.
 
@@ -262,7 +276,7 @@ Construction from an ndarray, IFT, Kind and optional Info.
 Parameters
 ----------
 
-Required
+**Required**
 
 arr : array-like
     A 2D array sequence of points with shape (N, 2).
@@ -279,7 +293,7 @@ Info : text (optional)
 
 IDs : IFT[:, 0]
     Shape ids, the id number will be repeated for each part and hole in
-    the shape
+    the shape.
 Fr : IFT[:, 1]
     The ``from`` point in the point sequence.
 To : IFT[:, 2]
@@ -675,6 +689,122 @@ sample dir of a Geo array::
 
 """
 
+# ---- (19) add_intersections
+add_intersections_doc = r"""
+
+Parameters
+----------
+p0, p1 : array_like
+   The overlapping poly features. `p0` bottom; `p1` top
+roll_to_minX : boolean
+    Select the intersection point with the minimum x-value.  This is used
+    to roll the arrays.
+p0_pgon, p1_pgon : boolean
+    True, the input geometry is a polygon feature, False, for polyline.
+    Some operations permit polygon and polyline inputs, so you can alter
+    `p0_pgon=True, p1_pgon=False]` if the first is a polygon and the
+    second a polyline.
+class_ids : boolean
+    Return Pout, Pin, Cout, Cin if True.  These are the indices of the
+    points that are in or out of their respective counterpart.
+
+Requires
+--------
+`_add_pnts_`, `_del_seq_dupl_pnts_`, `_w_`, `_wn_clip_`
+ _add_pnts_(p0, p1, x_pnts, whr)
+
+Returns
+-------
+- The poly features rotated to the first intersection point (`p0_n, p1_n`),
+- Their respective indices from the start (`id_01`),
+- Intersection points (`x_pnts`),
+- The classified indices for each polygon as to whether the points are
+  outside, on or inside the other.
+
+p0_n, p1_n : arrays
+    The input arrays, rotated to their first intersection point and those
+    points added to their perimeter.
+
+x_pnts : array
+    The intersection points with sequential duplicates removed.
+
+id_plcl : array
+    Where the polygons intersect with p0, p1 representing the ids in their
+    respective column.  By convention, `poly` and `clip` is the order of
+    the indices (eg. `plcl`).
+
+p0_ioo, p1_ioo : arrays
+    Poly id values and whether the point is outside the other (-1), an
+    intersection point on the boundary (0) or inside the other polygon (1).
+
+Example
+-------
+Outside and inside ids are determined using `in_out_on`.
+Using `E` and `d0_` as `p0_` and `p1_`::
+
+    w0 =  np.nonzero(p0_ioo[:, 1] <= 0)[0]  # outside and on
+    Pout = p0_n[w0]
+    w1 =  np.nonzero(p1_ioo[:, 1] >= 0)[0]  # inside and on
+    Pin = p1_n[w1]
+    z0_id, z1_id = np.nonzero((z0 == z1[:, None]).all(-1))
+    id_s10 = np.concatenate((z0_id[:, None], z1_id[:, None]), axis=1)  # or
+    id_s01 = np.concatenate((z1_id[:, None], z0_id[:, None]), axis=1)
+    id_s01srt = id_s01[np.argsort(id_s01[:, 0])]
+    plot_polygons([z0, z1])
+
+"""
+
+# ---- (20) prep_overlay
+prep_overlay_doc = r"""
+
+Parameters
+----------
+arrs : list/tuple
+    arrs = [poly, line]
+    The first geometry is the one being acted upon and the second is the
+    one being used to overlay the first for operations such as clipping,
+    splitting, intersection.
+p0_pgon, p1_pgon : boolean
+    True, the input geometry is a polygon feature, False, for polyline.
+    Some operations permit polygon and polyline inputs, so you can alter
+    `p0_pgon=True, p1_pgon=False]` if the first is a polygon and the
+    second a polyline.
+
+Requires
+--------
+This script compiles the common functions::
+
+- `roll_arrays` (optional)
+- `_wn_clip_`
+- `_node_type_`
+- `_add_pnts_`
+- `_del_seq_dupl_pnts_`
+
+Returns
+-------
+The following are returned::
+
+- x_pnts : intersection points
+- a0, a1 : arrays rolled to first intersection,
+- a0_new, a1_new : rolled with intersections added on,
+- args : optional arguments
+-   px_in_c, cx_in_p : poly/intersection in c and clip/intersection in p
+-   p_in_c, c_in_p : poly in clip, clip in poly
+-   c_eq_p, c_eq_x : clip equals poly or intersection
+-   p_eq_c, p_eq_x : poly equals clip or intersection
+
+Notes
+-----
+The sequence is as follows::
+
+  - Roll the arrays so that their first coordinate is the closest
+    to the lower left of the geometry extent.
+  - Determine points inside each other`s geometry.
+  - Classify the points.
+  - Add intersection points to both geometries.
+  - Delete sequential duplicates if any exist.
+
+"""
 
 # ---- Final main section ----------------------------------------------------
 if __name__ == "__main__":

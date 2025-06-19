@@ -13,7 +13,7 @@ Script :
     npg_arc_npg.py
 
 Author :
-    Dan_Patterson@carleton.ca
+    https://github.com/Dan-Patterson
 
 Modified :
     2022-11-23

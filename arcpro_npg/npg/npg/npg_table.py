@@ -12,13 +12,20 @@ npg_table
 Script :
     npg_table.py
 Author :
-    Dan_Patterson@carleton.ca
+    `<https://github.com/Dan-Patterson>`_.
 Modified :
-    2024-03-28
+    2025-05-13
 
 Purpose
 -------
 Tools for working with tabular data in the Geo class.
+
+Notes
+-----
+`<https://numpy.org/doc/stable/reference/arrays.scalars.html#`_.
+
+np.NINF deprecated use -np.inf
+
 
 Data types handled::
 
@@ -26,6 +33,7 @@ Data types handled::
     u : unsigned integer
     f : float
     U : Unicode text
+    T : StringDType
 
 >>> np.iinfo(np.int64).min # -9223372036854775808
 >>> np.iinfo(np.int32).min # -2147483648
@@ -44,15 +52,10 @@ Data types handled::
 ...  'Text': 'None', 'Date': numpy.datetime64('NaT'), 'Geometry': nan}
 
 >>> z = np.zeros(4, dtype=[('A', 'f8'), ('B', 'i4'), ('C', 'u4'), ('D', 'U5')])
->>> z.fill(np.nan)
->>> z
-array([(nan, -2147483648, 0, 'nan'), (nan, -2147483648, 0, 'nan'),
-       (nan, -2147483648, 0, 'nan'), (nan, -2147483648, 0, 'nan')],
-      dtype=[('A', '<f8'), ('B', '<i4'), ('C', '<u4'), ('D', '<U5')])
 
 **This is good**
 
->>> np.full(4, np.NINF, dtype=[('A', 'f8'), ('B', 'i4'),
+>>> np.full(4, -np.inf, dtype=[('A', 'f8'), ('B', 'i4'),
                                ('C', 'u4'), ('D', 'U5')])
 array([(-inf, -2147483648, 0, '-inf'), (-inf, -2147483648, 0, '-inf'),
        (-inf, -2147483648, 0, '-inf'), (-inf, -2147483648, 0, '-inf')],
@@ -84,7 +87,7 @@ import numpy.lib.recfunctions as rfn
 
 from npg import npg_prn
 if 'arcpy' not in list(locals().keys()):
-    from npg import npg_arc_npg
+    from npg import npg_arc_npg  #noqa
 
 ft = {"bool": lambda x: repr(x.astype(np.int32)),
       "float_kind": '{: 6.2f}'.format}
@@ -130,7 +133,7 @@ def nd2struct(a, fld_names=None):
     --------
     >>> a = np.arange(2*3).reshape(2, 3)
     array([[0, 1, 2],
-           [3, 4, 5]])  # dtype('int32')
+           [3, 4, 5]])  # dtype('int64')
     >>> b = nd2struct(a)
     array([(0, 1, 2), (3, 4, 5)],
           dtype=[('A', '<i8'), ('B', '<i8'), ('C', '<i8')])
@@ -208,9 +211,9 @@ def _field_specs(a):
     >>> z = np.arange(0, 27).reshape(9,3)
     >>> z0 = uts(z, names=['a', 'b', 'c'])  # rfn.unstructured_to_structured
     >>> _field_specs(z)
-    ... ['No_name', dtype('int32')]
+    ... ['No_name', dtype('int64')]
     >>> _field_specs(z0)
-    ... [('a', dtype('int32')), ('b', dtype('int32')), ('c', dtype('int32'))]
+    ... [('a', dtype('int64')), ('b', dtype('int64')), ('c', dtype('int64'))]
 
     See Also
     --------
@@ -362,6 +365,7 @@ def merge_arrays(a, others):
     -----
     This partially emulate np.lib.recfunctions' merge_arrays but with fewer
     checks.
+
     """
     if not isinstance(others, (list, tuple)):
         others = [others, ]
@@ -388,6 +392,72 @@ def merge_arrays(a, others):
     for i in out:
         z[list(i.dtype.names)] = i
     return z
+
+
+def id_duplicates(a, key_fld=None, sorted_order=True,
+                  sep_char=" ", prepend_zeros=True, min_0s=1):
+    """Return new indices for duplicates in a structured array.
+
+    Parameters
+    ----------
+    a : structured array
+    key_fld : string or list of strings
+        The field names to use.  If `None`, then all fields are used.
+    sorted_order : boolean
+        True, returns the output array sorted on the reindexed `key_fld`.
+    sep_char : string
+        A string, or space or `_` used to separate the the original key_fld
+        value and the numerical sequence identifying the duplicates.
+    prepend_zeros : boolean
+        True, will prepend `0`s to an index number (see `Example`).
+    min_0s : number
+        The minimum number of `0s` to prepend.  Ignored if `prepend_zeros` is
+        False.
+
+    Example
+    -------
+    >>> arr = np.array([(0, '77070'), (1, '77070'), (2, '77070'), (3, '77064'),
+    ...                 (4, '77070'), (5, '77064'), (6, '77065'), (7, '77070'),
+    ...                 (8, '77070'), (9, '77075')],
+    ...                dtype=[('IDs', '<i8'), ('Code', '<U20')])
+    >>> id_duplicates(arr, key_fld='Code', sorted_order=True,
+    ..                sep_char=" ", prepend_zeros=True))
+    ... array([(0, '77064 000'), (1, '77064 001'), (2, '77065 000'),
+    ...        (3, '77070 000'), (4, '77070 001'), (5, '77070 002'),
+    ...        (6, '77070 003'), (7, '77070 004'), (8, '77070 005'),
+    ...        (9, '77075 000')],
+    ...       dtype=[('IDs', '<i8'), ('Code', '<U20')])
+    """
+    nmes = a.dtype.names
+    if nmes is None:
+        print("\nA structured array with named fields is required.")
+        return None
+    else:
+        nmes = list(nmes)
+    #
+    if key_fld is None:
+        key_fld = nmes
+    #
+    # -- sort on the key_fld
+    tmp = a[key_fld]
+    seq_srt = np.argsort(tmp)
+    u, cnts = np.unique(tmp, return_counts=True)  # unique and counts
+    tmp1 = [list(zip([u[i]] * cnts[i], np.arange(cnts[i])))
+            for i in range(len(cnts))]
+    tmp2 = np.concatenate(tmp1)
+    out = []
+    mx_ = len(str(np.max(cnts))) + min_0s
+    prepend = 0 if prepend_zeros else ""
+    frmt_ = "{}" + str(sep_char) + "{:" + str(prepend) + ">" + str(mx_) + "}"
+    for i in tmp2:
+        out.append(frmt_.format(i[0], i[1]))
+        # out.append("{} {:0>3}".format(i[0], i[1]))
+    final = np.array(out)
+    final_arr = np.copy(a)
+    final_arr[key_fld] = final
+    if not sorted_order:
+        final_arr = final_arr[seq_srt]
+    return final_arr
 
 
 # ---- ---------------------------
@@ -467,7 +537,8 @@ def crosstab_tbl(in_tbl, flds=None, as_pivot=True):
     depending on the field type.  This is handled by the call to fc_data which
     uses make_nulls to do the work.
     """
-    a = npg_arc_npg.fc_data(in_tbl)  # uncomment
+    a = in_tbl
+    # a = npg_arc_npg.fc_data(in_tbl)  # uncomment
     if flds is None:
         flds = list(a.dtype.names)
     uni, cnts = np.unique(a[flds], return_counts=True)
@@ -599,7 +670,7 @@ def calc_stats(arr, axis=None, deci=4):
     return s
 
 
-def _get_numeric_fields(a, fields):
+def _get_numeric_fields(a, fields=None):
     """Determine numeric fields in a structured/recarray."""
     num_flds = []
     dt_names = a.dtype.names
@@ -834,17 +905,17 @@ def find_in(a, col, what, where="in", any_case=True, pull="all"):
         c = c.astype("U")
         what = str(what)
     elif any_case:
-        c = np.char.lower(c)
+        c = np.strings.lower(c)
         what = what.lower()
     where = where.lower()[0]
     if where == "i":
-        q = np.char.find(c, what) >= 0   # -- is in query ----
+        q = np.strings.find(c, what) >= 0   # -- is in query ----
     elif where == "s":
-        q = np.char.startswith(c, what)  # -- startswith query ----
+        q = np.strings.startswith(c, what)  # -- startswith query ----
     elif where == "eq":
-        q = np.char.equal(c, what)
+        q = np.strings.equal(c, what)
     elif where == "en":
-        q = np.char.endswith(c, what)    # -- endswith query ----
+        q = np.strings.endswith(c, what)    # -- endswith query ----
     if q.sum() == 0:
         print("none found")
         return None
@@ -934,9 +1005,9 @@ def group_sort(a, group_fld, sort_fld=None, ascend=True, sort_name=None):
 
     Example
     -------
-    >>> fn = "C:/Git_Dan/arraytools/Data/pnts_in_poly.npy"
+    >>> fn = "C:/arcpro_npg/data/npz_npy/pnts_in_poly.npy"
     >>> a = np.load(fn)
-    >>> out = _split_sort_slice_(a, split_fld="Grid_codes", val_fld="Norm")
+    >>> out = split_sort_slice(a, split_fld="Grid_codes", order_fld="Norm")
     >>> arcpy.da.NumPyArrayToFeatureClass(out, out_fc, ["Xs", "Ys"], "2951")
 
     References

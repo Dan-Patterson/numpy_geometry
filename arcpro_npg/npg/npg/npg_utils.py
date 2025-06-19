@@ -6,13 +6,13 @@ npg_utils
 ---------
 
 Script :
-    utils.py
+    npg_utils.py
 
 Author :
-    Dan_Patterson@carleton.ca
+    `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-02-17
+    2025-05-29
 
 Purpose
 -------
@@ -115,9 +115,24 @@ script = sys.argv[0]  # print this should you need to locate the script
 
 
 __all__ = [
-    'time_deco', 'run_deco', 'doc_func', 'get_func', 'get_module_info',
-    'find_def', '_wrapper', '_utils_help_', 'get_dirs', 'folders',
-    'sub_folders', 'env_list', 'dir_py'
+    'time_deco',                       # decorators
+    'run_deco',
+    'doc_func',                        # (1) doc_func
+    'get_func',                        # (2) get_func
+    'get_module_info',                 # (3) get_module_info
+    'find_def',
+    'doc_deco',                        # (4) doc_deco
+
+    'get_dirs',                        # (5) folder tree
+    'folders',
+    'sub_folders',
+    'env_list',
+    'dir_py'                           # (6) doc_func
+]
+
+__helpers__ = [
+    '_wrapper',
+    '_utils_help_',
 ]
 
 
@@ -319,7 +334,7 @@ def get_func(func, line_nums=True, output=False):
         1522  def array_IFT(in_arrays, shift_to_origin=False):
         ... etc ...
 
-        """
+    """
     # --
     frmt = r"""
     -----------------------------------------------------------------
@@ -334,6 +349,7 @@ def get_func(func, line_nums=True, output=False):
     Source code:
     {}
     -----------------------------------------------------------------
+
     """
     import inspect  # required if not imported at the top
     # import dis
@@ -767,11 +783,12 @@ def toolbox_info(t_box):
                               ]
                     msg += "--Parameters\n"
                     txt = "\n".join(["  {!s:<} : {!s:}".format(*j)
-                                      for j in list(zip(z0, z1))])
+                                     for j in list(zip(z0, z1))])
                     msg += "parameter"
                 else:
                     msg += "unknown"
         return msg
+
 
 # ----------------------------------------------------------------------
 # __main__ .... code section

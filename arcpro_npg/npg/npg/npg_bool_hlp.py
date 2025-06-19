@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# noqa: D205, D400, F403
+# noqa: D205, D208, D400, F403
 r"""
 ------------
 npg_bool_hlp
@@ -13,8 +13,6 @@ Script :
     npg_bool_hlp.py
 
 Author :
-    Dan_Patterson@carleton.ca
-
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
@@ -52,11 +50,12 @@ import sys
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view as swv
 import npg
-from npg.npGeo import roll_arrays
+# from npg.npGeo import roll_arrays
 from npg.npg_geom_hlp import sort_segment_pairs
 from npg.npg_pip import np_wn  # noqa
 from npg.npg_plots import plot_polygons, plot_2d  # noqa
 
+from npg.npgDocs import (add_intersections_doc, prep_overlay_doc)
 
 script = sys.argv[0]
 
@@ -64,19 +63,20 @@ __all__ = [
     'prep_overlay',                   # (2) prepare for boolean operations
     'add_intersections',              # (3) add intersection points
     'segment_intersections',          # (4) segment intersections
+    'self_intersection_check',
     'find_sequence',                  # (5) sequences
     'sequences'
 ]
 
 __helpers__ = [
     '_add_pnts_',                      # (1) private helpers
-    'del_seq_pnts',
+    '_del_seq_pnts_',
     '_roll_',
-    'p_ints_p',
+    '_p_ints_p_',
     '_w_',                             # (2) prepare for boolean operations
     '_wn_clip_',
     '_node_type_',
-    'seg_prep_'                        # (4) segment intersections
+    '_seg_prep_'                        # (4) segment intersections
 ]
 __imports__ = [
     'swv',                      # np.lib.stride_tricks, sliding window view
@@ -145,7 +145,7 @@ def _add_pnts_(ply0, ply1, x_pnts, whr):
     return p_, c_
 
 
-def _del_seq_pnts_(arr, poly=True):
+def _del_seq_dupl_pnts_(arr, poly=True):
     """Remove sequential duplicates in a Nx2 array of points.
 
     Parameters
@@ -214,11 +214,11 @@ def _roll_(arrs):
         if chk:
             out.append(npg.roll_coords(ar))
         else:
-            out.append(roll_arrays(ar))
+            out.append(npg.roll_arrays(ar))
     return out
 
 
-def p_ints_p(poly0, poly1):
+def _p_ints_p_(poly0, poly1):
     r"""Intersect two polygons.  Used in clipping.
 
     Parameters
@@ -506,7 +506,7 @@ def prep_overlay(arrs, roll=True, p0_pgon=True, p1_pgon=True,):
     - `_wn_clip_`
     - `_node_type_`
     - `_add_pnts_`
-    - `_del_seq_pnts_`
+    - `_del_seq_dupl_pnts_`
 
     Returns
     -------
@@ -546,9 +546,9 @@ def prep_overlay(arrs, roll=True, p0_pgon=True, p1_pgon=True,):
     args = _node_type_(pInc, cInp, a0, a1, x_pnts)
     # px_in_c, cx_in_p, p_in_c, c_in_p, c_eq_p, c_eq_x, p_eq_c, p_eq_x = args
     a0_new, a1_new = _add_pnts_(a0, a1, x_pnts, whr)
-    x_pnts = _del_seq_pnts_(x_pnts, poly=False)
-    a0_new = _del_seq_pnts_(np.concatenate((a0_new), axis=0), poly=is_0)
-    a1_new = _del_seq_pnts_(np.concatenate((a1_new), axis=0), poly=is_1)
+    x_pnts = _del_seq_dupl_pnts_(x_pnts, poly=False)
+    a0_new = _del_seq_dupl_pnts_(np.concatenate((a0_new), axis=0), poly=is_0)
+    a1_new = _del_seq_dupl_pnts_(np.concatenate((a1_new), axis=0), poly=is_1)
     return x_pnts, a0, a1, a0_new, a1_new, args
 
 
@@ -557,68 +557,8 @@ def prep_overlay(arrs, roll=True, p0_pgon=True, p1_pgon=True,):
 #
 def add_intersections(
         p0, p1, roll_to_minX=True, p0_pgon=True, p1_pgon=True, class_ids=True):
-    """Return input polygons with intersections points added.
+    """Return input polygons with intersections points added."""
 
-    Parameters
-    ----------
-    p0, p1 : array_like
-       The overlapping poly features.
-    roll_to_minX : boolean
-        Select the intersection point with the minimum x-value.  This is used
-        to roll the arrays.
-    p0_pgon, p1_pgon : boolean
-        True, the input geometry is a polygon feature, False, for polyline.
-        Some operations permit polygon and polyline inputs, so you can alter
-        `p0_pgon=True, p1_pgon=False]` if the first is a polygon and the
-        second a polyline.
-    class_ids : boolean
-        Return Pout, Pin, Cout, Cin if True.  These are the indices of the
-        points that are in or out of their respective counterpart.
-
-    Requires
-    --------
-    `_add_pnts_`, `_del_seq_pnts_`, `_w_`, `_wn_clip_`
-     _add_pnts_(p0, p1, x_pnts, whr)
-
-    Returns
-    -------
-    - The poly features rotated to the first intersection point (`p0_n, p1_n`),
-    - Their respective indices from the start (`id_01`),
-    - Intersection points (`x_pnts`),
-    - The classified indices for each polygon as to whether the points are
-      outside, on or inside the other.
-
-    p0_n, p1_n : arrays
-        The input arrays, rotated to their first intersection point and those
-        points added to their perimeter.
-
-    x_pnts : array
-        The intersection points with sequential duplicates removed.
-
-    id_plcl : array
-        Where the polygons intersect with p0, p1 representing the ids in their
-        respective column.  By convention, `poly` and `clip` is the order of
-        the indices (eg. `plcl`).
-
-    p0_ioo, p1_ioo : arrays
-        Poly id values and whether the point is outside the other (-1), an
-        intersection point on the boundary (0) or inside the other polygon (1).
-
-    Example
-    -------
-    Outside and inside ids are determined using `in_out_on`.
-    Using `E` and `d0_` as `p0_` and `p1_`::
-
-        w0 =  np.nonzero(p0_ioo[:, 1] <= 0)[0]  # outside and on
-        Pout = p0_n[w0]
-        w1 =  np.nonzero(p1_ioo[:, 1] >= 0)[0]  # inside and on
-        Pin = p1_n[w1]
-        z0_id, z1_id = np.nonzero((z0 == z1[:, None]).all(-1))
-        id_s10 = np.concatenate((z0_id[:, None], z1_id[:, None]), axis=1)  # or
-        id_s01 = np.concatenate((z1_id[:, None], z0_id[:, None]), axis=1)
-        id_s01srt = id_s01[np.argsort(id_s01[:, 0])]
-        plot_polygons([z0, z1])
-    """
     def _classify_(p0_, p1_, id_):
         """Return classified points.
 
@@ -629,8 +569,10 @@ def add_intersections(
         p_neq = np.array(p_neq)  # convert to array
         z = p0_[p_neq]  # check the points not on, but may be in or out
         # -- error if z is only 1 point !!!
-        p_w = _w_(z, p1_, False)  # original
-        # p_w = np_wn(z, p1_, False)  # use _w_ from _wn_clip_
+        if len(z) == 1:
+            p_w = np_wn(z, p1_, False)  # use _w_ from _wn_clip_
+        else:
+            p_w = _w_(z, p1_, False)  # original
         #
         p_i = np.nonzero(p_w)[0]
         p_o = np.nonzero(p_w + 1)[0]
@@ -680,9 +622,9 @@ def add_intersections(
     vals = _wn_clip_(p0, p1, all_info=True)
     x_pnts, pInc, cInp, x_type, whr = vals  # x_pnts are by decreasing y-value
     p0_n, p1_n = _add_pnts_(p0, p1, x_pnts, whr)
-    p0_n = _del_seq_pnts_(np.concatenate((p0_n), axis=0), poly=is_0)
-    p1_n = _del_seq_pnts_(np.concatenate((p1_n), axis=0), poly=is_1)
-    # x_pnts = _del_seq_pnts_(x_pnts, False)  # True, if wanting a polygon
+    p0_n = _del_seq_dupl_pnts_(np.concatenate((p0_n), axis=0), poly=is_0)
+    p1_n = _del_seq_dupl_pnts_(np.concatenate((p1_n), axis=0), poly=is_1)
+    # x_pnts = _del_seq_dupl_pnts_(x_pnts, False)  # True, if wanting a polygon
     x_pnts, idx = np.unique(x_pnts, True, axis=0)  # x_pnts increase by x-value
     # optional lexsort
     # x_lex = np.lexsort((-x_pnts[:, 1], x_pnts[:, 0]))
@@ -855,6 +797,7 @@ def self_intersection_check(a):
         return extra_cross, crosses, whr, x_pnts
     return [], whr, x_pnts
 
+
 # ---- ---------------------------
 # ---- (5) sequences
 #
@@ -970,6 +913,11 @@ def sequences(data, stepsize=0):
     out = np.array(list(zip(seq_num, vals, cnts, frum, too)), dtype=dt)
     return out
 
+
+# ---- add doc strings
+#
+add_intersections.__doc__ += add_intersections_doc
+prep_overlay.__doc__ += prep_overlay_doc
 
 # ---- ---------------------------
 # ---- (6) extras

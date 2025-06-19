@@ -8,9 +8,9 @@ npg_setops
 Script :
     npg_setops.py
 Author :
-    Dan_Patterson@carleton.ca
+    `<https://github.com/Dan-Patterson>`_.
 Modified :
-    2023-08-23
+    2025-05-29
 
 Purpose
 -------
@@ -36,11 +36,11 @@ _view_as_struct_
     >>> _view_as_struct_(a, return_all=False)
     ... array([[(  0,   0)],
     ...        [(  0, 100)],
-    ...        [(100, 100)]], dtype=[('f0', '<i4'), ('f1', '<i4')])
+    ...        [(100, 100)]], dtype=[('f0', '<i8'), ('f1', '<i8')])
     ...
     >>> a_view, shp, dt = _view_as_struct_(a, return_all=True)
     ... shp  #  (3, 2)
-    ... dt   #  dtype('int32')
+    ... dt   #  dtype('int64')
 
 nd_is_in
     >>> a = np.array([[  0,   0], [  0, 100], [100, 100]])
@@ -60,7 +60,7 @@ nd_diff(a, b)
     >>> nd_diff(a, b)
     array([[0, 0]])
 
-nd_diffxor(a, b, uni=False)
+nd_diffxor(a, c, uni=False)
     >>> nd_diffxor(a, c, uni=False)
     array([[  0, 100],
            [ 20,  20],
@@ -75,7 +75,7 @@ nd_intersect(a, b, invert=False)
     >>> nd_intersect(a, c, invert=False)
     array([[0, 0]])
 
-nd_union(a, b)
+nd_union(a, c)
     >>> nd_union(a, c)
     array([[  0,   0],
            [  0, 100],
@@ -84,7 +84,7 @@ nd_union(a, b)
            [100,  20],
            [100, 100]])
 
-nd_uniq(a, counts=False)
+nd_uniq(a, return_counts=False)
     >>> d = np.array([[ 0, 0], [100, 100], [100, 100], [ 0, 0]])
     nd_uniq(d)
     array([[  0,   0],
@@ -115,17 +115,21 @@ np.ma.masked_print_option.set_display('-')  # change to a single -
 script = sys.argv[0]  # print this should you need to locate the script
 
 
-__all__ = ['_view_as_struct_',
-           '_check_dtype_',
-           '_unique1d_',
-           'nd_diff',
-           'nd_diffxor',
-           'nd_intersect',
-           'nd_isin',
-           'nd_merge',
-           'nd_union',
-           'nd_uniq'
-           ]
+__all__ = [
+    'nd_diff',
+    'nd_diffxor',
+    'nd_intersect',
+    'nd_isin',
+    'nd_merge',
+    'nd_union',
+    'nd_uniq'
+]
+
+__helpers__ = [
+    '_view_as_struct_',
+    '_check_dtype_',
+    '_unique1d_'
+]
 
 
 def _view_as_struct_(a, return_all=False):
@@ -223,9 +227,15 @@ def nd_diffxor(a, b, uni=False):
 
 
 def nd_in1d(a, b, assume_unique=False, invert=False):
-    """Check for the presence of array in the other.  Taken from `in1d` in.
+    r"""Check for the presence of array in the other.  Taken from `in1d` in.
 
     `<https://github.com/numpy/numpy/blob/master/numpy/lib/arraysetops.py>`_.
+
+    Notes
+    -----
+    - numpy\_core\_internal.py ... _promote_fields.py line 471.
+    requires that the field names for the two arrays being compared are the
+    same.  This applies to object/structured arrays.
     """
     ar1 = np.asarray(a).ravel()
     ar2 = np.asarray(b).ravel()

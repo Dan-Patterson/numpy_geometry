@@ -13,8 +13,6 @@ Script :
     npg_boolean.py
 
 Author :
-    Dan_Patterson@carleton.ca
-
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
@@ -38,23 +36,26 @@ import numpy as np
 import npg  # noqa
 # from npg.npGeo import roll_arrays
 from npg.npg_geom_hlp import a_eq_b
-from npg.npg_bool_hlp import (_add_pnts_, _del_seq_pnts_, _wn_clip_,
+from npg.npg_bool_hlp import (_add_pnts_, _del_seq_dupl_pnts_, _wn_clip_,
                               prep_overlay)  # _node_type_)
 from npg.npg_plots import plot_polygons  # noqa
 
-ft = {"bool": lambda x: repr(x.astype(np.int32)),
-      "float_kind": '{: 6.2f}'.format}
+#  --- alter or use below
 np.set_printoptions(
-    edgeitems=10, linewidth=120, precision=3, suppress=True, threshold=200,
-    formatter=ft
-)
+    edgeitems=10, linewidth=120, precision=2, suppress=True, threshold=200,
+    legacy='1.25',
+    formatter={"bool": lambda x: repr(x.astype(np.int32)),
+               "float_kind": '{: 6.2f}'.format}
+    )  # legacy=False or legacy='1.25'
 
-script = sys.argv[0]
+np.ma.masked_print_option.set_display('-')  # change to a single -
+
+script = sys.argv[0]  # print this should you need to locate the script
 
 __all__ = ['clip_poly', 'split_poly', 'find_overlap_segments']
-# __helpers__ = ['del_seq_pnts', '_roll_', 'prep_overlay']
 
 
+# ---- ---------------------------
 # ---- (1) clip polygons
 #
 def clip_poly(poly, clp, as_geo=False):
@@ -71,7 +72,7 @@ def clip_poly(poly, clp, as_geo=False):
     --------
     `npg_geom_hlp` : `a_eq_b`
 
-    `_roll_`, `_del_seq_pnts_
+    `_roll_`, `_del_seq_dupl_pnts_
     """
 
     def _bits_(i0, i1, in_, seen_):
@@ -312,6 +313,7 @@ def clip_poly(poly, clp, as_geo=False):
     # doesn't work with C, A or A, C
 
 
+# ---- ---------------------------
 # ---- (2) split polygon
 #
 def split_poly(poly, line):
@@ -327,7 +329,7 @@ def split_poly(poly, line):
 
     Requires
     --------
-    `_roll_`, `_del_seq_pnts_`
+    `_roll_`, `_del_seq_dupl_pnts_`
 
     Returns
     -------
@@ -343,9 +345,11 @@ def split_poly(poly, line):
         # -- args =
         #    px_in_c, cx_in_p, p_in_c, c_in_p, c_eq_p, c_eq_x, p_eq_c, p_eq_x
         a0_new, a1_new = _add_pnts_(a0, a1, x_pnts, whr)
-        x_pnts = _del_seq_pnts_(x_pnts, poly=False)
-        a0_new = _del_seq_pnts_(np.concatenate((a0_new), axis=0), poly=True)
-        a1_new = _del_seq_pnts_(np.concatenate((a1_new), axis=0), poly=False)
+        x_pnts = _del_seq_dupl_pnts_(x_pnts, poly=False)
+        a0_new = _del_seq_dupl_pnts_(np.concatenate((a0_new), axis=0),
+                                     poly=True)
+        a1_new = _del_seq_dupl_pnts_(np.concatenate((a1_new), axis=0),
+                                     poly=False)
         # account for multiple points on intersection line, but start and
         # end must intersect the line
         # w = np.nonzero((a1_new[:, None] == x_pnts).all(-1).any(-1))[0]
@@ -402,7 +406,9 @@ def split_poly(poly, line):
     # line = np.array([[6., 0.], [12., 10.]])
 
 
+# ---- ---------------------------
 # ---- Extras section --------------------------------------------------------
+#
 def find_overlap_segments(arr, is_poly=True, return_all=True):
     """Locate and remove overlapping segments in a polygon boundary.
 
@@ -415,7 +421,7 @@ def find_overlap_segments(arr, is_poly=True, return_all=True):
     --------
     See `simplify` in `npg_geom_ops`.
     """
-    tmp = _del_seq_pnts_(np.asarray(arr), poly=is_poly)  # keep dupl last point
+    tmp = _del_seq_dupl_pnts_(np.asarray(arr), poly=is_poly)  # keep dupl pnt
     # -- create from-to points
     frto = np.concatenate((tmp[:-1], tmp[1:]), axis=1)
     frto_idx = np.arange(frto.shape[0])
