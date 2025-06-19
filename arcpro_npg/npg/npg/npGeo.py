@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# noqa: D205, D400, F403
+# noqa: D205, D208, D400, F403
 r"""
 ------------------------------------------
   npGeo: Geo class, properties and methods
@@ -9,7 +9,8 @@ The Geo class is a subclass of numpy's ndarray.  Properties that are related
 to geometry have been assigned and methods developed to return geometry
 properties.
 
-Modified = "2025-03-01"
+Modified :
+    2025-05-31
 
 ----
 
@@ -29,8 +30,9 @@ from numpy.lib.recfunctions import unstructured_to_structured as uts
 from numpy.lib.recfunctions import repack_fields
 
 import npg  # noqa
-from npg import npg_geom_ops as geom
 from npg import npg_geom_hlp, npg_io, npg_prn  # npg_create
+from npg import npg_geom_ops as geom
+from npg import npg_bool_ops, npg_bool_hlp
 from npg import npg_min_circ as sc  # requires scipy
 
 from npg.npg_geom_hlp import (
@@ -54,7 +56,7 @@ np.set_printoptions(
     legacy='1.25',
     formatter={"bool": lambda x: repr(x.astype(np.int32)),
                "float_kind": '{: 6.2f}'.format}
-    )
+    )  # legacy=False or legacy='1.25'
 np.ma.masked_print_option.set_display('-')  # change to a single -
 
 script = sys.argv[0]  # print this should you need to locate the script
@@ -72,7 +74,7 @@ __all__ = [
     'arrays_to_Geo',
     'Geo_to_arrays',                   # (3) Geo to arrays/lists
     'Geo_to_lists',
-    '_fill_float_array',
+    'fill_float_array',
     'remove_seq_dupl',                 # (4) check/fix functions
     'check_geometry',
     'clean_polygons',
@@ -122,7 +124,7 @@ class Geo(np.ndarray):
         self.IFT = IFT            # array id, fr-to, cl, part id
         self.K = Kind             # Points (0), Polylines (1), Polygons (2)
         self.Info = Info          # any useful information
-        self.IDs = IFT[:, 0]      # shape id
+        self.IDs = IFT[:, 0]      # shape id for all bits of a shape
         self.Fr = IFT[:, 1]       # from point id
         self.To = IFT[:, 2]       # to point id
         self.CL = IFT[:, 3]       # clockwise and outer/inner ring identifier
@@ -424,7 +426,7 @@ class Geo(np.ndarray):
         df = self.To - self.Fr
         cnt = np.bincount(self.IDs, df)
         gt0 = np.nonzero(cnt)[0]         # -- account for discontinuous ids
-        too = np.cumsum(cnt[gt0], axis=0, dtype=np.int32)[1:]
+        too = np.cumsum(cnt[gt0], axis=0, dtype=np.int32)  # [1:] 2025-05-23
         fr = np.concatenate(([0], too[:-1]), axis=0)
         fr, too = [uniq_1d(i) for i in [fr, too]]  # use uniq_1d vs unique
         fr_to = np.concatenate((fr[:, None], too[:, None]), axis=1)
@@ -671,11 +673,14 @@ class Geo(np.ndarray):
             return None
         centr = []
         areas = []
-        o_rings = self.outer_rings(True)
-        ids = o_rings.part_ids  # unique shape ID values
-        for ID in o_rings.U:
-            parts_ = o_rings.part_IFT[ids == ID]
-            out = [np.asarray(o_rings.XY[p[1]:p[2]]) for p in parts_]
+        ids = self.bit_ids
+        # o_rings = self.outer_rings(True)
+        # ids = o_rings.part_ids  # unique shape ID values
+        for ID in self.U:  # o_rings.U:
+            parts_ = self.bit_IFT[ids == ID]
+            out = [np.asarray(self.XY[p[1]:p[2]]) for p in parts_]
+            # parts_ = o_rings.part_IFT[ids == ID]
+            # out = [np.asarray(o_rings.XY[p[1]:p[2]]) for p in parts_]
             for prt in out:
                 area, cen = _area_centroid_(prt)  # -- determine both
                 centr.append(cen)
@@ -1262,7 +1267,7 @@ class Geo(np.ndarray):
     def common_segments(self, shift_back=False):
         """Return the common segments in poly* features.
 
-        The result is an array of  from-to pairs of points.  ft, tf pairs are
+        The result is an array of from-to pairs of points.  ft, tf pairs are
         evaluated to denote common segments or duplicates.
 
         Parameters
@@ -1279,16 +1284,14 @@ class Geo(np.ndarray):
                                     for b in bts], axis=0)
         if fr_to is None:
             return None
-        h_0 = uts(fr_to)  # view as structured array to facilitate unique test
-        names = h_0.dtype.names
-        h_1 = h_0[list(names[2:4] + names[:2])]  # x_to, y_to and x_fr, y_frr
-        idx = np.isin(h_0, h_1)
-        common = h_0[idx]
-        common = uniq_1d(common)  # replace np.unique(common) sorts output
+        # -- changed 2025-05-22
+        tst = np.concatenate((fr_to[:, 2:4], fr_to[:, :2]), axis=1)
+        idx = np.nonzero((fr_to == tst[:, None]).all(-1))[0]
+        common = fr_to[idx]
         if shift_back:
             common[:, :2] += self.LL
             common[:, 2:] += self.LL
-        return _fill_float_array(common)  # , idx  # stu(common)
+        return common
 
     def unique_segments(self, shift_back=False):
         """Return the unique segments in poly* features.
@@ -1299,6 +1302,10 @@ class Geo(np.ndarray):
         ----------
         shift_back : boolean
             Whether to shift back to real-world coordinates.
+
+        Notes
+        -----
+        See `common_segments` comments in the code regarding uts names.
         """
         fr_to = np.concatenate([np.concatenate((b[:-1], b[1:]), axis=1)
                                 for b in self.bits], axis=0)
@@ -1307,10 +1314,11 @@ class Geo(np.ndarray):
         h_0 = uts(fr_to)
         names = h_0.dtype.names
         h_1 = h_0[list(names[2:4] + names[:2])]
+        h_1.dtype.names = names  # added 2025-05-21
         idx0 = ~np.isin(h_0, h_1)
         uniq01 = np.concatenate((h_0[idx0], h_0[~idx0]), axis=0)
         uniq02 = uniq_1d(uniq01)  # np.unique(uniq01)
-        vals = _fill_float_array(uniq02)
+        vals = fill_float_array(uniq02)
         if shift_back:
             return vals + np.concatenate((self.LL, self.LL))  # , idx0
         return vals  # , idx0  # return stu(uniq01)
@@ -1875,7 +1883,7 @@ def Geo_to_lists(g, shift_back=True):
     return arrs  # np.asarray(arrs, dtype="O")
 
 
-def _fill_float_array(arr):
+def fill_float_array(arr):
     """Fill an array of floats from a structured array of floats as an ndarray.
 
     This is a simplified version of `stu`.  Used by the `common_segments` and
@@ -2140,8 +2148,16 @@ def dirr(obj, cols=3, prn=True):
         a.extend(_sub_(sorted(geom.__helpers__), cols))
         a.extend(["\n... npg_geom_hlp ..."])
         a.extend(_sub_(sorted(npg_geom_hlp.__all__), cols))
-        a.extend(["\n... npg_geom_hlp helpers ..."])
+        a.extend(["\n... npg_geom_hlp  helpers ..."])
         a.extend(_sub_(sorted(npg_geom_hlp.__helpers__), cols))
+        a.extend(["\n... npg_bool_ops ..."])
+        a.extend(_sub_(sorted(npg_bool_ops.__all__), cols))
+        a.extend(["\n... npg_bool_ops  helpers ..."])
+        a.extend(_sub_(sorted(npg_bool_ops.__helpers__), cols))
+        a.extend(["\n... npg_bool_hlp ..."])
+        a.extend(_sub_(sorted(npg_bool_hlp.__all__), cols))
+        a.extend(["\n... npg_bool_hlp  helpers ..."])
+        a.extend(_sub_(sorted(npg_bool_hlp.__helpers__), cols))
         a.extend(["\n... npg_io ..."])
         a.extend(_sub_(npg_io.__all__, cols))
         a.extend(["\n... npg_prn ..."])
