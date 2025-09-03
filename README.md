@@ -78,6 +78,7 @@ See the **geonumeracy** repository for more examples of numpy geometry functions
 
 *2025*
 
+- [Where is the point?](https://community.esri.com/t5/python-blog/where-is-the-point/ba-p/1638618)
 - [Text Data... NumPy moves up a notch](https://community.esri.com/t5/python-blog/text-data-numpy-moves-up-a-notch/ba-p/1614353)
 - [Clean polygons boundaries](https://community.esri.com/t5/python-blog/clean-polygons-boundaries/ba-p/1600683)
 - [Einsum in geometry](https://community.esri.com/t5/python-snippets-blog/bg-p/python-snippetsblog-board)
