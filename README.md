@@ -144,4 +144,5 @@ See the **geonumeracy** repository for more examples of numpy geometry functions
 *2018*
 
 - [Minimum area bounding ellipse](https://community.esri.com/t5/python-blog/minimum-area-bounding-ellipses-containers-for/ba-p/902600)
+- [Concave Hulls...the elusive container](https://community.esri.com/t5/python-blog/concave-hulls-the-elusive-container/ba-p/902545)
 
