@@ -78,6 +78,7 @@ See the **geonumeracy** repository for more examples of numpy geometry functions
 
 *2025*
 
+- [Common segments](https://community.esri.com/t5/python-blog/common-segments/ba-p/1651289)
 - [Sorting points and sweepline](https://community.esri.com/t5/python-blog/sorting-points-and-sweepline/ba-p/1649942)
 - [Where is the point?](https://community.esri.com/t5/python-blog/where-is-the-point/ba-p/1638618)
 - [Text Data... NumPy moves up a notch](https://community.esri.com/t5/python-blog/text-data-numpy-moves-up-a-notch/ba-p/1614353)
