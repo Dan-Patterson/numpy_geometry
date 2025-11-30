@@ -6,7 +6,7 @@ npg_bool_ops
 ------------
 
 Modified :
-    2025-06-11
+    2025-11-15
 
 ** Boolean operations on poly geometry.
 
@@ -75,18 +75,16 @@ __all__ = [
     'nx_solve',
     'wrap_',
     'polygon_overlay',
-    'overlay_to_geo',
-    'sweep',                           # (3) sweep algorithm testing
-    'clp_',                            # (4) polygon overlay operations.
+    'clp_',                            # (3) polygon overlay operations.
     'erase_',
     'symm_diff_',
-    'append_',                         # (5) append geometry
-    'split_at_intersections',          # (6) split at intersections
-    'union_adj',                       # (7) dissolve shared boundaries
+    'append_',                         # (4) append geometry
+    'split_at_intersections',          # (5) split at intersections
+    'union_adj',                       # (6) dissolve shared boundaries
     'union_over',
-    'adjacency_array',                 # (8) adjacency
+    'adjacency_array',                 # (7) adjacency
     'adjacency_matrix',
-    'merge_',                          # (9) merge geometry
+    'merge_',                          # (8) merge geometry
 ]   # 'dissolve'
 
 __helpers__ = [
@@ -256,14 +254,14 @@ def orient_clockwise(geom):
     """
     cw_ordered = []
     for i in geom:
-        if _bit_area_(i) > 0.0:
+        if _bit_area_(i) > 0.0:  # -- 2025_10_27  changed not sure
             cw_ordered.append(i)
         else:
             cw_ordered.append(i[::-1])
     return cw_ordered
 
 
-def reorder_x_pnts(cl_n, pl_n, x_pnts):
+def reorder_x_pnts(cl_n, x_pnts, pl_n=None):
     """Reorder the intersection points so that they follow the `clp` order.
 
     Parameters
@@ -280,6 +278,7 @@ def reorder_x_pnts(cl_n, pl_n, x_pnts):
 
     Notes
     -----
+    - `pl_n` is currently optional in case it is desired for other returns.
     - The gaps in `c_srt` or `p_srt` sequences are points that are either
       inside or outside the other geometry.
     - `x_srt0` is the position that the intersection points were found on
@@ -288,123 +287,18 @@ def reorder_x_pnts(cl_n, pl_n, x_pnts):
 
     """
     c_srt, x_srt0 = np.nonzero((x_pnts == cl_n[:-1, None]).all(-1))
-    p_srt, x_srt1 = np.nonzero((x_pnts == pl_n[:, None]).all(-1))
     x_new = x_pnts[x_srt0]
+    if pl_n is not None:  # -- option return for the future
+        p_srt, x_srt1 = np.nonzero((x_pnts == pl_n[:, None]).all(-1))
     return x_new
 
 
-def renumber_pnts(cl_n, pl_n):
-    """Return renumbered points from two polygons that intersect.
-
-    Parameters
-    ----------
-    cl_n, pl_n : arrays
-        In normal useage, `pl_n` is the polygon being clipped by `cl_n`,
-
-    Returns
-    -------
-    The an array of id values which include columns for the original ids,
-    the re-sequenced ids and the new values the include id values from
-    `cl_n` ids, where the points are equal.  See `Example` below.
-
-     The combined `cl_n`, `pl_n` is returned as well as CP_.
-
-    Example
-    -------
-    Since the start and end of each poly are rotated to the first intersection
-    point, the first and last of each sequence are renumbered, then the polygon
-    ids are sequenced from there.  Unique points in `pl_n` are assigned a new
-    number.  Intersection points with `cl_n` are assigned their value, as
-    follows::
-
-      # Initial state
-      c_ids  [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11]
-      p_ids  [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12]
-      # Renumber end points
-      c_ids  [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 0]
-      p_ids  [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 0]
-      # pl_n intersects with points 1, 3, 5, 7, 8, 4 in `cl_n` sequentially
-      # new sequence
-      z = [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10,  0,
-            0, 13,  1,  3,  5,  7, 18, 19, 20, 21,  8,  4,  0]
-
-    The old and new id values can be derived using the following::
-
-      old_new = np.concatenate((p_ids_old[:, None],
-                                p_ids[:, None],
-                                z[N_c + 1:][:, None]),
-                               axis=1)
-      # where `z` is the new sequence and N_c is number of points in `cl_n`.
-      N_c = cl_n.shape[0] - 1
-      old_new
-      array([[ 0, 12,  0],
-             [ 1, 13, 13],
-             [ 2, 14,  1],
-             [ 3, 15,  3],
-             [ 4, 16,  5],
-             [ 5, 17,  7],
-             [ 6, 18, 18],
-             [ 7, 19, 19],
-             [ 8, 20, 20],
-             [ 9, 21, 21],
-             [10, 22,  8],
-             [11, 23,  4],
-             [12, 24,  0]])
-
-    The resultant `old_new` columns are the original sequence, the new
-    sequence and the renumbered ids which reference identical points in `cl_n`.
-
-    """
-    #
-    N_c = cl_n.shape[0] - 1
-    N_p = pl_n.shape[0] - 1
-    # -- remove the duplicate last/first point in the middle
-    CP_ = np.concatenate((cl_n, pl_n), axis=0)  #
-    # CP_ = np.concatenate((cl_n[:-1], pl_n), axis=0)  #
-    # --
-    # -- Initially number the sequential points.
-    c_ids = np.arange(0, N_c + 1)  # cl_n ids - 1
-    p_ids_old = np.arange(0, N_p + 1)  # --- try negative
-    #
-    strt = c_ids[-1] + 1  # get new start and end points for `pl_n` sequence.
-    end_ = N_c + N_p + 2
-    p_ids = np.arange(strt, end_)  # new values for `pl_n` ids
-    cp_ids = np.concatenate((c_ids, p_ids), axis=0)  # combine both
-    #
-    # -- Find where the points on `cl_n` (wc0) are equal to the points
-    #    on `pl_n` (wp0).
-    wc0, wp0 = np.nonzero((pl_n == cl_n[:, None]).all(-1))  # onConP by part
-    wc0_ids = np.nonzero((wc0 == N_c))[0]  # reclass N_c to 0
-    wc0[wc0_ids] = 0                       # first is already 0
-    wp0_ids = np.nonzero((wp0 == N_p))[0]  # reclass N_p to 0 and set first
-    wp0[wp0_ids] = 0                       # to 0 as well
-    #
-    zz = wp0[1:-1] + N_c + 1         # increment the `pl_n` ids
-    zz0 = list(zip(zz, wc0[1:-1]))   # concatenate pl and cl ids to 2d array
-    zz0 = np.array(zz0)              #
-    new_ids = np.copy(cp_ids)            # use a copy of `cp_ids`
-    # find where they are equal, r0 is basically clp ids, r1 is the ids
-    # of where clp equals poly and poly ids outside and inside of clp
-    r0, r1 = (new_ids == zz0[:, 0][:, None]).nonzero()
-    # -- the relabelled points.  cl_n is first, pl_n is 2nd
-    new_ids[r1] = zz0[:, 1]
-    new_ids[(new_ids == N_c).nonzero()] = 0   # renumber N_c and N_c+N_p+1 to 0
-    new_ids[(new_ids == N_c + N_p + 1).nonzero()] = 0
-    #
-    # -- tricky, renumber the points that aren't duplicate of clp from N_c + 1
-    tmp = np.nonzero(new_ids > N_c)[0]
-    tmp0 = [N_c + 1 + i for i in range(len(tmp))]  # 2024-12-12 to fix stuff
-    new_ids[tmp] = tmp0
-    #
-    old_new = np.concatenate((p_ids_old[:, None],
-                              p_ids[:, None],
-                              new_ids[N_c + 1:][:, None]),
-                             axis=1)
-    return new_ids, old_new, CP_
-
-
-def pnt_connections(from_to, as_dict=True, keep_size=1, exclude=None,
-                    bidirectional=False):
+def pnt_connections(from_to,
+                    as_dict=True,
+                    keep_size=1,
+                    exclude=None,
+                    bidirectional=True,
+                    non_sequential=False):
     """Return a dictionary of point connections given an array of connections.
 
     Parameters
@@ -426,6 +320,9 @@ def pnt_connections(from_to, as_dict=True, keep_size=1, exclude=None,
 
     bidirectional : boolean
         True, returns the output format as from-to and to-from connections.
+    non_sequential : boolean
+        True, omits expected sequences which are a point`s preceeding and
+        following number.
 
     Notes
     -----
@@ -483,7 +380,6 @@ def pnt_connections(from_to, as_dict=True, keep_size=1, exclude=None,
     # -- continue and return a dictionary
     d = {}
     remove = []
-    unused = []
     for elem in frto2:
         if elem[0] in exclude:
             continue
@@ -494,14 +390,133 @@ def pnt_connections(from_to, as_dict=True, keep_size=1, exclude=None,
             d[elem[0]] = [elem[1]]
     for k, v in d.items():
         if len(v) > keep_size:
-            d[k] = list(v)
+            if non_sequential:
+                v = sorted(list(set(v)))
+                vals = [i for i in v if i not in [k-1, k+1]]
+                if len(vals) > 0:
+                    d[k] = vals
+                else:
+                    remove.append(k)
+            else:
+                d[k] = list(v)
         else:
             remove.append(k)
-            unused.append(list(v))
     if len(remove) > 0:
         for i in remove:
-            d.pop(i)
+            d.pop(i, None)
     return d  # , remove, unused
+
+
+def seg_connections(c_on, p_on, _CP_, c_seq, p_seq, as_lists=True):
+    """Return the segment connections which represent overlapping polygons.
+
+    Parameters
+    ----------
+    c_on : array_like
+        The point ids of the segment start/end points.
+    c_seq, p_seq : array_like
+        Sequences of point ids for an overlay polygon and the intersecting
+        polygon.
+
+    Notes
+    -----
+    `c_on` provides the keys to the initial dictionary and it represents the
+    start/end point id values for c_seq.  p_seq must meet at one of the c_seq
+    segments since the polygons overlap.
+
+    """
+    if as_lists:
+        c_seq = [i.tolist() for i in c_seq]
+        p_seq = [i.tolist() for i in p_seq]
+    # de = {k: [v] for k, v in zip(c_on, c_seq)}  # -- initial key/vals orig
+    # de = {k: {'e': [v[-1]], 'seg': [v]} for k, v in zip(c_on, c_seq)}
+    # de = {k: {'s': [v[0]], 'e': [v[-1]], 'seg': [v]}
+    #       for k, v in zip(c_on, c_seq)}
+    # de = {k: {'se': [v[0], v[-1]], 'seg': [v]} for k, v in zip(c_on, c_seq)}
+    #
+    de = {k: {'ids': [v[0], v[-1]], 'ft': [v], 'tf': []}
+          for k, v in zip(c_on, c_seq)}
+    # -- fill in segments not seen during the initialization
+    # -- original
+    """
+    for k, v in de.items():
+        frst = v[0]
+        if len(frst) > 2:
+            de[frst[-1]].append(frst[::-1])
+        # else:  # only add reverse when cycling through p_seq below
+        #     de[frst[-1]].append(frst)
+    """
+    # -- append from the second sequence
+    # try sorting p_on first
+    p_on_srt = np.argsort(p_on)
+    p_seq_srt = [p_seq[i] for i in p_on_srt]
+    for cnt, seq in enumerate(p_seq_srt):
+        seq = p_seq_srt[cnt]
+        st, en = seq[0], seq[-1]  # for arrays, seq[[0, -1]]
+        if st < en:
+            de[st]['ft'].append(seq)
+            if en not in de[st]['ids']:
+                de[st]['ids'].append(en)
+        else:
+            if st not in de[en]['ids']:
+                de[en]['ids'].append(st)
+            if en not in de[st]['ids']:
+                de[st]['ids'].append(en)
+            de[en]['tf'].append(seq)
+            de[st]['ft'].append(seq)
+    #
+    # get the sorted dictionary
+    xys = _CP_[c_on]
+    xys_lex = np.lexsort((-xys[:, 1], xys[:, 0]))  # sorted intersection points
+    c_on_srted = c_on[xys_lex]
+    srted = [de[i] for i in c_on_srted]  # get the sorted dictionary
+    # de_srted = {k: de[k] for k in c_on_srted}  # as a dictionary
+    #
+    # -- try putting some together
+    out = []
+    dups = []
+    closed = []
+    for cnt, s in enumerate(srted):
+        # -- produce all the pairs, 2 methods, use the second
+        # pairs = [[s[i], s[j]] for i in range(len(s))
+        #          for j in range(i + 1, len(s))]
+        s = srted[cnt]['ft']
+        pairs = [[s[0], s[j]] for j in range(1, len(s))]
+        sub = []
+        for cnt1, p in enumerate(pairs):
+            frst, secn = pairs[cnt1]
+            chk = len(set(frst + secn))  # -- eg [0, 1], [1, 0]
+            if chk == 2:
+                dups.append(frst)
+            elif frst[0] == secn[0]:
+                vals = frst[::-1] + secn
+                if vals[0] == vals[-1]:
+                    closed.append(vals)
+                else:
+                    sub.append(frst[::-1] + secn)
+            elif frst[-1] == secn[0]:
+                vals = frst + secn
+                if vals[0] == vals[-1]:
+                    closed.append(vals)
+                else:
+                    sub.append(vals)
+            elif frst[0] == secn[-1]:
+                vals = secn + frst
+                if vals[0] == vals[-1]:
+                    closed.append(vals)
+                elif abs(vals[0] - vals[-1]) == 1:
+                    closed.append(vals)
+                else:
+                    sub.append(vals)
+        #
+        if len(sub) > 0:
+            out.extend(sub)
+    # -- cleanup
+    zz = np.asarray(closed, dtype='O')  # array shape not guaranteed
+    closed_u = np.unique(zz).tolist()
+    zz = np.asarray(dups)  # this will be an Nx2 array
+    dups_u = np.unique(zz, axis=0).tolist()
+    return de, closed_u, dups_u
 
 
 def tri_array(frto):
@@ -548,9 +563,8 @@ def rolling_match(seq_, _out_, _in_, extras=False):
     ----------
     seq_ : array-like
         A list of arrays representing segment from-to id values.  There are
-        various sort values, but `seq_srted_2` from polygon_overlay can be used
-        or `seq_1` from sweep.  However, `seq_srted` worked for M, W whereas
-        `_2` version did not.
+        various sort values, but `seq_srted` from polygon_overlay can be used
+        or `sw_srt` from sweep.
 
     Notes
     -----
@@ -667,21 +681,6 @@ def turns(frto, _CP_):
     lft_arr = zz[final == 1]
     strg_arr = zz[final == 0]
     turns_arr = np.concatenate((zz, final[:, None]), axis=1)
-    # -- look for triangles in the sequential ids
-    """
-    s_rgt = np.sort(rgt_arr, axis=1)
-    w1 = np.lexsort((s_rgt[:, 2], s_rgt[:, 1], s_rgt[:, 0]))
-    sw1 = s_rgt[w1]
-    u0, cnts0 = np.unique(s_rgt[w1], return_counts=True, axis=0)
-    tri_rgt = u0[cnts0 >= 2]
-    # ----
-    # or using zz
-    s0 = np.sort(zz, axis=1)
-    w1 = np.lexsort((s0[:, 2], s0[:, 1], s0[:, 0]))
-    s1 = s0[w1]
-    u1, cnts1 = np.unique(s1, return_counts=True, axis=0)
-    tris_zz = u1[cnts1 > 2]
-    """
     #
     return rgt_arr, lft_arr, strg_arr, turns_arr
 
@@ -689,13 +688,142 @@ def turns(frto, _CP_):
 # ---- ---------------------------
 # ---- (2) polygon overlay functions.
 #
+def renumber_pnts(cl_n, pl_n):
+    """Return renumbered points from two intersected polygons.
+
+    Parameters
+    ----------
+    cl_n, pl_n : arrays
+        In normal useage, `pl_n` is the polygon being clipped by `cl_n`,
+
+    Notes
+    -----
+    Used by `prepare` which is called by `polygon_overlay`.
+
+    Returns
+    -------
+    The an array of id values which include columns for the original ids,
+    the re-sequenced ids and the new values the include id values from
+    `cl_n` ids, where the points are equal.  See `Example` below.
+
+     The combined `cl_n`, `pl_n` is returned as well as CP_.
+
+    Example
+    -------
+    Since the start and end of each poly are rotated to the first intersection
+    point, the first and last of each sequence are renumbered, then the polygon
+    ids are sequenced from there.  Unique points in `pl_n` are assigned a new
+    number.  Intersection points with `cl_n` are assigned their value, as
+    follows::
+
+      # Initial state
+      c_ids  [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11]
+      p_ids  [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12]
+      # Renumber end points
+      c_ids  [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 0]
+      p_ids  [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 0]
+      # pl_n intersects with points 1, 3, 5, 7, 8, 4 in `cl_n` sequentially
+      # new sequence
+      z = [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10,  0,
+            0, 13,  1,  3,  5,  7, 18, 19, 20, 21,  8,  4,  0]
+
+    The old and new id values can be derived using the following::
+
+      old_new = np.concatenate((p_ids_old[:, None],
+                                p_ids[:, None],
+                                z[N_c + 1:][:, None]),
+                               axis=1)
+      # where `z` is the new sequence and N_c is number of points in `cl_n`.
+      N_c = cl_n.shape[0] - 1
+      old_new
+      array([[ 0, 12,  0],
+             [ 1, 13, 13],
+             [ 2, 14,  1],
+             [ 3, 15,  3],
+             [ 4, 16,  5],
+             [ 5, 17,  7],
+             [ 6, 18, 18],
+             [ 7, 19, 19],
+             [ 8, 20, 20],
+             [ 9, 21, 21],
+             [10, 22,  8],
+             [11, 23,  4],
+             [12, 24,  0]])
+
+    The resultant `old_new` columns are the original sequence, the new
+    sequence and the renumbered ids which reference identical points in `cl_n`.
+
+    """
+    #
+    N_c = cl_n.shape[0] - 1
+    N_p = pl_n.shape[0] - 1
+    # -- remove the duplicate last/first point in the middle
+    CP_ = np.concatenate((cl_n, pl_n), axis=0)  #
+    # CP_ = np.concatenate((cl_n[:-1], pl_n), axis=0)  #
+    # --
+    # -- Initially number the sequential points.
+    c_ids = np.arange(0, N_c + 1)  # cl_n ids - 1
+    p_ids_old = np.arange(0, N_p + 1)  # --- try negative
+    #
+    strt = c_ids[-1] + 1  # get new start and end points for `pl_n` sequence.
+    end_ = N_c + N_p + 2
+    p_ids = np.arange(strt, end_)  # new values for `pl_n` ids
+    cp_ids = np.concatenate((c_ids, p_ids), axis=0)  # combine both
+    #
+    # -- Find where the points on `cl_n` (wc0) are equal to the points
+    #    on `pl_n` (wp0).
+    wc0, wp0 = np.nonzero((pl_n == cl_n[:, None]).all(-1))  # onConP by part
+    wc0_ids = np.nonzero((wc0 == N_c))[0]  # reclass N_c to 0
+    wc0[wc0_ids] = 0                       # first is already 0
+    wp0_ids = np.nonzero((wp0 == N_p))[0]  # reclass N_p to 0 and set first
+    wp0[wp0_ids] = 0                       # to 0 as well
+    #
+    zz = wp0[1:-1] + N_c + 1         # increment the `pl_n` ids
+    zz0 = list(zip(zz, wc0[1:-1]))   # concatenate pl and cl ids to 2d array
+    zz0 = np.array(zz0)              #
+    new_ids = np.copy(cp_ids)            # use a copy of `cp_ids`
+    # find where they are equal, r0 is basically clp ids, r1 is the ids
+    # of where clp equals poly and poly ids outside and inside of clp
+    r0, r1 = (new_ids == zz0[:, 0][:, None]).nonzero()
+    # -- the relabelled points.  cl_n is first, pl_n is 2nd
+    new_ids[r1] = zz0[:, 1]
+    new_ids[(new_ids == N_c).nonzero()] = 0   # renumber N_c and N_c+N_p+1 to 0
+    new_ids[(new_ids == N_c + N_p + 1).nonzero()] = 0
+    #
+    # -- tricky, renumber the points that aren't duplicate of clp from N_c + 1
+    tmp = np.nonzero(new_ids > N_c)[0]
+    tmp0 = [N_c + 1 + i for i in range(len(tmp))]  # 2024-12-12 to fix stuff
+    new_ids[tmp] = tmp0
+    #
+    old_new = np.concatenate((p_ids_old[:, None],
+                              p_ids[:, None],
+                              new_ids[N_c + 1:][:, None]),
+                             axis=1)
+    return new_ids, old_new, CP_
+
+
 def prepare(ply_a, ply_b):
     """Prepare for overlay analysis.
 
-    See `polygon_overlay`. Used by `polygon_overlay` and `overlay_nx`.
+    Parameters
+    ----------
+    ply_a, ply_b : arrays
+        Arrays of point coordinates representing the boundary of two polygons.
 
+    Requires
+    --------
+    `add_intersections` and `renumber_pnts`
+
+    Returns
+    -------
       - result0 : pl_n, cl_n, id_plcl, onConP, x_pnts, ps_info, cs_info
       - result1 : new_ids, old_new, CP_
+      - result2 : _CP_, N_c, N_p, frto
+
+    Notes
+    -----
+    See `polygon_overlay`. Used by `polygon_overlay` and `overlay_nx`.
+
     """
     result0 = add_intersections(
                 ply_a, ply_b,
@@ -704,9 +832,20 @@ def prepare(ply_a, ply_b):
                 p1_pgon=True,
                 class_ids=False
                 )
-    pl_n, cl_n = result0[:2]
+    pl_n, cl_n = result0[:2]  # >2 id_plcl, onConP, x_pnts, ps_info, cs_info
+    #
     result1 = renumber_pnts(cl_n, pl_n)
-    args = [result0, result1]
+    cp_ids = result1[0]  # aka new_ids
+    #
+    z = pl_n[(cl_n != pl_n[:, None]).any(-1).all(-1)]
+    _CP_ = np.concatenate((cl_n, z), axis=0)
+    N_c = cl_n.shape[0] - 1  # noqa
+    N_p = pl_n.shape[0] - 1  # noqa
+    frto = np.concatenate((cp_ids[:-1][:, None], cp_ids[1:][:, None]), axis=1)
+    frto = frto[frto[:, 0] != frto[:, 1]]  # -- remove 0,0 middle point
+    #
+    result2 = [_CP_, N_c, N_p, frto]
+    args = [result0, result1, result2]
     return args
 
 
@@ -725,14 +864,18 @@ def no_overlay_(p_a, c_a, N_p, N_c, ply_a, ply_b):
     print("no intersection points")
     if p_a == N_p + 1:
         if c_a == N_c + 1:
-            return [ply_a, ply_b]  # both outside each other
+            print("both outside each other")
+            return [ply_a, ply_b]
         else:
-            return [ply_a, ply_b[::-1]]  # clp completely inside poly
+            print("clp completely inside poly")
+            return [ply_a, ply_b[::-1]]
     elif (c_a == N_c + 1):
         if p_a == N_p + 1:
-            return [ply_a, ply_b]  # both outside each other
+            print("both outside each other")
+            return [ply_a, ply_b]
         else:
-            return [ply_a[::-1], ply_b]  # ply completely inside clp
+            print("ply completely inside clp")
+            return [ply_a[::-1], ply_b]
 
 
 def one_overlay_(chk0, chk1, c_on, p_on, pl_n, cl_n, ply_a, ply_b):
@@ -783,17 +926,63 @@ def nx_solve(frto):
     # ---- Generate the edges
     #
     d0 = pnt_connections(from_to=frto, as_dict=False,
-                         keep_size=1, exclude=None, bidirectional=True)
+                         keep_size=1, exclude=None,
+                         bidirectional=True,
+                         non_sequential=False)
     #
-    G = nx.Graph()  # ---- Greate the graph and return the indices
+    G = nx.Graph()  # ---- Create the graph and return the indices
     G.add_edges_from(d0.tolist())  # frto used to create d0
     cycles = nx.minimum_cycle_basis(G)  # not for directed graphs
-    result = [i + [i[0]] for i in cycles]
+    tmp_ = [[i[-1]] + i for i in cycles]
+    frst = [i[0] for i in tmp_]
+    whr = np.argsort(frst)
+    result = [tmp_[i] for i in whr]
     return result
 
 
-def wrap_(seq_srted, c_subs, p_subs, _in_, _out_, _on_):  # rgt_arr):
-    """Return segments."""
+def segment_classify(result, c_in, c_out, p_in, p_out):
+    """Classify the segments as to their type
+    """
+    in_c = set(c_in)
+    out_c = set(c_out)
+    in_p = set(p_in)
+    out_p = set(p_out)
+    c_in_segs = []
+    c_out_segs = []
+    p_in_segs = []
+    p_out_segs = []
+    oth_segs = []
+    for i in result:
+        if len(in_c) > 0:
+            if len(in_c.intersection(i)) > 0:
+                c_in_segs.append(i)
+                continue
+        if len(out_c) > 0:
+            if len(out_c.intersection(i)) > 0:
+                c_out_segs.append(i)
+                continue
+        if len(in_p) > 0:
+            if len(in_p.intersection(i)) > 0:
+                p_in_segs.append(i)
+                continue
+        if len(out_p) > 0:
+            if len(out_p.intersection(i)) > 0:
+                p_out_segs.append(i)
+                continue
+        oth_segs.append(i)
+        # fix the above to class c_out
+    return c_in_segs, c_out_segs, p_in_segs, p_out_segs, oth_segs
+
+
+def wrap_(seq, c_subs, p_subs, _in_, _out_, _on_):  # rgt_arr):
+    """Return segments.
+
+    Parameters
+    ----------
+    seq : Sorted segments
+        Use the sweep_srt on seq_srted from polygon_overlay to produce
+        `sw_srt`.
+    """
 
     def _chk_(row):
         """Check to see if start end indices are equal."""
@@ -802,7 +991,7 @@ def wrap_(seq_srted, c_subs, p_subs, _in_, _out_, _on_):  # rgt_arr):
         return eq_chk
 
     def _order_(row):
-        """Check the sort order of 2d array or object array."""
+        """Check the sort order, by length, of a 2d array or object array."""
         frst, secn = row
         if frst.ndim == secn.ndim:
             if len(frst) > len(secn):
@@ -810,20 +999,32 @@ def wrap_(seq_srted, c_subs, p_subs, _in_, _out_, _on_):  # rgt_arr):
         return row
 
     # ---- start here
-    sp = [i[0] for i in seq_srted]   # -- get the first id value of each seq
-    sp_spl = sp[0::2]  # !!! every second pair of ids  !! really cool
+    sp = [i[0] for i in seq]   # -- get the first id value of each seq
+    sp_spl = sp[0::2]  # every second pair of ids  !! really cool
     sp_arg_srt = np.argsort(sp_spl)  # -- used to resort the sequences at end
     #
     w = np.where(np.diff(sp) != 0)[0] + 1
-    tmp = np.array_split(np.array(seq_srted, dtype='O'),  w)
+    tmp = np.array_split(np.array(seq, dtype='O'),  w)
+    # or for pairs that match
+    # tmp = np.array_split(np.array(sw_srt, dtype='O'), len(sw_srt)//2)
     #
     # pairs = [_order_(i) for i in tmp]  # error found cor cr1 and flipped
-    # -- or
+    # -- original
     pairs = []
     for i in tmp:
         if len(i) > 1:
             pairs.append(_order_(i))
-    #
+    # -- new for testing
+    """
+    pairs = []
+    for cnt_, i in enumerate(tmp):
+        if len(i) == 2:
+            pairs.append(_order_(i))
+        elif len(i) > 2:
+            sub = list(zip(i[:-1], i[1:]))
+            for j in sub:
+                pairs.append(_order_(j))
+    """
     segs_out = []
     clps = []
     _un_ = []
@@ -901,7 +1102,7 @@ def wrap_(seq_srted, c_subs, p_subs, _in_, _out_, _on_):  # rgt_arr):
 
 # ---- polygon overlay algorithm ----
 #
-def polygon_overlay(ply_a, ply_b):
+def polygon_overlay(ply_a, ply_b, asGeo=False):
     """Return the overlay of two polygons and assemble the areas by type.
 
     Parameters
@@ -935,6 +1136,7 @@ def polygon_overlay(ply_a, ply_b):
                [-1,  1],     out, in
                [-1, -1],     out, out
                [ 0, -1],     on,  out
+               [ 0,  0],     on,  on
                [ 0,  1],     on,  in
                [ 1, -1],     in,  out
                [ 1,  0]])    in,  on
@@ -976,36 +1178,68 @@ def polygon_overlay(ply_a, ply_b):
       array([ 1,  3,  4,  7, 14, 17, 18, 20]),
       array([ 0,  2,  5,  6,  8, 13, 15, 16, 19, 21]),
       array([ 9, 10, 11, 12])
+
+    # ---- turns calculation
+    rgt_arr, lft_arr, strg_arr, turns_arr = turns(frto, _CP_)
+
     """
     #
     # ---- start here ----
     args = prepare(ply_a, ply_b)
-    result0, result1 = args
-    # -- result0 and result1 from prepare
+    result0, result1, result2 = args
+    #
+    # -- result0
+    # x_pnts are lex sorted
     pl_n, cl_n, id_plcl, onConP, x_pnts, ps_info, cs_info = result0
     p_out, p_on, p_in, pl_ioo = ps_info
     c_out, c_on, c_in, cl_ioo = cs_info
+    #
+    # -- result1
     cp_ids, old_new_ids, CP_ = result1
-    N_c = cl_n.shape[0] - 1  # noqa
-    N_p = pl_n.shape[0] - 1  # noqa
     #
-    frto = np.concatenate((cp_ids[:-1][:, None], cp_ids[1:][:, None]), axis=1)
-    frto = frto[frto[:, 0] != frto[:, 1]]  # -- remove 0,0 middle point
+    # -- result2
+    _CP_, N_c, N_p, frto = result2
     #
-    # ---- (1) get p_subs2 with renumbered id values and produce p_ft2
+    # ---- CP_ and _CP_
+    # -- CP_ from result1, _CP_ from result2
+    #  cl_n are the clipper polygons pnts
+    #  z are the poly pnts that are not duplicates/intersections of clipper
+    #  _CP_ are the coordinates of cl_n and those of pl_n that aren't in cl_n
+    #
+    # ---- plotting
+    """
+    # label cl_n
+    l0 = frto[:N_c, 0]
+    z0 = _CP_[l0]
+    # label renumbered pl_n
+    l1 = frto[N_c:, 0]
+    z1 = _CP_[l1]
+    # this works
+    zz = np.concatenate((z0, z1), axis=0)
+    zzl = np.concatenate((l0, l1))
+    plot_polygons(zz, labels=zzl)
+
+    # individual plots
+    plot_polygons(z0, True, True, labels=l0)
+    plot_polygons(z1, True, True, labels=l1)
+
+    """
+    #
+    # ---- (1) get p_subs with renumbered id values and produce p_ft
     p_ft = np.concatenate((p_on[:-1][:, None], p_on[1:][:, None]), axis=1)
-    cl_ioo[-1, 0] = 0
     pl_ioo2 = np.copy(pl_ioo)
     pl_ioo2[:, 0] = old_new_ids[:, -1]  # -- use the renumbered ids
     z_ = np.concatenate((pl_ioo, pl_ioo2), axis=1)
     p_subs = [z_[i[0]:i[1] + 1][:, -2:] for i in p_ft]
     #
-    # ---- (2) get c_ft, c_subs
+    # ---- (2) get c_ft, c_subs and p_ft2
+    cl_ioo[-1, 0] = 0
     c_ft = np.concatenate((c_on[:-1][:, None], c_on[1:][:, None]), axis=1)
     c_subs = [cl_ioo[i[0]:i[1] + 1] for i in c_ft]
     c_ft[-1, 1] = 0  # set last `to` to 0
     c_subs[-1][-1][0] = 0  # set the last point to return to 0
     #
+    # -- renumber p`s using new values
     _out_ = []
     for i in [p_on, p_in, p_out]:
         _whr_ = np.nonzero(i == old_new_ids[:, 0][:, None])[0]
@@ -1014,101 +1248,60 @@ def polygon_overlay(ply_a, ply_b):
     p_ft2 = list(zip(p_on[:-1], p_on[1:]))  # removed +1 to `to`
     p_ft2 = np.array(p_ft2)
     #
-    # ---- plotting
-    #  cl_n are the clipper polygons pnts
-    #  z are the poly pnts that are not duplicates/intersections of clipper
-    #  _CP_ are the coordinates of cl_n and those of pl_n that aren't in cl_n
-    #
-    z = pl_n[(cl_n != pl_n[:, None]).any(-1).all(-1)]
-    _CP_ = np.concatenate((cl_n, z), axis=0)
-    #
-    # -- plotting
-    """
-    # label cl_n
-    l0 = frto[:N_c, 0]
-    z0 = _CP_[l0]
-    plot_polygons(z0, True, True, labels=l0)
-
-    # label renumbered pl_n
-    l1 = frto[N_c:, 0]
-    z1 = _CP_[l1]
-    plot_polygons(z1, True, True, labels=l1)
-
-    plot_polygons([pl_n, cl_n], True, True, labels=frto[:, 0])
-    doesn't work fully
-    plot_polygons(_CP_, labels=np.arange(len(_CP_)))
-    plot_polygons(CP_, labels=frto[:, 0])
-    # this alternative does
-    plot_polygons([pl_n, cl_n], True, True, True)
-    """
-    # --
-    # ---- turns calculation
-    #
-    # rgt_arr, lft_arr, strg_arr, turns_arr = turns(frto, _CP_)
-    #
-    # ---- (3) fix c_on and p_on since first and last are equal, so should ids
-    c_on = c_on[:-1]  # c_on[-1] = 0
-    p_on = p_on[:-1]  # p_on[-1] = 0
-    #
-    # ---- (4) get c_ft_v, c_subs and  split_at_intersections
+    # ---- (3) get c_ft_v, c_subs and  split_at_intersections
     c_vals = [sub[1][1] for sub in c_subs]
     c_ft_v = np.concatenate((c_ft, np.array(c_vals)[:, None]), axis=1)
     c_ft_v[-1, 1] = 0  # set last `to` to 0
     #
-    # ---- (5) get p_ft_v, p_subs_full, then p_subs
+    # ---- (4) get p_ft_v, p_subs_full, then p_subs
     p_subs_full = [pl_ioo[i[0]:i[1] + 1] for i in p_ft]  # added +1 to `to`
     p_vals = [sub[1][1] for sub in p_subs_full]
     p_ft_v = np.concatenate((p_ft, np.array(p_vals)[:, None]), axis=1)
     p_ft_v[-1, 1] = 0  # set last `to` to 0
     #
-    # ---- (6) get p_subs2 with renumbered id values
-    # p_ft_v2 = np.concatenate((p_ft2, np.array(p_vals)[:, None]), axis=1)
-    # p_ft_v2[-1, 1] = 0  # set last `to` to 0
-    #
-    # ---- (7) generate combos and reclass p_on, p_in, p_out
+    # ---- (5) generate combos and reclass p_on, p_in, p_out
     # -- "c_fr c_to v ... v  p_fr2 p_to2
     combos = np.zeros((c_ft_v.shape[0], 6), dtype='int')
     combos[:, :3] = c_ft_v
     combos[:, 3] = p_ft_v[:, -1]
     combos[:, 4:] = p_ft2  # set final 2 columns of combos
     #
-    # original
-    # -- "c_fr c_to v ... v  p_fr p_to p_fr_o, p_to_old"
-    # combos2 = np.zeros((c_ft_v.shape[0], 8), dtype='int')
-    # combos2[:, :3] = c_ft_v
-    # combos2[:, 3:6] = p_ft_v[:, [-1, 0, 1]]
-    # combos2[:, 6:] = p_ft2  # set final 2 columns of combos
-    # #
-    # # ---- (8) cut pairs is used for both
-    # c_cut0, p_cut0, bth0 = _cut_pairs_(onConP[:, :2], c_in, c_out)  # 2
-    # p_cut1, c_cut1, bth1 = _cut_pairs_(id_plcl, p_in, p_out)  # 3
-    # c_cut = np.array(sorted(c_cut0 + c_cut1, key=lambda l:l[0]))  # noqa
-    # p_cut = np.array(sorted(p_cut0 + p_cut1, key=lambda l:l[0]))  # noqa
-    # #
-    # # -- now fix the places that equal to N_c, N_p to 0
-    # c_cut[c_cut == N_c] = 0
-    # p_cut[p_cut == N_p] = 0  # was N_p, should be N_c because first = last
+
+    # ---- (6) sorting section,  -- all sequences, and seq_srted creation
+    # the ids of the intersection pnts
+    # x_ids, idx = np.unique(combos[:, :2], return_index=True)
+    # ls = np.lexsort((-x_pnts[:, 1], x_pnts[:, 0]))
     #
-    # ---- (8) sorting section,  -- all sequences, and seq_srted creation
     c_seq = [i[:, 0] for i in c_subs if i.size > 0]   # get the stuff needed
     p_seq = [i[:, 0] for i in p_subs if i.size > 0]
-    all_seq = c_seq + p_seq  # -- see _all_ below
+    all_seq = c_seq + p_seq
+    #
+    # -- added the following to ensure that reversed segments are captured
+    """ uncomment if wanting to use swapped values
+    p_swapped = [i[::-1] for i in p_seq if i[0] > i[1]]
+    all_seq = c_seq + p_seq + p_swapped  # -- see _all_ below
+    """
     all_st_en = [i[[0, -1]] for i in all_seq]
     all_st_en = np.array(all_st_en)
     #
-    # -- minimum `x` of start-end point
+    # -- lexsort on the minimum `x` of start-end point and max y, and an
+    #    argsort on the first sequence id value,
     xs_2 = np.array([_CP_[i][:, 0][[0, -1]] for i in all_seq])  # st-en x`s
-    xs_2_lex = np.lexsort((xs_2[:, 1], xs_2[:, 0]))  # sorted
+    xs_2_lex = np.lexsort((-xs_2[:, 1], xs_2[:, 0]))  # sorted
     #
-    seq_srted = [all_seq[i] for i in xs_2_lex]  # all seqs sorted by min x
+    seq_srted_tmp = [all_seq[i] for i in xs_2_lex]  # all seqs sorted by min x
     #
-    # -- now an argsort may be needed
-    s_ = np.argsort([i[0] for i in seq_srted])
-    seq_srted_2 = [seq_srted[i] for i in s_]
+    s_ = np.argsort([i[0] for i in seq_srted_tmp])  # sort by id
     #
-    # #
-    # get in/out/on corrections and split the sequence to identify singletons
-    #  This replicates `sequences.py`
+    # ---- alternative use
+    # _seq_srted_ = sequence_srt(seq, _CP_)
+    seq_srted = [seq_srted_tmp[i] for i in s_]  # final paired segments
+    #
+    # -- get in/out/on corrections and split the sequence to identifys
+    #    singletons. This replicates `sequences.py`
+    #    Fix c_on and p_on since first and last are equal as are their ids.
+    c_on = c_on[:-1]  # c_on[-1] = 0
+    p_on = p_on[:-1]  # p_on[-1] = 0
     _out_ = np.concatenate((c_out, p_out))
     _in_ = np.concatenate((c_in, p_in))
     _on_ = np.unique(np.concatenate((c_on, p_on)))
@@ -1134,9 +1327,8 @@ def polygon_overlay(ply_a, ply_b):
         return geom
     #
     # ---- -- simple, but multiple intersections
-    if (c_ft == p_ft2).all():  # -- 2025-06-06 use seq_srted_2 ... E, C case
-        result = wrap_(seq_srted_2, c_subs, p_subs, _in_, _out_, _on_)
-        # result = wrap_(seq_srted, c_subs, p_subs, _in_, _out_, _on_)
+    if (c_ft == p_ft2).all():  # -- 2025-06-06 use seq_srted ... E, C case
+        result = wrap_(seq_srted, c_subs, p_subs, _in_, _out_, _on_)
         segs_out, clip_geom, segs_in = result
         geom = []
         _add0 = [_CP_[i] for i in segs_out]
@@ -1145,12 +1337,16 @@ def polygon_overlay(ply_a, ply_b):
         _add1 = [_CP_[i] for i in segs_in]
         _add2 = [_CP_[i] for i in clip_geom]
         geom = _add0 + _add1 + _add2
+        geom = [_del_seq_dupl_pnts_(i) for i in geom]
     # ---- -- complex, use networkx
     else:  # -- geom sorts lexicographically
-        # NOTE !!!! maybe frto_2 but not for E, A
-        # frto_2 = np.concatenate((c_ft, p_ft2), axis=0)
         #
         result = nx_solve(frto)  # or wrap_
+        #
+        # -- classify the result
+        ret_ = segment_classify(result, c_in, c_out, p_in, p_out)
+        c_in_segs, c_out_segs, p_in_segs, p_out_segs, oth_segs = ret_
+        #
         tmp = [_CP_[i] for i in result]
         t_mins = [np.min(i[:, 0]) for i in tmp]
         s_1 = np.argsort(t_mins)
@@ -1160,231 +1356,50 @@ def polygon_overlay(ply_a, ply_b):
         # optionally get the ID values back using
         #  [np.nonzero((g == _CP_[:, None]).all(-1).any(-1))[0].tolist()
         #   for g in geom]
+    if asGeo:
+        geom = npg.arrays_to_Geo(geom, kind=2, info=None, to_origin=False)
     return geom
 
     #
     # works for
     #
-    # (p00, c00), (c00, p00) : wrap_ code : one_overlay_ :2 x_pnts on line
-    # (p00, c01), (c01, p00) : wrap_ code : 2 x_pnts, cuts go out and in
-    # (p00, c02), (c02, p00) : wrap_ code : 4 x_pnts, double in/out cuts
-    # (p00, c03), (c03, p00) : wrap_ code : 4 x_pnts, extra point on line
-    # (p01, c00), (c00, p01) : wrap_ code : 4 x_pnts, v-intersection
-    # (p01, c01), (c01, p01) : wrap_ code :
-    # (p01, c02), (c02, p01) : wrap_ code :
-    # (p01, c03), (c03, p01) : wrap_ code :
-    # (p02, c00), (c00, p02) : wrap_ code :
-    # (p02, c01), (c01, p02) : wrap_ code :
-    # (p02, c02), (c02, p02) : wrap_ code : handles c_ft != p_ft2
-    # (p02, c03), (c03, p02) : wrap_ code : 7 x_pnts
-    # (p03, c00), (c00, p03) : wrap_ code : one_overlay_ : 1 xsection pnt
-    # (p03, c01), (c01, p03) : wrap_ code : one_overlay_
-    # (p03, c02), (c02, p03) : wrap_ code : one_overlay_
-    # (p03, c03), (c03, p03) : wrap_ code : one_overlay_
-    # (pl_, cl_)             : wrap_ code :
-    # (edgy1, eclip)         : wrap_ code :
-    # (B, K), (K, B)         : wrap_ code :
-    # (d0_, d1_)             : wrap_ code : or nx_overlay
-    # E, C                   : wrap_ code : or nx_overlay  2025-06-06
-    # E, F                   : wrap_ code : or nx_overlay  2025-06-08
-    # M, W                   : nx_overlay  2025-06-09  current
+    # (p00, c00), (c00, p00) : wrap_      : one_overlay_ :2 x_pnts on line
+    # (p00, c01), (c01, p00) : wrap_      : 2 x_pnts, cuts go out and in
+    # (p00, c02), (c02, p00) : wrap_      : 4 x_pnts, double in/out cuts
+    # (p00, c03), (c03, p00) : wrap_      : 4 x_pnts, extra point on line
+    # (p01, c00), (c00, p01) : wrap_      : 4 x_pnts, v-intersection
+    # (p01, c01), (c01, p01) : wrap_      :
+    # (p01, c02), (c02, p01) : wrap_      :
+    # (p01, c03), (c03, p01) : wrap_      :
+    # (p02, c00), (c00, p02) : wrap_      :
+    # (p02, c01), (c01, p02) : wrap_      :
+    # (p02, c02), (c02, p02) : wrap_      : handles c_ft != p_ft2
+    # (p02, c03), (c03, p02) : wrap_      : 7 x_pnts
+    # (p03, c00), (c00, p03) : wrap_      : one_overlay_ : 1 xsection pnt
+    # (p03, c01), (c01, p03) : wrap_      : one_overlay_
+    # (p03, c02), (c02, p03) : wrap_      : one_overlay_
+    # (p03, c03), (c03, p03) : wrap_      : one_overlay_
+    # (aoi, aoi0)            : wrap_      : 4 x_pnts aoi0 is rotated inside aoi
+    # (pl_, cl_)             : wrap_      :
+    # (edgy1, eclip)         : wrap_      :
+    # (B, K), (K, B)         : wrap_      :
+    # (d0_, d1_)             : wrap_      : or nx_overlay
+    # E, C                   : wrap_      : or nx_overlay  2025-06-06
+    # E, F                   : wrap_      : or nx_overlay  2025-06-08
+    # C, Io                  : wrap_
+    # E, Io                  : wrap_
+    # (E, d0_), (d0_, E)     : nx_overlay
+    # M, W                   : nx_overlay  2025-06-09
+    # poly0, poly1           : nx_overlay  2025-06-22
+    # E, d1_                 : nx_overlay  2025-09-01  tried others to no avail
 
-    # (A, C), (C, A) : used _in_out_   or nx_overlay
     # last worked above
+    # (A, C), (C, A) : nx_overlay
     # (C, K)  (K, C) : nx_overlay similar to A,C
-    # (E, d0_), (d0_, E) : nx_overlay
-
-
-def overlay_to_geo(ply_a, ply_b, extras=False):
-    """Return a Geo array from a polygon overlay.
-
-    Parameters
-    ----------
-    ply_a, ply_b : array_like
-        `ply_a` is the polygon being differenced/overlain by polygon `ply_b`.
-    extras : boolean
-        True to return optional output similar to `polygon_overlay`.
-    """
-    args = prepare(ply_a, ply_b)
-    result0, result1 = args
-    #
-    pl_n, cl_n, id_plcl, onConP, x_pnts, ps_info, cs_info = result0
-    p_out, p_on, p_in, pl_ioo = ps_info
-    c_out, c_on, c_in, cl_ioo = cs_info
-    #
-    N_c = cl_n.shape[0] - 1  # noqa
-    N_p = pl_n.shape[0] - 1  # noqa
-    #
-    cp_ids, old_new_ids, CP_ = result1
-    #
-    frto = np.concatenate((cp_ids[:-1][:, None], cp_ids[1:][:, None]), axis=1)
-    frto = frto[frto[:, 0] != frto[:, 1]]  # -- remove 0,0 middle point
-    #
-    # -- get c_ft_v, c_subs
-    c_ft = np.concatenate((c_on[:-1][:, None], c_on[1:][:, None]), axis=1)
-    c_subs = [cl_ioo[i[0]:i[1] + 1] for i in c_ft]  # added +1 to `to`
-    c_subs[-1][-1][0] = 0  # set the last point to return to 0
-    c_vals = [sub[1][1] for sub in c_subs]
-    c_ft_v = np.concatenate((c_ft, np.array(c_vals)[:, None]), axis=1)
-    c_ft_v[-1, 1] = 0  # set last `to` to 0
-    #
-    # -- get p_ft_v, p_subs
-    p_ft = np.concatenate((p_on[:-1][:, None], p_on[1:][:, None]), axis=1)
-    p_subs = [pl_ioo[i[0]:i[1] + 1] for i in p_ft]  # added +1 to `to`
-    p_vals = [sub[1][1] for sub in p_subs]
-    p_ft_v = np.concatenate((p_ft, np.array(p_vals)[:, None]), axis=1)
-    p_ft_v[-1, 1] = 0  # set last `to` to 0
-    #
-    # -- get p_subs2 with renumbered id values
-    pl_ioo2 = np.copy(pl_ioo)
-    pl_ioo2[:, 0] = old_new_ids[:, 2]
-    z_ = np.concatenate((pl_ioo, pl_ioo2), axis=1)
-    p_subs2 = [z_[i[0]:i[1] + 1] for i in p_ft]
-    #
-    subc = [i[:, 0] for i in c_subs]
-    subp = [i[:, 2] for i in p_subs2]
-    c_xy = [CP_[i] for i in subc]
-    p_xy = [CP_[i] for i in subp]
-    cp_xy = c_xy + p_xy
-    #
-    # -- generate combos and reclass p_on, p_in, p_out
-    combos = np.zeros((c_ft_v.shape[0], 8), dtype='int')
-    combos[:, :3] = c_ft_v
-    combos[:, 3:6] = p_ft_v[:, [-1, 0, 1]]
-    _out_ = []
-    for i in [p_on, p_in, p_out]:
-        _whr_ = np.nonzero(i == old_new_ids[:, 0][:, None])[0]
-        _out_.append(old_new_ids[_whr_, -1])  # get the new values
-    p_on, p_in, p_out = _out_
-    p_ft2 = list(zip(p_on[:-1], p_on[1:]))  # removed +1 to `to`
-    p_ft_v2 = np.concatenate((p_ft2, np.array(p_vals)[:, None]), axis=1)
-    p_ft_v2[-1, 1] = 0  # set last `to` to 0
-    #
-    combos[:, 6:] = p_ft2  # set final 2 columns of combos
-    #
-    g = npg.arrays_to_Geo(cp_xy, kind=1, info=None, to_origin=False)
-    if extras:
-        return [g, combos]
-    return g
-
-
-# ---- (3) sweep algorithm testing ----
-#
-def sweep(_CP_, N_c,
-          c_out, p_out,
-          c_in, p_in,
-          all_seq,
-          all_st_en,
-          frto_2):
-    """Sweep."""
-    # ---- Sweep implementation ----
-    # ---- Get turn info.
-    # rgt_arr, lft_arr, strg_arr, turns_arr = turns(frto, _CP_)
-    #
-    # ---- Sort sequence using x min for `_CP_`
-    out = []
-    for i in all_seq:
-        v = _CP_[i]
-        out.append([np.min(v[:, 0]), np.max(v[:, 1])])
-    out = np.array(out)
-    order = np.lexsort((-out[:, 1], out[:, 0]))  # ascending X, descending Y
-    seq_1 = [all_seq[i] for i in order]
-    #
-    # ---- Extract initial polygons with > 3 points.
-    u_st_en = np.array([[i[0], i[-1]] for i in seq_1])
-    zz = np.sort(u_st_en, axis=1)  # sort by row
-    u, idx, inv, cnts = np.unique(zz, True, True, True, axis=0)
-    # -- keep the above info for later
-    #
-    pairs = u[cnts == 2].tolist()
-    to_close = []
-    to_remove = []
-    keep = []
-    dump = np.concatenate((c_out, p_out, c_in, p_in))  # keep for now
-    for p in pairs:
-        rows = np.nonzero((zz == p).all(-1))[0]
-        p2 = ([seq_1[i] for i in rows])
-        chk = [np.isin(i, dump).any() for i in p2]  # was dump
-        if chk[0] and not chk[1]:  # -- one out/in, one on
-            to_remove.extend([p2[0]])
-        elif not chk[0] and chk[1]:  # -- one out/in, one on
-            to_remove.extend([p2[1]])
-        else:  # -- both out/in, so keep both just in case
-            keep.extend(p2)
-        if p2[0][0] == p2[1][-1]:
-            val = np.concatenate(p2)
-        else:
-            val = np.concatenate((p2[0], p2[1][::-1]))
-        to_close.append(val)
-    #
-    kp_ = [i for i in to_close if len(set(i)) > 2]
-    tmp = [_CP_[i] for i in kp_]
-    geom = [_del_seq_dupl_pnts_(i, True) for i in tmp]
-    geom = orient_clockwise(geom)
-    #
-    # geom = roll_arrays(geom)
-    #
-    # ---- get triangles
-    #  using sorted set, unique and concatenate to add the first col to last
-    tri_s = tri_array(frto_2)
-    if len(tri_s) > 0:
-        tmp = tri_s[0]
-        tmp = [sorted(list(set(i))) for i in tmp]
-        id_s = np.unique(np.array(tmp), axis=0)
-        id_s = np.concatenate((id_s, id_s[:, 0][:, None]), axis=1)
-        tri_geom = [_CP_[i] for i in id_s]
-    #
-    # ---- get clipper
-    # Also add any ply pnts that are inside to `to_remove`
-    _in_ = np.concatenate((c_in, p_in))
-    clp_ids = []
-    for i in seq_1:
-        if len(i) == 2:
-            if abs(i[0] - i[-1]) not in [1, N_c - 1]:  # compare differences
-                to_remove.append(i)  # clp outside
-                clp_ids.append(np.sort(i))
-        elif len(i) > 2:
-            if np.all(i < N_c):
-                if np.isin(i, c_out).any():  # need to check c_out
-                    to_remove.append(i)  # clp outside
-                else:
-                    clp_ids.append(i)
-            elif np.isin(i, _in_).any():
-                if np.any(i > N_c):
-                    clp_ids.append(i[::-1])
-                    to_remove.append(i)
-
-    fst = [i[0] for i in clp_ids]
-    srt = np.argsort(fst)
-    tmp = [clp_ids[i] for i in srt]
-    kp_ids = np.concatenate(tmp)
-    tmp = _CP_[kp_ids]
-    clp_geom = _del_seq_dupl_pnts_(tmp)
-    #
-    # ---- piece together any remaining
-    #
-    # ---- Clean `seq_1` ----
-    # still needs work
-    clear = sorted(list(set(sum([i.tolist() for i in to_remove], []))))
-    #
-    seq_2 = []
-    for i in seq_1:
-        chk = np.isin(i, clear).all()
-        if not chk:
-            seq_2.append(i)
-    #
-    fst = [i[0] for i in seq_2]
-    srt = np.argsort(fst)
-    tmp = [seq_2[i] for i in srt]
-    #
-    # # ---- Begin main cycle. ----
-    #
-
-# ---- networkx algorithm is moved----
 
 
 # ---------------------------
-# ---- (4) polygon overlay operations.
+# ---- (3) polygon overlay operations.
 #
 def clp_(ply_a, ply_b, as_geo=True):
     """Return the symmetrical difference.  See `overlay_ops`."""
@@ -1411,7 +1426,7 @@ def symm_diff_(ply_a, ply_b, as_geo=True):
 
 
 # ---- ---------------------------
-# ---- (5) append geometry
+# ---- (4) append geometry
 #
 def append_(this, to_this):
     """Append `this` geometry `to_this` geometry.
@@ -1461,9 +1476,9 @@ def append_(this, to_this):
 
 
 # ---- ---------------------------
-# ---- (6) split at intersections
+# ---- (5) split at intersections
 #
-def split_at_intersections(ply_a, ply_b, as_array=True):
+def split_at_intersections(ply_a, ply_b, sort_by_x=False, as_array=False):
     """Return polygon features split at their intersections points.
 
     Parameters
@@ -1478,7 +1493,23 @@ def split_at_intersections(ply_a, ply_b, as_array=True):
     Returns
     -------
     Poly features split at their intersection points.
+    Use `plot_polylines(*seg*)` to see the segments
     """
+
+    def _srt_fwd_(seq, ft_vals):
+        """Return the sequence sorted so that x increases."""
+        tm = []
+        # ft2 = []
+        for cnt, i in enumerate(seq):
+            chk = i[0][0] <= i[-1][0]
+            if chk:
+                tm.append(i)
+                # ft2.append(ft_vals[cnt])
+            else:
+                tm.append(i[::-1])
+                # ft2.append(ft_vals[cnt][::-1])
+        return tm  # ft2
+
     r = add_intersections(
             ply_a, ply_b,
             roll_to_minX=True,
@@ -1486,24 +1517,34 @@ def split_at_intersections(ply_a, ply_b, as_array=True):
             p1_pgon=True,
             class_ids=False
             )
-    p0_n, p1_n, id_plcl, onConP, x_pnts, ps_info, cs_info = r
+    pl_n, cl_n, id_plcl, onConP, x_pnts, ps_info, cs_info = r
     p_out, p_on, p_in, p0_ioo = ps_info
     c_out, c_on, c_in, p1_ioo = cs_info
-    p_ft = np.concatenate((p_on[:-1][:, None], p_on[1:][:, None]), axis=1)
     c_ft = np.concatenate((c_on[:-1][:, None], c_on[1:][:, None]), axis=1)
-    p_segs = [p0_n[f:t + 1] for f, t in p_ft]
-    c_segs = [p1_n[f:t + 1] for f, t in c_ft]
+    p_ft = np.concatenate((p_on[:-1][:, None], p_on[1:][:, None]), axis=1)
+    c_segs = [cl_n[f:t + 1] for f, t in c_ft]
+    p_segs = [pl_n[f:t + 1] for f, t in p_ft]
+    #
+    # --
+    if sort_by_x:
+        c_segs = _srt_fwd_(c_segs, c_ft)
+        p_segs = _srt_fwd_(p_segs, p_ft)
+
+    z = pl_n[(cl_n != pl_n[:, None]).any(-1).all(-1)]
+    _CP_ = np.concatenate((cl_n, z), axis=0)
+    xys = _CP_[c_on]
+    xys_lex = np.lexsort((-xys[:, 1], xys[:, 0]))  # sorted intersection points
+    c_on_srted = c_on[xys_lex]
+    #
     if as_array:
-        p_segs = np.asarray(p_segs, dtype='O')
         c_segs = np.asarray(c_segs, dtype='O')
-    return p_segs, c_segs
+        p_segs = np.asarray(p_segs, dtype='O')
+    return p_segs, c_segs, c_on_srted
 
 
 # ---- ---------------------------
-# ---- (7) dissolve shared boundaries
+# ---- (6) dissolve shared boundaries
 #
-
-
 def union_adj(a, asGeo=False):
     """Union polygon features with a dissolve of internal shared edges.
 
@@ -1559,7 +1600,7 @@ def union_over(ply_a, ply_b):
 
 
 # ---- ---------------------------
-# ---- (8) adjacency
+# ---- (7) adjacency
 #
 def adjacency_array(d, to_array=True):
     """Return an array of connections from `pnt_connections` results.
@@ -1689,7 +1730,7 @@ def adjacency_matrix(a, collapse=True, prn=False):
 
 
 # ---- ---------------------------
-# ---- (9) merge geometry
+# ---- (8) merge geometry
 #
 def merge_(this, to_this):
     """
@@ -1749,76 +1790,6 @@ def merge_(this, to_this):
     sr = b.SR
     out = npGeo.Geo(xys, IFT=new_ift, Kind=kind, Extent=None, Info="", SR=sr)
     return out
-
-
-# ---- ---------------------------
-# ---- (10) keep for now section
-def _tri_chk_(prev, cur, frto_pairs):
-    """Check and classify triangles.
-
-    Parameters
-    ----------
-    prev, cur : integer
-        previous (c_p) and current (c_c) id values
-    cut_pairs : array_like
-        id pairs (c_cut) of the segments that intersect the boundary of the
-        other geometry.
-
-    Returns
-    -------
-    tchk : boolean
-        True, indicates both points are in the cut segement id pairs.
-    ids :  list
-        If a triangle is found, a list of integer ids is returned, otherwise
-        an empty list.
-    knd : integer
-        2 : clockwise oriented triangle
-        1 : counterclockwise orientation
-        9 : no triangle
-    Notes
-    -----
-    A segment is said to `cut` another geometry if it intersects along another
-    geometry segment or crosses from one segment to another segment.
-
-    """
-    c_p, c_c = prev  # prev = [c_p, c_c]
-    c_nxt = cur[1]   # cur  = [c_c, c_nxt]
-    c_cut = frto_pairs
-    tchk = False
-    ids = []
-    # knd = 9
-    t0 = ([c_c, c_nxt] == c_cut[:, None]).all(-1).any()
-    t1 = ([c_nxt, c_p] == c_cut[:, None]).all(-1).any()
-    t2 = ([c_p, c_nxt] == c_cut[:, None]).all(-1).any()
-    tchk = t0 and (t1 or t2)
-    if tchk:
-        if t1 and not t2:
-            ids = [c_p, c_nxt, c_c, c_p]  # knd = 2
-            print("t1 not t2")
-        elif t2:
-            ids = [c_p, c_c, c_nxt, c_p]  # knd = 1
-            print("t2")
-    return ids  # tchk, ids, knd
-
-
-def triangle_check(frto_pairs):
-    """Classify line segments that may form triangles.
-
-    Parameters
-    ----------
-    frto_pairs : array_like
-        Segment id values for the start and end of a 2 point line segment.
-    """
-    result = []
-    for cnt, cur in enumerate(frto_pairs[1:], 1):
-        prev = frto_pairs[cnt - 1]
-        vals = _tri_chk_(prev, cur, frto_pairs)
-        if len(vals) > 0:
-            # print("triangle {}: {}, {} : {}".format(cnt, prev, cur, vals))
-            result.append(vals)
-        # else:
-            # print("not triangle {} {}".format(prev, cur))
-    return result
 
 
 # ---- Final main section ----------------------------------------------------

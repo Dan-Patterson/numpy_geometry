@@ -633,6 +633,7 @@ def nested_len(obj, out=[], target_cls=list):
 
     Example
     -------
+        >>> out = npg.nested_len(lst, out= [], target_cls=lst)
         >>> # input list            nested_len
         >>> lst = [                  idx0, idx1, count
         ...        [[1, 2, 3],      [[0, 0, 3],       two lists in list 0
@@ -647,6 +648,10 @@ def nested_len(obj, out=[], target_cls=list):
         ...          [4, 5]],
         ...         [[6, 7, 8]]]     [5, 1, 1]]
         ...       ]
+
+    For Geo array class::
+
+        out = npg.nested_len(sq2.bits, out= [], target_cls=np.ndarray)
 
     """
 
@@ -670,66 +675,6 @@ def nested_len(obj, out=[], target_cls=list):
             out.append(sub)
     return out
 
-
-"""
-out = []
-
-nl = nested_len(coords, out=[], target_cls=list)
-
-
-# same as nested_len
-#
-out = []
-sub = []
-s = True
-while s:
-    for j in range(0, len(coords)):
-        for k in range(0, len(coords[j])):
-            chk = len(coords[j][k])
-            out.append([j, k, chk])
-    s = False
-#
-
-def depth(lst):
-    d = 0
-    for item in lst:
-        if isinstance(item, list):
-            d = max(depth(item), d)
-    return d + 1
-
-
-
-def nested_len(obj, *, target_cls=list):
-    return [len(x) if isinstance(x, target_cls) else
-            nested_len(x) for x in obj]
-
-
-nested_len(coords, target_cls=list)
-Out[9]: [2, 2, 1]
-
-[nested_len(i, target_cls=list) for i in coords]
-Out[10]: [[4, 2], [1, 4], [4]]
-
-[nested_len(i, target_cls=list) for i in coords[0]]
-Out[38]: [[5, 5, 4, 4], [5, 4]]
-
-[nested_len(i, target_cls=list) for i in coords[0][0]]
-Out[39]: [[2, 2, 2, 2, 2], [2, 2, 2, 2, 2], [2, 2, 2, 2], [2, 2, 2, 2]]
-
-def flatten(arr, list_=None):
-    if list_ is None:
-        list_ = []
-    if isinstance(arr, list):
-        for i in arr:
-            if isinstance(i[0], list) and len(i) > 1:
-                flatten(i, list_)
-            else:
-                list_.append(np.array(i))
-    else:
-        list_.append(np.array(arr))
-    return list_
-
-"""
 
 # ===========================================================================
 # -- main section

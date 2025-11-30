@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2024-12-13
+    2025-09-13
 
 Purpose
 -------
@@ -83,6 +83,8 @@ __all__ = [
     'plot_2d',
     'plot_3d',
     'plot_polygons',
+    'plot_polylines',
+    'plot_segments',
     'plot_mesh',
     'plot_mst'
 ]
@@ -237,7 +239,7 @@ def plot_mixed(data, title="Title", invert_y=False, ax_lbls=None):
         """
         lbl = np.arange(len(pnts))
         for label, xpt, ypt in zip(lbl[:], pnts[:, 0], pnts[:, 1]):
-            plt.annotate(label, xy=(xpt, ypt), xytext=(2, 2), size=10,
+            plt.annotate(label, xy=(xpt, ypt), xytext=(2, 2), size=8,
                          textcoords='offset points', ha='left', va='bottom')
 
     def _line(p, plt):  # , arrow=True):  # , color, marker, linewdth):
@@ -260,7 +262,7 @@ def plot_mixed(data, title="Title", invert_y=False, ax_lbls=None):
     for i, vals in enumerate(data):
         pnts, kind, color, marker, connect = vals
         if kind == 0:
-            _scatter(pnts, plt, color='black', marker='s')
+            _scatter(pnts, plt, color='black', marker='o')
             _label_pnts(pnts, plt)
         elif kind == 2:
             # cmap = plt.cm.get_cmap('hsv', len(pnts))
@@ -615,7 +617,7 @@ plt.show()
 
 # ---- ---------------------------
 # ---- (3) testing section ----
-def plot_polylines(a, title=None):
+def plot_polylines(a, title=None, label_segs=False):
     """
     Plot polylines from point pairs.
 
@@ -630,10 +632,10 @@ def plot_polylines(a, title=None):
     None.
 
     """
-    def _line(p, plt, color):  # , arrow=True):  # , color, marker, linewdth):
+    def _line(p, plt, color):  # arrow=True  # , color, marker, linewdth):
         """Connect the points."""
         X, Y = p[:, 0], p[:, 1]
-        plt.plot(X, Y, color=color, linestyle='solid', linewidth=1)
+        plt.plot(X, Y, color=color, linestyle='solid', linewidth=2)
     #
     if isinstance(a, (list, tuple)):
         polys = a
@@ -671,20 +673,23 @@ def plot_polylines(a, title=None):
     for cnt, xys in enumerate(polys):
         color = colors[cnt]
         _line(xys, plt, color)
-    lbl = np.arange(len(polys))
-    mid_pnts = np.array(mid_pnts)
-    uni, idx, inv, cnts = np.unique(mid_pnts, True, True, True, axis=0)
-    dup_lbl = idx[cnts == 2]
-    # dup_mid = uni[cnts == 2]
-    lbl = lbl[idx]  # mark duplicates assuming only 2 based on sorting
-    lbl = [f"{i},{i + 1}" if i in dup_lbl else str(i) for i in lbl]
-    mid_pnts = mid_pnts[idx]
-    for label, xpt, ypt in list(zip(lbl[:], mid_pnts[:, 0], mid_pnts[:, 1])):
-        plt.annotate(label, xy=(xpt, ypt), size=8, ha='center', va='center')
+    if label_segs:
+        lbl = np.arange(len(polys))
+        mid_pnts = np.array(mid_pnts)
+        uni, idx, inv, cnts = np.unique(mid_pnts, True, True, True, axis=0)
+        dup_lbl = idx[cnts == 2]
+        # dup_mid = uni[cnts == 2]
+        lbl = lbl[idx]  # mark duplicates assuming only 2 based on sorting
+        lbl = [f"{i},{i + 1}" if i in dup_lbl else str(i) for i in lbl]
+        mid_pnts = mid_pnts[idx]
+        lbl_args = list(zip(lbl[:], mid_pnts[:, 0], mid_pnts[:, 1]))
+        for label, xpt, ypt in lbl_args:
+            plt.annotate(label, xy=(xpt, ypt),
+                         size=8, ha='center', va='center')
     plt.show()
 
 
-def plot_segments(a, title=None):
+def plot_segments(a, title=None,  label_segs=False):
     """
     Plot line segments from from-to point pairs.
 
@@ -692,7 +697,7 @@ def plot_segments(a, title=None):
     ----------
     frto : array
         The array can be an Nx4 or an Nx2x2 array representing x0,y0 x1, y1
-        point pairs.
+        point pairs.  If an Nx2 array, then the from-to pairs are created
 
     Returns
     -------
@@ -706,12 +711,18 @@ def plot_segments(a, title=None):
             pairs = a
         elif a.shape[1] == 4:
             pairs = a.reshape((-1, 2, 2))
+        elif hasattr(a, "IFT"):
+            a_vals = a.bits
+            # -- Do the concatenation
+            fr_to = np.concatenate([np.concatenate((i[:-1], i[1:]), axis=1)
+                                    for i in a_vals], axis=0)
+            pairs = fr_to.reshape((-1, 2, 2))
         else:
             print("An Nx4 or an Nx2x2 array is expected")
             pairs = None
         return pairs
     #
-    if isinstance(a, (list, tuple)):
+    if isinstance(a, (list, tuple)) or a.dtype == 'O':  # 2025-09-13 dtype chk
         vals = [_chk_(v) for v in a]
         pairs = np.concatenate(vals, axis=0)
     else:
@@ -737,8 +748,10 @@ def plot_segments(a, title=None):
         plt.plot(pair[:, 0], pair[:, 1], marker='o')
     mid_pnts = np.array(mid_pnts)
     lbl = np.arange(len(mid_pnts))
-    for label, xpt, ypt in list(zip(lbl[:], mid_pnts[:, 0], mid_pnts[:, 1])):
-        plt.annotate(label, xy=(xpt, ypt), size=8, ha='left', va='bottom')
+    if label_segs:
+        lbl_args = list(zip(lbl[:], mid_pnts[:, 0], mid_pnts[:, 1]))
+        for label, xpt, ypt in lbl_args:
+            plt.annotate(label, xy=(xpt, ypt), size=8, ha='left', va='bottom')
     plt.show()
 
 

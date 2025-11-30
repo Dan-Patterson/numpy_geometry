@@ -130,7 +130,7 @@ from scipy.spatial import Delaunay
 # import npGeo
 from npg import npGeo, npg_geom_hlp, npg_pip  # noqa
 from npg.npg_helpers import _view_as_struct_
-from npg.npg_geom_hlp import (_bit_min_max_, _base_, _e_2d_)
+from npg.npg_geom_hlp import (_bit_min_max_, _bit_area_, _base_, _e_2d_)
 from npg.npg_maths import _angles_3pnt_
 from npg.npg_pip import np_wn
 from npg.npg_prn import prn_q, prn_tbl
@@ -1125,10 +1125,14 @@ def triangulate_pnts(pnts):
     z = np.zeros((len(simps), 4), dtype='int32')
     z[:, :3] = simps
     z[:, 3] = simps[:, 0]
-    z = z[:, ::-1]                    # reorder clockwise
-    new_pnts = p[z] + avg
-    # new_pnts = new_pnts.reshape(-1, 2)
-    return new_pnts.tolist()
+    tmp_ = p[z] + avg
+    new_pnts= []
+    for i in tmp_:
+        if _bit_area_(i) < 0.0:  # -- 2025_10_27
+            i = i[::-1]
+        new_pnts.append(i)
+    # z = z[:, ::-1]                    # reorder clockwise
+    return new_pnts  # .tolist() not needed any more
 
 
 # ---- ---------------------------
@@ -1172,6 +1176,8 @@ def polys_to_segments(self, as_basic=True, to_orig=False, as_3d=False):
 
     Notes
     -----
+    See `npGeo.to_segments` for main function.
+
     Use `prn_tbl` if you want to see a well formatted output.
     """
     if self.K not in (1, 2):

@@ -233,6 +233,7 @@ def _angle_between_(p0, cent, p1, inside=True, in_degrees=False):
 
     Notes
     -----
+    determinant : for 2D array [[a, b], [c, d]] == sum(a*d)
     The vectors are created from the three points, cent -> p0 and cent -> p1
     This works::
 
@@ -394,8 +395,9 @@ def _pnt_on_segment_(pnt, seg):
 
 # ---- ---------------------------
 # ---- (2) geom helpers
+# !!! these two don't work for Nx2 array
 def flip_left_right(a, shift_back=True):
-    """Return an array flipped vertically.
+    """Return an array flipped left to right.
 
     Parameters
     ----------
@@ -407,7 +409,7 @@ def flip_left_right(a, shift_back=True):
     m = np.array([[-1, 0], [0, -1]], dtype='float')  # rotate 180
     vals = a @ m
     if shift_back:
-        mins_ = np.min(vals, axis=0)
+        mins_ = np.min(vals, axis=1)
         vals = vals - mins_
     return vals
 
@@ -482,7 +484,7 @@ def norm_2d(a, b):
     >>> np.linalg.norm(aoi, axis=1)
     ... array([  0.00,  10.00,  14.14,  10.00,   0.00])
 
-    # Euclidean Distance Caculator
+    # Euclidean Distance Calculator
     def dist(a, b, axis=1):
         return np.linalg.norm(a - b, axis=ax)
 

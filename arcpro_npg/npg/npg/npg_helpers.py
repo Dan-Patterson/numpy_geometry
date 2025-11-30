@@ -16,7 +16,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-06-01
+    2025-09-15
 
 Purpose
 -------
@@ -29,6 +29,8 @@ To add
 
 import sys
 import numpy as np
+from numpy.lib.stride_tricks import sliding_window_view as swv
+from numpy.lib.stride_tricks import as_strided
 import npg  # noqa
 
 script = sys.argv[0]
@@ -37,6 +39,7 @@ __all__ = [
     'cartesian_product',               # (2) main functions
     'drop_seq_dupl',
     'separate_string_number',
+    'find_sequence',                   # (3) sequences
     'sequences',
     'stride_2d',
     'uniq_1d',
@@ -207,21 +210,6 @@ def cartesian_product(sequences):
     return arr.reshape(-1, len_)
 
 
-def drop_seq_dupl(a):
-    """Remove sequential duplicates from an array.
-
-    The array is stacked with the first value in the sequence to retain it.
-    Designed to removed sequential duplicates in point arrays.
-    """
-    uni = a[np.where(a[:-1] != a[1:])[0] + 1]
-    if a.ndim == 1:
-        uni = np.hstack((a[0], uni))
-    else:
-        uni = np.vstack((a[0], uni))
-    uni = np.ascontiguousarray(uni)
-    return uni
-
-
 def separate_string_number(string, as_list=False):
     """Return a string split into strings and numbers, as a list.
 
@@ -267,13 +255,15 @@ def separate_string_number(string, as_list=False):
     return s
 
 
+# ---- (3) sequences
+#
 def sequences(data, stepsize=0):
     """Return an array of sequence information denoted by stepsize.
 
     Parameters
     ----------
     data : array-like
-        List/array of values in 1D
+        List/array of values in 1D.
     stepsize : integer
         Separation between the values.
     If stepsize=0, sequences of equal values will be searched.  If stepsize
@@ -303,6 +293,12 @@ def sequences(data, stepsize=0):
 
     >>> np.split(data, np.where(np.abs(np.diff(data)) >= N)[0]+1)
 
+    Variants
+    --------
+    Change `N` in the expression to find other splits in the data
+
+    >>> np.split(data, np.where(np.abs(np.diff(data)) >= N)[0]+1)
+
     Keep for now::
 
         checking sequences of 0, 1
@@ -317,6 +313,12 @@ def sequences(data, stepsize=0):
     ----------
     `<https://stackoverflow.com/questions/7352684/how-to-find-the-groups-of-
     sequences-elements-from-an-array-in-numpy>`__.
+
+    `<https://community.esri.com/t5/python-blog/patterns-sequences-occurrence-
+    and-position/ba-p/902504>`_.
+    `<https://stackoverflow.com/questions/50551776/python-chunk-array-on-
+    condition#50551924>`_
+
     """
     #
     a = np.array(data)
@@ -338,6 +340,77 @@ def sequences(data, stepsize=0):
     return out
 
 
+def drop_seq_dupl(a):
+    """Remove sequential duplicates from an array.
+
+    The array is stacked with the first value in the sequence to retain it.
+    Designed to removed sequential duplicates in point arrays.
+    """
+    uni = a[np.where(a[:-1] != a[1:])[0] + 1]
+    if a.ndim == 1:
+        uni = np.hstack((a[0], uni))
+    else:
+        uni = np.vstack((a[0], uni))
+    uni = np.ascontiguousarray(uni)
+    return uni
+
+
+def find_sequence(a, b):
+    """Return the indices of sequence `a` within the 1d array `b`.
+
+    Parameters
+    ----------
+    a, b : array_like
+        The sequences must be 1d.
+
+    Notes
+    -----
+    >>> from numpy.lib.stride_tricks import sliding_window_view as swv
+    >>> a = np.array([-1,  0, -1,  0, -1,  1,  0,  0, -1,  0,  0,  0])
+    >>> b = [0, -1, 0]
+    >>> n = len(b)
+    >>> idx = np.nonzero((swv(a, (n,)) == b).all(-1))[0]
+    >>> # -- the sliding window sequence
+    >>> swv(a, (n,))
+    ... array([[-1,  0, -1],
+    ...        [ 0, -1,  0],
+    ...        [-1,  0, -1],
+    ...        [ 0, -1,  1],
+    ...        [-1,  1,  0],
+    ...        [ 1,  0,  0],
+    ...        [ 0,  0, -1],
+    ...        [ 0, -1,  0],
+    ...        [-1,  0,  0],
+    ...        [ 0,  0,  0]])
+    >>> # -- result
+    >>> idx
+    ... array([1, 7], dtype=int64)
+    >>> seqs
+    ... array([[1, 2, 3],
+    ...        [7, 8, 9]], dtype=int64)
+
+    References
+    ----------
+    `<https://community.esri.com/t5/python-blog/finding-irregular-patterns-in-
+    data-numpy-snippets/ba-p/1549306>`_.
+    """
+    # from numpy.lib.stride_tricks import sliding_window_view as swv
+    a = np.asarray(a)
+    b = np.asarray(b)
+    if a.ndim > 1 or b.ndim > 1:
+        msg = """\n
+        1d sequences are required, your provided:
+        array, shape\na {}\nb {}
+        """
+        print(msg.format(a.shape, b.shape))
+    n = len(b)
+    idx = np.nonzero((swv(a, (n,)) == b).all(-1))[0]
+    seqs = np.asarray([np.arange(i, i + n) for i in idx]).reshape(-1, n)
+    return seqs
+
+
+# ---- (6) stride, unique, flatten
+#
 def stride_2d(a, win=(2, 2), stepby=(1, 1)):
     """Provide a 2D sliding/moving view of a 2D array.
 
@@ -392,7 +465,7 @@ def stride_2d(a, win=(2, 2), stepby=(1, 1)):
                 [4, 5]]])
 
     """
-    from numpy.lib.stride_tricks import as_strided
+    # from numpy.lib.stride_tricks import as_strided  # -- required
     shp = np.array(a.shape)    # array shape 2D (r, c) or 3D (d, r, c)
     win_shp = np.array(win)    # window    (4,) (3, 3) or    (1, 3, 3)
     ss = np.array(stepby)      # step by   (2,) (1, 1) or    (1, 1, 1)
@@ -404,6 +477,7 @@ def stride_2d(a, win=(2, 2), stepby=(1, 1)):
 
 def uniq_1d(arr):
     """Return mini `unique` 1D."""
+    # -- np.array(list(set(zz))) is not much faster
     mask = np.empty(arr.shape, dtype=np.bool_)
     mask[:1] = True
     a_copy = np.sort(arr)

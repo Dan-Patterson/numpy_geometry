@@ -10,7 +10,7 @@ to geometry have been assigned and methods developed to return geometry
 properties.
 
 Modified :
-    2025-05-31
+    2025-09-12
 
 ----
 
@@ -38,7 +38,7 @@ from npg import npg_min_circ as sc  # requires scipy
 from npg.npg_geom_hlp import (
     _area_centroid_, _bit_area_, _bit_crossproduct_,
     _clean_segments_, _bit_min_max_, _bit_length_, _rotate_, geom_angles,
-)
+)  # swap_segment_pnts
 
 from npg.npg_maths import _angles_3pnt_
 
@@ -1077,7 +1077,7 @@ class Geo(np.ndarray):
         return self.od_pairs()
 
     def od_pairs(self):
-        """Construct origin-destination pairs."""
+        """Construct origin-destination pairs.  Return a list of arrays."""
         # return [np.concatenate((p[:-1], p[1:]), axis=1) for p in self.bits]
         z = np.concatenate((self.XY[:-1], self.XY[1:]), axis=1)
         return [z[ft[0]:ft[1] - 1] for ft in self.FT]
@@ -1122,25 +1122,41 @@ class Geo(np.ndarray):
 
         See Also
         --------
-        `common_segments`, `od_pairs`, `fr_to_segments` and `to_fr_segments`
+        `od_pairs`, `fr_to_segments` and `to_fr_segments`
         """
         return geom.polys_to_segments(self, as_basic=as_basic,
                                       to_orig=shift_back, as_3d=as_3d)
 
-    def fr_to_segments(self, as_basic=True, shift_back=False, as_3d=False):
+    def fr_to_segments(self, as_basic=True):
         """Return `from-to` points segments for poly* features as 2D array.
 
-        Call `polys_to_segments`.  See `segment_polys`.
-        """
-        return geom.polys_to_segments(self, as_basic=as_basic,
-                                      to_orig=shift_back, as_3d=as_3d)
+        If `as_basic` is True, then an Nx4 array is returned.  If False, then
+        an object array of Nx4 subarrays is returned.
 
-    def to_fr_segments(self, as_basic=True, shift_back=False, as_3d=False):
-        """Return to-from points segments to compare to fr_to_segments."""
+        Use `npg.npg_plots.plot_segments` to plot the segments with id values.
+        """
+        a_vals = self.bits
+        # -- Do the concatenation
+        subs = [np.concatenate((i[:-1], i[1:]), axis=1) for i in a_vals]
+        if as_basic:
+            fr_to = np.concatenate(subs, axis=0)
+        else:
+            fr_to = np.asarray(subs, dtype='O')
+        return fr_to
+
+    def to_fr_segments(self, as_basic=True):
+        """Return to-from points segments to compare to fr_to_segments.
+
+        If `as_basic` is True, then an Nx4 array is returned.  If False, then
+        an object array of Nx4 subarrays is returned.
+        """
         b_vals = self.bits
         # -- Do the concatenation
-        to_fr = np.concatenate(
-            [np.concatenate((b[1:], b[:-1]), axis=1) for b in b_vals], axis=0)
+        subs = [np.concatenate((i[1:], i[:-1]), axis=1) for i in b_vals]
+        if as_basic:
+            to_fr = np.concatenate(subs, axis=0)
+        else:
+            to_fr = np.asarray(subs, dtype='O')
         return to_fr
 
     def close_polylines(self, out_kind=1):
@@ -1249,8 +1265,8 @@ class Geo(np.ndarray):
 
         See Also
         --------
-        `npGeo.segment_polys()` and `npg_geom_hlp.polys_to_segments` for other
-        output options.
+        `npGeo.segment_polys()`, `npGeo.fr_to_segments`, `npGeo.od_pairs` or
+        `npg_geom_hlp.polys_to_segments` for other output options.
         """
         if self.K not in (1, 2):
             print("Poly* features required.")
@@ -1264,7 +1280,7 @@ class Geo(np.ndarray):
                            for b in fr_to], dtype='O')
         return segs
 
-    def common_segments(self, shift_back=False):
+    def common_segments(self, just_uniq=False, shift_back=False):
         """Return the common segments in poly* features.
 
         The result is an array of from-to pairs of points.  ft, tf pairs are
@@ -1272,8 +1288,16 @@ class Geo(np.ndarray):
 
         Parameters
         ----------
+        just_uniq : boolean
+            True reorders the pairs so they are lexicographically sorted,
+            then the unique fr-to points are returned.  False, returns all
+            segments that are common but may differ in directionality.
         shift_back : boolean
             Whether to shift back to real-world coordinates.
+
+        Notes
+        -----
+        This is called by `duplicate_segments` with `just_uniq` set to True.
         """
         bts = self.bits
         if len(bts) == 1:
@@ -1286,12 +1310,33 @@ class Geo(np.ndarray):
             return None
         # -- changed 2025-05-22
         tst = np.concatenate((fr_to[:, 2:4], fr_to[:, :2]), axis=1)
-        idx = np.nonzero((fr_to == tst[:, None]).all(-1))[0]
-        common = fr_to[idx]
+        idx0, idx1 = np.nonzero((fr_to == tst[:, None]).all(-1))
+        idx_01 = np.asarray((idx0, idx1)).T
+        common = fr_to[idx0]
+        #
+        # -- just unique, lex sorted increasing x
+        common_pair_ids = None
+        if just_uniq:
+            common_pair_ids = np.asarray([i for i in idx_01 if i[0] < i[1]])
+            pair_0 = common_pair_ids[:, 0]
+            common = fr_to[pair_0]
+            # em, idx_ = swap_segment_pnts(common)  # added 2025-09-12 em, idx_
+            # common = np.unique(em, axis=0)
         if shift_back:
             common[:, :2] += self.LL
             common[:, 2:] += self.LL
-        return common
+        # -- return all pairs or just the uniq direction non-specific ids
+        pair_ids = common_pair_ids if just_uniq else idx_01
+        return common, pair_ids
+
+    def duplicate_segments(self, just_uniq=True, shift_back=False):
+        """Return the common segments in poly* features.
+
+        See `common_segments` for parameters.  This function calls it using
+        `just_uniq` set to True.
+        """
+        dups = self.common_segments(just_uniq=True, shift_back=shift_back)
+        return dups
 
     def unique_segments(self, shift_back=False):
         """Return the unique segments in poly* features.
@@ -1491,7 +1536,7 @@ class Geo(np.ndarray):
         return dups, num
 
     def singleton_pnts(self, as_structured=False):
-        """Return unique points, optionally, as a structured array."""
+        """Points with a count of 1, optionally, as a structured array."""
         uni, cnts = np.unique(self, return_counts=True, axis=0)
         uni = uni[cnts == 1]
         if as_structured:
@@ -1773,6 +1818,15 @@ def arrays_to_Geo(in_arrays, kind=2, info=None, to_origin=False):
             if len(dif) > 1:  # *** added
                 fix_seq = np.concatenate([np.arange(i) for i in dif])
                 z0[:len(fix_seq), 5] = fix_seq
+                # -- need to fix the ids z0[:, 0]  # -- 2025-11-10 for A0
+                if len(z0) == 2:
+                    # from npg.npg_pip import np_wn
+                    # bt0, bt1 = np_wn(bt1, bt0)
+                    # in_ = np_wn(bt1, bt0)
+                    # if np.equal(bt1, in_).all():
+                    #     they are all in, so renumber    
+                    z0[:len(fix_seq), 0] = z0[:, 0][0]  # -- only len == 2
+                #
             g = Geo(a_2d, z0, Kind=kind, Extent=extent, Info=info)
     elif kind == 1:  # check for closed-loop polylines
         _c = [(i[-1] == i[0]).all() for i in g.bits]
@@ -1832,7 +1886,8 @@ def Geo_to_arrays(g, shift_back=True):
             subs = []
         else:
             subs.append(np.asarray(vals, dtype=dt).squeeze())
-    return np.asarray(arrs, dtype="O")
+    final = [i for i in arrs if len(i) > 0]
+    return np.asarray(final, dtype="O").squeeze()
 
 
 def Geo_to_lists(g, shift_back=True):

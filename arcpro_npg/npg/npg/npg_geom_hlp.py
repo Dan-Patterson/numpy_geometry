@@ -279,7 +279,7 @@ def _from_to_pnts_(a, as_pairs=False):
 # ---- (a) angles, orientation, sidedness
 def _is_clockwise_(a):
     """Return whether the sequence (polygon) is clockwise oriented or not."""
-    return 1 if _bit_area_(a) > 0. else 0
+    return 1 if _bit_area_(a) < 0. else 0
 
 
 def _is_ccw_(a):
@@ -1150,15 +1150,18 @@ def swap_segment_pnts(a):
     shp0 -= 1
     if shp1 == 2:
         tmp = np.concatenate((a[:-1], a[1:]), axis=1)
-        idx_ = np.zeros((shp0, 2), dtype=int)
-        idx_[:, 0] = np.arange(shp0)
-        idx_[:-1, 1] = np.arange(1, shp0)
+        # idx_ = np.zeros((shp0, 2), dtype=int)  # modified 2025-09-12
+        # idx_[:, 0] = np.arange(shp0)           # moved idx_ cals below
+        # idx_[:-1, 1] = np.arange(1, shp0)
     elif shp1 == 4:
         tmp = np.copy(a)
     else:
         print("Array shape of Nx2 or Nx4 required.")
         return None
     #
+    idx_ = np.zeros((shp0, 2), dtype=int)
+    idx_[:, 0] = np.arange(shp0)
+    idx_[:-1, 1] = np.arange(1, shp0)
     # -- compare x columns, fill output array
     gte_idx = tmp[:, 0] >= tmp[:, 2]  # compare x-coordinates
     # check y if x is equal
@@ -1187,13 +1190,14 @@ def sort_segment_pairs(a):
     The new segments and their from-to indices.
     The segments are sorted lexicographically with ascending x-values for the
     point pairs.  The segments are oriented so they lie in quadrant I or II.
+    Modified so that duplicate first points take precedence by adding tmp[:, 1]
 
     Notes
     -----
     See `swap_segment_pnts` for parameters and details.
     """
     tmp, idx_ = swap_segment_pnts(a)
-    ind = np.lexsort((tmp[:, 2], tmp[:, 0]))
+    ind = np.lexsort((tmp[:, 2], tmp[:, 1], tmp[:, 0]))  # 2025-11-07
     return tmp[ind], idx_[ind]  # ind, idx_
 
 

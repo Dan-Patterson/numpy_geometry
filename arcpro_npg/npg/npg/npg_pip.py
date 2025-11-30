@@ -375,6 +375,8 @@ def np_wn(pnts, poly, return_winding=False, extras=False):
     `<https://github.com/congma/polygon-inclusion/blob/master/
     polygon_inclusion.py>`_.  inspiration for this numpy version
     """
+    if pnts.ndim == 1:
+        pnts = pnts[None, :]  # 2025-11-09 to check for a single point
     x0, y0 = poly[:-1].T  # polygon `from` coordinates
     x1, y1 = poly[1:].T   # polygon `to` coordinates
     x, y = pnts.T         # point coordinates

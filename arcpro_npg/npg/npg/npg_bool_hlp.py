@@ -16,7 +16,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-01-22
+    2025-07-27
 
 Purpose
 -------
@@ -48,7 +48,7 @@ To determine right turns in arrays::
 
 import sys
 import numpy as np
-from numpy.lib.stride_tricks import sliding_window_view as swv
+# from numpy.lib.stride_tricks import sliding_window_view as swv
 import npg
 # from npg.npGeo import roll_arrays
 from npg.npg_geom_hlp import sort_segment_pairs
@@ -64,8 +64,6 @@ __all__ = [
     'add_intersections',              # (3) add intersection points
     'segment_intersections',          # (4) segment intersections
     'self_intersection_check',
-    'find_sequence',                  # (5) sequences
-    'sequences'
 ]
 
 __helpers__ = [
@@ -90,60 +88,6 @@ __imports__ = [
 # ---- ---------------------------
 # ---- (1) private helpers
 #
-def _add_pnts_(ply0, ply1, x_pnts, whr):
-    """Return input arrays with intersections added to their lines.
-
-    Parameters
-    ----------
-    ply0, ply1 : array_like
-        N-2 arrays of clockwise ordered points representing poly* features.
-    x_pnts : array_like
-        The intersection points.
-    whr : array_like
-        The id locations where the line points intersect the polygon segments.
-
-    Requires
-    --------
-    `_wn_clip_` is used to generate the intersection points and segments of the
-    poly* features that they intersect on (this is the `whr`ere parameter).
-
-    """
-    def _srt_pnts_(p):
-        """Order intersection points on a line, from the start/first point.
-
-        `_sort_on_line_` is the full version, `p` is the combined point list.
-        """
-        if len(p) == 2:  # -- only start and end point
-            return p
-        dxdy = np.abs(p[0] - p[1:])  # difference from first
-        if dxdy.sum(axis=0)[0] == 0:  # -- vertical line check
-            order = np.argsort(dxdy[:, 1])  # sort ascending on y-values
-        else:
-            order = np.argsort(dxdy[:, 0])
-        p[1:] = p[1:][order]
-        return p
-    # --
-    p_ = np.concatenate((ply0[:-1], ply0[1:]), axis=1).reshape((-1, 2, 2))
-    p_ = list(p_)
-    c_ = np.concatenate((ply1[:-1], ply1[1:]), axis=1).reshape((-1, 2, 2))
-    c_ = list(c_)
-    for cnt, cp in enumerate(whr):
-        cl, pl = cp  # print(f"cnt {cnt}  cp {cp}") add this below to see order
-        x = x_pnts[cnt]
-        chk0 = (x == c_[cl]).all(-1).any(-1)  # correct but slow
-        chk1 = (x == p_[pl]).all(-1).any(-1)  # correct but slow
-        if not chk0:
-            c_[cl] = np.concatenate((c_[cl], x[None, :]), axis=0)
-        if not chk1:
-            p_[pl] = np.concatenate((p_[pl], x[None, :]), axis=0)
-    for cnt, p in enumerate(p_):
-        if len(p) > 2:
-            p_[cnt] = _srt_pnts_(p)
-    for cnt, c in enumerate(c_):
-        if len(c) > 2:
-            c_[cnt] = _srt_pnts_(c)
-    return p_, c_
-
 
 def _del_seq_dupl_pnts_(arr, poly=True):
     """Remove sequential duplicates in a Nx2 array of points.
@@ -167,7 +111,7 @@ def _del_seq_dupl_pnts_(arr, poly=True):
 
     See Also
     --------
-    `npg_helpers.uniq_2d` above, which can be used in situations where genuine
+    `npg_helpers.uniq_2d` which can be used in situations where genuine
     uniqueness is desired.
     """
     # -- like np.unique but not sorted
@@ -274,7 +218,7 @@ def _p_ints_p_(poly0, poly1):
         ys = u_a * p10_y + poly0[:-1][:, 1]
         # *** np.any(both, axis=1)
         # yields the segment on the clipper that the points are on
-        # *** np.sum(bth, axis=1)  how many intersections on clipper
+        # *** np.sum(both, axis=1)  how many intersections on clipper
         #     np.sum(both, axis=0)  intersections on the polygon
     xs = xs[both]
     ys = ys[both]
@@ -542,8 +486,8 @@ def prep_overlay(arrs, roll=True, p0_pgon=True, p1_pgon=True,):
     if roll:
         a0, a1 = _roll_(arrs)
     vals = _wn_clip_(a0, a1, all_info=True)
-    x_pnts, pInc, cInp, x_type, whr = vals
-    args = _node_type_(pInc, cInp, a0, a1, x_pnts)
+    x_pnts, p_in_c, c_in_p, x_type, whr = vals
+    args = _node_type_(p_in_c, c_in_p, a0, a1, x_pnts)
     # px_in_c, cx_in_p, p_in_c, c_in_p, c_eq_p, c_eq_x, p_eq_c, p_eq_x = args
     a0_new, a1_new = _add_pnts_(a0, a1, x_pnts, whr)
     x_pnts = _del_seq_dupl_pnts_(x_pnts, poly=False)
@@ -554,7 +498,93 @@ def prep_overlay(arrs, roll=True, p0_pgon=True, p1_pgon=True,):
 
 # ---- ---------------------------
 # ---- (3) add intersection points
-#
+#  There is the mini version and the full version, depending on what is needed.
+
+def _add_pnts_(ply0, ply1, x_pnts, whr):
+    """Return input arrays with intersections added to their lines.
+
+    Parameters
+    ----------
+    ply0, ply1 : array_like
+        N-2 arrays of clockwise ordered points representing poly* features.
+    x_pnts : array_like
+        The intersection points.
+    whr : array_like
+        The id locations where the line points intersect the polygon segments.
+
+    Requires
+    --------
+    `_wn_clip_` is used to generate the intersection points and segments of the
+    poly* features that they intersect on (this is the `whr`ere parameter).
+
+    """
+    def _srt_pnts_(p):
+        """Order intersection points on a line, from the start/first point.
+
+        `_sort_on_line_` is the full version, `p` is the combined point list.
+        """
+        if len(p) == 2:  # -- only start and end point
+            return p
+        dxdy = np.abs(p[0] - p[1:])  # difference from first
+        if dxdy.sum(axis=0)[0] == 0:  # -- vertical line check
+            order = np.argsort(dxdy[:, 1])  # sort ascending on y-values
+        else:
+            order = np.argsort(dxdy[:, 0])
+        p[1:] = p[1:][order]
+        return p
+    # --
+    p_ = np.concatenate((ply0[:-1], ply0[1:]), axis=1).reshape((-1, 2, 2))
+    p_ = list(p_)
+    c_ = np.concatenate((ply1[:-1], ply1[1:]), axis=1).reshape((-1, 2, 2))
+    c_ = list(c_)
+    for cnt, cp in enumerate(whr):
+        cl, pl = cp  # print(f"cnt {cnt}  cp {cp}") add this below to see order
+        x = x_pnts[cnt]
+        chk0 = (x == c_[cl]).all(-1).any(-1)  # correct but slow
+        chk1 = (x == p_[pl]).all(-1).any(-1)  # correct but slow
+        if not chk0:
+            c_[cl] = np.concatenate((c_[cl], x[None, :]), axis=0)
+        if not chk1:
+            p_[pl] = np.concatenate((p_[pl], x[None, :]), axis=0)
+    for cnt, p in enumerate(p_):
+        if len(p) > 2:
+            p_[cnt] = _srt_pnts_(p)
+    for cnt, c in enumerate(c_):
+        if len(c) > 2:
+            c_[cnt] = _srt_pnts_(c)
+    return p_, c_
+
+
+def _add_intersections_(
+        p0, p1, roll_to_minX=True, p0_pgon=True, p1_pgon=True):
+    """Mini version of `add_intersections`."""
+    is_0, is_1 = p0_pgon, p1_pgon
+    vals = _wn_clip_(p0, p1, all_info=True)
+    x_pnts, p_in_c, c_in_p, x_type, whr = vals  # x_pnts by decreasing y-value
+    p0_n, p1_n = _add_pnts_(p0, p1, x_pnts, whr)
+    p0_n = _del_seq_dupl_pnts_(np.concatenate((p0_n), axis=0), poly=is_0)
+    p1_n = _del_seq_dupl_pnts_(np.concatenate((p1_n), axis=0), poly=is_1)
+    # x_pnts = _del_seq_dupl_pnts_(x_pnts, False)  # True, if wanting a polygon
+    x_pnts, idx = np.unique(x_pnts, True, axis=0)  # x_pnts increase by x-value
+    # ---- lexsort
+    # ensures that the upper pnt will be taken if there are 2 or more with min
+    # x values.
+    x_lex = np.lexsort((-x_pnts[:, 1], x_pnts[:, 0]))
+    x_pnts = x_pnts[x_lex]
+    #
+    # -- locate the roll coordinates
+    if roll_to_minX:
+        xp = x_pnts[0]
+    else:
+        xp = x_pnts
+    r0 = np.nonzero((xp == p0_n[:, None]).all(-1).any(-1))[0]
+    r1 = np.nonzero((xp == p1_n[:, None]).all(-1).any(-1))[0]
+    v0, v1 = r0[0], r1[0]
+    p0_n = np.concatenate((p0_n[v0:-1], p0_n[:v0], [p0_n[v0]]), axis=0)
+    p1_n = np.concatenate((p1_n[v1:-1], p1_n[:v1], [p1_n[v1]]), axis=0)
+    return p0_n, p1_n
+
+
 def add_intersections(
         p0, p1, roll_to_minX=True, p0_pgon=True, p1_pgon=True, class_ids=True):
     """Return input polygons with intersections points added."""
@@ -620,15 +650,20 @@ def add_intersections(
     #
     is_0, is_1 = p0_pgon, p1_pgon
     vals = _wn_clip_(p0, p1, all_info=True)
-    x_pnts, pInc, cInp, x_type, whr = vals  # x_pnts are by decreasing y-value
+    x_pnts, p_in_c, c_in_p, x_type, whr = vals  # x_pnts by decreasing y-value
     p0_n, p1_n = _add_pnts_(p0, p1, x_pnts, whr)
     p0_n = _del_seq_dupl_pnts_(np.concatenate((p0_n), axis=0), poly=is_0)
     p1_n = _del_seq_dupl_pnts_(np.concatenate((p1_n), axis=0), poly=is_1)
     # x_pnts = _del_seq_dupl_pnts_(x_pnts, False)  # True, if wanting a polygon
     x_pnts, idx = np.unique(x_pnts, True, axis=0)  # x_pnts increase by x-value
-    # optional lexsort
-    # x_lex = np.lexsort((-x_pnts[:, 1], x_pnts[:, 0]))
-    # x_pnts = x_pnts[x_lex]
+    #
+    # -- lexsort
+    # ensures that the upper pnt will be taken if there are 2 or more with min
+    # x values.
+    # points that the upper one sorts first, use -x_pnts[:, 1] to sort y from
+    # top left, otherwise, bottom left
+    x_lex = np.lexsort((-x_pnts[:, 1], x_pnts[:, 0]))  # -- -x_pnts
+    x_pnts = x_pnts[x_lex]
     # -- locate the roll coordinates
     if roll_to_minX:
         xp = x_pnts[0]
@@ -796,122 +831,6 @@ def self_intersection_check(a):
         extra_cross = x_pnts[crosses]
         return extra_cross, crosses, whr, x_pnts
     return [], whr, x_pnts
-
-
-# ---- ---------------------------
-# ---- (5) sequences
-#
-def find_sequence(a, b):
-    """Return the indices of sequence `a` within the 1d array `b`.
-
-    Parameters
-    ----------
-    a, b : array_like
-        The sequences must be 1d
-
-    Notes
-    -----
-    >>> from numpy.lib.stride_tricks import sliding_window_view as swv
-    >>> a = np.array([-1,  0, -1,  0, -1,  1,  0,  0, -1,  0,  0,  0])
-    >>> b = [0, -1, 0]
-    >>> n = len(b)
-    >>> idx = np.nonzero((swv(a, (n,)) == b).all(-1))[0]
-    >>> # -- the sliding window sequence
-    >>> swv(a, (n,))
-    ... array([[-1,  0, -1],
-    ...        [ 0, -1,  0],
-    ...        [-1,  0, -1],
-    ...        [ 0, -1,  1],
-    ...        [-1,  1,  0],
-    ...        [ 1,  0,  0],
-    ...        [ 0,  0, -1],
-    ...        [ 0, -1,  0],
-    ...        [-1,  0,  0],
-    ...        [ 0,  0,  0]])
-    >>> # -- result
-    >>> idx
-    ... array([1, 7], dtype=int64)
-    >>> seqs
-    ... array([[1, 2, 3],
-    ...        [7, 8, 9]], dtype=int64)
-
-    References
-    ----------
-    `<https://community.esri.com/t5/python-blog/finding-irregular-patterns-in-
-    data-numpy-snippets/ba-p/1549306>`_.
-    """
-    # from numpy.lib.stride_tricks import sliding_window_view as swv
-    a = np.asarray(a)
-    b = np.asarray(b)
-    if a.ndim > 1 or b.ndim > 1:
-        msg = """\n
-        1d sequences are required, your provided:
-        array, shape\na {}\nb {}
-        """
-        print(msg.format(a.shape, b.shape))
-    n = len(b)
-    idx = np.nonzero((swv(a, (n,)) == b).all(-1))[0]
-    seqs = np.asarray([np.arange(i, i + n) for i in idx]).reshape(-1, n)
-    return seqs
-
-
-def sequences(data, stepsize=0):
-    """Return an array of sequence information denoted by stepsize.
-
-    Parameters
-    ----------
-    data : array-like of values in 1D
-    stepsize : Separation between the values.
-        If stepsize=0, sequences of equal values will be searched. If stepsize
-        is 1, then sequences incrementing by 1... etcetera.
-        Stepsize can be both positive or negative.
-
-    >>> # check for incrementing sequence by 1's
-    d = [1, 2, 3, 4, 4, 5]
-    s, o = sequences(d, 1, True)
-    # s = [array([1, 2, 3, 4]), array([4, 5])]
-    # o = array([[1, 4, 4],
-    #            [4, 2, 6]])
-
-    Notes
-    -----
-    For strings, use
-
-    >>> partitions = np.where(a[1:] != a[:-1])[0] + 1
-
-    Variants
-    --------
-    Change `N` in the expression to find other splits in the data
-
-    >>> np.split(data, np.where(np.abs(np.diff(data)) >= N)[0]+1)
-
-    References
-    ----------
-    `<https://community.esri.com/t5/python-blog/patterns-sequences-occurrence-
-    and-position/ba-p/902504>`_.
-
-    `<https://stackoverflow.com/questions/7352684/how-to-find-the-groups-of-
-    sequences-elements-from-an-array-in-numpy>`_.
-
-    `<https://stackoverflow.com/questions/50551776/python-chunk-array-on-
-    condition#50551924>`_
-    """
-    a = np.array(data)
-    a_dt = a.dtype.kind
-    dt = [('ID', '<i4'), ('Value', a.dtype.str), ('Count', '<i4'),
-          ('From_', '<i4'), ('To_', '<i4')]
-    if a_dt in ('U', 'S'):
-        seqs = np.split(a, np.where(a[1:] != a[:-1])[0] + 1)
-    elif a_dt in ('i', 'f'):
-        seqs = np.split(a, np.where(np.diff(a) != stepsize)[0] + 1)
-    vals = [i[0] for i in seqs]
-    cnts = [len(i) for i in seqs]
-    seq_num = np.arange(len(cnts))
-    too = np.cumsum(cnts)
-    frum = np.zeros_like(too)
-    frum[1:] = too[:-1]
-    out = np.array(list(zip(seq_num, vals, cnts, frum, too)), dtype=dt)
-    return out
 
 
 # ---- add doc strings
