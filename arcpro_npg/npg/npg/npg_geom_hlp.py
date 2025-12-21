@@ -16,7 +16,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-06-01
+    2025-12-08
 
 Purpose
 -------
@@ -299,14 +299,35 @@ def _is_turn(pnts, tol=1e-6):
 
     Returns
     -------
-    -1 : right
-     0 : straight
-     1 : left
+    >>>   -1 : right
+    >>>    0 : straight
+    >>>    1 : left
+
+    Useage
+    ------
+    Applied to a polygon::
+
+        C = np.array([[0., 0.], [0., 10.], [10., 10.], [10., 8.], [2., 8.],
+                      [2., 2.], [10., 2.], [10., 0.], [0., 0.]])
+        zz = np.array([_is_turn(i) for i in npg.stride_2d(C, (3,2))])
+        # array([-1, -1, -1, 1, 1, -1, -1])
+        rght_turn = np.nonzero(zz == -1)[0]  # find the right turns
+        # array([0, 1, 2, 5, 6])
+        pnt_seq = np.array([[i - 1, i, i + 1] for i in rght_turn])
+        array([[-1,  0,  1],
+               [ 0,  1,  2],
+               [ 1,  2,  3],
+               [ 4,  5,  6],
+               [ 5,  6,  7]])
 
     Notes
     -----
     No error checking.  It is assumed you can provide an array of 3 points.
     Do any required conversion elsewhere.
+
+    See Also
+    --------
+    See `turns` in `npg_bool_ops`.
     """
     pnts = np.array(pnts)
     if len(pnts) != 3:
@@ -428,17 +449,22 @@ def _angle_between_(p0, cent, p1, in_degrees=False):
         a = np.array([[2.,0], [0., 0], [10., 10.]])
         p0, cent, p1 = a
         angle_between(p0, cent, p1, in_degrees=False)
-        0.7853981633974485
+        0.7853981633974483
         angle_between(p0, cent, p1, in_degrees=True)
-        45.000000000000014
+        45.0
 
     Note:  use np.degrees(angle).item() to get a python number.
 
+    np.cross cannot be used on 2d arrays since numpy 2.x, so use...
+
+    def cross2d(x, y):
+        return x[..., 0] * y[..., 1] - x[..., 1] * y[..., 0]
+    
     https://community.esri.com/t5/spatial-data-science
     -questions/how-to-identify-polygons-with-approximate-right/m-p/752828
         ba = p1 - p0     p1 is the center
         bc = p1 - p2
-        cr = np.cross(ba, bc)
+        cr = np.cross(ba, bc)  # replaced in numpy 2.x, use cross2d
         dt = np.dot(ba, bc)
         ang = np.arctan2(np.linalg.norm(cr), dt)
     """
@@ -660,12 +686,24 @@ def _rotate_(a, R, as_group):
 
 
 def _scale_(a, factor=1):
-    """Scale a geometry equally."""
+    """Scale a convex geometry by distance about the center."""
     a = _base_(a)
-    cent = np.min(a, axis=0)
+    cent = np.mean(a[:-1], axis=0)  # -- drop duplicate last point
     shift_orig = a - cent
-    scaled = shift_orig * [factor, factor]
-    return scaled + cent
+    scaled = shift_orig * [factor, factor] + cent
+    return scaled
+
+
+def _area_scaler_(a, factor=1):
+    """Scale a convex geometry equally by area about the center."""
+    if factor <= 0.0:
+        return None
+    a = np.array(a)
+    area_, cent = _area_centroid_(a)  # from npg_geom_hlp 2025-04-09
+    shifted = a - cent
+    alpha = np.sqrt(factor * area_ / area_)
+    scaled = shifted * [alpha, alpha] + cent
+    return scaled 
 
 
 def _translate_(a, dx=0, dy=0):
@@ -1470,7 +1508,8 @@ def reclass_ids(vals=None):
     ----------
     vals : integers
         A sequence of integers representing ID values for objects.  They may
-        contain gaps in the sequence and duplicates of values.
+        contain gaps in the sequence and duplicates of values.  Duplicates are
+        retained, gaps are filled.
 
     Notes
     -----
@@ -1478,12 +1517,21 @@ def reclass_ids(vals=None):
     Unique values are easily determined by sorting, finding successive
     differences as a reverse boolean, then producing and assigning a
     cumulative sum.
+
+    Useage
+    ------
+    >>> # input has duplicates and gaps
+    >>> vals = np.array([1, 2, 2, 3, 5, 6, 7, 9, 10])
+    >>> reclass_ids(vals=vals)  # yields
+    >>> array([0, 1, 1, 2, 3, 4, 5, 6, 7], dtype=int32)
     """
     if vals is None:
         return None
     idx = np.arange(len(vals), dtype="int32")
     ordr = np.zeros(len(vals), dtype="int32")
-    dt = [("ID", "int32"), ("Values", "U5"), ("Order", "int32")]
+    # -- ("Values", "U5") changed 2025-12-08 because the following did not work
+    #     vals = np.array([1, 2, 2, 3, 5, 6, 7, 9, 10])
+    dt = [("ID", "int32"), ("Values", "int32"), ("Order", "int32")]
     a = np.array(list(zip(idx, vals, ordr)), dtype=dt)
     #
     # sort the array, determine where consecutive values are equal

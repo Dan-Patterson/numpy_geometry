@@ -67,10 +67,11 @@ Sample data
 
 References
 ----------
-See comment by Serge Tolstov in:
 
 `List of geometry topics
 <https://en.wikipedia.org/wiki/List_of_geometry_topics>`_.
+
+See comment by Serge Tolstov in:
 
 `Geometry checks
 <https://community.esri.com/thread/244587-check-geometry-fails-in-shared
@@ -1086,9 +1087,10 @@ def mabr(polys, p_centers, p_angles):
             if area_ <= area_old:
                 area_old = area_
                 Xmin, Ymin, Xmax, Ymax = LBRT
-                vals = [area_, p_centers[i], angle, Xmin, Ymin, Xmax, Ymax]
+                x_cent, y_cent = p_centers[i]
+                vals = [area_, x_cent, y_cent, angle, Xmin, Ymin, Xmax, Ymax]
         rects.append(vals)
-    rects = np.asarray(rects, dtype='O')
+    rects = np.asarray(rects)  #, dtype='O')
     return rects
 
 

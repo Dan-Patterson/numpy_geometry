@@ -2,7 +2,7 @@
 # noqa: D205, D400, F403
 r"""
 -----------
-npg_boolean
+npg_clip_split
 -----------
 
 ** Boolean operations on poly geometry.
@@ -10,13 +10,13 @@ npg_boolean
 ----
 
 Script :
-    npg_boolean.py
+    npg_clip_split.py
 
 Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2023-12-07
+    2025-12-21
 
 Purpose
 -------

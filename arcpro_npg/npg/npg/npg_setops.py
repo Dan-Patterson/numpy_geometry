@@ -10,7 +10,7 @@ Script :
 Author :
     `<https://github.com/Dan-Patterson>`_.
 Modified :
-    2025-05-29
+    2025-12-20
 
 Purpose
 -------
@@ -176,10 +176,7 @@ def _check_dtype_(a_view, b_view):
 
 def _unique1d_(ar, return_index=False, return_inverse=False,
                return_counts=False):
-    """Return unique array elements. From `np.lib.arraysetops`.
-
-    `<https://github.com/numpy/numpy/blob/master/numpy/lib/arraysetops.py>`_.
-    """
+    """Return unique array elements. From `_arraysetops_impl in np.lib`."""
     ar = np.asanyarray(ar).flatten()
     any_indices = return_index or return_inverse
     if any_indices:
@@ -229,7 +226,7 @@ def nd_diffxor(a, b, uni=False):
 def nd_in1d(a, b, assume_unique=False, invert=False):
     r"""Check for the presence of array in the other.  Taken from `in1d` in.
 
-    `<https://github.com/numpy/numpy/blob/master/numpy/lib/arraysetops.py>`_.
+    `_arraysetops_impl in np.lib`_.
 
     Notes
     -----
@@ -280,7 +277,7 @@ def nd_intersect(a, b, invert=False):
 
     References
     ----------
-    `<https://github.com/numpy/numpy/blob/master/numpy/lib/arraysetops.py>`_.
+    ``_arraysetops_impl in np.lib`
 
     `<https://stackoverflow.com/questions/9269681/intersection-of-2d-
     numpy-ndarrays>`_.
@@ -375,7 +372,7 @@ def nd_uniq(a, return_index=True,
     a : Geo array or ndarray
         For other array-like objects, see `unique` and `_unique1d` in:
 
-    `<https://github.com/numpy/numpy/blob/master/numpy/lib/arraysetops.py>`_.
+    `_arraysetops_impl in np.lib`
 
     Notes
     -----

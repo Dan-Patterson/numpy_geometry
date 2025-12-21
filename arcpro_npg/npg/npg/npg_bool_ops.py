@@ -6,7 +6,7 @@ npg_bool_ops
 ------------
 
 Modified :
-    2025-11-15
+    2025-12-21
 
 ** Boolean operations on poly geometry.
 
@@ -1005,15 +1005,14 @@ def wrap_(seq, c_subs, p_subs, _in_, _out_, _on_):  # rgt_arr):
     #
     w = np.where(np.diff(sp) != 0)[0] + 1
     tmp = np.array_split(np.array(seq, dtype='O'),  w)
-    # or for pairs that match
-    # tmp = np.array_split(np.array(sw_srt, dtype='O'), len(sw_srt)//2)
-    #
-    # pairs = [_order_(i) for i in tmp]  # error found cor cr1 and flipped
-    # -- original
     pairs = []
     for i in tmp:
         if len(i) > 1:
             pairs.append(_order_(i))
+    #
+    # or for pairs that match
+    #   tmp = np.array_split(np.array(sw_srt, dtype='O'), len(sw_srt)//2)
+    #   pairs = [_order_(i) for i in tmp]  # error found cor cr1 and flipped
     # -- new for testing
     """
     pairs = []
@@ -1194,10 +1193,8 @@ def polygon_overlay(ply_a, ply_b, asGeo=False):
     p_out, p_on, p_in, pl_ioo = ps_info
     c_out, c_on, c_in, cl_ioo = cs_info
     #
-    # -- result1
+    # -- result1 and result2
     cp_ids, old_new_ids, CP_ = result1
-    #
-    # -- result2
     _CP_, N_c, N_p, frto = result2
     #
     # ---- CP_ and _CP_
@@ -1222,7 +1219,6 @@ def polygon_overlay(ply_a, ply_b, asGeo=False):
     # individual plots
     plot_polygons(z0, True, True, labels=l0)
     plot_polygons(z1, True, True, labels=l1)
-
     """
     #
     # ---- (1) get p_subs with renumbered id values and produce p_ft
@@ -1232,14 +1228,12 @@ def polygon_overlay(ply_a, ply_b, asGeo=False):
     z_ = np.concatenate((pl_ioo, pl_ioo2), axis=1)
     p_subs = [z_[i[0]:i[1] + 1][:, -2:] for i in p_ft]
     #
-    # ---- (2) get c_ft, c_subs and p_ft2
+    # ---- (2) get c_ft, c_subs and p_ft2,  renumber p`s using new values
     cl_ioo[-1, 0] = 0
     c_ft = np.concatenate((c_on[:-1][:, None], c_on[1:][:, None]), axis=1)
     c_subs = [cl_ioo[i[0]:i[1] + 1] for i in c_ft]
     c_ft[-1, 1] = 0  # set last `to` to 0
     c_subs[-1][-1][0] = 0  # set the last point to return to 0
-    #
-    # -- renumber p`s using new values
     _out_ = []
     for i in [p_on, p_in, p_out]:
         _whr_ = np.nonzero(i == old_new_ids[:, 0][:, None])[0]
@@ -1248,7 +1242,7 @@ def polygon_overlay(ply_a, ply_b, asGeo=False):
     p_ft2 = list(zip(p_on[:-1], p_on[1:]))  # removed +1 to `to`
     p_ft2 = np.array(p_ft2)
     #
-    # ---- (3) get c_ft_v, c_subs and  split_at_intersections
+    # ---- (3) get c_ft_v, c_subs and split_at_intersections
     c_vals = [sub[1][1] for sub in c_subs]
     c_ft_v = np.concatenate((c_ft, np.array(c_vals)[:, None]), axis=1)
     c_ft_v[-1, 1] = 0  # set last `to` to 0
@@ -1260,45 +1254,33 @@ def polygon_overlay(ply_a, ply_b, asGeo=False):
     p_ft_v[-1, 1] = 0  # set last `to` to 0
     #
     # ---- (5) generate combos and reclass p_on, p_in, p_out
-    # -- "c_fr c_to v ... v  p_fr2 p_to2
+    # -- row contents: c_fr c_to v ... v  p_fr2 p_to2
+    #    v is -1 (out), 0 (on), 1 (in)
     combos = np.zeros((c_ft_v.shape[0], 6), dtype='int')
     combos[:, :3] = c_ft_v
     combos[:, 3] = p_ft_v[:, -1]
     combos[:, 4:] = p_ft2  # set final 2 columns of combos
     #
-
     # ---- (6) sorting section,  -- all sequences, and seq_srted creation
-    # the ids of the intersection pnts
-    # x_ids, idx = np.unique(combos[:, :2], return_index=True)
-    # ls = np.lexsort((-x_pnts[:, 1], x_pnts[:, 0]))
+    #    lexsort on the minimum `x` of start-end point and max y, and an
+    #    argsort on the first sequence id value,
     #
     c_seq = [i[:, 0] for i in c_subs if i.size > 0]   # get the stuff needed
     p_seq = [i[:, 0] for i in p_subs if i.size > 0]
     all_seq = c_seq + p_seq
     #
-    # -- added the following to ensure that reversed segments are captured
-    """ uncomment if wanting to use swapped values
-    p_swapped = [i[::-1] for i in p_seq if i[0] > i[1]]
-    all_seq = c_seq + p_seq + p_swapped  # -- see _all_ below
-    """
     all_st_en = [i[[0, -1]] for i in all_seq]
     all_st_en = np.array(all_st_en)
     #
-    # -- lexsort on the minimum `x` of start-end point and max y, and an
-    #    argsort on the first sequence id value,
     xs_2 = np.array([_CP_[i][:, 0][[0, -1]] for i in all_seq])  # st-en x`s
     xs_2_lex = np.lexsort((-xs_2[:, 1], xs_2[:, 0]))  # sorted
     #
     seq_srted_tmp = [all_seq[i] for i in xs_2_lex]  # all seqs sorted by min x
-    #
     s_ = np.argsort([i[0] for i in seq_srted_tmp])  # sort by id
-    #
-    # ---- alternative use
-    # _seq_srted_ = sequence_srt(seq, _CP_)
     seq_srted = [seq_srted_tmp[i] for i in s_]  # final paired segments
     #
-    # -- get in/out/on corrections and split the sequence to identifys
-    #    singletons. This replicates `sequences.py`
+    # ---- (7) in/out/on corrections
+    #    and split the sequence to identify singletons.
     #    Fix c_on and p_on since first and last are equal as are their ids.
     c_on = c_on[:-1]  # c_on[-1] = 0
     p_on = p_on[:-1]  # p_on[-1] = 0
@@ -1314,7 +1296,7 @@ def polygon_overlay(ply_a, ply_b, asGeo=False):
     chk1 = c_a == 0
     chk2 = p_a == 0
     #
-    # ---- (10) process geometry ----
+    # ---- (8) process geometry ----
     # ---- -- no intersections
     if chk0 == 0:
         geom = no_overlay_(p_a, c_a, N_p, N_c, ply_a, ply_b)

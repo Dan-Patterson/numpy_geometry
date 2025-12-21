@@ -16,7 +16,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-05-31
+    2025-12-09
 
 Purpose
 -------
@@ -353,7 +353,7 @@ def _resize_segment_(a, absolute=True, value=1, direction=0, keep_all=True):
     return np.array(arr)
 
 
-def _pnt_on_segment_(pnt, seg):
+def _pnt_on_segment_(pnt, seg, full=True):
     """Orthogonal projection of a point onto a 2 point line segment.
 
     Returns the intersection point, if the point is between the segment end
@@ -365,12 +365,13 @@ def _pnt_on_segment_(pnt, seg):
         `x,y` coordinate pair as list or ndarray
     seg : array-like
         `from-to points`, of x,y coordinates as an ndarray or equivalent.
-
+    full : boolean
+        True returns the location and the distance.  False, just the location.
     Notes
     -----
     >>> seg = np.array([[0, 0], [10, 10]])  # p0, p1
     >>> p = [10, 0]
-    >>> pnt_on_seg(seg, p)
+    >>> _pnt_on_segment_(p, seg)
     array([5., 5.])
 
     Generically, with cross products and norms.
@@ -389,8 +390,11 @@ def _pnt_on_segment_(pnt, seg):
     u = ((x0 - x1) * dx + (y0 - y1) * dy) / dist_
     u = max(min(u, 1), 0)
     xy = np.array([dx, dy]) * u + [x1, y1]
-    d = xy - pnt
-    return xy, np.hypot(d[0], d[1])
+    if full:
+        d = xy - pnt
+        return xy, np.hypot(d[0], d[1])
+    else:
+        return xy
 
 
 # ---- ---------------------------

@@ -16,7 +16,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-07-27
+    2025-12-08
 
 Purpose
 -------
@@ -24,21 +24,7 @@ Functions for boolean operations on polygons:
 
 Notes
 -----
-To determine right turns in arrays::
-
-   zz = [_is_turn(i) for i in npg.stride_2d(cl_n, (3,2))]
-   # [-1, -1, 0, 0, -1, -1, 0, 0, 1, 0, 1, 0, 0, 0, -1, -1, 0, 0, 0]
-   whr = np.nonzero(zz)[0] + 1
-   # array([ 1,  2,  5,  6,  9, 11, 15, 16], dtype=int64)
-   seqs = np.array([[i - 1, i, i + 1] for i in whr])
-   array([[ 0,  1,  2],
-          [ 1,  2,  3],
-          [ 4,  5,  6],
-          [ 5,  6,  7],
-          [ 8,  9, 10],
-          [10, 11, 12],
-          [14, 15, 16],
-          [15, 16, 17]], dtype=int64)
+To determine right turns in arrays, `_is_turn(i)` in `np_geom_hlp`.
 
 """
 # pylint: disable=C0103,C0302,C0415
@@ -48,9 +34,8 @@ To determine right turns in arrays::
 
 import sys
 import numpy as np
-# from numpy.lib.stride_tricks import sliding_window_view as swv
+
 import npg
-# from npg.npGeo import roll_arrays
 from npg.npg_geom_hlp import sort_segment_pairs
 from npg.npg_pip import np_wn  # noqa
 from npg.npg_plots import plot_polygons, plot_2d  # noqa
@@ -67,17 +52,18 @@ __all__ = [
 ]
 
 __helpers__ = [
-    '_add_pnts_',                      # (1) private helpers
-    '_del_seq_pnts_',
+    '_add_pnts_',                     # (3) add intersection helpers
+    '_add_intersections_',
+    '_del_seq_pnts_',                 # (1) private helpers
     '_roll_',
     '_p_ints_p_',
-    '_w_',                             # (2) prepare for boolean operations
+    '_w_',                            # (2) prepare for boolean operations
     '_wn_clip_',
     '_node_type_',
-    '_seg_prep_'                        # (4) segment intersections
+    '_seg_prep_'                      # (4) segment intersections
 ]
 __imports__ = [
-    'swv',                      # np.lib.stride_tricks, sliding window view
+    'np_wn',                    # npg_pip
     'roll_arrays',              # npGeo
     'sort_segment_pairs',       # npg_geom_hlp
     'plot_polygons',            # npg_plots
@@ -429,52 +415,7 @@ def _node_type_(p_in_c, c_in_p, poly, clp, x_pnts):
 def prep_overlay(arrs, roll=True, p0_pgon=True, p1_pgon=True,):
     """Prepare arrays for overlay analysis.
 
-    Parameters
-    ----------
-    arrs : list/tuple
-        arrs = [poly, line]
-        The first geometry is the one being acted upon and the second is the
-        one being used to overlay the first for operations such as clipping,
-        splitting, intersection.
-    p0_pgon, p1_pgon : boolean
-        True, the input geometry is a polygon feature, False, for polyline.
-        Some operations permit polygon and polyline inputs, so you can alter
-        `p0_pgon=True, p1_pgon=False]` if the first is a polygon and the
-        second a polyline.
-
-    Requires
-    --------
-    This script compiles the common functions::
-
-    - `roll_arrays` (optional)
-    - `_wn_clip_`
-    - `_node_type_`
-    - `_add_pnts_`
-    - `_del_seq_dupl_pnts_`
-
-    Returns
-    -------
-    The following are returned::
-
-    - x_pnts : intersection points
-    - a0, a1 : arrays rolled to first intersection,
-    - a0_new, a1_new : rolled with intersections added on,
-    - args : optional arguments
-    -   px_in_c, cx_in_p : poly/intersection in c and clip/intersection in p
-    -   p_in_c, c_in_p : poly in clip, clip in poly
-    -   c_eq_p, c_eq_x : clip equals poly or intersection
-    -   p_eq_c, p_eq_x : poly equals clip or intersection
-
-    Notes
-    -----
-    The sequence is as follows::
-
-      - Roll the arrays so that their first coordinate is the closest
-        to the lower left of the geometry extent.
-      - Determine points inside each other`s geometry.
-      - Classify the points.
-      - Add intersection points to both geometries.
-      - Delete sequential duplicates if any exist.
+    Documentation imported from `npgDocs`.
     """
     #
     # -- roll towards LL.  `_wn_clp_` gets pnts inside, on, outside each other
@@ -587,7 +528,10 @@ def _add_intersections_(
 
 def add_intersections(
         p0, p1, roll_to_minX=True, p0_pgon=True, p1_pgon=True, class_ids=True):
-    """Return input polygons with intersections points added."""
+    """Return input polygons with intersections points added.
+
+    Documentation imported from `npgDocs`.
+    """
 
     def _classify_(p0_, p1_, id_):
         """Return classified points.

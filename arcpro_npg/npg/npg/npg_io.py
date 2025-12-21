@@ -21,7 +21,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-05-29
+    2025-12-20
 
 Purpose
 -------
@@ -191,7 +191,7 @@ def load_geo(f_name, extras=False, prn_info=False):
     From above::
 
         arrs = np.load(f_name)
-        arrs : numpy.lib.npyio.NpzFile
+        arrs : from `numpy/lib/_npyio_impl.py`
             The type of file.
         other properties : dir(arrs)
             'allow_pickle', 'close', 'f', 'fid', 'files', 'get', 'items',
@@ -634,7 +634,14 @@ def nested_len(obj, out=[], target_cls=list):
     Example
     -------
         >>> out = npg.nested_len(lst, out= [], target_cls=lst)
+        >>> lst = [[[1, 2, 3], [4, 5]],
+        ...        [[1, 2]],
+        ...        [1, 2],
+        ...        [[]],
+        ...        [[1, 2, 3], [4, 5], [6, 7, 8]],
+        ...        [[[1, 2, 3], [4, 5]], [[6, 7, 8]]]]
         >>> # input list            nested_len
+        >>>
         >>> lst = [                  idx0, idx1, count
         ...        [[1, 2, 3],      [[0, 0, 3],       two lists in list 0
         ...         [4, 5]],         [0, 1, 2],
