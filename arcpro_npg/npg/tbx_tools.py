@@ -11,7 +11,7 @@ Script :
 Author :
     Dan_Patterson@carleton.ca
 Modified :
-    2023-10-13
+    2024-09-15
 
 Purpose
 -------
@@ -137,7 +137,7 @@ import numpy as np
 from numpy.lib.recfunctions import append_fields
 
 # from importlib import reload
-# import npg
+import npg
 
 # from npg import npGeo, npg_arc_npg, npg_create, npg_overlay
 
@@ -145,7 +145,7 @@ from npg.npGeo import arrays_to_Geo  # Geo
 from npg.npg_arc_npg import (get_SR, get_shape_K, fc_to_Geo, Geo_to_fc,
                              Geo_to_arc_shapes, fc_data)
 from npg.npg_create import circle, hex_flat, hex_pointy, rectangle, triangle
-from npg.npg_overlay import dissolve, merge_
+from npg.npg_bool_ops import union_adj, merge_
 
 from scipy.spatial import Voronoi  # Delaunay
 
@@ -175,7 +175,7 @@ pth = os.path.split(script)[0]
 # ===========================================================================
 
 tool_list = [
-    'Attribute sort', 'Frequency and Stats',
+    'Attribute Sort', 'Frequency and Stats',
     'Features to Points', 'Polygons to Polylines', 'Split at Vertices',
     'Vertices to Points',
     'Extent Sort', 'Geometry Sort',
@@ -268,7 +268,7 @@ def check_path(fc):
     if (len(pth) == 1) or (name[-4:] == ".gdb"):
         fail = True
     if fail:
-        # tweet(msg)
+        tweet(msg)
         return (None, None)
     gdb = "/".join(pth[:-1])
     return gdb, name
@@ -697,7 +697,7 @@ def dissolve_boundaries(in_fc, gdb, name):
     g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
     out_kind = shp_kind
     x, y = g.LL
-    g0 = dissolve(g, asGeo=True)
+    g0 = union_adj(g, asGeo=True)
     tweet("g0")
     # g0 = arrays_to_Geo(g0, kind=2, info="extent")
     g0 = g0.translate(dx=x, dy=y)
