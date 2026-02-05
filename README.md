@@ -76,6 +76,11 @@ See the **geonumeracy** repository for more examples of numpy geometry functions
 --------------
 **Some links**
 
+*2026*
+
+-[Mixing environments for working with python](https://community.esri.com/t5/python-blog/mixing-environments-for-working-with-python/ba-p/1682268).
+
+
 *2025*
 
 - [Constrained triangulation of polygons](https://community.esri.com/t5/python-blog/constrained-triangulation-of-polygons/ba-p/1664488).
