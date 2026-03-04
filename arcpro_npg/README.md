@@ -12,7 +12,7 @@
 
 **NOTE**
 
-Initially developed using python <= 3.12 and numpy < 2.0 and ArcGIS Pro <= 3.4.
+Initially developed using python <= 3.13 and numpy < 2.2 and ArcGIS Pro <= 3.6.
 
 I no longer have access to ArcGIS Pro so I am no longer actively developing or supporting anything that involves arcpy or arcgisscripting.
 
@@ -36,7 +36,7 @@ The basic structure is as follows:
 
 file, folder | purpose
 ------------ | -------
-npg/npg_tools.tbx |  the toolbox for ArcGIS Pro (2.8 although may work with 2.7).
+npg/npg_tools.tbx |  the toolbox for ArcGIS Pro.
 npg/tbx_tools.py  |  the main script controlling all tools in the toolbox
 npg/npg           |  the scripts folder which contains the modules imported by *tbx_tools*. 
 
@@ -56,6 +56,9 @@ a simple conversion of the geometry type, no fancy intersection and overlap stuf
 You get what you pay for, but the widest use is probably the simplest.
 
 ----
+## 2026-03-03 update ##
+Still working with Python 3.13 and NumPy > 2.x.  I now have access to ArcGIS Pro again, and I will resume toolbox development.  My main focus is still on geometry analysis and functionality using NumPy.
+
 ## 2025-04-29 update ##
 The big split is done.  I am now working with Python 3.13 and NumPy > 2.0.  I also no longer have access to ArcGIS Pro.  The functionality within *npg* works with numpy arrays, so that part is still being developed.  Get your data into array format and you can use geojson as an interchange format if you need to map within Pro.
 
