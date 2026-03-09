@@ -40,16 +40,68 @@ npg.dtype_info(a, True)
 Out[4]: ('f0, f1, f2', '<i4, <i4, <i4')
 ```
 
-**load_geo(f_name, suppress_extras=True)**
+**load_geo(f_name, extras=True, prn_info=True)**
 
 Load saved arrays and supplemental information.
 
 ```python
 
-geo = npg.load_geo(f_name, True)
+f_name = r"C:\arcpro_npg\data\npz_npy\g_arr.npz"
+geo, arrs, names = npg.load_geo(f_name, extras=True, prn_info=True)
 
-Loading...C:/Git_Dan/npgeom/data/g_arr.npz
-Arrays include...['g', 'ift', 'kind', 'extents', 'spatial_ref']
+Loading...C:\arcpro_npg\data\npz_npy\g_arr.npz
+Array(s) include...['g', 'ift', 'kind', 'extents', 'spatial_ref']
+
+geo  # the Geo array
+Geo([[ 10.000,  10.000],
+     [ 10.000,  0.000],
+     [ 1.500,  1.500],
+     [ 0.000,  10.000],
+     [ 10.000,  10.000],
+     ...,
+     [ 10.500,  2.000],
+     [ 14.000,  10.000],
+     [ 10.000,  10.000],
+     [ 15.000,  18.000],
+     [ 14.000,  10.000]])
+
+names  # the names of the base and derived arrays and their purpose
+
+['g', 'ift', 'kind', 'extents', 'spatial_ref']
+
+arrs['ift'] 
+array([[ 1,  0,  5,  1,  1,  0],
+       [ 1,  5, 10,  0,  1,  1],
+       [ 1, 10, 14,  0,  1,  2],
+       [ 1, 14, 18,  0,  1,  3],
+       [ 1, 18, 23,  1,  2,  0],
+       [ 1, 23, 27,  0,  2,  1],
+       [ 2, 27, 36,  1,  1,  0],
+       [ 2, 36, 46,  1,  2,  0],
+       [ 2, 46, 50,  0,  2,  1],
+       [ 2, 50, 54,  0,  2,  2],
+       [ 2, 54, 58,  0,  2,  3],
+       [ 3, 58, 62,  1,  1,  0]], dtype=int32)
+
+arrs['kind']
+array(2, dtype=int32)
+
+arrs['extents'] 
+array([[ 300000.000,  5000000.000],
+       [ 300025.000,  5000018.000]])
+
+arrs['spatial_ref']
+array('NAD_1983_CSRS_MTM_9', dtype='<U19')
+
+arrs['g']
+array([[ 10.000,  10.000],
+       [ 10.000,  0.000],
+       [ 1.500,  1.500],
+       ...,
+       [ 10.000,  10.000],
+       [ 15.000,  18.000],
+       [ 14.000,  10.000]])
+
 (0) name : g
   shape : (62, 2)
   descr. : [('', '<f8')]
@@ -66,25 +118,6 @@ Arrays include...['g', 'ift', 'kind', 'extents', 'spatial_ref']
   shape : ()
   descr. : [('', '<U19')]
 
-geo, arrs, names = npg.load_geo(f_name, False)
-
-Loading...C:/Git_Dan/npgeom/data/g_arr.npz
-Arrays include...['g', 'ift', 'kind', 'extents', 'spatial_ref']
-(0) name : g
-  shape : (62, 2)
-  descr. : [('', '<f8')]
-(1) name : ift
-  shape : (12, 6)
-  descr. : [('', '<i4')]
-(2) name : kind
-  shape : ()
-  descr. : [('', '<i4')]
-(3) name : extents
-  shape : (2, 2)
-  descr. : [('', '<f8')]
-(4) name : spatial_ref
-  shape : ()
-  descr. : [('', '<U19')]
 ```
 
 **load_geo_attr(f_name)**
