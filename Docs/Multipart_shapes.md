@@ -63,7 +63,7 @@ The point coordinates with (300,000 m, 5,000,000 m, MTM 9) subtracted from their
 
 ``` 
  
-This shape (s2) is simply represented by the last 2 columns, the first 2 columns are solely for printing purposes.
+This shape (g) is simply represented by the last 2 columns, the first 2 columns are solely for printing purposes.
 The sequence of points is identified by their Id and From and To points (IFT)
 
 ```python
