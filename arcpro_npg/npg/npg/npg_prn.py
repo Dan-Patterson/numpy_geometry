@@ -19,7 +19,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-02-13
+    2025-12-22
 
 Purpose
 -------
@@ -47,15 +47,10 @@ import numpy as np
 # import npGeo
 
 from npg import npg_geom_hlp as n_h
-# import npg_geom_hlp as n_h
-# from npg_geom_hlp import shape_finder
 
 # ---- Keep for now.
 from numpy.lib.recfunctions import structured_to_unstructured as stu
 from numpy.lib.recfunctions import unstructured_to_structured as uts  #noqa
-# import npGeo
-# from npGeo import *
-
 
 # ---- Constants
 #
@@ -65,13 +60,13 @@ FLOATS = np.typecodes['AllFloat']
 INTS = np.typecodes['AllInteger']
 NUMS = FLOATS + INTS
 
-
-np.set_printoptions(
-    edgeitems=10, linewidth=120, precision=2, suppress=True, threshold=200,
-    legacy='1.25',
-    formatter={"bool": lambda x: repr(x.astype(np.int32)),
-               "float_kind": '{: 6.2f}'.format}
-    )  # legacy=False or legacy='1.25'
+fmt_ = {"bool": lambda x: repr(x.astype(np.int32)),
+      "float_kind": '{: 0.3f}'.format}
+np.set_printoptions(precision=3, threshold=100, edgeitems=10, linewidth=80,
+                    suppress=True,
+                    formatter=fmt_,
+                    floatmode='maxprec_equal',
+                    legacy='1.25')  # legacy=False or legacy='1.25'
 np.ma.masked_print_option.set_display('-')  # change to a single -
 
 __all__ = [
@@ -240,7 +235,7 @@ def prn_(a, deci=2, width=120, prefix=". . "):
         print(out)
 
 
-def prn_tbl(a, rows_m=20, names=None, deci=2, width=88):
+def prn_tbl(a, rows_m=20, names=None, deci=2, width=88, return_tbl=False):
     """Print and format a structured array with a mixed dtype.
 
     Parameters
@@ -302,6 +297,8 @@ def prn_tbl(a, rows_m=20, names=None, deci=2, width=88):
             t = " {:>03.0f} ".format(idx) + row_frmt.format(*a[i]) + tail
             txt.append(t)
     msg = "\n".join(txt)
+    if return_tbl:
+        return msg
     print(msg)
     return None
     # return row_frmt, hdr2  # uncomment for testing
@@ -671,24 +668,3 @@ def gms(arr):
 if __name__ == "__main__":
     """optional location for parameters"""
     print("\n{}".format(script))
-
-r"""
-'C:/arcpro_npg/npg/data/sq.json'
-'C:/arcpro_npg/npg/data/sq.geojson'
-'C:/arcpro_npg/npg/data/g.npz'
-"""
-
-"""
-lists to dictionary
-
-list1 =  [('84116', 1750),('84116', 1774),('84116', 1783),('84116',1792)]
-list2 = [('84116', 1783),('84116', 1792),('84116', 1847),('84116', 1852),
-         ('84116', 1853)]
-Lst12 = list1 + list2
-dt = [('Keys', 'U8'), ('Vals', '<i4')]
-arr = np.asarray((list1 + list2), dtype=dt)
-a0 =np.unique(arr)
-k = np.unique(arr['Keys'])
-{i : a0['Vals'][a0['Keys'] == i].tolist() for i in k}
-
-"""

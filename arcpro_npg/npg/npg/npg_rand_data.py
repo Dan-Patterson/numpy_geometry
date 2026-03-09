@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# noqa: D205, D208, D400, F403
 """
 -------------
 npg_rand_data
@@ -9,7 +10,7 @@ Script :  npg_rand_data.py
 Author :
     `<https://github.com/Dan-Patterson>`_.
 Modified :
-    2025-05-29
+    2025-12-22
 
 Purpose
 -------
@@ -17,7 +18,6 @@ Tools for working with, and to create, tabular data in the Geo class.
 
 References
 ----------
-
 `<blog post_. https://community.esri.com/blogs/dan_patterson/2016/04/04/
 numpy-lessons-6-creating-data-for-testing-purposes>`_.
 
@@ -41,7 +41,6 @@ Generating various random::
                       shuffle=True)
     r_shuf = rng.shuffle(x, axis=0)
     r_uni = rng.uniform(low=0.0, high=1.0, size=None)
-
 """
 
 # ---- imports, formats, constants ----
@@ -51,12 +50,14 @@ import numpy.lib.recfunctions as rfn  # noqa
 import npg  # noqa
 from npg.npg_prn import prn_tbl, prn_, prn_q  # noqa
 
-ft = {"bool": lambda x: repr(x.astype(np.int32)),
-      "float_kind": '{: 6.2f}'.format}
-np.set_printoptions(
-    edgeitems=10, linewidth=120, precision=2, suppress=True, threshold=200,
-    formatter=ft)
-np.ma.masked_print_option.set_display("-")  # change to a single -
+fmt_ = {"bool": lambda x: repr(x.astype(np.int32)),
+      "float_kind": '{: 0.3f}'.format}
+np.set_printoptions(precision=3, threshold=100, edgeitems=10, linewidth=80,
+                    suppress=True,
+                    formatter=fmt_,
+                    floatmode='maxprec_equal',
+                    legacy='1.25')  # legacy=False or legacy='1.25'
+np.ma.masked_print_option.set_display('-')  # change to a single -
 
 script = sys.argv[0]  # print this should you need to locate the script
 
@@ -73,7 +74,7 @@ str_opt = [
     'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
 ]
 
-# -- define `rng`
+# ---- define `rng`
 # rng = np.random.default_rng()
 
 

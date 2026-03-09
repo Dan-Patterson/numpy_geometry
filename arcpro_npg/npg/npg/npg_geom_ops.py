@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-06-01
+    2025-12-27
 
 Purpose
 -------
@@ -64,10 +64,8 @@ Sample data
 - g : the geo array
 - arrs : the sub arrays
 
-
 References
 ----------
-
 `List of geometry topics
 <https://en.wikipedia.org/wiki/List_of_geometry_topics>`_.
 
@@ -137,11 +135,14 @@ from npg.npg_pip import np_wn
 from npg.npg_prn import prn_q, prn_tbl
 
 
-# np.set_printoptions(
-#     edgeitems=10, linewidth=100, precision=2, suppress=True, threshold=200,
-#     formatter={"bool": lambda x: repr(x.astype(np.int32)),
-#                "float_kind": '{: 6.2f}'.format})
-# np.ma.masked_print_option.set_display('-')  # change to a single -
+fmt_ = {"bool": lambda x: repr(x.astype(np.int32)),
+      "float_kind": '{: 0.3f}'.format}
+np.set_printoptions(precision=3, threshold=100, edgeitems=10, linewidth=80,
+                    suppress=True,
+                    formatter=fmt_,
+                    floatmode='maxprec_equal',
+                    legacy='1.25')  # legacy=False or legacy='1.25'
+np.ma.masked_print_option.set_display('-')  # change to a single -
 
 script = sys.argv[0]  # print this should you need to locate the script
 
@@ -561,7 +562,7 @@ def eucl_dist(a, b, metric='euclidean'):
     """
     a = np.atleast_2d(a)
     b = np.atleast_2d(b)
-    # -- Note subtle difference:  a.ndim >= 2 versus >b.ndim > 2
+    # -- Note subtle difference:  a.ndim >= 2 versus b.ndim > 2
     if a.ndim >= 2:  # -- see above
         a = a[:, np.newaxis]
     if b.ndim > 2:  # -- see above
@@ -1183,7 +1184,7 @@ def polys_to_segments(self, as_basic=True, to_orig=False, as_3d=False):
     Use `prn_tbl` if you want to see a well formatted output.
     """
     if self.K not in (1, 2):
-        print("Poly* features required.")
+        print("Poly* geo array features required.")
         return None
     # -- basic return as ndarray used by common_segments
     if as_3d:  # The array cannot be basic if it is 3d
@@ -1379,14 +1380,3 @@ x    is_in = np.any([np.isclose(pnt, i) for i in pnts_list])
 if __name__ == "__main__":
     """optional location for parameters"""
     # optional controls here
-
-"""
-Demo
-
-r = np.array(['A', 'A', 'B', 'B', 'B', 'A', 'A', 'C', 'C', 'A'], dtype='<U1')
-c = np.array(['b', 'a', 'b', 'a', 'b', 'b', 'b', 'a', 'b', 'a'], dtype='<U1')
-rc = np.array(["{}_{}".format(*i) for i in zip(r, c)])
-u, idx, cnts = np.unique(rc, return_index=True, return_counts=True)
-dt = [('r_c', u.dtype.str), ('cnts', '<i4')]
-ctab = np.array(list(zip(u, cnts)), dtype=dt)
-"""

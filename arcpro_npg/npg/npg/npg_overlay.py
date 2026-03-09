@@ -26,7 +26,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-02-17
+    2025-12-22
 
 Purpose
 -------
@@ -92,10 +92,14 @@ from npg.npg_helpers import _to_lists_
 # from numpy.lib.recfunctions import repack_fields
 
 # noqa: E501
-np.set_printoptions(
-    edgeitems=10, linewidth=120, precision=3, suppress=True, threshold=200,
-    formatter={"bool": lambda x: repr(x.astype(np.int32)),
-               "float_kind": '{: 7.3f}'.format})
+fmt_ = {"bool": lambda x: repr(x.astype(np.int32)),
+      "float_kind": '{: 0.3f}'.format}
+np.set_printoptions(precision=3, threshold=100, edgeitems=10, linewidth=80,
+                    suppress=True,
+                    formatter=fmt_,
+                    floatmode='maxprec_equal',
+                    legacy='1.25')  # legacy=False or legacy='1.25'
+np.ma.masked_print_option.set_display('-')  # change to a single -
 
 script = sys.argv[0]  # print this should you need to locate the script
 
@@ -565,8 +569,3 @@ def line_side(pnts, line=None):
 if __name__ == "__main__":
     """optional location for parameters"""
     print("\nRunning... {}\n".format(script))
-#    in_fc = r"C:\Git_Dan\npgeom\npgeom.gdb\Polygons"
-#     in_fc = r"C:\Git_Dan\npgeom\npgeom.gdb\Polygons2"
-#    in_fc = r"C:\Git_Dan\npgeom\npgeom.gdb\Polylines2"
-#    in_fc = r"C:\Git_Dan\npgeom\npgeom.gdb\Polygon2pnts"
-# python

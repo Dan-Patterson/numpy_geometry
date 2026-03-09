@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-09-13
+    2026-02-15
 
 Purpose
 -------
@@ -70,11 +70,14 @@ from matplotlib.collections import LineCollection
 # import matplotlib.lines as lines
 # from matplotlib.markers import MarkerStyle
 
-np.set_printoptions(
-    edgeitems=10, linewidth=120, precision=2, suppress=True, threshold=200,
-    formatter={"bool": lambda x: repr(x.astype(np.int32)),
-               "float_kind": '{: 6.2f}'.format})
-np.ma.masked_print_option.set_display('-')
+fmt_ = {"bool": lambda x: repr(x.astype(np.int32)),
+      "float_kind": '{: 0.3f}'.format}
+np.set_printoptions(precision=3, threshold=100, edgeitems=10, linewidth=80,
+                    suppress=True,
+                    formatter=fmt_,
+                    floatmode='maxprec_equal',
+                    legacy='1.25')  # legacy=False or legacy='1.25'
+np.ma.masked_print_option.set_display('-')  # change to a single -
 
 script = sys.argv[0]
 
@@ -193,23 +196,23 @@ def scatter_params(plt, fig, ax, title=None, ax_lbls=None):
     -----
     ticklabel_format(useoffset), turns off scientific formatting
     """
-    fig.set_figheight = 8
-    fig.set_figwidth = 8
-    fig.dpi = 200
+    fig.set_figheight = 4  # 4
+    fig.set_figwidth = 4  # 4
+    fig.dpi = 200  # default
     if ax_lbls is None:
         ax_lbls = ['X', 'Y']
     x_label, y_label = ax_lbls
     font1 = {'family': 'sans-serif', 'color': 'black',
-             'weight': 'bold', 'size': 10}  # set size to other values
+             'weight': 'bold', 'size': 10}  # 10 set size to other values
     ax.set_aspect('equal', adjustable='box')
     ax.ticklabel_format(style='sci', axis='both', useOffset=False)
     ax.xaxis.label_position = 'bottom'
     ax.yaxis.label_position = 'left'
-    plt.xlabel(x_label, fontdict=font1, labelpad=10, size=10)
-    plt.ylabel(y_label, fontdict=font1, labelpad=10, size=10)
+    plt.xlabel(x_label, fontdict=font1, labelpad=10, size=11)
+    plt.ylabel(y_label, fontdict=font1, labelpad=10, size=11)
     if title is not None:
         plt.title(title + "\n", loc='center', fontdict=font1, size=14)
-    # plt.tight_layout(pad=0.2, h_pad=0.1, w_pad=0.1)
+    plt.tight_layout(pad=0.2, h_pad=0.1, w_pad=0.1)
     plt.grid(True)
     return None
 
@@ -245,7 +248,7 @@ def plot_mixed(data, title="Title", invert_y=False, ax_lbls=None):
     def _line(p, plt):  # , arrow=True):  # , color, marker, linewdth):
         """Connect the points."""
         X, Y = p[:, 0], p[:, 1]
-        plt.plot(X, Y, color='black', linestyle='solid', linewidth=2)
+        plt.plot(X, Y, color='black', linestyle='solid', linewidth=1.5)
 
     def _scatter(p, plt, color, marker):
         """Do the actual point plotting. Change `s` to increase marker size."""
@@ -332,7 +335,7 @@ def plot_2d(pnts, label_pnts=False, connect=False,
     def _scatter(p, plt, color, marker):
         """Do the actual point plotting. Change `s` to increase marker size."""
         X, Y = p[:, 0], p[:, 1]
-        plt.scatter(X, Y, s=30, c=color, linewidths=None, marker=marker)
+        plt.scatter(X, Y, s=25, c=color, linewidths=None, marker=marker)
 
     def _line(p, plt, color, marker, linewdth):
         """Connect the points with lines."""
@@ -403,14 +406,14 @@ def plot_3d(a):
     >>> plot_3d(xyz)
     """
     import matplotlib as mpl
-    from mpl_toolkits.mplot3d import Axes3D
+    # from mpl_toolkits.mplot3d import Axes3D
     import matplotlib.pyplot as plt
     #
     mpl.rcParams['legend.fontsize'] = 10
     #
     fig = plt.figure()
-    fig.set_figheight = 8
-    fig.set_figwidth = 8
+    fig.set_figheight = 4  # 4
+    fig.set_figwidth = 4  # 4
     fig.dpi = 200
     # ax = Axes3D(fig)  # old  #ax = fig.gca(projection='3d')
     ax = fig.add_subplot(projection='3d')
@@ -419,7 +422,7 @@ def plot_3d(a):
     y = a[:, 1]
     z = a[:, 2]
     ax.scatter(x, y, z, s=10, marker='.')  # 'o'
-    ax.plot(x, y, z, label='xyz', linestyle='solid')
+    ax.plot(x, y, z, label='xyz', linestyle='solid')  # linestyle='None'
     # ax.plot(x, y, z, label='xyz', linestyle='solid')
     ax.legend()
     # plt.tight_layout(pad=0.2, h_pad=0.1, w_pad=0.1)
@@ -433,7 +436,7 @@ def plot_polygons(arr, outline=True, vertices=True,
 
     Parameters
     ----------
-    arr : ndarray or Geo array or list of arrays
+    arr : a Geo array or list of arrays
         If the array is a Geo array, it will be converted to `arr.bits`.  A
         list of arrays can be provided
     outline : boolean
@@ -458,7 +461,7 @@ def plot_polygons(arr, outline=True, vertices=True,
     def _line(p, plt):  # , arrow=True):  # , color, marker, linewdth):
         """Connect the points."""
         X, Y = p[:, 0], p[:, 1]
-        plt.plot(X, Y, color='black', linestyle='solid', linewidth=1)
+        plt.plot(X, Y, color='black', linestyle='solid', linewidth=1.5)
 
     def _label_pnts(pnts, lables, plt, color_='black', offx=2, offy=2):
         """Label the points.
@@ -473,7 +476,7 @@ def plot_polygons(arr, outline=True, vertices=True,
             lables = labels[:N]
         elif len(labels) != N:
             lables = np.arange(len(pnts))
-        for label, xpt, ypt in zip(lables[:], pnts[:, 0], pnts[:, 1]):
+        for label, xpt, ypt in zip(lables[:-1], pnts[:-1, 0], pnts[:-1, 1]):
             plt.annotate(label, color=color_, xy=(xpt, ypt),
                          xytext=(offx, offy),
                          size=8, textcoords='offset points',
@@ -482,7 +485,7 @@ def plot_polygons(arr, outline=True, vertices=True,
     def _scatter(p, plt, size, color, marker):
         """Do the actual point plotting. Change `s` to increase marker size."""
         X, Y = p[:, 0], p[:, 1]
-        plt.scatter(X, Y, s=50, c=color, linewidths=None, marker=marker)
+        plt.scatter(X, Y, s=25, c=color, linewidths=None, marker=marker)
     # --
     if hasattr(arr, 'IFT'):
         cw = arr.CL
@@ -496,14 +499,17 @@ def plot_polygons(arr, outline=True, vertices=True,
         shapes = arr
 
     font1 = {'family': 'sans-serif',
-             'weight': 'bold', 'size': 12}  # 'color': 'black',
+             'weight': 'bold', 'size': 10}  # 'color': 'black',
     fig, ax = plt.subplots(1, 1)
-    fig.set_figheight = 8
-    fig.set_figwidth = 8
-    fig.dpi = 200
+    fig.set_figheight = 4  # 4
+    fig.set_figwidth = 4  # 4
+    fig.dpi = 100
     plt.tight_layout(pad=0.2, h_pad=0.1, w_pad=0.1)
     plt.grid(False)
     plt.rc('font', **font1)
+    #
+    scatter_params(plt, fig, ax, title='', ax_lbls=['X', 'Y'])  # None)
+    #
     ax.set_aspect('equal', adjustable='box')
     # cmap = plt.cm.get_cmap(plt.cm.viridis, 143)  # default colormap
     colors_ = ['black', 'blue', 'green', 'red', 'darkgrey', 'magenta',
@@ -518,10 +524,10 @@ def plot_polygons(arr, outline=True, vertices=True,
                     _line(shape, plt)  # alternate, see line for options
             elif random_colors:
                 plt.fill(*zip(*shape), fill='none', facecolor='none',
-                         edgecolor=colors_[i], linewidth=2)
+                         edgecolor=colors_[i], linewidth=1.5)
             else:
                 plt.fill(*zip(*shape), fill='none', facecolor='none',
-                         edgecolor='black', linewidth=2)
+                         edgecolor='black', linewidth=1.5)
         else:
             if hasattr(arr, 'IFT'):
                 if cw[i] == 0:
@@ -533,7 +539,7 @@ def plot_polygons(arr, outline=True, vertices=True,
             plt.fill(*zip(*shape), facecolor=clr)
     # --
         if vertices:
-            _scatter(shape[:-1], plt, size=50, color=colors_[i], marker=".")
+            _scatter(shape[:-1], plt, size=25, color=colors_[i], marker=".")
         if labels is not None:
             ox, oy = lbl_off[i]  # offset point labels
             if isinstance(labels, bool):
@@ -635,7 +641,7 @@ def plot_polylines(a, title=None, label_segs=False):
     def _line(p, plt, color):  # arrow=True  # , color, marker, linewdth):
         """Connect the points."""
         X, Y = p[:, 0], p[:, 1]
-        plt.plot(X, Y, color=color, linestyle='solid', linewidth=2)
+        plt.plot(X, Y, color=color, linestyle='solid', linewidth=1.5)
     #
     if isinstance(a, (list, tuple)):
         polys = a
@@ -647,8 +653,8 @@ def plot_polylines(a, title=None, label_segs=False):
     font1 = {'family': 'sans-serif',
              'weight': 'bold', 'size': 11}  # 'color': 'black',
     fig, ax = plt.subplots(1, 1)
-    fig.set_figheight = 8
-    fig.set_figwidth = 8
+    fig.set_figheight = 4  # 4
+    fig.set_figwidth = 4  # 4
     fig.dpi = 200
     plt.tight_layout(pad=0.2, h_pad=0.1, w_pad=0.1)
     plt.grid(False)
@@ -731,8 +737,8 @@ def plot_segments(a, title=None,  label_segs=False):
     font1 = {'family': 'sans-serif',
              'weight': 'bold', 'size': 12}  # 'color': 'black',
     fig, ax = plt.subplots(1, 1)
-    fig.set_figheight = 8
-    fig.set_figwidth = 8
+    fig.set_figheight = 4  # 4
+    fig.set_figwidth = 4  # 4
     fig.dpi = 200
     plt.tight_layout(pad=0.2, h_pad=0.1, w_pad=0.1)
     plt.grid(False)

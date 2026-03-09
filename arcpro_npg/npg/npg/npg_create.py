@@ -14,7 +14,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-03-04
+    2026-01-30
 
 Purpose
 -------
@@ -90,10 +90,13 @@ from npg.npg_helpers import _to_lists_
 from npg.npg_bool_ops import merge_  # noqa
 from npg.npg_plots import plot_mixed, plot_polygons    # noqa # plot_2d, 
 
-np.set_printoptions(
-    edgeitems=10, linewidth=120, precision=3, suppress=True, threshold=200,
-    formatter={"bool": lambda x: repr(x.astype(np.int32)),
-               "float_kind": '{: 7.3f}'.format})
+fmt_ = {"bool": lambda x: repr(x.astype(np.int32)),
+      "float_kind": '{: 0.3f}'.format}
+np.set_printoptions(precision=3, threshold=100, edgeitems=10, linewidth=80,
+                    suppress=True,
+                    formatter=fmt_,
+                    floatmode='maxprec_equal',
+                    legacy='1.25')  # legacy=False or legacy='1.25'
 np.ma.masked_print_option.set_display('-')  # change to a single -
 
 script = sys.argv[0]  # print this should you need to locate the script
@@ -807,12 +810,13 @@ def mesh_xy(L=0, B=0, R=5, T=5, dx=1, dy=1, as_rec=True):
     B(ott), T(op), dy  : number
         Same as above for Y axis.
     as_rec : boolean
-        Produce a structured array (or convert to a record array).
+        Use True for a structured array (or record array) with point ids and
+        x,y coordinates.  False returns an ndarray of the coordinates. 
 
     Returns
     -------
     -  A list of coordinates of X,Y pairs and an ID if as_rec is True.
-    -  A mesh grid X and Y coordinates is also produced.
+    -  A mesh grid, which is a tuple of X and Y coordinates arrays.
     """
     dt = [('Pnt_num', '<i4'), ('X', '<f8'), ('Y', '<f8')]
     x = np.arange(L, R + dx, dx, dtype='float64')

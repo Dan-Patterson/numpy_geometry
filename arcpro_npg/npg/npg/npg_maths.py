@@ -16,7 +16,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-12-09
+    2026-01-30
 
 Purpose
 -------
@@ -284,8 +284,8 @@ def _offset_segment_(poly, value=1.):
     rr = np.concatenate((r[:, None], -r[:, None]), axis=1)
     dx_dy = dxdy * rr
     dy_dx = dx_dy[:, [1, 0]]  # -- swap order yielding dy, dx
-    pnt0 = poly[:-1] + dy_dx     # new start and end points for offset segments
-    pnt1 = poly[1:] + dy_dx      #
+    pnt0 = poly[:-1] + dy_dx  # new start and end points for offset segments
+    pnt1 = poly[1:] + dy_dx   #
     # -- offset segments
     offsets = np.concatenate((pnt0, pnt1), axis=1)
     return offsets
