@@ -16,7 +16,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-05-29
+    2026-02-18
 
 Purpose
 -------
@@ -81,10 +81,14 @@ import numpy as np
 # from numpy.lib.recfunctions import repack_fields
 
 # noqa: E501
-np.set_printoptions(
-    edgeitems=10, linewidth=120, precision=3, suppress=True, threshold=200,
-    formatter={"bool": lambda x: repr(x.astype(np.int32)),
-               "float_kind": '{: 7.3f}'.format})
+fmt_ = {"bool": lambda x: repr(x.astype(np.int32)),
+      "float_kind": '{: 0.3f}'.format}
+np.set_printoptions(precision=3, threshold=100, edgeitems=10, linewidth=80,
+                    suppress=True,
+                    formatter=fmt_,
+                    floatmode='maxprec_equal',
+                    legacy='1.25')  # legacy=False or legacy='1.25'
+np.ma.masked_print_option.set_display('-')  # change to a single -
 
 script = sys.argv[0]  # print this should you need to locate the script
 
@@ -377,12 +381,12 @@ def np_wn(pnts, poly, return_winding=False, extras=False):
     """
     if pnts.ndim == 1:
         pnts = pnts[None, :]  # 2025-11-09 to check for a single point
+    x, y = pnts.T         # point coordinates
     x0, y0 = poly[:-1].T  # polygon `from` coordinates
     x1, y1 = poly[1:].T   # polygon `to` coordinates
-    x, y = pnts.T         # point coordinates
+    x_x0 = x[:, None] - x0
     y_y0 = y[:, None] - y0
     y_y1 = y[:, None] - y1
-    x_x0 = x[:, None] - x0
     # -- diff = np.sign(np.einsum("ikj, kj -> ij", pnts[:, None], poly[:-1]))
     diff_ = ((x1 - x0) * y_y0 - (y1 - y0) * x_x0) + 0.0  # einsum originally
     chk1 = (y_y0 >= 0.0)  # -- top and bottom point inclusion!   try `>`
@@ -393,7 +397,6 @@ def np_wn(pnts, poly, return_winding=False, extras=False):
     wn = pos - neg
     in_ = pnts[np.nonzero(wn)]
     if extras:
-        # eq_ids = np.isin(pnts, poly).all(-1).nonzero()[0]  # not correct
         eq_ids = np.nonzero((pnts == poly[:, None]).all(-1))
         extra_info = ["equal poly ids then pnt ids", eq_ids]
     if return_winding:
