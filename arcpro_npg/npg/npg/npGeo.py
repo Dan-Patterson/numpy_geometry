@@ -10,7 +10,7 @@ to geometry have been assigned and methods developed to return geometry
 properties.
 
 Modified :
-    2025-09-12
+    2025-12-10
 
 ----
 
@@ -51,12 +51,13 @@ from npg.npgDocs import (
     radial_sort_doc, sort_by_extent_doc, array_IFT_doc, dirr_doc
 )  #
 
-np.set_printoptions(
-    edgeitems=10, linewidth=120, precision=2, suppress=True, threshold=200,
-    legacy='1.25',
-    formatter={"bool": lambda x: repr(x.astype(np.int32)),
-               "float_kind": '{: 6.2f}'.format}
-    )  # legacy=False or legacy='1.25'
+fmt_ = {"bool": lambda x: repr(x.astype(np.int32)),
+      "float_kind": '{: 0.3f}'.format}
+np.set_printoptions(precision=3, threshold=100, edgeitems=10, linewidth=80,
+                    suppress=True,
+                    formatter=fmt_,
+                    floatmode='maxprec_equal',
+                    legacy='1.25')  # legacy=False or legacy='1.25'
 np.ma.masked_print_option.set_display('-')  # change to a single -
 
 script = sys.argv[0]  # print this should you need to locate the script
@@ -1004,7 +1005,9 @@ class Geo(np.ndarray):
         p_angles = geom_angles(polys, fromNorth=False)
         rects = geom.mabr(polys, p_centers, p_angles)
         if as_structured:
-            dt = np.dtype([('Rect_area', '<f8'), ('Angle_', '<f8'),
+            dt = np.dtype([('Rect_area', '<f8'),
+                           ('Xcent', '<f8'), ('Ycent', '<f8'),
+                           ('Angle_', '<f8'),
                            ('Xmin', '<f8'), ('Ymin', '<f8'),
                            ('Xmax', '<f8'), ('Ymax', '<f8')])
             return uts(rects, dtype=dt)
@@ -1012,9 +1015,9 @@ class Geo(np.ndarray):
         mabrs = []
         LL = self.XT[0]
         for i, rect in enumerate(rects):
-            c = rect[1]
-            ang = rect[2]
-            L, B, R, T = rect[3:]
+            c = np.array(rect[1:3])
+            ang = rect[3]
+            L, B, R, T = rect[4:]
             tmp = np.array([[L, B], [L, T], [R, T], [R, B], [L, B]])
             tmp = _r_(tmp, cent=c, angle=ang, clockwise=True)
             if shift_back:

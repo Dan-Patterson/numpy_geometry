@@ -466,9 +466,9 @@ def Geo_to_fc(geo, gdb=None, name=None, kind=None, SR=None):
         Delete(tmp_name)
     CreateFeatureclass(wkspace, "tmp", kind, spatial_reference=SR)
     AddField("tmp", 'ID_arr', 'LONG')
-    with InsertCursor("tmp", 'SHAPE@') as cur:
+    with InsertCursor("tmp", ['SHAPE@', 'ID_arr']) as cur:
         for row in polys:
-            cur.insertRow([row])
+            cur.insertRow(row)  # -- 2026-02-05 for err in densify by dist
     CopyFeatures("tmp", out_name)
     return None
 

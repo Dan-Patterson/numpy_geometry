@@ -13,7 +13,7 @@ Author :
     https://github.com/Dan-Patterson
 
 Modified :
-    2023-11-03
+    2026-02-14
 
 Purpose
 -------
@@ -41,16 +41,31 @@ import numpy as np
 # from numpy.lib.recfunctions import repack_fields
 # from numpy.lib.recfunctions import structured_to_unstructured as stu
 
-np.set_printoptions(
-    edgeitems=10, linewidth=120, precision=3, suppress=True, threshold=200,
-    formatter={"bool": lambda x: repr(x.astype(np.int32)),
-               "float_kind": '{: 7.3f}'.format})
+from npg.npg_bool_hlp import _w_
+
+fmt_ = {"bool": lambda x: repr(x.astype(np.int32)),
+      "float_kind": '{: 0.3f}'.format}
+np.set_printoptions(precision=3, threshold=100, edgeitems=10, linewidth=80,
+                    suppress=True,
+                    formatter=fmt_,
+                    floatmode='maxprec_equal',
+                    legacy='1.25')  # legacy=False or legacy='1.25'
 np.ma.masked_print_option.set_display('-')  # change to a single -
 
 __all__ = [
-    'closest_n', 'distances', 'not_closer', 'n_check', 'n_near',
-    'n_spaced', '_x_sect_2', 'intersection_pnt', 'knn', 'knn0',
-    'mst', 'connect', 'concave'
+    'closest_n',
+    'distances',
+    'not_closer',
+    'n_check',
+    'n_near',
+    'n_spaced',
+    '_x_sect_2',
+    'intersection_pnt',
+    'knn',
+    'knn0',
+    'mst',
+    'connect',
+    'concave'
 ]
 __helpers__ = ['_dist_arr_', '_e_dist_']
 
@@ -245,7 +260,66 @@ def n_spaced(L=0, B=0, R=10, T=10, min_space=1, num=10, verbose=True):
 
 
 # ---- ---------------------------
-# ---- (2) intersection
+# ---- (2) near analysis
+#
+'''  may be needed to actually put the point onto the closest poly segment
+
+    def _pnt_on_seg_(seg, pnt):
+        """Mini pnt_on_seg function normally required by pnt_on_poly."""
+        x0, y0, x1, y1, dx, dy = *pnt, *seg[0], *(seg[1] - seg[0])
+        dist_ = dx * dx + dy * dy  # squared length
+        u = ((x0 - x1) * dx + (y0 - y1) * dy) / dist_
+        u = max(min(u, 1), 0)  # u must be between 0 and 1
+        xy = (np.array([dx, dy]) * u) + [x1, y1]  # noqa
+        return xy
+'''
+def nearest_polygon(pnts, polys):
+    """Return the nearest polygon for a point or points
+
+    Parameters
+    ----------
+    pnts : array-like
+        A Nx2 sequence of points.  The `from` features.
+    polys : array-like
+        A polygon or polygons.  The `to` features.
+
+    Requires
+    --------
+    npg_bool_hlp : `_w_` to derive winding number information
+    npg_geom_ops : ` _closest_pnt_on_poly_` which contains `_pnt_on_seg_`
+
+    Example
+    -------
+    pnts = [[0., 6.], [2., 6.], [5., 6.], [11., 6.],
+            [0., 9.], [1., 9.], [3., 9.], [8., 9.], [11., 9.]]
+    polys = sq2.bits
+    """
+    # --
+    if isinstance(pnts, (list, tuple)):  # pnts list and single point check
+        pnts = np.array(pnts)
+        if pnts.ndim == 1:
+            pnts = pnts[None, :]  # 2025-11-09 to check for a single point
+    if hasattr(polys, "IFT"):  # Geo array check
+        polys = polys.bits
+    elif isinstance(polys, np.ndarray):
+        polys = [polys]
+    # elif isinstance(polys, (list, tuple)):
+    #    polys = np.asarray(polys, dtype='O')
+    #
+    # -- determine inside, outside and on first
+    # wn_, denom, x0, y0, x1_x0, y1_y0, a_num, b_num = _w_(pnts, polys)
+    keep_ = []
+    for cnt, p in enumerate(polys):
+        args = _w_(pnts, p, True)
+        frst = args[0]
+        if np.sum(np.abs(frst)) != 0:  # use abs value since pnts may be in/out 
+            whr = np.nonzero(frst)[0]
+            keep_.append([cnt, whr])
+            # wn_, denom, x0, y0, x1_x0, y1_y0, a_num, b_num
+    #  !! see _closest_pnt_on_poly_ npg.geom_ops
+    
+# ---- ---------------------------
+# ---- (3) intersection
 #
 def _x_sect_2(args):
     """Line intersection with extrapolation if needed.
@@ -339,7 +413,7 @@ def intersection_pnt(p0, p1, p2, p3):
 
 
 # ---- ---------------------------
-# ---- (3) k-nearest neighbors
+# ---- (4) k-nearest neighbors
 # knn0 used by concave hulls
 #
 def knn(p, pnts, k=1, return_dist=True):
@@ -409,7 +483,7 @@ def knn0(p, pnts, k):
 
 
 # ---- ---------------------------
-# ---- (4) minimum spanning tree
+# ---- (5) minimum spanning tree
 #
 def _dist_arr_(a, verbose=False):
     """Minimum spanning tree preparation."""
@@ -471,15 +545,20 @@ def mst(arr, calc_dist=True):
     -----
     To plot the results you can use::
 
-        plot_mst(arr, pairs)
+        npg.npg_plots.plot_mst(arr, pairs)
 
     Example
     -------
     >>> a = np.array(
             [[0.4, 0.5], [1.2, 9.1], [1.2, 3.6], [1.9, 4.6], [2.9, 5.9],
-             [4.2, 5.5], [4.3, 3.0], [5.1, 8.2] [5.3, 9.5], [5.5, 5.7],
+             [4.2, 5.5], [4.3, 3.0], [5.1, 8.2], [5.3, 9.5], [5.5, 5.7],
              [6.1, 4.0], [6.5, 6.8], [7.1, 7.6], [7.3, 2.0], [7.4, 1.0],
              [7.7, 9.6], [8.5, 6.5], [9.0, 4.7], [9.6, 1.6], [9.7, 9.6]])
+        idx = np.lexsort((a[:,1], a[:,0]))
+        a_srt = a[idx:]
+        d = _e_dist_(a_srt)   # determine the square form distances
+        pairs, fr_to = mst(d)
+        npg.npg_plots.plot_mst(a_srt, pairs)
     """
     tmp, idx = np.unique(arr, return_index=True, axis=0)
     W = arr[idx]  # retain input order
@@ -523,7 +602,7 @@ def connect(a, dist_arr, edges):
     a : array
         A point array
     dist : array
-        The distance array, from _e_dist
+        The distance array, from _e_dist_
     edge : array
         The edges derived from mst
     """
@@ -543,18 +622,18 @@ def connect(a, dist_arr, edges):
 """
     a = np.array([[0, 0], [0, 8], [10, 8],  [10, 0], [3, 4], [7, 4]])
     a = np.unique(a, axis=0)
-    idx= np.lexsort((a[:,1], a[:,0]))  # sort X, then Y
-    a_srt = a[idx,:]                   # slice the sorted array
-    d = _e_dist_(a_srt)                # determine the square form distances
-    pairs, fr_to = mst(d)              # get the orig-dest pairs for the mst
-    plot_mst(a_srt, pairs)             # a little plot
-    o_d = connect(a_srt, d, pairs)     # produce an o-d structured array
+    idx = np.lexsort((a[:,1], a[:,0]))   # sort X, then Y
+    a_srt = a[idx,:]                     # slice the sorted array
+    d = _e_dist_(a_srt)                  # determine the square form distances
+    pairs, fr_to = mst(d)                # get the orig-dest pairs for the mst
+    npg.npg_plots.plot_mst(a_srt, pairs) # a little plot
+    o_d = connect(a_srt, d, pairs)       # produce an o-d structured array
 
 """
 
 
 # ---- ---------------------------
-# ---- (5) concave hull
+# ---- (6) concave hull
 #
 def concave(points, k, pip_check=False):
     """Return the concave hull for given points.

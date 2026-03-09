@@ -16,7 +16,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-12-08
+    2026-03-07
 
 Purpose
 -------
@@ -78,6 +78,15 @@ from numpy.lib.recfunctions import unstructured_to_structured as uts
 # from numpy.lib.recfunctions import repack_fields
 
 from npg.npg_prn import prn_tbl  # used by `shape_finder`
+
+fmt_ = {"bool": lambda x: repr(x.astype(np.int32)),
+        "float_kind": '{: 0.3f}'.format}
+np.set_printoptions(precision=3, threshold=100, edgeitems=10, linewidth=80,
+                    suppress=True,
+                    formatter=fmt_,
+                    floatmode='maxprec_equal',
+                    legacy='1.25')  # legacy=False or legacy='1.25'
+np.ma.masked_print_option.set_display('-')  # change to a single -
 
 script = sys.argv[0]  # print this should you need to locate the script
 
@@ -555,10 +564,11 @@ def _area_centroid_(a):
     r"""Calculate area and centroid for a singlepart polygon, `a`.
 
     This is also used to calculate area and centroid for a Geo array's parts.
+    Used by `centroids` in npGeo for Geo arrays.
 
     Notes
     -----
-    For multipart shapes, just use this syntax:
+    For multipart shapes and/or lists of arrays, just use this syntax:
 
     >>> # rectangle with hole
     >>> a0 = np.array([[[0., 0.], [0., 10.], [10., 10.], [10., 0.], [0., 0.]],
@@ -1086,7 +1096,9 @@ def del_seq_dups(arr, poly=True):
     mask[1:] = tmp[:-1] != tmp[1:]
     # wh_ = np.nonzero(mask)[0]
     # sub_arrays = np.array_split(arr, wh_[wh_ > 0])
-    tmp = arr.base[mask]  # -- slice original array sequentially unique points
+    #
+    # -- slice original array sequentially unique points
+    tmp = _base_(arr)[mask]
     if poly:  # -- polygon source check
         if not (tmp[0] != tmp[-1]).all(-1):
             arr = np.concatenate((tmp, tmp[0, None]), axis=0)

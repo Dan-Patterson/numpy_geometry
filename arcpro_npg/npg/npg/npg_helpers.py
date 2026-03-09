@@ -5,7 +5,7 @@ r"""
 npg_helpers
 -----------
 
-** General helpers for the npg package and ndarrays in general.
+** General helpers for the `npg` package and ndarrays in general.
 
 ----
 
@@ -16,7 +16,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-09-15
+    2026-03-07
 
 Purpose
 -------
@@ -31,7 +31,7 @@ import sys
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view as swv
 from numpy.lib.stride_tricks import as_strided
-import npg  # noqa
+# import npg  # noqa
 
 script = sys.argv[0]
 
@@ -343,15 +343,32 @@ def sequences(data, stepsize=0):
 def drop_seq_dupl(a):
     """Remove sequential duplicates from an array.
 
-    The array is stacked with the first value in the sequence to retain it.
-    Designed to removed sequential duplicates in point arrays.
+    Parameters
+    ----------
+    a : array-like
+        Only 1 or 2D arrays or lists/tuples that can be cast as such, are
+        supported.
+    
+    See Also
+    --------
+    Based on ` del_seq_dups` in `npg_geom_hlp`.
     """
-    uni = a[np.where(a[:-1] != a[1:])[0] + 1]
-    if a.ndim == 1:
-        uni = np.hstack((a[0], uni))
+    if isinstance(a, (list, tuple)):
+        a = np.array(a)
+    # -- proceed if ndarray, list or tuple, it will error otherwise
+    a_dim = a.ndim
+    if a_dim == 1:
+        whr = np.where(a[1:] != a[:-1])[0]
+        uni = a[whr]
+        uni = np.array(uni.tolist() + [a[-1]])  # -- np.append(uni, a[-1])
+    elif a_dim == 2:
+        whr = np.nonzero((a[1:] != a[:-1]).any(-1))[0]
+        uni = a[whr]
+        uni = np.concatenate((uni, a[-1][None, :]), axis=0)
+        # or np.vstack((uni, a[-1])
     else:
-        uni = np.vstack((a[0], uni))
-    uni = np.ascontiguousarray(uni)
+        print("\nOnly 1D and 2D arrays are supported.")
+        uni = a
     return uni
 
 

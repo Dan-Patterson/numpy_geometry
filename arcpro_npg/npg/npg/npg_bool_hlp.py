@@ -16,7 +16,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-12-08
+    2026-02-26
 
 Purpose
 -------
@@ -34,9 +34,17 @@ To determine right turns in arrays, `_is_turn(i)` in `np_geom_hlp`.
 
 import sys
 import numpy as np
+fmt_ = {"bool": lambda x: repr(x.astype(np.int32)),
+      "float_kind": '{: 0.3f}'.format}
+np.set_printoptions(precision=3, threshold=100, edgeitems=10, linewidth=80,
+                    suppress=True,
+                    formatter=fmt_,
+                    floatmode='maxprec_equal',
+                    legacy='1.25')  # legacy=False or legacy='1.25'
+np.ma.masked_print_option.set_display('-')  # change to a single -
 
 import npg
-from npg.npg_geom_hlp import sort_segment_pairs
+from npg.npg_geom_hlp import  _bit_area_, sort_segment_pairs
 from npg.npg_pip import np_wn  # noqa
 from npg.npg_plots import plot_polygons, plot_2d  # noqa
 
@@ -55,6 +63,7 @@ __helpers__ = [
     '_add_pnts_',                     # (3) add intersection helpers
     '_add_intersections_',
     '_del_seq_pnts_',                 # (1) private helpers
+    '_orient_clockwise_',
     '_roll_',
     '_p_ints_p_',
     '_w_',                            # (2) prepare for boolean operations
@@ -65,7 +74,8 @@ __helpers__ = [
 __imports__ = [
     'np_wn',                    # npg_pip
     'roll_arrays',              # npGeo
-    'sort_segment_pairs',       # npg_geom_hlp
+    '_orient_clockwise_',       # npg_geom_hlp
+    'sort_segment_pairs',
     'plot_polygons',            # npg_plots
     'plot_2d'
 ]
@@ -118,6 +128,27 @@ def _del_seq_dupl_pnts_(arr, poly=True):
             arr = np.concatenate((tmp, tmp[0, None]), axis=0)
             return arr
     return tmp
+
+
+def _orient_clockwise_(geom):
+    """Orient polygons so they are clockwise.
+
+    Parameters
+    ----------
+    geom : list
+        A list of polygon geometry arrays.
+
+    Requires
+    --------
+    Ensure `del_seq_dups` is run on the geometry first.
+    """
+    cw_ordered = []
+    for i in geom:
+        if _bit_area_(i) > 0.0:  # -- 2025_10_27  changed not sure
+            cw_ordered.append(i)
+        else:
+            cw_ordered.append(i[::-1])
+    return cw_ordered
 
 
 def _roll_(arrs):
@@ -220,8 +251,25 @@ def _p_ints_p_(poly0, poly1):
 # ---- (2) prepare for boolean operations
 #
 def _w_(a, b, all_info=False):
-    """Return winding number and other values."""
+    """Return winding number and other values.
+
+    Parameters
+    ----------
+    a, b : arrays
+        `a` is either a line or polygon. `b` is a polygon.
+    all_info : boolean
+        True, returns the winding number, point coordinates and the numerators
+        and denominator for signed distance and/or intersection calculations.
+    
+    See Also
+    --------
+    `npg_pip.np_wn` is the general points in polygon algorithm.  This variant
+    is designed to test for poly feature vertices within a polygon as a first
+    step in determining intersection points.
+    """
     # -- if a polygon, you can slice off the last point, otherwise dont
+    if a.ndim == 1:
+        a = a[None, :]  # 2025-11-09 to check for a single point
     x0, y0 = a[:-1].T  # point `from` coordinates
     # x1, y1 = a[1:].T  # point `to` coordinates
     x1_x0, y1_y0 = (a[1:] - a[:-1]).T
@@ -242,7 +290,7 @@ def _w_(a, b, all_info=False):
     b_1 = y1_y0 * x0_x2
     #
     a_num = (a_0 - a_1) + 0.0  # signed distance diff_ in npg.pip.np_wn
-    b_num = (b_0 - b_1) + 0.0
+    b_num = (b_0 - b_1) + 0.0  # for both points of a segment
     #
     # pnts in poly
     chk1 = y0_y2 >= 0.0  # y above poly's first y value, per segment
@@ -279,7 +327,6 @@ def _wn_clip_(pnts, poly, all_info=True):
 
     Notes
     -----
-    Negative and positive zero np.NZERO, np.PZERO == 0.0.
     `The denominator of this expression is the (squared) distance between
     P1 and P2.  The numerator is twice the area of the triangle with its
     vertices at the three points, (x0, y0), p1 and p2.` Wikipedia
@@ -507,7 +554,7 @@ def _add_intersections_(
     p1_n = _del_seq_dupl_pnts_(np.concatenate((p1_n), axis=0), poly=is_1)
     # x_pnts = _del_seq_dupl_pnts_(x_pnts, False)  # True, if wanting a polygon
     x_pnts, idx = np.unique(x_pnts, True, axis=0)  # x_pnts increase by x-value
-    # ---- lexsort
+    # -- lexsort
     # ensures that the upper pnt will be taken if there are 2 or more with min
     # x values.
     x_lex = np.lexsort((-x_pnts[:, 1], x_pnts[:, 0]))
