@@ -538,16 +538,6 @@ OID_    Shape_Length    Shape_Area    CENTROID_X    CENTROID_Y    INSIDE_X     I
  002      3           21.50         16.00     300013.00    5000022.67    300013.00    5000022.67
  ```
 
-The methods used to convert esri geometries to an appropriate array format.
-This script will require you have a valid license for ArcGIS Pro since esri FeatureClasses in a File Geodatabase need to be read and their arcpy geometries extracted and converted to numpy arrays.
+The methods used to convert esri geometries to an appropriate array format will require a valid license for ArcGIS Pro since esri FeatureClasses in a File Geodatabase need to be read and their arcpy geometries extracted and converted to numpy arrays.
 
-Numpy is part of the distribution for ArcGIS Pro, so no other dependencies need to be made to their conda packages.
-If you wish to clone their distribution or modify the existing one, some guidance is provided here.
 
-[Clone .... ArcGISPro 2.5](https://community.esri.com/blogs/dan_patterson/2020/02/09/clone-arcgis-pro-25)
-
-[ArcGISPro 2.4 ... Installation, package updates and installs](https://community.esri.com/blogs/dan_patterson/2019/06/28/arcgis-pro-24-installation-package-updates-and-installs)
-
-[Clone... ArcGIS Pro ... for non administrators](https://community.esri.com/blogs/dan_patterson/2018/12/28/clone)
-
-<a href="url"><img src="../images/clones2.png" align="center" height="200" width="auto" ></a>
