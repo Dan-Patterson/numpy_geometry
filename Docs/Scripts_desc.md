@@ -1,6 +1,6 @@
 # Scripts
 ----
-**Last update: 2022-11-22**
+**Last update: 2026-03-09**
 
 **Slowly updating**
 I will update the documentation as soon as I can.
@@ -154,7 +154,7 @@ If you wish to modify this, modify save_txt as well.
 
 **Others**
 
-    There are functionsto work with geojson files as well.
+    There are functions to work with geojson files as well.
 
 ```python
 
