@@ -380,6 +380,30 @@ P  : part 1 or more
            [  2.00  11.00]
 
 ```
+**prn_tbl**
+
+Print the structure of a Geo array.  In the example below, the object id (OID_) for each polygon is given.  The from-to point ids (Fr_pnt, To_pnt) as well the orientation of the polygon rings is denoted.  If a polygon is multipart, consisting of one or more rings/bits, then the Part_ID and Bit_ID columns will denoted.
+
+The first polygon consists of 2 parts consisting of clockwise rings.  The first part has 3 holes (counter-clockwise rings) and the second part has one hole.
+
+```
+npg.npg_prn.prn_tbl(g)
+       OID_    Fr_pnt    To_pnt    CW/CCW    Part_ID    Bit_ID  
+----------------------------------------------------------------
+ 000      1         0         5         1          1         0
+ 001      1         5        10         0          1         1
+ 002      1        10        14         0          1         2
+ 003      1        14        18         0          1         3
+ 004      1        18        23         1          2         0
+ 005      1        23        27         0          2         1
+ 006      2        27        36         1          1         0
+ 007      2        36        46         1          2         0
+ 008      2        46        50         0          2         1
+ 009      2        50        54         0          2         2
+ 010      2        54        58         0          2         3
+ 011      3        58        62         1          1         0
+
+```
 
 **prn_lists**
 
