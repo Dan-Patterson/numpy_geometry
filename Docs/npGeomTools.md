@@ -11,14 +11,19 @@ The *Geo* array, based on a numpy array, is used along with *arcpy* functions to
 
 The tools here are the most recent version of those provided in *FreeTools*
 
-<br clear="all">
+
 
 
 (1) **Attribute tools**
 
 The tools are self-evident and don't include multiple options.
 
+<br>
+<br clear="all">
+
 (2) **Containers**
+
+<a href="url"><img src="../images/containers.png" align="right" height="auto" width="200" ></a>
 
 The containers toolset offers the options shown in the image.
 
@@ -28,7 +33,16 @@ The containers toolset offers the options shown in the image.
 
 - `Convex hull` is included for convenience.  It uses scipy's Qhull implementation.
 
+- `minimum area bounding rectangle` is an extent rectangle, but oriented to provide the tightest bounds around a polygon.
+
+
+
+<br clear="all">
+
 (3) **Conversion**
+
+
+<a href="url"><img src="../images/npGeo_conversion_tools.png" align="right" height="auto" width="200" ></a>
 
 The options for `conversion` are as follows:
 
@@ -44,8 +58,7 @@ The reciprocal function was not implemented because I didn't want to provide a w
 
 If you have polyline geometry that you know will create well-formed polygons, simply change `K`.
 
-<a href="url"><img src="../images/containers.png" align="left" height="auto" width="200" ></a>
-<a href="url"><img src="../images/npGeo_conversion_tools.png" align="center" height="auto" width="200" ></a>
+
 
 
 <br clear="all">
