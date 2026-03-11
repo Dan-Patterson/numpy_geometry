@@ -14,8 +14,6 @@
 
 Initially developed using python <= 3.13 and numpy < 2.2 and ArcGIS Pro <= 3.6.
 
-I no longer have access to ArcGIS Pro so I am no longer actively developing or supporting anything that involves arcpy or arcgisscripting.
-
 Currently development is using python >= 3.13 and numpy > 2.0.  A major transition is denoted pre and post numpy 2.0.
 
 These demo scripts and the toolbox show how numpy and arcpy can play nice together and generate geometries that are normally only available at the ArcGIS Pro Advanced level.  The tools are already provided to do this, but less attention is paid to the attributes.
