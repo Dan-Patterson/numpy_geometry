@@ -14,7 +14,7 @@ Script :
 Author :
     `<https://github.com/Dan-Patterson>`_.
 Modified :
-    2025-05-13
+    2026-03-29
 
 Purpose
 -------
@@ -120,7 +120,7 @@ flotsam = ' !"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~'  # including the space
 def nd2struct(a, fld_names=None):
     """Return a view of an ndarray as structured array with a uniform dtype.
 
-    Same as unstructured_to_structured in np.lib.recfunctions.
+    Same as `unstructured_to_structured` in np.lib.recfunctions.
 
     Parameters
     ----------
@@ -466,7 +466,7 @@ def id_duplicates(a, key_fld=None, sorted_order=True,
 # ---- (2) Crosstabulation tools
 # -- fancy print/string formatter for crosstabulation and pivot
 def _prn(r, c, a, stat_name="Total"):
-    """Fancy print formatting."""
+    """Fancy print formatting.  Used by `_as_pivot`."""
     r = r.tolist()
     r.append(stat_name)
     c = c.tolist()

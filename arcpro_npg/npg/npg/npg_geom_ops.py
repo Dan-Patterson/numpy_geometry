@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 # noqa: D205, D208, D400, F403
 r"""
-----------------------------------
+--------------------------------------
 npg_geom_ops: Geometry focused methods
-----------------------------------
+--------------------------------------
 
 **Geometry focused methods that work with Geo arrays or np.ndarrays.**
 
@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-12-27
+    2026-03-26
 
 Purpose
 -------

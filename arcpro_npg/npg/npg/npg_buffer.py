@@ -18,8 +18,8 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-06-01
-
+    2026-03-31
+    
 Purpose
 -------
 Buffering/offsetting methods that work with Geo arrays or np.ndarrays.
@@ -43,15 +43,10 @@ import numpy as np
 from npg import npGeo  # noqa
 
 from npg.npg_bool_hlp import _del_seq_dupl_pnts_
-
 from npg.npg_geom_hlp import (_area_centroid_, _in_extent_) # noqa
-
 from npg.npg_geom_ops import _is_pnt_on_line_  # noqa
-
 from npg.npg_maths import _angles_3pnt_
-
 from npg.npg_pip import np_wn, _side_  # noqa
-
 from npg.npg_plots import plot_polygons, plot_segments, plot_polylines  # noqa
 
 
@@ -180,7 +175,7 @@ def _x_ings_(args):
     return None
 
 
-def _offset_np_(poly, buff_dist=1.0, offset_check=False, as_segments=False):  #
+def _offset_np_(poly, buff_dist=1.0, offset_check=False, as_segments=False):
     """Buffer by offsetting lines.
 
     Parameters
@@ -255,7 +250,7 @@ def _offset_np_(poly, buff_dist=1.0, offset_check=False, as_segments=False):  #
     new_segs = np.concatenate((new_pnts[:-1], new_pnts[1:]), axis=1)
     #
     if as_segments:  # return both the polygon and the original segments
-        #
+        # -- plotting demo
         # o_segs = np.concatenate((poly[:-1], poly[1:]), axis=1)
         # plot_segments(np.concatenate((o_segs, _offset_orig_), axis=0))
         # plot_segments(np.concatenate((o_segs, new_segs), axis=0))

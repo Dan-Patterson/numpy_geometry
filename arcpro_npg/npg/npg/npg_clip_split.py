@@ -282,7 +282,7 @@ def clip_poly(poly, clp, as_geo=False):
         # out.extend(pl_n[p_missing])
         # out.extend(cl_n[c_missing])
         msg = "\nMissed during processing clip {} poly {}"
-        print(msg.format(c_missing, p_missing))
+        # print(msg.format(c_missing, p_missing))
     #
     final = np.asarray(out)
     #

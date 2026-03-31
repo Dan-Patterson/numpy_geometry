@@ -5,14 +5,22 @@ r"""
 npg_bool_ops
 ------------
 
-Modified :
-    2026-02-07
+** Boolean operations on poly geometry. **
 
-** Boolean operations on poly geometry.
+----
+
+Script :
+    npg_bool_ops.py
+
+Author :
+    `<https://github.com/Dan-Patterson>`_.
+
+Modified :
+    2026-03-21
+
 
 In npg_clip_split.
 
-- clip
 - split
 
 Here.
@@ -29,13 +37,6 @@ Other ops.
 - A union B (OR)
 - A intersect B (AND)
 - A XOR B
-----
-
-Script :
-    npg_bool_ops.py
-
-Author :
-    `<https://github.com/Dan-Patterson>`_.
 
 """
 # pylint: disable=C0103,C0201,C0209,C0302,C0415
@@ -62,7 +63,7 @@ import npg  # noqa
 from npg import npGeo
 
 from npg.npg_pip import winding_num
-from npg.npg_helpers import drop_seq_dupl
+from npg.npg_helpers import drop_seq_dupl, flatten_list
 from npg.npg_bool_hlp import add_intersections, _del_seq_dupl_pnts_
 from npg.npg_geom_hlp import _bit_check_, _bit_area_  # _is_turn, _bit_length_
 from npg.npg_prn import prn_, prn_as_obj  # noqa
@@ -75,22 +76,28 @@ __all__ = [
     'reorder_x_pnts',
     'renumber_pnts',
     'pnt_connections',
-    'tri_array',
+    'seg_connections',
+    'sweep_srt',
+    # 'tri_array',
     'rolling_match',
+    'rolling_pairer',
     'turns',
-    'prepare',                         # (2) polygon overlay functions
+    'renumber_pnts',                   # (2) polygon overlay functions
+    'prepare',
     'bail',
     'no_overlay_',
-    'one_overlay_',
     'nx_solve',
+    'segment_classify',
+    'pair_',
     'wrap_',
     'polygon_overlay',
-    'clp_',                            # (3) polygon overlay operations.
+    'clip_',                            # (3) polygon overlay operations.
     'erase_',
     'symm_diff_',
     'append_',                         # (4) append geometry
     'split_at_intersections',          # (5) split at intersections
-    'union_adj',                       # (6) dissolve shared boundaries
+    'dissolve_geo',                    # (6) dissolve shared boundaries
+    'union_adj',
     'union_over',
     'adjacency_array',                 # (7) adjacency
     'adjacency_matrix',
@@ -212,7 +219,7 @@ def _cut_pairs_(arr, _in_, _out_):
 def _union_op_(a, b):
     """Union two polygon features with a dissolve of their shared edges.
 
-    Private helper for  `union`.
+    Private helper for  `union_adj`.
 
     Returns
     -------
@@ -536,41 +543,144 @@ def seg_connections(c_on, p_on, _CP_, c_seq, p_seq, as_lists=True):
     return de, closed_u, dups_u
 
 
-def tri_array(frto):
-    """Return line segments forming triangles when geometry is overlain.
+
+def sweep_srt(seq, _CP_, descending_y=True, increasing_angle=True):
+    """Sort the sequences in lexicographical order.
 
     Parameters
     ----------
-    frto : array_like
-        Segment id values for the start and end of a 2 point line segment
-        represented by `from`-`to` pairs.
+    seq : list of arrays of segment ids.
+        Use `all_seq` from `polygon_overlay`.
+    _CP_ : array
+        The x, y coordinate pairs of the intersections and original polygons.
+    descending_y : boolean
+        True, sorts by increasing x and decreasing Y (left to right,
+        top to bottom).  False returns values by increasing x and y.
 
     Returns
     -------
-    If a triangle is found, a list of integer ids, for the points forming the
-    segments, is returned.
-    t1 = ([c_nxt, c_p] == c_cut[:, None]).all(-1).any()
+    The sequence points are sorted by increasing x and optionally, decreasing
+    y should a duplicate x value exist.  The start and end points of each
+    sequence determine the minimum x.
     """
-    pre_cur = np.concatenate((frto[:-1], frto[1:]), axis=1)
-    # c_c_c_nxt = pre_cur[:, :2]
-    c_nxt_c_p = pre_cur[:, [3, 0]]
-    c_p_c_nxt = pre_cur[:, [0, 3]]
-    # t0 = np.nonzero((c_c_c_nxt == frto[:, None]).all(-1))
-    t1 = np.nonzero((c_nxt_c_p == frto[:, None]).all(-1))
-    t2 = np.nonzero((c_p_c_nxt == frto[:, None]).all(-1))
-    tri_s = []
-    if sum([i.size for i in t1]) > 0:  # use size to determine there are any
-        t1_0 = frto[t1[0]]
-        t1_1 = frto[t1[1]][:, [1, 0]]
-        tmp = np.concatenate((t1_1[:, [1, 0]], t1_0), axis=1)
-        tri_s.append(tmp)
-    if sum([i.size for i in t2]) > 0:  # ditto
-        t2_0 = frto[t2[0]]
-        t2_1 = frto[t2[1]][:, [1, 0]]
-        tmp = np.concatenate((t2_0, t2_1), axis=1)
-        tri_s.append(tmp)
-    # -- tri_s will either be an empty list or geometries
-    return tri_s
+    def dup_chk(seq):
+        """Return the processed sequence with duplicates separated."""
+        dups = []
+        new_seq = []
+        prev = seq[0]
+        new_seq = [seq[0]]
+        for cnt, s in enumerate(seq[1:]):
+            if len(prev) == 2 and len(s) == 2:
+                if (prev == s).all():
+                    dups.append(s)
+                    continue
+            else:
+                chk_eq1 = len(set(prev).union(set(s)))
+                if chk_eq1 == 2:
+                    dups.append(s)
+                    continue
+            new_seq.append(s)
+            prev = s
+        return new_seq, dups
+
+    def rad_srt(sub, _CP_, increasing_angle):
+        """Radially sort the subarrays."""
+        cent = _CP_[sub[0][0]]  # start point of the subarray
+        ends = np.array([_CP_[i[1]] for i in sub])  # second point of each
+        dxdy = ends - cent
+        angles = np.arctan2(-dxdy[:, 1], dxdy[:, 0])
+        idx_ = np.argsort(angles)
+        sub = [sub[i] for i in idx_]
+        if not increasing_angle:
+            return sub[::-1]
+        return sub
+
+    def _sequence_srt_(seq, geom):
+        """Sort the sequence lexicographically, then by common id value.
+    
+        Parameters
+        ----------
+        seq : list of arrays of segment ids.  A segment may consist of 2 or more
+            points.
+    
+        Notes
+        -----
+        This is a private function for `polygon_overlay` and `sweep_srt`.
+        Normally using `all_seq` and `_CP_`.
+    
+        """
+        all_st_en = [i[[0, -1]] for i in seq]
+        all_st_en = np.array(all_st_en)
+        #
+        # -- lexsort on the minimum `x` of start-end point and max y, and an
+        #    argsort on the first sequence id value,
+        xs_2 = np.array([geom[i][:, 0][[0, -1]] for i in seq])  # st-en x`s
+        xs_2_lex = np.lexsort((-xs_2[:, 1], xs_2[:, 0]))  # sorted
+        seq_srted_tmp = [seq[i] for i in xs_2_lex]  # all seqs sorted by min x
+        s_ = np.argsort([i[0] for i in seq_srted_tmp])  # sort by id
+        seq_srted = [seq_srted_tmp[i] for i in s_]  # final paired segments
+        return seq_srted
+
+    # --
+    # -- sort, then clean the segments, separating out the duplicates
+    #
+    seq = _sequence_srt_(seq, _CP_)
+    #
+    sw_seq, dups = dup_chk(seq)
+    st_en = [i[[0, -1]] for i in sw_seq]
+    st_en = np.array(st_en)
+    seq_2 = []
+    seq_rev = []
+    _xyy = []
+    for cnt, s in enumerate(sw_seq):
+        fir, sec = _CP_[st_en[cnt]]
+        if fir[0] <= sec[0]:
+            seq_2.append(s)
+            _xyy.append(np.array(fir.tolist() + sec.tolist()))
+        else:
+            seq_2.append(s[::-1])
+            seq_rev.append(s)
+            _xyy.append(np.array(sec.tolist() + fir.tolist()))
+    # a_s = np.argsort([i[0] for i in all_seq_2])
+    _xyy = np.array(_xyy)
+    if descending_y:
+        wh_ = np.lexsort((_xyy[:, 2], -_xyy[:, 3], -_xyy[:, 1], _xyy[:, 0]))
+    else:
+        wh_ = np.lexsort((_xyy[:, 1], _xyy[:, 0]))
+    _srt = [seq_2[i] for i in wh_]
+    # -- try sorting by y examples
+    # wh_2 = np.lexsort((_xyy[:, 2], -_xyy[:, 3]))
+    # -- recheck for duplicates
+    sw_srt, dups_ = dup_chk(_srt)
+    dups += dups_
+    #
+    # -- split the segments according to their first intersection point id
+    tmp_ = np.array([sw_srt[i][0] for i in range(len(sw_srt))])
+    spl_whr = np.nonzero(tmp_[1:] - tmp_[:-1])[0] + 1
+    spl_whr = [0] + list(spl_whr) + [len(tmp_)]
+    # _ids_ = tmp_[spl_whr[:-1]]  # the ids of c_on in lex order
+    ft_ = np.array([spl_whr[:-1], spl_whr[1:]]).T
+    tmp_1 = [sw_srt[i[0]:i[1]] for i in ft_]
+    #
+    # -- check orientation with subarrays
+    # arrs_flat is sw_srt with angles corrected!!!
+    #
+    arrs_ = [rad_srt(i, _CP_, increasing_angle) for i in tmp_1]
+            # if len(i) > 1 else i for i in tmp_1]  # error, keep for now
+    #
+    # -- get the start/end ids
+    st_en_srt = []
+    arrs_flat = []
+    for i in arrs_:
+        for j in i:
+            st_en_srt.append(j[[0, -1]])
+            arrs_flat.append(j)
+    st_en_srt = np.array(st_en_srt)
+    sw_srt = arrs_flat  # -- just copy the name since sw_srt is arrs_flat
+    # -- for plotting
+    # sw_segs = [_CP_[i] for i in arrs_flat]
+    # plot_polylines(sw_segs, title=None, label_segs=True)
+    return arrs_, arrs_flat, sw_srt, dups, st_en_srt, seq_rev  # wh_, , _ids_
 
 
 def rolling_match(seq_, _out_, _in_):
@@ -883,7 +993,7 @@ def prepare(ply_a, ply_b):
 
     Notes
     -----
-    See `polygon_overlay`. Used by `polygon_overlay` and `overlay_nx`.
+    See `polygon_overlay`. Used by `polygon_overlay` and `nx_solve`.
 
     """
     result0 = add_intersections(
@@ -893,6 +1003,10 @@ def prepare(ply_a, ply_b):
                 p1_pgon=True,
                 class_ids=False
                 )
+    # -- no intersection check will result in result0[0] be None
+    if result0[0] is None:  # `add_intersections` found no intersections
+        #  No intersections found by `add_intersections`.
+        return [result0, None, None]
     pl_n, cl_n = result0[:2]  # >2 id_plcl, onConP, x_pnts, ps_info, cs_info
     #
     result1 = renumber_pnts(cl_n, pl_n)
@@ -926,37 +1040,37 @@ def no_overlay_(p_a, c_a, N_p, N_c, ply_a, ply_b):
     if p_a == N_p + 1:
         if c_a == N_c + 1:
             print("both outside each other")
-            return [ply_a, ply_b]
+            return [ply_a, ply_b], None
         else:
             print("clp completely inside poly")
-            return [ply_a, ply_b[::-1]]
+            return [ply_a, ply_b[::-1]], None
     elif (c_a == N_c + 1):
         if p_a == N_p + 1:
             print("both outside each other")
-            return [ply_a, ply_b]
+            return [ply_a, ply_b], None
         else:
             print("ply completely inside clp")
-            return [ply_a[::-1], ply_b]
+            return [ply_a[::-1], ply_b], None
 
 
-def one_overlay_(chk0, chk1, c_on, p_on, pl_n, cl_n, ply_a, ply_b):
-    """Return geometry."""
-    if (pl_n[p_on[:2]] == cl_n[c_on[:2]]).all():
-        if chk1:  # clp out
-            geom = [ply_b]  # poly all in
-            if chk0 == 2:  # -- drop the duplicate last
-                pre = cl_n[::-1][:-1]
-            else:
-                pre = cl_n[::-1]  # -- keep it when there is one int. pnt
-            # -- single point check
-            post = pl_n[1:]
-        else:
-            geom = [ply_a]
-            pre = pl_n[::-1][:-1]
-            post = cl_n[1:]
-        bth = np.concatenate((pre, post), axis=0)
-        geom.append(bth)
-        return geom
+# def one_overlay_(chk0, chk1, chk2, c_on, p_on, pl_n, cl_n, ply_a, ply_b):
+#     """Return geometry."""
+#     if (pl_n[p_on[:2]] == cl_n[c_on[:2]]).all():
+#         if chk1:  # clp out
+#             geom = [ply_b]  # poly all in
+#             if chk0 == 2:  # -- drop the duplicate last
+#                 pre = cl_n[::-1][:-1]
+#             else:
+#                 pre = cl_n[::-1]  # -- keep it when there is one int. pnt
+#             # -- single point check
+#             post = pl_n[1:]
+#         else:
+#             geom = [ply_a]
+#             pre = pl_n[::-1][:-1]
+#             post = cl_n[1:]
+#         bth = np.concatenate((pre, post), axis=0)
+#         geom.append(bth)
+#         return geom, [pre, post]
 
 
 def nx_solve(frto):
@@ -1085,145 +1199,6 @@ def concat_pairs(arrs_):
     return closed_, new_segs
 
 
-def sweep_srt(seq, _CP_, descending_y=True, increasing_angle=True):
-    """Sort the sequences in lexicographical order.
-
-    Parameters
-    ----------
-    seq : list of arrays of segment ids.
-        Use `all_seq` from `polygon_overlay`.
-    _CP_ : array
-        The x, y coordinate pairs of the intersections and original polygons.
-    descending_y : boolean
-        True, sorts by increasing x and decreasing Y (left to right,
-        top to bottom).  False returns values by increasing x and y.
-
-    Returns
-    -------
-    The sequence points are sorted by increasing x and optionally, decreasing
-    y should a duplicate x value exist.  The start and end points of each
-    sequence determine the minimum x.
-    """
-    def dup_chk(seq):
-        """Return the processed sequence with duplicates separated."""
-        dups = []
-        new_seq = []
-        prev = seq[0]
-        new_seq = [seq[0]]
-        for cnt, s in enumerate(seq[1:]):
-            if len(prev) == 2 and len(s) == 2:
-                if (prev == s).all():
-                    dups.append(s)
-                    continue
-            else:
-                chk_eq1 = len(set(prev).union(set(s)))
-                if chk_eq1 == 2:
-                    dups.append(s)
-                    continue
-            new_seq.append(s)
-            prev = s
-        return new_seq, dups
-
-    def rad_srt(sub, _CP_, increasing_angle):
-        """Radially sort the subarrays."""
-        cent = _CP_[sub[0][0]]  # start point of the subarray
-        ends = np.array([_CP_[i[1]] for i in sub])  # second point of each
-        dxdy = ends - cent
-        angles = np.arctan2(-dxdy[:, 1], dxdy[:, 0])
-        idx_ = np.argsort(angles)
-        sub = [sub[i] for i in idx_]
-        if not increasing_angle:
-            return sub[::-1]
-        return sub
-
-    def _sequence_srt_(seq, geom):
-        """Sort the sequence lexicographically, then by common id value.
-    
-        Parameters
-        ----------
-        seq : list of arrays of segment ids.  A segment may consist of 2 or more
-            points.
-    
-        Notes
-        -----
-        This is a private function for `polygon_overlay` and `sweep_srt`.
-        Normally using `all_seq` and `_CP_`.
-    
-        """
-        all_st_en = [i[[0, -1]] for i in seq]
-        all_st_en = np.array(all_st_en)
-        #
-        # -- lexsort on the minimum `x` of start-end point and max y, and an
-        #    argsort on the first sequence id value,
-        xs_2 = np.array([geom[i][:, 0][[0, -1]] for i in seq])  # st-en x`s
-        xs_2_lex = np.lexsort((-xs_2[:, 1], xs_2[:, 0]))  # sorted
-        seq_srted_tmp = [seq[i] for i in xs_2_lex]  # all seqs sorted by min x
-        s_ = np.argsort([i[0] for i in seq_srted_tmp])  # sort by id
-        seq_srted = [seq_srted_tmp[i] for i in s_]  # final paired segments
-        return seq_srted
-
-    # --
-    # -- sort, then clean the segments, separating out the duplicates
-    #
-    seq = _sequence_srt_(seq, _CP_)
-    #
-    sw_seq, dups = dup_chk(seq)
-    st_en = [i[[0, -1]] for i in sw_seq]
-    st_en = np.array(st_en)
-    seq_2 = []
-    seq_rev = []
-    _xyy = []
-    for cnt, s in enumerate(sw_seq):
-        fir, sec = _CP_[st_en[cnt]]
-        if fir[0] <= sec[0]:
-            seq_2.append(s)
-            _xyy.append(np.array(fir.tolist() + sec.tolist()))
-        else:
-            seq_2.append(s[::-1])
-            seq_rev.append(s)
-            _xyy.append(np.array(sec.tolist() + fir.tolist()))
-    # a_s = np.argsort([i[0] for i in all_seq_2])
-    _xyy = np.array(_xyy)
-    if descending_y:
-        wh_ = np.lexsort((_xyy[:, 2], -_xyy[:, 3], -_xyy[:, 1], _xyy[:, 0]))
-    else:
-        wh_ = np.lexsort((_xyy[:, 1], _xyy[:, 0]))
-    _srt = [seq_2[i] for i in wh_]
-    # -- try sorting by y examples
-    # wh_2 = np.lexsort((_xyy[:, 2], -_xyy[:, 3]))
-    # -- recheck for duplicates
-    sw_srt, dups_ = dup_chk(_srt)
-    dups += dups_
-    #
-    # -- split the segments according to their first intersection point id
-    tmp_ = np.array([sw_srt[i][0] for i in range(len(sw_srt))])
-    spl_whr = np.nonzero(tmp_[1:] - tmp_[:-1])[0] + 1
-    spl_whr = [0] + list(spl_whr) + [len(tmp_)]
-    # _ids_ = tmp_[spl_whr[:-1]]  # the ids of c_on in lex order
-    ft_ = np.array([spl_whr[:-1], spl_whr[1:]]).T
-    tmp_1 = [sw_srt[i[0]:i[1]] for i in ft_]
-    #
-    # -- check orientation with subarrays
-    # arrs_flat is sw_srt with angles corrected!!!
-    #
-    arrs_ = [rad_srt(i, _CP_, increasing_angle) for i in tmp_1]
-            # if len(i) > 1 else i for i in tmp_1]  # error, keep for now
-    #
-    # -- get the start/end ids
-    st_en_srt = []
-    arrs_flat = []
-    for i in arrs_:
-        for j in i:
-            st_en_srt.append(j[[0, -1]])
-            arrs_flat.append(j)
-    st_en_srt = np.array(st_en_srt)
-    sw_srt = arrs_flat  # -- just copy the name since sw_srt is arrs_flat
-    # -- for plotting
-    # sw_segs = [_CP_[i] for i in arrs_flat]
-    # plot_polylines(sw_segs, title=None, label_segs=True)
-    return arrs_, arrs_flat, sw_srt, dups, st_en_srt, seq_rev  # wh_, , _ids_
-
-
 def wrap_(seq, c_subs, p_subs, _in_, _out_, _on_):  # rgt_arr):
     """Return segments.
 
@@ -1258,26 +1233,13 @@ def wrap_(seq, c_subs, p_subs, _in_, _out_, _on_):  # rgt_arr):
     #
     w = np.where(np.diff(sp) != 0)[0] + 1
     tmp = np.array_split(np.array(seq, dtype='O'),  w)
-    pairs = []
-    for i in tmp:
-        if len(i) > 1:
-            pairs.append(_order_(i))
     #
-    # or for pairs that match
-    #   tmp = np.array_split(np.array(sw_srt, dtype='O'), len(sw_srt)//2)
-    #   pairs = [_order_(i) for i in tmp]  # error found cor cr1 and flipped
-    # -- new for testing
-    """
-    # -- used with sweep sort input  ie. seq = sw_srt
-    pairs = []
-    for cnt_, i in enumerate(tmp):
-        if len(i) == 2:
-            pairs.append(_order_(i))
-        elif len(i) > 2:
-            sub = list(zip(i[:-1], i[1:]))
-            for j in sub:
-                pairs.append(_order_(j))
-    """
+    # -- run pair_
+    pairs = pair_(tmp)
+    #
+    o_set = set(_out_)
+    i_set = set(_in_)
+    #
     segs_out = []
     clps = []
     _un_ = []
@@ -1288,24 +1250,37 @@ def wrap_(seq, c_subs, p_subs, _in_, _out_, _on_):  # rgt_arr):
     for cnt, p in enumerate(pairs):
         p = pairs[cnt]
         frst, secn = pairs[cnt]
-        chk = (frst[[0, -1]] == secn[[0, -1]]).all()
-        chk_in = (secn == _in_[:, None]).any()        # check the longest
-        chk_out = (secn == _out_[:, None]).any()      # seq which is second
+        #
+        f_out = len(o_set.intersection(frst)) > 0  # check first (f)
+        f_in = len(i_set.intersection(frst)) > 0
+        s_out = len(o_set.intersection(secn)) > 0
+        s_in = len(i_set.intersection(secn)) > 0
+        #  f_out, f_in, s_out, s_in
+        chk = (frst[[0, -1]] == secn[[0, -1]]).all()  # -- closure check
+        # chk_in = (secn == _in_[:, None]).any()        # check the longest
+        # chk_out = (secn == _out_[:, None]).any()      # seq which is second
         #
         if chk:  # -- start and end are equal for the pair
-            if chk_out:
-                clps.append(frst.tolist())  # append vs extend
-            elif chk_in:
-                clps.append(secn.tolist())  # append vs extend
+            if s_out:  # chk_out:
+                clps.append(frst.tolist())
+                seg = secn.tolist() + frst[::-1].tolist()
+            elif s_in:  # chk_in:
+                clps.append(secn.tolist())
+                seg = frst.tolist() + secn[::-1].tolist()
+            elif f_out:
+                clps.append(secn.tolist())
+                seg = frst.tolist() + secn[::-1].tolist()
+            elif f_in:
+                clps.append(frst.tolist())
+                seg = secn.tolist() + frst[::-1].tolist()
             elif (frst == secn[:, None]).any(-1).all(-1):  # duplicate seg
                 clps.append(frst.tolist())
                 continue
             # now add the seg
-            seg = secn.tolist() + frst[::-1].tolist()
             segs_out.append(seg)
         #
         else:  # -- there is a mismatch in the pairs
-            if (secn[-1] - frst[0]) == 2:
+            if abs(secn[-1] - frst[0]) == 2:  # triangle detection
                 _f = frst.tolist()
                 _s = secn.tolist()
                 seg = _f + _s[::-1]
@@ -1353,7 +1328,7 @@ def wrap_(seq, c_subs, p_subs, _in_, _out_, _on_):  # rgt_arr):
     #
     if len(clip_geom) == 0:
         clip_geom = segs_in
-    result = [segs_out, clip_geom, segs_in]
+    result = [segs_out, segs_in, clip_geom]
     return result
 
 
@@ -1442,11 +1417,29 @@ def polygon_overlay(ply_a, ply_b, asGeo=False):
     """
     #
     # ---- start here ----
-    args = prepare(ply_a, ply_b)
+    #
+    
+    args = prepare(ply_a, ply_b) 
     result0, result1, result2 = args
+    #
+    if result0[0] is None:  # ---- no intersection points found,
+        p_in_c, c_in_p = result0[1:]
+        if len(c_in_p) > 0:
+            out = [ply_b]
+        elif len(p_in_c) > 0:
+            out = [ply_a]
+        else:
+            return None, None  # no overlap
+        if asGeo:
+            g = npg.arrays_to_Geo(out, kind=2, info=None, to_origin=False)
+            return g, None
+        else:
+            return out, None
     #
     # -- result0
     # x_pnts are lex sorted
+    #  ps_info = [po_, pn_, pi_, p0_ioo] out, on, in and paired
+    #  cs_info = [co_, cn_, ci_, p1_ioo]
     pl_n, cl_n, id_plcl, onConP, x_pnts, ps_info, cs_info = result0
     p_out, p_on, p_in, pl_ioo = ps_info
     c_out, c_on, c_in, cl_ioo = cs_info
@@ -1476,10 +1469,10 @@ def polygon_overlay(ply_a, ply_b, asGeo=False):
 
     # clipper points sorted lexicographically by x
     whr_x = np.nonzero((z0 == x_pnts[:, None]).all(-1))
-    x_ids_, cl_ids_ = whr_x  # use cl_ids
+    x_ids_, cl_ids_x = whr_x  # use cl_ids
     # clipper points sorted lexicographically by y
     z2 = np.lexsort((x_pnts[:, 0], -x_pnts[:, 1]))
-    cl_ids2 = cl_ids_[z2]
+    cl_ids_y = cl_ids_x[z2]
 
     # individual plots
     plot_polygons(z0, True, True, labels=l0)
@@ -1557,26 +1550,26 @@ def polygon_overlay(ply_a, ply_b, asGeo=False):
     #
     c_a, c_b, c_c = [len(i) for i in [c_out, c_on, c_in]]  # clp
     p_a, p_b, p_c = [len(i) for i in [p_out, p_on, p_in]]  # ply
-    chk0 = len(x_pnts)
-    chk1 = c_a == 0
-    chk2 = p_a == 0
+    chk0 = len(x_pnts)  # chk1 = c_a == 0   # chk2 = p_a == 0
     #
     # ---- (8) process geometry ----
     # ---- -- no intersections
     if chk0 == 0:
         geom = no_overlay_(p_a, c_a, N_p, N_c, ply_a, ply_b)
-        return geom
+        return geom, None
     # ---- -- single intersection
-    elif chk0 <= 2 and (chk1 or chk2):
-        print("\n-- _one_overlay --")
-        # -- returns the actual geometry
-        geom = one_overlay_(chk0, chk1, c_on, p_on, pl_n, cl_n, ply_a, ply_b)
-        return geom
+    # elif chk0 <= 2 and (chk1 or chk2):
+    #     print("\n-- _one_overlay --")
+    #     # -- returns the actual geometry
+    #     geom = one_overlay_(chk0, chk1, chk2,
+    #                         c_on, p_on, pl_n,
+    #                         cl_n, ply_a, ply_b)
+    #     return geom, None
     #
     # ---- -- simple, but multiple intersections
     if (c_ft == p_ft2).all():  # -- 2025-06-06 use seq_srted ... E, C case
         result = wrap_(seq_srted, c_subs, p_subs, _in_, _out_, _on_)
-        segs_out, clip_geom, segs_in = result
+        segs_out, segs_in, clip_geom = result
         geom = []
         #
         p_out_s = set(p_out)
@@ -1584,20 +1577,10 @@ def polygon_overlay(ply_a, ply_b, asGeo=False):
         c_out_s = set(c_out)
         c_in_s = set(c_in)
         #
-        clp_out = []
-        ply_out = []
-        clp_in = []
-        ply_in = []
-        for i in segs_out:
-            if len(p_out_s.intersection(i)) > 0:
-                ply_out.append(i)
-            elif len(c_out_s.intersection(i)) > 0:
-                clp_out.append(i)
-        for i in segs_in:
-            if len(p_in_s.intersection(i)) > 0:
-                ply_in.append(i)
-            elif len(c_in_s.intersection(i)) > 0:
-                clp_in.append(i)
+        ply_in = [i for i in segs_in if len(p_in_s.intersection(i)) > 0]
+        ply_out = [i for i in segs_out if len(p_out_s.intersection(i)) > 0]
+        clp_in = [i for i in segs_in if len(c_in_s.intersection(i)) > 0]
+        clp_out = [i for i in segs_out if len(c_out_s.intersection(i)) > 0]
         #
         _add0 = [_CP_[i] for i in ply_in if len(i) > 0]   # ply_in
         _add1 = [_CP_[i] for i in ply_out if len(i) > 0]  # ply_out
@@ -1607,12 +1590,13 @@ def polygon_overlay(ply_a, ply_b, asGeo=False):
         #
         pieces = [_add0, _add1, _add2, _add3, _add4]
         bits_ = [[_del_seq_dupl_pnts_(i) for i in bts] for bts in pieces]
+        #      0 ply_in  1 ply_out  2 clp_in  3 clp_out  4 segs_in/clip_geom
         geom = bits_[0] + bits_[1] + bits_[2] + bits_[3] + bits_[4]
-        # geom = [_del_seq_dupl_pnts_(i) for i in geom]
-        # geom = _add4 + geom  # -- the first is the clipper
+        #
     # ---- -- complex, use networkx
     else:  # -- geom sorts lexicographically
         #
+        print("Trying nx_solve\n")
         result = nx_solve(frto)  # or wrap_
         #
         # -- classify the result
@@ -1650,26 +1634,28 @@ def polygon_overlay(ply_a, ply_b, asGeo=False):
     return geom, bits_
 
     #
-    # works for
+    # wrap_ : works for c_ft == p_ft2
     #
-    # (p00, c00), (c00, p00) : wrap_      : one_overlay_ :2 x_pnts on line
+    # (p00, c00), (c00, p00) : wrap_      :2 x_pnts on line
+
+    # (p03, c00), (c00, p03) : one_overlay_ : 1 xsection pnt
+    # (p03, c01), (c01, p03) : one_overlay_
+    # (p03, c02), (c02, p03) : one_overlay_
+    # (p03, c03), (c03, p03) : one_overlay_
     # (p00, c01), (c01, p00) : wrap_      : 2 x_pnts, cuts go out and in
     # (p00, c02), (c02, p00) : wrap_      : 4 x_pnts, double in/out cuts
     # (p00, c03), (c03, p00) : wrap_      : 4 x_pnts, extra point on line
-    # (p01, c00), (c00, p01) : wrap_      : 4 x_pnts, v-intersection
+    # (p01, c00), (c00, p01) : wrap_      : 4 x_pnts, v-intersection   
     # (p01, c01), (c01, p01) : wrap_      :
     # (p01, c02), (c02, p01) : wrap_      :
     # (p01, c03), (c03, p01) : wrap_      :
     # (p02, c00), (c00, p02) : wrap_      :
     # (p02, c01), (c01, p02) : wrap_      :
-    # (p02, c02), (c02, p02) : wrap_      : handles c_ft != p_ft2
-    # (p02, c03), (c03, p02) : wrap_      : 7 x_pnts
-    # (p03, c00), (c00, p03) : wrap_      : one_overlay_ : 1 xsection pnt
-    # (p03, c01), (c01, p03) : wrap_      : one_overlay_
-    # (p03, c02), (c02, p03) : wrap_      : one_overlay_
-    # (p03, c03), (c03, p03) : wrap_      : one_overlay_
-    # (aoi, aoi0)            : wrap_      : 4 x_pnts aoi0 is rotated inside aoi
-    # (aoi0, aoi1)           : wrap_      : 4 x_pnts aoi1 rotated in aoi0 
+    # -- special case aoi, aoi0 completely within/contains
+    # (aoi, aoi0)            : wrap_      : aoi0 is completely within aoi
+    #
+    # (aoi, aoi1)            : wrap_      : 4 x_pnts aoi1 rotated in aoi0
+    # (aoi0, aoi1)           : wrap_      : 8 x_pnts aoi1 rotated in aoi0 
     # (pl_, cl_)             : wrap_      :
     # (edgy1, eclip)         : wrap_      :
     # (B, K), (K, B)         : wrap_      :
@@ -1678,7 +1664,12 @@ def polygon_overlay(ply_a, ply_b, asGeo=False):
     # E, F                   : wrap_      : or nx_solve  2025-06-08
     # C, Io                  : wrap_
     # E, Io                  : wrap_
-    # E, aoi1                :
+
+    # E, aoi1                : none work  :   c_ft != p_ft2
+
+    # ## (p02, c02), (c02, p02) : wrap_      : handles c_ft != p_ft2
+    # ## (p02, c03), (c03, p02) : wrap_      : 7 x_pnts
+
     # (E, d0_), (d0_, E)     : nx_solve
     # M, W                   : nx_solve  2025-06-09
     # poly0, poly1           : nx_solve  2025-06-22
@@ -1689,36 +1680,246 @@ def polygon_overlay(ply_a, ply_b, asGeo=False):
     # (C, K)  (K, C) : nx_solve similar to A,C
 
 
-# ---------------------------
-# ---- (3) polygon overlay operations.
+# ---- ---------------------------
+# ---- (3) overlay operations
 #
-# -- bits_ = ply_in, ply_out, clp_in, clp_out
+def intersect_check(geom, in_this, ids_only=True):
+    """Return overlaps between polygon geometry and an intersector polygon.
 
-def clp_(ply_a, ply_b, as_geo=True):
-    """Return the symmetrical difference.  See `overlay_ops`."""
-    bits_, geom  = polygon_overlay(ply_a, ply_b)
-    out = bits_[0]
+    Parameters
+    ----------
+    geom : Geo array, list of ndarrays, ndarray
+        The geometry to be check for inclusion in the extent of `in_this`.
+    in_this : array_like
+        The `aoi`, `clip polygon`. In short, the intersecting geometry.
+    ids_only : boolean
+        Return the geometry ids of the input `geom`
+    Notes
+    -----
+    The check initially is for the points within the extent of `in_this`.  This
+    is to prune out geometries that are not likely to be within the bounds of
+    it.
+
+    comp = np.logical_and(LB <= pnts, pnts <= RT)
+    """
+    # -- determine the extent of the intersecting geometry
+    c_ext = np.concatenate((np.min(in_this, axis=0), np.max(in_this, axis=0)))
+    LB, RT = c_ext.reshape(2, 2)
+    # -- Geo array section
+    if hasattr(geom, 'IFT'):
+        pnts = geom.XY
+        geom_ids = geom.pnt_ids
+        w = np.nonzero(((LB <= pnts) & (pnts <= RT)).all(-1))[0]
+        keep_ids = list(set(geom_ids[w]))
+        # -- return ids
+        if ids_only:
+            return keep_ids  
+        # -- return list of arrays
+        tmp = geom.get_shapes(ids=keep_ids, asGeo=False)
+        out = []
+        for i in tmp:
+            if isinstance(i, (list, tuple)):
+                out.extend(i)
+            else:
+                out.append(i)
+        return out
+    # -- process individual array or list of arrays
+    elif isinstance(geom, np.ndarray):
+        geom = [geom]
+    elif not isinstance(geom, (list, tuple)):
+        print('\nGeo array, list of arrays or ndarray required as input.')
+        return None
+    # -- process lists
+    out = []
+    for cnt, pnts in enumerate(geom):
+        comp = ((LB <= pnts) & (pnts <= RT)).all(-1).any(-1)
+        if comp:
+            if ids_only:
+                out.append(cnt)
+            else:
+                out.append(pnts)
+    return out
+
+# ---- -- base clip, erase and symmetrical difference
+"""
+Notes
+-----
+    A small trick is used to determine whether poly points are within
+    clipper.  For example b0, aoi1 overlap but b0 has no points inside aoi1,
+    so calculate the center of poly and test for its inclusion.  If all else
+    fails, use `intersect_check` above.
+"""
+
+def clip_(poly, clipper, as_geo=True):
+    """Return the common area(s) between `poly` and `clipper`.
+
+    Parameters
+    ----------
+    poly, clipper : arrays
+        `poly` is the array being overlain by `clipper`.
+    
+    Notes
+    -----
+    bits_ :  0 ply_in  1 ply_out  2 clp_in  3 clp_out  4 segs_in/clip_geom
+    """
+    def _clip_(bt, clipper):
+        """Clip function for Geo and NumPy arrays."""
+        bt_mean = np.mean(bt[:-1], axis=0)
+        none_in_chk = len(winding_num(bt, clipper, True)[0])
+        mean_in_chk = winding_num(bt_mean, clipper, False)
+        # if none in clipper return the bit in list
+        if (none_in_chk == 0) and (mean_in_chk == 0): # bt is outside clipper
+            return [bt]
+        geom, bits_  = polygon_overlay(bt, clipper)
+        if bits_ is not None:
+            out = bits_[-1]
+        else:
+            out = geom
+        return out
+    # --
+    if hasattr(poly, 'IFT'):  # -- Geo arrays
+        _bts_ = poly.bits
+    elif isinstance(poly, np.ndarray):
+        _bts_ = [poly]
+    elif isinstance(poly, (list, tuple)):
+        _bts_ = poly
+    else:
+        print("\nGeo array, ndarray or a list of coordinates required.")
+        return None
+    #
+    out = []
+    for bt in _bts_:
+        res = _clip_(bt, clipper)
+        if res is not None:
+            # f = flatten_list(res, None)  # flatten a potential list of lists
+            if isinstance(res, np.ndarray):
+                out.append(res)
+            elif isinstance(res, (list, tuple)):   
+                out.extend(res)
+    if as_geo:
+        out = npg.arrays_to_Geo(out, kind=2, info=None, to_origin=False)
+    return out
+
+
+def erase_(poly, clipper, as_geo=True):
+    """Return the area(s) from `poly` that is removed by `clipper`.
+
+    Parameters
+    ----------
+    poly, clipper : arrays
+        `poly` is the array being overlain by `clipper`.
+    
+    Notes
+    -----
+    `erase_` is the clipper shape that removes the areas from poly, the reverse
+    of `clip_` which keeps the inside.
+
+    # bits_ :  0 ply_in  1 ply_out  2 clp_in  3 clp_out  4 segs_in/clip_geom
+    """
+    def _erase_(bt, clipper):
+        """Erase function for Geo and NumPy arrays."""
+        bt_mean = np.mean(bt[:-1], axis=0)
+        none_in_chk = len(winding_num(bt, clipper, True)[0])
+        mean_in_chk = winding_num(bt_mean, clipper, False)
+        # if none in clipper return the bit in list
+        if (none_in_chk == 0) and (mean_in_chk == 0): # bt is outside clipper
+            return [bt]
+        geom, bits_  = polygon_overlay(bt, clipper)
+        out = None
+        if bits_ is not None:
+            out = bits_[1]  # + bits_[2] + bits_[3]
+        return out
+    # --
+    if hasattr(poly, 'IFT'):  # -- Geo arrays
+        _bts_ = poly.bits
+    elif isinstance(poly, np.ndarray):
+        _bts_ = [poly]
+    elif isinstance(poly, (list, tuple)):
+        _bts_ = poly
+    else:
+        print("\nGeo array, ndarray or a list of coordinates required.")
+        return None
+    #
+    out = []
+    for bt in _bts_:
+        res = _erase_(bt, clipper)
+        if res is not None:
+            #f = flatten_list(res, None)  # flatten a potential list of lists
+            if isinstance(res, np.ndarray):
+                out.append(res)
+            elif isinstance(res, (list, tuple)):   
+                out.extend(res)
     if as_geo:
         return npg.arrays_to_Geo(out, kind=2, info=None, to_origin=False)
     return out
 
 
-def erase_(ply_a, ply_b, as_geo=True):
-    """Return the symmetrical difference.  See `overlay_ops`."""
-    bits_, geom = polygon_overlay(ply_a, ply_b)
-    out = bits_[1] + bits_[2] + bits_[3]
-    if as_geo:
-        return npg.arrays_to_Geo(out, kind=2, info=None, to_origin=False)
-    return out
+def symm_diff_(poly, clipper, as_geo=True):
+    """Return the area(s) from `poly` and `clipper` that is unique to each.
 
+    Parameters
+    ----------
+    poly, clipper : arrays
+        `poly` is the array being overlain by `clipper`.
+    
+    Notes
+    -----
+    `symmetrical difference` is the bits of each that are not in the other.
 
-def symm_diff_(ply_a, ply_b, as_geo=True):
-    """Return the symmetrical difference.  See `overlay_ops`."""
-    bits_, geom = polygon_overlay(ply_a, ply_b)
-    out = bits_[1] + bits_[3]
+    # bits_ :  0 ply_in  1 ply_out  2 clp_in  3 clp_out  4 segs_in/clip_geom
+    """
+    def _sd_(bt, clipper):
+        """Clip function for Geo and NumPy arrays."""
+        geom, bits_  = polygon_overlay(bt, clipper)
+        out = None
+        if bits_ is not None:
+            out = bits_[1] # + bits_[2] + bits_[3]
+        return out
+    # --
+    if hasattr(poly, 'IFT'):  # -- Geo arrays
+        poly_new = union_adj(poly, asGeo=True)
+        _bts_ = poly_new.bits
+    elif isinstance(poly, np.ndarray):
+        _bts_ = [poly]
+    elif isinstance(poly, (list, tuple)):
+        _bts_ = poly
+    else:
+        print("\nGeo array, ndarray or a list of coordinates required.")
+        return None
+    #
+    # -- poly bits outside clipper
+    out = []
+    for bt in _bts_:
+        res = _sd_(bt, clipper)
+        if res is not None:
+            #f = flatten_list(res, None)  # flatten a potential list of lists
+            if isinstance(res, np.ndarray):
+                out.append(res)
+            elif isinstance(res, (list, tuple)):   
+                out.extend(res)
+    #
+    # -- now remove the bits from clipper using an erase
+    out2 = []
+    new_bits = _bts_
+    new_clip = clipper[::]
+    for bt in new_bits:
+        res = _sd_(new_clip, bt)
+        # print(res)
+        if res is not None:
+            out2.extend(res)
+            new_clip = res[0]
+    #
+    # -- now combine them
+    out2 = flatten_list(out2, None)
+    all_out = out + out2
+    # -- roll, order arrays for easy identification on graph
+    tmp = npg.roll_arrays(all_out)
+    frst = np.array([i[0] for i in tmp])
+    f_srt = np.lexsort((-frst[:, 1], frst[:, 0]))
+    final = [tmp[i] for i in f_srt]
     if as_geo:
-        return npg.arrays_to_Geo(out, kind=2, info=None, to_origin=False)
-    return out
+        return npg.arrays_to_Geo(final, kind=2, info=None, to_origin=False)
+    return final
 
 
 # ---- ---------------------------
@@ -1816,6 +2017,10 @@ def split_at_intersections(ply_a, ply_b, sort_by_x=False, as_array=False):
             p1_pgon=True,
             class_ids=False
             )
+    # -- no intersection check will result in r being an empty list
+    if r[0] is None:  # `add_intersections` found no intersections
+        print("\nNo intersections found by `add_intersections`.")
+        return r
     pl_n, cl_n, id_plcl, onConP, x_pnts, ps_info, cs_info = r
     p_out, p_on, p_in, p0_ioo = ps_info
     c_out, c_on, c_in, p1_ioo = cs_info
@@ -1844,6 +2049,12 @@ def split_at_intersections(ply_a, ply_b, sort_by_x=False, as_array=False):
 # ---- ---------------------------
 # ---- (6) dissolve shared boundaries
 #
+def dissolve_geo(a, asGeo=False):
+    """Return `union_adj` for Geo arrays"""
+    out = union_adj(a, asGeo=False)
+    return out
+
+
 def union_adj(a, asGeo=False):
     """Union polygon features with a dissolve of internal shared edges.
 
@@ -2089,6 +2300,45 @@ def merge_(this, to_this):
     sr = b.SR
     out = npGeo.Geo(xys, IFT=new_ift, Kind=kind, Extent=None, Info="", SR=sr)
     return out
+
+# ---- keep for now
+#
+
+# def tri_array(frto):
+#     """Return line segments forming triangles when geometry is overlain.
+
+#     Parameters
+#     ----------
+#     frto : array_like
+#         Segment id values for the start and end of a 2 point line segment
+#         represented by `from`-`to` pairs.
+
+#     Returns
+#     -------
+#     If a triangle is found, a list of integer ids, for the points forming the
+#     segments, is returned.
+#     t1 = ([c_nxt, c_p] == c_cut[:, None]).all(-1).any()
+#     """
+#     pre_cur = np.concatenate((frto[:-1], frto[1:]), axis=1)
+#     # c_c_c_nxt = pre_cur[:, :2]
+#     c_nxt_c_p = pre_cur[:, [3, 0]]
+#     c_p_c_nxt = pre_cur[:, [0, 3]]
+#     # t0 = np.nonzero((c_c_c_nxt == frto[:, None]).all(-1))
+#     t1 = np.nonzero((c_nxt_c_p == frto[:, None]).all(-1))
+#     t2 = np.nonzero((c_p_c_nxt == frto[:, None]).all(-1))
+#     tri_s = []
+#     if sum([i.size for i in t1]) > 0:  # use size to determine there are any
+#         t1_0 = frto[t1[0]]
+#         t1_1 = frto[t1[1]][:, [1, 0]]
+#         tmp = np.concatenate((t1_1[:, [1, 0]], t1_0), axis=1)
+#         tri_s.append(tmp)
+#     if sum([i.size for i in t2]) > 0:  # ditto
+#         t2_0 = frto[t2[0]]
+#         t2_1 = frto[t2[1]][:, [1, 0]]
+#         tmp = np.concatenate((t2_0, t2_1), axis=1)
+#         tri_s.append(tmp)
+#     # -- tri_s will either be an empty list or geometries
+#     return tri_s
 
 
 # ---- Final main section ----------------------------------------------------

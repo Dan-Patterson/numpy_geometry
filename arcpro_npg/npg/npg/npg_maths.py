@@ -16,7 +16,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2026-01-30
+    2026-03-29
 
 Purpose
 -------
@@ -62,14 +62,14 @@ __all__ = [
 
 __helpers__ = [
     '_area_centroid_2',                 # (1) geom private helpers
-    'trans_rot_2',
+    '_trans_rot_2',
     '_arc_mini_',
     '_angles_3pnt_',
     '_angle_between_',
     '_offset_segment_',
     '_resize_segment_',
     '_pnt_on_segment_',
-    '_point_along_a_line'
+    '_point_along_a_line'               # (5) to incorporate
 ]
 
 __imports__ = []
@@ -93,7 +93,7 @@ def _area_centroid_2(a):
 
     Notes
     -----
-    **See npg.npg_geom_hlp  ... _area_centroid_ ** for the main
+    **See npg.npg_geom_hlp  ... _area_centroid_ ** for the main function
     For multipart shapes, just use this syntax:
 
     >>> # rectangle with hole
@@ -817,7 +817,7 @@ def running_count(a, to_label=False):
     return z
 
 
-# ---- (4)To incorporate
+# ---- (5) To incorporate
 #
 def _point_along_a_line(x0, y0, x1, y1, d):
     """Return a point on a line.

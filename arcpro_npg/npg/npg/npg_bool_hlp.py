@@ -16,7 +16,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2026-02-26
+    2026-03-29
 
 Purpose
 -------
@@ -44,7 +44,7 @@ np.set_printoptions(precision=3, threshold=100, edgeitems=10, linewidth=80,
 np.ma.masked_print_option.set_display('-')  # change to a single -
 
 import npg
-from npg.npg_geom_hlp import  _bit_area_, sort_segment_pairs
+from npg.npg_geom_hlp import  sort_segment_pairs
 from npg.npg_pip import np_wn  # noqa
 from npg.npg_plots import plot_polygons, plot_2d  # noqa
 
@@ -63,7 +63,6 @@ __helpers__ = [
     '_add_pnts_',                     # (3) add intersection helpers
     '_add_intersections_',
     '_del_seq_pnts_',                 # (1) private helpers
-    '_orient_clockwise_',
     '_roll_',
     '_p_ints_p_',
     '_w_',                            # (2) prepare for boolean operations
@@ -74,8 +73,7 @@ __helpers__ = [
 __imports__ = [
     'np_wn',                    # npg_pip
     'roll_arrays',              # npGeo
-    '_orient_clockwise_',       # npg_geom_hlp
-    'sort_segment_pairs',
+    'sort_segment_pairs',       # npg_geom_hlp
     'plot_polygons',            # npg_plots
     'plot_2d'
 ]
@@ -128,27 +126,6 @@ def _del_seq_dupl_pnts_(arr, poly=True):
             arr = np.concatenate((tmp, tmp[0, None]), axis=0)
             return arr
     return tmp
-
-
-def _orient_clockwise_(geom):
-    """Orient polygons so they are clockwise.
-
-    Parameters
-    ----------
-    geom : list
-        A list of polygon geometry arrays.
-
-    Requires
-    --------
-    Ensure `del_seq_dups` is run on the geometry first.
-    """
-    cw_ordered = []
-    for i in geom:
-        if _bit_area_(i) > 0.0:  # -- 2025_10_27  changed not sure
-            cw_ordered.append(i)
-        else:
-            cw_ordered.append(i[::-1])
-    return cw_ordered
 
 
 def _roll_(arrs):
@@ -642,6 +619,12 @@ def add_intersections(
     is_0, is_1 = p0_pgon, p1_pgon
     vals = _wn_clip_(p0, p1, all_info=True)
     x_pnts, p_in_c, c_in_p, x_type, whr = vals  # x_pnts by decreasing y-value
+    #
+    # ---- no intersections check
+    if len(x_pnts) == 0:
+        # print("\nNo intersections found by `add_intersections`.")
+        args = [None, p_in_c, c_in_p]
+        return args
     p0_n, p1_n = _add_pnts_(p0, p1, x_pnts, whr)
     p0_n = _del_seq_dupl_pnts_(np.concatenate((p0_n), axis=0), poly=is_0)
     p1_n = _del_seq_dupl_pnts_(np.concatenate((p1_n), axis=0), poly=is_1)
@@ -710,7 +693,8 @@ def add_intersections(
         return r
     ps_info = [po_, pn_, pi_, p0_ioo]
     cs_info = [co_, cn_, ci_, p1_ioo]
-    return p0_n, p1_n, id_plcl, onConP, x_pnts, ps_info, cs_info
+    args = [p0_n, p1_n, id_plcl, onConP, x_pnts, ps_info, cs_info]
+    return args
 
 
 # ---- ---------------------------

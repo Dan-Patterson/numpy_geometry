@@ -147,13 +147,13 @@ __helpers__ = [
     '_bit_crossproduct_',
     '_bit_min_max_',
     '_bit_length_',
-    '_bit_segment_angles_'
+    '_bit_segment_angles_',
+    '_orient_clockwise_',
     '_rotate_',
     '_scale_',
     '_translate_',
     '_trans_rot_',
-    '_perp_'
-    # not classes
+    '_perp_',
     '_iterate_'
 ]
 
@@ -285,7 +285,7 @@ def _from_to_pnts_(a, as_pairs=False):
 
 # ---- ---------------------------
 # ---- (2) Condition checking
-# ---- (a) angles, orientation, sidedness
+# ---- -- (a) angles, orientation, sidedness
 def _is_clockwise_(a):
     """Return whether the sequence (polygon) is clockwise oriented or not."""
     return 1 if _bit_area_(a) < 0. else 0
@@ -356,7 +356,7 @@ def _is_convex_(a, is_closed=True):
     return np.all(check >= 0)
 
 
-# ---- (b) location, position, shape
+# ---- -- (b) location, position, shape
 #
 def _in_extent_(pnts, extent):
     """Return points in, or on the line of an extent. See `_in_LBRT_` also.
@@ -659,6 +659,27 @@ def _bit_segment_angles_(a, fromNorth=False):
     if fromNorth:
         ang = np.mod((450.0 - ang), 360.)
     return ang
+
+
+def _orient_clockwise_(geom):
+    """Orient polygons so they are clockwise.
+
+    Parameters
+    ----------
+    geom : list
+        A list of polygon geometry arrays.
+
+    Requires
+    --------
+    Ensure `del_seq_dups` is run on the geometry first.
+    """
+    cw_ordered = []
+    for i in geom:
+        if _bit_area_(i) > 0.0:  # -- 2025_10_27  changed not sure
+            cw_ordered.append(i)
+        else:
+            cw_ordered.append(i[::-1])
+    return cw_ordered
 
 
 def _rotate_(a, R, as_group):

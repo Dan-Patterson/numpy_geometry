@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2024-05-04
+    2026-02-01
 
 Purpose
 -------
@@ -36,12 +36,14 @@ import sys
 # from textwrap import dedent
 import numpy as np
 
-ft = {"bool": lambda x: repr(x.astype(np.int32)),
-      "float_kind": '{: 0.2f}'.format}
-np.set_printoptions(
-    edgeitems=10, linewidth=80, precision=2, suppress=True, threshold=200,
-    formatter=ft
-)
+fmt_ = {"bool": lambda x: repr(x.astype(np.int32)),
+      "float_kind": '{: 0.3f}'.format}
+np.set_printoptions(precision=3, threshold=100, edgeitems=10, linewidth=80,
+                    suppress=True,
+                    formatter=fmt_,
+                    floatmode='maxprec_equal',
+                    legacy='1.25')  # legacy=False or legacy='1.25'
+np.ma.masked_print_option.set_display('-')  # change to a single -
 
 script = sys.argv[0]  # print this should you need to locate the script
 
@@ -645,8 +647,6 @@ Source, ``arraytools.py_tools`` has a pure python equivalent.
 
 Parameters
 ----------
-colwise : boolean
-    `True` or `1`, otherwise, `False` or `0`.
 cols : number
     Pick a size to suit.
 prn : boolean

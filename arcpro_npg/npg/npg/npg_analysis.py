@@ -310,14 +310,16 @@ def nearest_polygon(pnts, polys):
     # wn_, denom, x0, y0, x1_x0, y1_y0, a_num, b_num = _w_(pnts, polys)
     keep_ = []
     for cnt, p in enumerate(polys):
-        args = _w_(pnts, p, True)
+        args = _w_(pnts, p, False)  # True)
         frst = args[0]
         if np.sum(np.abs(frst)) != 0:  # use abs value since pnts may be in/out 
             whr = np.nonzero(frst)[0]
             keep_.append([cnt, whr])
             # wn_, denom, x0, y0, x1_x0, y1_y0, a_num, b_num
     #  !! see _closest_pnt_on_poly_ npg.geom_ops
-    
+    return keep_
+
+
 # ---- ---------------------------
 # ---- (3) intersection
 #

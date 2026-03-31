@@ -324,9 +324,10 @@ def get_func(func, line_nums=True, output=False):
         -----------------------------------------------------------------
         File path: ... C:\arcpro_npg\npg\npGeo.py
         Function: .... array_IFT ....
-        Signature .... In [1]: array_IFT(in_arrays, shift_to_origin=False)
-        Line number... 1522
-        Defaults:  ... (False,)
+        Signature .... In [1]: array_IFT(in_arrays, kind=2,
+                                         shift_to_origin=False)
+        Line number... 1684
+        Defaults:  ... (2, False)
         kwdefaults: .. None
         Variable names:
             in_arrays, shift_to_origin, id_too, a_2d, subs,
@@ -420,7 +421,7 @@ def get_module_info(obj, max_number=100, verbose=True):
     itself.
 
     >>> from npgeom.npg_utils import get_module_info
-    >>> get_module_info(npg, False, True)
+    >>> get_module_info(npg, 100, True)
     >>> # No quotes around module name, code=True for module code
     """
     def wrapit(_in, counter=None):
@@ -759,37 +760,40 @@ def toolbox_info(t_box):
     for k in keys0:  # toolbox properties
         v = t_props[k]
         msg += "\n" + frmt0.format(k, v)
-    if keys1:  # `tool` properties
-        v = t_props[keys1]
-        v_keys = sorted(list(v.keys()))
-        hdr_1 = max([len(i) for i in v_keys])
-        frmt1 = _hdr_(hdr_1)
-        msg += "\n" + frmt1.format("--Tool", "  Toolset")
-        for k1 in v_keys:
-            v1 = v[k1]
-            msg += "\n  " + frmt1.format(k1, v1)
-        for k1 in v_keys:
-            pth = "{}/{}".format(t_box, k1)
-            t_0 = _utbx.getToolProps(pth, '*')
-            tool_keys = list(t_0.keys())
-            msg += "\nTools and Properties"
-            msg += "\n--Tool : {!s:<}\n--Toolset : {!s:}".format(k1, v[k1])
-            for k2 in tool_keys:
-                if k2 != 'params':
-                    msg += "  {!s:}  : {!s}\n".format(k2, t_0[k2])
-                elif k2 == 'params':
-                    for i in t_0['params']:
-                        z1 = [str(j) if j != '' else 'None'
-                              for j in [i.name, i.displayName, i.direction,
-                              i.datatype, i.parameterType, i.enabled,
-                              i.category, i.symbology, i.multiValue]
-                              ]
-                    msg += "--Parameters\n"
-                    txt = "\n".join(["  {!s:<} : {!s:}".format(*j)
-                                     for j in list(zip(z0, z1))])
-                    msg += "parameter"
-                else:
-                    msg += "unknown"
+    
+        if keys1:  # `tool` properties
+            v = t_props[keys1]
+            v_keys = sorted(list(v.keys()))
+            hdr_1 = max([len(i) for i in v_keys])
+            frmt1 = _hdr_(hdr_1)
+            msg += "\n" + frmt1.format("--Tool", "  Toolset")
+            for k1 in v_keys:
+                v1 = v[k1]
+                msg += "\n  " + frmt1.format(k1, v1)
+            for k1 in v_keys:
+                pth = "{}/{}".format(t_box, k1)
+                t_0 = _utbx.getToolProps(pth, '*')
+                tool_keys = list(t_0.keys())
+                msg += "\n\nTools and Properties"
+                msg += "\n--Tool : {!s:<}\n--Toolset : {!s:}\n".format(k1, v[k1])
+                for k2 in tool_keys:
+                    if k2 != 'params':
+                        msg += "  {!s:}  : {!s}\n".format(k2, t_0[k2])
+                    elif k2 == 'params':
+                        for i in t_0['params']:
+                            z1 = [str(j) if j != '' else 'None'
+                                  for j in [i.name, i.displayName, i.direction,
+                                  i.datatype, i.parameterType, i.enabled,
+                                  i.category, i.symbology, i.multiValue]
+                                  ]
+                        msg += "--Parameters\n"
+                        txt = "\n".join(["  {!s:<} : {!s:}".format(*j)
+                                         for j in list(zip(z0, z1))])
+                        # msg += "parameter"
+                        msg += txt
+                    else:
+                        msg += "unknown"
+# ----
         return msg
 
 

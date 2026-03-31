@@ -44,7 +44,7 @@ __all__ = [
     'stride_2d',
     'uniq_1d',
     'uniq_2d',
-    'flatten',
+    'flatten_list',
     'unpack'
 ]
 
@@ -544,7 +544,7 @@ def uniq_2d(arr, return_sorted=False):  # *** keep but slower than unique
     return uniq
 
 
-def flatten(a_list, flat_list=None):
+def flatten_list(a_list, flat_list=None):
     """Change the isinstance as appropriate.
 
     :  Flatten an object using recursion
@@ -554,7 +554,7 @@ def flatten(a_list, flat_list=None):
         flat_list = []
     for item in a_list:
         if isinstance(item, list):
-            flatten(item, flat_list)
+            flatten_list(item, flat_list)
         else:
             flat_list.append(item)
     return flat_list
