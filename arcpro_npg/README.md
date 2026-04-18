@@ -18,7 +18,7 @@ Currently development is using python >= 3.13 and numpy > 2.0.  A major transiti
 
 These demo scripts and the toolbox show how numpy and arcpy can play nice together and generate geometries that are normally only available at the ArcGIS Pro Advanced level.  The tools are already provided to do this, but less attention is paid to the attributes.
 
-The image to the right reflects the tools as they stand on 2022/02/07.
+The image to the right reflects the tools as they stand on 2026/04/18.
 
 The */npg* folder contains the toolbox and scripts needed to run the tools in ArcGIS Pro.
 
