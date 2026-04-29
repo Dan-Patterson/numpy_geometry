@@ -35,7 +35,7 @@ To determine right turns in arrays, `_is_turn(i)` in `np_geom_hlp`.
 import sys
 import numpy as np
 fmt_ = {"bool": lambda x: repr(x.astype(np.int32)),
-      "float_kind": '{: 0.3f}'.format}
+        "float_kind": '{: 0.3f}'.format}
 np.set_printoptions(precision=3, threshold=100, edgeitems=10, linewidth=80,
                     suppress=True,
                     formatter=fmt_,
@@ -550,13 +550,11 @@ def _add_intersections_(
     return p0_n, p1_n
 
 
-def add_intersections(
-        p0, p1, roll_to_minX=True, p0_pgon=True, p1_pgon=True, class_ids=True):
+def add_intersections(p0, p1, roll_to_minX=True, p0_pgon=True, p1_pgon=True):
     """Return input polygons with intersections points added.
 
     Documentation imported from `npgDocs`.
     """
-
     def _classify_(p0_, p1_, id_):
         """Return classified points.
 
@@ -581,39 +579,6 @@ def add_intersections(
         p_ioo[p_in, 1] = 1
         p_ioo[p_out, 1] = -1
         return p_ioo
-
-    def in_out_on(w0, p_sze):
-        """Return the array indices as lists of lists.
-
-        Returns
-        -------
-        empty : [[]]
-        one seq : [[1]] or [[1, 2, 3]]
-        two seq : [[1, 2, 3], [4, 5, 6]]
-        """
-        if w0.size == 0:  # print("Empty array.")
-            return [[]]   # 2023-12-22
-        if len(w0) == 1:  # 2023-05-07
-            val = w0.tolist()[0]
-            vals = [val - 1, val, val + 1] if val > 0 else [val, val + 1]
-            return [vals]  # 2023-12-22
-        out = []
-        cnt = 0
-        sub = [w0[0] - 1, w0[0]]
-        for cnt, i in enumerate(w0[1:], 0):
-            prev = w0[cnt]
-            if i - prev == 1:
-                sub.append(i)
-            else:
-                sub.append(prev + 1)
-                out.append(sub)
-                sub = [i - 1, i]
-        if cnt == len(w0) - 2:
-            if len(sub) >= 2 and p_sze not in sub:
-                add_ = min(p_sze, i + 1)
-                sub.append(add_)
-            out.append(sub)
-        return out
     # --
     #
     is_0, is_1 = p0_pgon, p1_pgon
@@ -628,14 +593,11 @@ def add_intersections(
     p0_n, p1_n = _add_pnts_(p0, p1, x_pnts, whr)
     p0_n = _del_seq_dupl_pnts_(np.concatenate((p0_n), axis=0), poly=is_0)
     p1_n = _del_seq_dupl_pnts_(np.concatenate((p1_n), axis=0), poly=is_1)
-    # x_pnts = _del_seq_dupl_pnts_(x_pnts, False)  # True, if wanting a polygon
     x_pnts, idx = np.unique(x_pnts, True, axis=0)  # x_pnts increase by x-value
     #
     # -- lexsort
-    # ensures that the upper pnt will be taken if there are 2 or more with min
-    # x values.
-    # points that the upper one sorts first, use -x_pnts[:, 1] to sort y from
-    # top left, otherwise, bottom left
+    # Ensures that the upper pnt will be taken if there are 2 or more with min
+    # x values.  For equal X, sort by descending Y.
     x_lex = np.lexsort((-x_pnts[:, 1], x_pnts[:, 0]))  # -- -x_pnts
     x_pnts = x_pnts[x_lex]
     # -- locate the roll coordinates
@@ -656,9 +618,9 @@ def add_intersections(
     whr1 = np.nonzero(id1 == p1N)[0]
     id0[whr0] = 0
     id1[whr1] = 0  # slice off the first and last
+    # --
     # -- create id_plcl and onConP
     id_plcl = np.concatenate((id0[:, None], id1[:, None]), axis=1)[1:-1]
-    # --
     id_plcl[-1] = [p0N, p1N]  # make sure the last entry is < shape[0]
     #
     w0 = np.argsort(id_plcl[:, 1])  # get the order and temporarily sort
@@ -679,18 +641,7 @@ def add_intersections(
     co_ = p1_ioo[p1_ioo[:, 1] < 0, 0]  # slice where p1_ioo < 0
     ci_ = p1_ioo[p1_ioo[:, 1] > 0, 0]  # slice where p1_ioo > 0
     cn_ = p1_ioo[p1_ioo[:, 1] == 0, 0]  # slice where p1_ioo == 0
-    if class_ids:
-        p0_sze = p0_n.shape[0] - 1
-        p1_sze = p1_n.shape[0] - 1
-        Pout = in_out_on(po_, p0_sze)  # poly outside clip
-        Pin = in_out_on(pi_, p0_sze)   # poly inside clip
-        Cout = in_out_on(co_, p1_sze)  # clip outside poly
-        Cin = in_out_on(ci_, p1_sze)   # clip inside poly
-        # -- NOTE
-        # -- id_plcl are the poly, clp point ids equal to x_pnts
-        r = [p0_n, p1_n, id_plcl, onConP, x_pnts,
-             Pout, Pin, Cout, Cin, p0_ioo, p1_ioo]
-        return r
+    #
     ps_info = [po_, pn_, pi_, p0_ioo]
     cs_info = [co_, cn_, ci_, p1_ioo]
     args = [p0_n, p1_n, id_plcl, onConP, x_pnts, ps_info, cs_info]
@@ -816,7 +767,57 @@ prep_overlay.__doc__ += prep_overlay_doc
 # ---- ---------------------------
 # ---- (6) extras
 #
+'''
+    def in_out_on(w0, p_sze):
+        """Return the array indices as lists of lists.
 
+        Returns
+        -------
+        empty : [[]]
+        one seq : [[1]] or [[1, 2, 3]]
+        two seq : [[1, 2, 3], [4, 5, 6]]
+        """
+        if w0.size == 0:  # print("Empty array.")
+            return [[]]   # 2023-12-22
+        if len(w0) == 1:  # 2023-05-07
+            val = w0.tolist()[0]
+            vals = [val - 1, val, val + 1] if val > 0 else [val, val + 1]
+            return [vals]  # 2023-12-22
+        out = []
+        cnt = 0
+        sub = [w0[0] - 1, w0[0]]
+        for cnt, i in enumerate(w0[1:], 0):
+            prev = w0[cnt]
+            if i - prev == 1:
+                sub.append(i)
+            else:
+                sub.append(prev + 1)
+                out.append(sub)
+                sub = [i - 1, i]
+        if cnt == len(w0) - 2:
+            if len(sub) >= 2 and p_sze not in sub:
+                add_ = min(p_sze, i + 1)
+                sub.append(add_)
+            out.append(sub)
+        return out
+'''
+
+''' from add_intersections class_ids removed
+    if class_ids:
+        p0_sze = p0_n.shape[0] - 1
+        p1_sze = p1_n.shape[0] - 1
+        Pout = in_out_on(po_, p0_sze)  # poly outside clip
+        Pin = in_out_on(pi_, p0_sze)   # poly inside clip
+        Cout = in_out_on(co_, p1_sze)  # clip outside poly
+        Cin = in_out_on(ci_, p1_sze)   # clip inside poly
+        # -- NOTE
+        # -- id_plcl are the poly, clp point ids equal to x_pnts
+        r = [p0_n, p1_n, id_plcl, onConP, x_pnts,
+             Pout, Pin, Cout, Cin, p0_ioo, p1_ioo]
+        return r
+
+
+'''
 
 # ---- ---------------------------
 # ---- Final main section

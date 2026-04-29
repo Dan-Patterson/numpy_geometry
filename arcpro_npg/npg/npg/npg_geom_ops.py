@@ -136,7 +136,7 @@ from npg.npg_prn import prn_q, prn_tbl
 
 
 fmt_ = {"bool": lambda x: repr(x.astype(np.int32)),
-      "float_kind": '{: 0.3f}'.format}
+        "float_kind": '{: 0.3f}'.format}
 np.set_printoptions(precision=3, threshold=100, edgeitems=10, linewidth=80,
                     suppress=True,
                     formatter=fmt_,

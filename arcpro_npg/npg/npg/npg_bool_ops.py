@@ -49,7 +49,7 @@ import numpy as np
 from numpy.lib.recfunctions import unstructured_to_structured as uts  # noqa
 
 fmt_ = {"bool": lambda x: repr(x.astype(np.int32)),
-      "float_kind": '{: 0.3f}'.format}
+        "float_kind": '{: 0.3f}'.format}
 np.set_printoptions(precision=3, threshold=100, edgeitems=10, linewidth=80,
                     suppress=True,
                     formatter=fmt_,
@@ -1000,8 +1000,7 @@ def prepare(ply_a, ply_b):
                 ply_a, ply_b,
                 roll_to_minX=True,
                 p0_pgon=True,
-                p1_pgon=True,
-                class_ids=False
+                p1_pgon=True
                 )
     # -- no intersection check will result in result0[0] be None
     if result0[0] is None:  # `add_intersections` found no intersections
@@ -1211,21 +1210,6 @@ def wrap_(seq, c_subs, p_subs, _in_, _out_, _on_):  # rgt_arr):
     others : arrays
         Other parameters are from `polygon_overlay`.
     """
-
-    def _chk_(row):
-        """Check to see if start end indices are equal."""
-        frst, secn = row
-        eq_chk = (frst[[0, -1]] == secn[[0, -1]]).all(-1)
-        return eq_chk
-
-    def _order_(row):
-        """Check the sort order, by length, of a 2d array or object array."""
-        frst, secn = row
-        if frst.ndim == secn.ndim:
-            if len(frst) > len(secn):
-                return row[::-1]
-        return row
-
     # ---- start here
     sp = [i[0] for i in seq]   # -- get the first id value of each seq
     sp_spl = sp[0::2]  # every second pair of ids  !! really cool
@@ -1242,35 +1226,29 @@ def wrap_(seq, c_subs, p_subs, _in_, _out_, _on_):  # rgt_arr):
     #
     segs_out = []
     clps = []
-    _un_ = []
-    mrk = 0
-    mrkers = [mrk]
+    # _un_ = []
+    # mrk = 0
+    # mrkers = [mrk]
     clipper = []
     #
     for cnt, p in enumerate(pairs):
-        p = pairs[cnt]
+        # p = pairs[cnt]
         frst, secn = pairs[cnt]
-        #
-        f_out = len(o_set.intersection(frst)) > 0  # check first (f)
-        f_in = len(i_set.intersection(frst)) > 0
-        s_out = len(o_set.intersection(secn)) > 0
-        s_in = len(i_set.intersection(secn)) > 0
-        #  f_out, f_in, s_out, s_in
         chk = (frst[[0, -1]] == secn[[0, -1]]).all()  # -- closure check
-        # chk_in = (secn == _in_[:, None]).any()        # check the longest
-        # chk_out = (secn == _out_[:, None]).any()      # seq which is second
         #
+        # print("{} : {}".format(cnt, chk))
         if chk:  # -- start and end are equal for the pair
-            if s_out:  # chk_out:
+            #
+            if len(i_set.intersection(frst)) > 0:    # f_in = ...
                 clps.append(frst.tolist())
                 seg = secn.tolist() + frst[::-1].tolist()
-            elif s_in:  # chk_in:
+            elif len(o_set.intersection(frst)) > 0:  # f_out = ...
                 clps.append(secn.tolist())
                 seg = frst.tolist() + secn[::-1].tolist()
-            elif f_out:
+            elif len(i_set.intersection(secn)) > 0:  # s_in = ...
                 clps.append(secn.tolist())
                 seg = frst.tolist() + secn[::-1].tolist()
-            elif f_in:
+            elif len(o_set.intersection(secn)) > 0:  # s_out = ...
                 clps.append(frst.tolist())
                 seg = secn.tolist() + frst[::-1].tolist()
             elif (frst == secn[:, None]).any(-1).all(-1):  # duplicate seg
@@ -1279,31 +1257,44 @@ def wrap_(seq, c_subs, p_subs, _in_, _out_, _on_):  # rgt_arr):
             # now add the seg
             segs_out.append(seg)
         #
-        else:  # -- there is a mismatch in the pairs
-            if abs(secn[-1] - frst[0]) == 2:  # triangle detection
-                _f = frst.tolist()
-                _s = secn.tolist()
-                seg = _f + _s[::-1]
-                segs_out.append(seg)
-                clps.extend(_f)  # was extend
-                clps.extend([_f[1], _s[1]])  # was extend
-            else:
-                if (mrk in frst) and (mrkers[0] in secn):  # close on 0 check
-                    seg = mrkers + secn.tolist()
-                    clps.append(mrk)
-                    clipper.append(clps)
-                    segs_out.append(seg)
-                elif (mrk in frst):  # splitting up clippers
-                    new_ = clps[:-2]  # slice off the last pair added
-                    new_.extend(frst.tolist())  # was extend
-                    clipper.append(new_)
-                    #
-                    clps = clps[-2:]  # add the last two back in to a new list
-                    mrk = frst[0]
-                    mrkers.append(mrk)
-                    _un_.extend(p)
-                else:  # -- all left over
-                    _un_.extend(p)
+        # else:  # -- there is a mismatch in the pairs
+        #     if frst[0] == secn[0]:
+        #         _f = frst.tolist()
+        #         _s = secn.tolist()
+        #         if abs(_f[-1] - _s[-1]) <= 2:  # triangle detection
+        #             seg = frst.tolist() + secn.tolist()[::-1]
+        #             # check which is clipper vs crossing over
+        #             if _f[-1] - _f[0] < _s[-1] - _s[0]:
+        #                 clps.append(_f)
+        #                 clps.append([_f[-1], _s[-1]])
+        #             else:
+        #                 clps.append(_s)
+        #                 clps.append([_s[-1], _f[-1]])
+        #             segs_out.append(seg)
+        #     elif abs(secn[-1] - frst[0]) == 2:  # triangle detection
+        #         _f = frst.tolist()
+        #         _s = secn.tolist()
+        #         seg = _f + _s[::-1]
+        #         segs_out.append(seg)
+        #         clps.extend(_f)  # was extend
+        #         clps.extend([_f[1], _s[1]])  # was extend
+        #     else:
+        #         if (mrk in frst) and (mrkers[0] in secn):  # close on 0 check
+        #             seg = mrkers + secn.tolist()
+        #             clps.append(mrk)
+        #             clipper.append(clps)
+        #             segs_out.append(seg)
+        #         elif (mrk in frst):  # splitting up clippers
+        #             new_ = clps[:-2]  # slice off the last pair added
+        #             new_.extend(frst.tolist())  # was extend
+        #             clipper.append(new_)
+        #             #
+        #             clps = clps[-2:]  # add the last two back in to a new list
+        #             mrk = frst[0]
+        #             mrkers.append(mrk)
+        #             _un_.extend(p)
+        #         else:  # -- all left over
+        #             _un_.extend(p)
     # ---- assemble
     # piece it together,  sp_arg_srt is from above, original traversal order
     #   is returned rather than the lex order
@@ -1418,7 +1409,6 @@ def polygon_overlay(ply_a, ply_b, asGeo=False):
     #
     # ---- start here ----
     #
-    
     args = prepare(ply_a, ply_b) 
     result0, result1, result2 = args
     #
@@ -1548,15 +1538,15 @@ def polygon_overlay(ply_a, ply_b, asGeo=False):
     #
     # frto_2 = np.concatenate((c_ft, p_ft2), axis=0)  # !!! keep
     #
-    c_a, c_b, c_c = [len(i) for i in [c_out, c_on, c_in]]  # clp
-    p_a, p_b, p_c = [len(i) for i in [p_out, p_on, p_in]]  # ply
-    chk0 = len(x_pnts)  # chk1 = c_a == 0   # chk2 = p_a == 0
+    # c_a, c_b, c_c = [len(i) for i in [c_out, c_on, c_in]]  # clp
+    # p_a, p_b, p_c = [len(i) for i in [p_out, p_on, p_in]]  # ply
+    # chk0 = len(x_pnts)  # chk1 = c_a == 0   # chk2 = p_a == 0
     #
     # ---- (8) process geometry ----
     # ---- -- no intersections
-    if chk0 == 0:
-        geom = no_overlay_(p_a, c_a, N_p, N_c, ply_a, ply_b)
-        return geom, None
+    # if chk0 == 0:
+    #     geom = no_overlay_(p_a, c_a, N_p, N_c, ply_a, ply_b)
+    #     return geom, None
     # ---- -- single intersection
     # elif chk0 <= 2 and (chk1 or chk2):
     #     print("\n-- _one_overlay --")
@@ -1596,7 +1586,7 @@ def polygon_overlay(ply_a, ply_b, asGeo=False):
     # ---- -- complex, use networkx
     else:  # -- geom sorts lexicographically
         #
-        print("Trying nx_solve\n")
+        print("\nTrying nx_solve...results can be suspect!...\n")
         result = nx_solve(frto)  # or wrap_
         #
         # -- classify the result
@@ -1612,6 +1602,7 @@ def polygon_overlay(ply_a, ply_b, asGeo=False):
         # optionally get the ID values back using
         #  [np.nonzero((g == _CP_[:, None]).all(-1).any(-1))[0].tolist()
         #   for g in geom]
+        asGeo = False  # set to false for nx output
     if asGeo:
         geom = npg.arrays_to_Geo(geom, kind=2, info=None, to_origin=False)
         cents = geom.centroids()
@@ -2303,6 +2294,20 @@ def merge_(this, to_this):
 
 # ---- keep for now
 #
+# from wrap
+# def _chk_(row):
+#     """Check to see if start end indices are equal."""
+#     frst, secn = row
+#     eq_chk = (frst[[0, -1]] == secn[[0, -1]]).all(-1)
+#     return eq_chk
+
+# def _order_(row):
+#     """Check the sort order, by length, of a 2d array or object array."""
+#     frst, secn = row
+#     if frst.ndim == secn.ndim:
+#         if len(frst) > len(secn):
+#             return row[::-1]
+#     return row
 
 # def tri_array(frto):
 #     """Return line segments forming triangles when geometry is overlain.

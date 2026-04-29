@@ -14,7 +14,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2026-01-30
+    2026-04-24
 
 Purpose
 -------
@@ -61,7 +61,7 @@ octagon :
 
 Test::
 
-    s = [3, 4, 5, 6, 8, 9, 10, 12]
+    s = [3, 4, 5, 6, 8, 9, 10, 12]  # number of sides
     c0 = [(n, np.linspace(-180, 180., n+1, True)) for n in s]
     xs = np.cos(np.radians(c0[0][1]))
     ys = np.sin(np.radians(c0[0][1]))
@@ -71,7 +71,7 @@ Test::
         xs = np.cos(np.radians(i[1]))
         ys = np.sin(np.radians(i[1]))
         out.append(np.array(list(zip(xs, ys))))
-    npg.plot_2d(out[:N], True, True)  # N, number of sides in range 3-->
+    plot_2d(out[:N], True, True)  # N, number of sides in range 3-->
     [np.mean(i[:-1], axis=0) for i in out]
 """
 # pylint: disable=C0103  # invalid-name
@@ -159,7 +159,7 @@ def rot_matrix(angle=0, nm_3=False):
 
     Returns
     -------
-    rot_m : matrix
+    rm : matrix
         Rotation matrix for 2D transform.
 
     Notes
@@ -598,18 +598,22 @@ def hex_flat(dx=1, dy=1,
     Parameters
     ----------
     See `rectangles` for shared parameter explanation.
+
+    Notes
+    -----
+    The origin is center of the top-left full cell, not the upper left point 
     """
     f_rad = np.deg2rad([180., 120., 60., 0., -60., -120., -180.])
     X = np.cos(f_rad) * dy
     Y = np.sin(f_rad) * dy            # scaled hexagon about 0, 0
     seed = np.array(list(zip(X, Y)))  # array of coordinates
-    dx = dx * 1.5
-    dy = dy * np.sqrt(3.) / 2.0
-    hexs = [seed + [dx * i, dy * (i % 2)] for i in range(0, x_cols)]
+    _dx_ = dx * 1.5
+    _dy_ = dy * np.sqrt(3.) / 2.0
+    hexs = [seed + [_dx_ * i, _dy_ * (i % 2)] for i in range(0, x_cols)]
     m = len(hexs)
     for j in range(1, y_rows):  # create the other rows
-        hexs += [hexs[h] + [0, dy * 2 * j] for h in range(m)]
-    hexs = np.asarray(hexs) + [orig_x, orig_y - dy]
+        hexs += [hexs[h] + [0, -_dy_ * 2 * j] for h in range(m)]
+    hexs = np.asarray(hexs) + [orig_x + dx, orig_y - dy]  # 2026-04-28
     if asGeo:
         frmt = "dx {}, dy {}, x_cols {}, y_rows {}, LB ({},{})"
         txt = frmt.format(dx, dy, x_cols, y_rows, orig_x, orig_y)
@@ -627,18 +631,22 @@ def hex_pointy(dx=1, dy=1,
     Parameters
     ----------
     See `rectangles` for shared parameter explanation.
+
+    Notes
+    -----
+    The origin is center of the top-left full cell, not the upper left point
     """
-    p_rad = np.deg2rad([150., 90, 30., -30., -90., -150., 150.])
+    p_rad = np.deg2rad([150., 90., 30., -30., -90., -150., 150.])
     X = np.cos(p_rad) * dx
     Y = np.sin(p_rad) * dy      # scaled hexagon about 0, 0
     seed = np.array(list(zip(X, Y)))
-    dx = dx * np.sqrt(3.) / 2.0
-    dy = dy * 1.5
-    hexs = [seed + [dx * i * 2, 0] for i in range(0, x_cols)]
+    _dx_ = dx * np.sqrt(3.) / 2.0
+    _dy_ = dy * 1.5
+    hexs = [seed + [_dx_ * i * 2, 0] for i in range(0, x_cols)]
     m = len(hexs)
     for j in range(1, y_rows):  # create the other rows
-        hexs += [hexs[h] + [dx * (j % 2), dy * j] for h in range(m)]
-    hexs = np.asarray(hexs) + [orig_x, orig_y - dy]
+        hexs += [hexs[h] + [_dx_ * (j % 2), -_dy_ * j] for h in range(m)]
+    hexs = np.asarray(hexs) + [orig_x, orig_y]  # 2026-04-26 dropped -dy
     if asGeo:
         frmt = "dx {}, dy {}, x_cols {}, y_rows {}, LB ({},{})"
         txt = frmt.format(dx, dy, x_cols, y_rows, orig_x, orig_y)
@@ -653,7 +661,7 @@ def hex_pointy(dx=1, dy=1,
 # The following all share the same parameter list.
 # x = cos(2kπ/n),y = sin(2kπ/n),k=1,2,3⋯n where ``n`` is the number of sides.
 # general equation
-def rectangle(dx=1, dy=-1,
+def rectangle(dx=1, dy=1,
               x_cols=1, y_rows=1,
               orig_x=0, orig_y=1,
               asGeo=True, kind=2):
@@ -662,8 +670,7 @@ def rectangle(dx=1, dy=-1,
     Parameters
     ----------
     dx, dy : number
-        x direction increment, +ve moves west to east, left/right.
-        y direction increment, -ve moves north to south, top/bottom.
+        Positive x and y increments. See `Notes` below.
     x_cols, y_rows : integers
         The number of columns and rows to produce.
     orig_x, orig_y : number
@@ -681,9 +688,11 @@ def rectangle(dx=1, dy=-1,
     X = [0.0, 0.0, dx, dx, 0.0] # X, Y values for a unit square
     Y = [0.0, dy, dy, 0.0, 0.0]
 
+    Notes
+    -----
     Cells are constructed clockwise from the bottom-left.  The rectangular grid
     is constructed from the top-left.  Specifying an origin (upper left) of
-    (0, 2) yields a bottom-right corner of (3,0) when the following are used.
+    (0, 2) yields a bottom-right corner of (3, 3) when the following are used.
 
     >>> z = rectangle(dx=1, dy=1, x_cols=3, y_rows=2, orig_x=0, orig_y=2,
     ...               kind=2, asGeo=False)
@@ -691,10 +700,12 @@ def rectangle(dx=1, dy=-1,
     The first `cell` will be in the top-left and the last `cell` in the
     bottom-right.
     """
+    dx = abs(dx)
+    dy = abs(dy)
     seed = np.array([[0.0, 0.0], [0.0, dy], [dx, dy], [dx, 0.0], [0.0, 0.0]])
-    a = [seed + [j * dx, i * dy]      # make the shapes
-         for i in range(0, y_rows)      # cycle through the rows
-         for j in range(0, x_cols)]     # cycle through the columns
+    a = [seed + [j * dx, i * -dy]      # negate dy so rows move down from UL
+         for i in range(0, y_rows)     # cycle through the rows
+         for j in range(0, x_cols)]    # cycle through the columns
     a = np.asarray(a) + [orig_x, orig_y - dy]
     if asGeo:
         frmt = "dx {}, dy {}, x_cols {}, y_rows {}, LB ({},{})"
@@ -706,7 +717,7 @@ def rectangle(dx=1, dy=-1,
 
 def triangle(dx=1, dy=1,
              x_cols=1, y_rows=1,
-             orig_x=0, orig_y=1,
+             orig_x=0, orig_y=0,
              asGeo=True, kind=2):
     """Create a row of meshed triangles.
 
@@ -719,14 +730,16 @@ def triangle(dx=1, dy=1,
     ----------
     See `rectangles` for shared parameter explanation.
     """
+    dx = abs(dx)
+    dy = abs(dy)
     a, dx, b = dx / 2.0, dx, dx * 1.5
     # X, Y values for a unit triangle, point up and point down
     seedU = np.array([[0.0, 0.0], [a, dy], [dx, 0.0], [0.0, 0.0]])
     seedD = np.array([[a, dy], [b, dy], [dx, 0.0], [a, dy]])
     seed = np.array([seedU, seedD])
-    a = [seed + [j * dx, i * dy]       # make the shapes
-         for i in range(0, y_rows)       # cycle through the rows
-         for j in range(0, x_cols)]      # cycle through the columns
+    a = [seed + [j * dx, i * -dy]      # negate dy so rows move down from UL
+         for i in range(0, y_rows)     # cycle through the rows
+         for j in range(0, x_cols)]    # cycle through the columns
     a = np.asarray(a) + [orig_x, orig_y - dy]
     s1, s2, s3, s4 = a.shape
     a = a.reshape(s1 * s2, s3, s4)
@@ -765,19 +778,18 @@ def code_grid(x_cols=1, y_rows=1,
     - list('0123456789')  # string.digits
     - import string .... string.ascii_uppercase
 
-    This use padding A01 to facilitate sorting.
-    If you want a different system change
-    >>> >>> "{}{}".format(UC[c], r)    # A1 to whatever, no padding
+    Element size is equal, padded where necessary to facilitate sorting.
+    If you want a different system change the options.
+
+    >>> "{}{}".format(UC[c], r)        # A1 to whatever, no padding
     >>> "{}{:02.0f}".format(UC[c], r)  # A01 to ..99
     >>> "{}{:03.0f}".format(UC[c], r)  # A001 to A999
     >>> # etc
-
     >>> c0 = code_grid(
-            cols=5, rows=3, zero_based=False, shaped=True, bottom_up=False
-            )
-    [['A01' 'B01' 'C01' 'D01' 'E01']
-     ['A02' 'B02' 'C02' 'D02' 'E02']
-     ['A03' 'B03' 'C03' 'D03' 'E03']]
+            x_cols=5, y_rows=3, zero_based=False, shaped=True, bottom_up=False)
+    ... [['A01' 'B01' 'C01' 'D01' 'E01']
+    ...  ['A02' 'B02' 'C02' 'D02' 'E02']
+    ...  ['A03' 'B03' 'C03' 'D03' 'E03']]
 
     See Also
     --------
