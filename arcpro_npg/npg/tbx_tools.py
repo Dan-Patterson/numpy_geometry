@@ -11,7 +11,7 @@ Script :
 Author :
     Dan_Patterson@carleton.ca
 Modified :
-    2024-09-15
+    2026-04-23
 
 Purpose
 -------
@@ -141,10 +141,12 @@ import npg
 
 # from npg import npGeo, npg_arc_npg, npg_create, npg_overlay
 
-from npg.npGeo import arrays_to_Geo  # Geo
+from npg.npGeo import *   # arrays_to_Geo  # Geo
+
 from npg.npg_arc_npg import (get_SR, get_shape_K, fc_to_Geo, Geo_to_fc,
                              Geo_to_arc_shapes, fc_data)
 from npg.npg_create import circle, hex_flat, hex_pointy, rectangle, triangle
+from npg.npg_geom_ops import _add_pnts_on_line_
 from npg.npg_bool_ops import union_adj, merge_
 
 from scipy.spatial import Voronoi  # Delaunay
@@ -156,7 +158,6 @@ from arcpy.management import (
     AddField, CopyFeatures, CreateFeatureclass, Delete, MakeFeatureLayer,
     MultipartToSinglepart, SelectLayerByLocation, XYToLine)
 from arcpy.analysis import Clip
-
 
 env.overwriteOutput = True
 
@@ -175,20 +176,23 @@ pth = os.path.split(script)[0]
 # ===========================================================================
 
 tool_list = [
-    'Attribute Sort', 'Frequency and Stats',
-    'Features to Points', 'Polygons to Polylines', 'Split at Vertices',
-    'Vertices to Points',
-    'Extent Sort', 'Geometry Sort',
     'Area Sort', 'Length Sort',
     'Fill Holes', 'Keep Holes',
     'Rotate Features', 'Shift Features', 'Dissolve Boundaries',
     'Delaunay', 'Voronoi']
-cont_list = ['Bounding Circles', 'Convex Hulls', 'Extent Polys',
-             'Minimum area bounding rectangle']
+convert_list = [
+    'Features to Point', 'Polygons to Polylines',
+    'Split at Vertices','Vertices to Points']
+stats_list = [
+    'Attribute sort', 'Frequency and Stats']
 dens_list = ['Densify by Distance', 'Densify by Percent', 'Densify by Factor']
+sort_list = ['Extent Sort', 'Geometry Sort']
+cont_list = [
+    'Bounding Circles', 'Convex Hulls',
+    'Extent Polys', 'Minimum area bounding rectangle']
 tile_list = ['rectangle', 'hex_pointy', 'hex_flat', 'triangle']
 
-all_tools = sorted(tool_list + tile_list + cont_list + dens_list)
+all_tools = sorted(tool_list + convert_list + stats_list + dens_list + cont_list + tile_list)
 # ============================================================================
 # ---- messages --------------------------------------------------------------
 msg0 = """
@@ -314,6 +318,9 @@ def _out_(shps, gdb, name, out_kind, SR):
     SR : spatial referencnce
        Spatial reference object name or kind.
     """
+    msg = "\n-----\nOutput create using...\n"
+    msg += "Geodatabase : {}\nFeatureclass : {}\nSpat. Ref. : {}\nGeom. type : {}"
+    tweet(msg.format(gdb, name, SR, out_kind)) 
     Geo_to_fc(shps, gdb=gdb, name=name, kind=out_kind, SR=SR)
 
 
@@ -345,7 +352,77 @@ def temp_fc(geo, name, kind, SR):
 
 
 # ============================================================================
-# ---- Attribute Tools -------------------------------------------------------
+# ---- 1 Conversion Tools ------------------------------------------------------
+#
+# features to point
+def f2pnts(in_fc):
+    """Features to point.
+
+    `getSR`, `get_shape_K` and `fc_geometry` are from `npg_io`.
+    """
+    g, oids, shp_kind, k, m, SR = _in_(in_fc, info="feature to points")
+    cent = g.centroids() + m
+    dt = np.dtype([('OID_', '<i4'), ('Xs', '<f8'), ('Ys', '<f8')])
+    out = np.empty((len(cent), ), dtype=dt)
+    out['OID_'] = oids
+    out['Xs'] = cent[:, 0]
+    out['Ys'] = cent[:, 1]
+    return out, SR  # featureclass creation handled elsewhere
+
+
+# polygon to polyline
+def pgon_to_pline(in_fc, gdb, name):
+    """Polygon to polyline conversion.
+
+    Multipart shapes are converted to singlepart.  Holes are re-oriented and
+    appended to the end of the outer-rings. The combined geometry is used to
+    produce the polylines.
+    """
+    g, oids, shp_kind, k, m, SR = _in_(in_fc, info="pgon to pline")
+    dx, dy = LL = g.LL
+    z = g.outer_rings()
+    z1 = g.holes_to_shape()
+    z2 = merge_(z1, z)
+    z2.XT = g.XT - LL
+    z2 = z2.translate(dx, dy)
+    z2.K = 1
+    out_kind = "Polyline"
+    _out_(z2, gdb, name, out_kind, SR)
+    # extend_table_(shps, gdb, name, in_fc)
+    # if Exists(out):
+    #     d = fc_data(in_fc)
+    #     import time
+    #     time.sleep(1.0)
+    #     da.ExtendTable(out, 'OBJECTID', d, 'OID_', append_only=False)
+    tweet(dedent(msg_pgon_pline))
+    return None
+
+
+# split line at vertices
+def split_at_vertices(in_fc, out_fc):
+    """Split at vertices.  Unique segments retained."""
+    g, oids, shp_kind, k, m, SR = _in_(in_fc, info="split at vertices")
+    od = g.segment_polys(as_basic=False, shift_back=True, as_3d=False)
+    tmp = "memory/tmp"
+    if Exists(tmp):
+        Delete(tmp)
+    ags.da.NumPyArrayToTable(od, tmp)
+    xyxy = list(od.dtype.names[:4])
+    args = [tmp, out_fc] + xyxy + ["GEODESIC", "Orig_id", SR]
+    XYToLine(*args)
+    return None
+
+
+# vertices to points
+def p_uni_pnts(in_fc):
+    """Implement `_polys_to_unique_pnts_` in `npg_helpers`."""
+    g, oids, shp_kind, k, m, SR = _in_(in_fc, info="unique points")
+    out = g.xy_id  # g.polys_to_unique_pnts(as_structured=True) changed 2026-04-14
+    return out, SR
+
+
+# ============================================================================
+# ---- 2 Attribute Tools -------------------------------------------------------
 # attribute sort
 def attr_sort(a, oid_fld=None, sort_flds=None, out_fld=None):
     """Return old and new id values for the sorted array."""
@@ -408,163 +485,8 @@ def freq(a, cls_flds, stat_fld):
 
 
 # ============================================================================
-# ---- Container Tools -------------------------------------------------------
+# ---- 3 Alter Geometry --------------------------------------------------------
 #
-# bounding circles
-def circles(in_fc, gdb, name, out_kind):
-    """Minimum area bounding circles.
-
-    Change `angle=2` to a smaller value for denser points on circle perimeter.
-
-    `getSR`, `get_shape_K` and `fc_geometry` are from `npg_io`.
-    """
-    info = "bounding circles"
-    g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
-    shps = g.bounding_circles(angle=2, shift_back=True, return_xyr=False)
-    _out_(shps, gdb, name, out_kind, SR)
-    return "{} completed".format("Circles")
-
-
-# convex hulls
-def convex_hull_polys(in_fc, gdb, name, out_kind):
-    """Determine the convex hulls on a shape basis."""
-    info = "convex hulls to polygons"
-    g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
-    shps = g.convex_hulls(by_bit=False, shift_back=True, threshold=50)
-    _out_(shps, gdb, name, out_kind, SR)
-    return "{} completed".format("Convex Hulls")
-
-
-# extent_poly section
-def extent_poly(in_fc, gdb, name, out_kind):
-    """Feature envelope to polygon demo."""
-    info = "extent to polygons"
-    g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
-    shps = g.extent_rectangles(shift_back=True, asGeo=True)
-    _out_(shps, gdb, name, out_kind, SR)
-    return "{} completed".format("Extents")
-
-
-def mabr(in_fc, gdb, name, out_kind):
-    """Return Minumum Area Bounding Rectangle."""
-    info = "minimum area bounding rectangle"
-    g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
-    shps = g.min_area_rect(shift_back=True, as_structured=False)
-    # LBRT = shps[:, 1:]
-    _out_(shps, gdb, name, out_kind, SR)
-    return "{} completed".format("Minimum area bounding rectangle")
-
-
-# ============================================================================
-# ---- Conversion Tools ------------------------------------------------------
-#
-# features to point
-def f2pnts(in_fc):
-    """Features to points.
-
-    `getSR`, `get_shape_K` and `fc_geometry` are from `npg_io`.
-    """
-    info = "feature to points"
-    g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
-    cent = g.centroids() + m
-    dt = np.dtype([('OID_', '<i4'), ('Xs', '<f8'), ('Ys', '<f8')])
-    out = np.empty((len(cent), ), dtype=dt)
-    out['OID_'] = oids
-    out['Xs'] = cent[:, 0]
-    out['Ys'] = cent[:, 1]
-    return out, SR  # featureclass creation handled elsewhere
-
-
-# polygon to polyline
-def pgon_to_pline(in_fc, gdb, name):
-    """Polygon to polyline conversion.
-
-    Multipart shapes are converted to singlepart.  Holes are re-oriented and
-    appended to the end of the outer-rings. The combined geometry is used to
-    produce the polylines.
-    """
-    info = "pgon to pline"
-    g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
-    dx, dy = LL = g.LL
-    z = g.outer_rings()
-    z1 = g.holes_to_shape()
-    z2 = merge_(z1, z)
-    z2.XT = g.XT - LL
-    z2 = z2.translate(dx, dy)
-    z2.K = 1
-    out_kind = "Polyline"
-    _out_(z2, gdb, name, out_kind, SR)
-    # extend_table_(shps, gdb, name, in_fc)
-    # if Exists(out):
-    #     d = fc_data(in_fc)
-    #     import time
-    #     time.sleep(1.0)
-    #     da.ExtendTable(out, 'OBJECTID', d, 'OID_', append_only=False)
-    tweet(dedent(msg_pgon_pline))
-    return None
-
-
-# split line at vertices
-def split_at_vertices(in_fc, out_fc):
-    """Split at vertices.  Unique segments retained."""
-    info = "split at vertices"
-    g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
-    od = g.segment_polys(as_basic=False, shift_back=True, as_3d=False)
-    tmp = "memory/tmp"
-    if Exists(tmp):
-        Delete(tmp)
-    ags.da.NumPyArrayToTable(od, tmp)
-    xyxy = list(od.dtype.names[:4])
-    args = [tmp, out_fc] + xyxy + ["GEODESIC", "Orig_id", SR]
-    XYToLine(*args)
-    return None
-
-
-# vertices to points
-def p_uni_pnts(in_fc):
-    """Implement `_polys_to_unique_pnts_` in `npg_helpers`."""
-    info = "unique points"
-    g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
-    out = g.polys_to_points(keep_order=True, as_structured=True)
-    return out, SR
-
-
-# ============================================================================
-# ---- Sort Geometry ---------------------------------------------------------
-#
-# sort by area, length
-def sort_geom(in_fc, gdb, name, sort_kind):
-    """Sort features by area, length for full shape."""
-#    tmp = MultipartToSinglepart(in_fc, r"memory\in_fc_temp")
-    info = "sort features"
-    g, oids, shp_kind, k, m, SR = _in_(in_fc, info)  # tmp, info)
-    if sort_kind == 'area':
-        srt = g.sort_by_area(ascending=True, just_indices=False)
-    elif sort_kind == 'length':
-        srt = g.sort_by_length(ascending=True, just_indices=False)
-    out_kind = shp_kind
-    x, y = g.LL
-    srt = srt.translate(dx=x, dy=y)
-    _out_(srt, gdb, name, out_kind, SR)
-    return None
-
-
-# sort by extent
-def sort_extent(in_fc, gdb, name, key):
-    """Sort features by extent."""
-    g, oids, shp_kind, k, m, SR = _in_(in_fc, info="sort features")
-    srt = g.sort_by_extent(extent_pnt='LB', key=key, just_indices=False)
-    out_kind = shp_kind
-    x, y = g.LL
-    srt = srt.translate(dx=x, dy=y)
-    _out_(srt, gdb, name, out_kind, SR)
-    return None
-
-
-# ============================================================================
-# ---- Alter Geometry --------------------------------------------------------
-#
-
 def dens_dist(in_fc, gdb, name, dist):
     """Densify by distance."""
     g, oids, shp_kind, k, m, SR = _in_(in_fc, info="densify by distance")
@@ -572,7 +494,9 @@ def dens_dist(in_fc, gdb, name, dist):
         dist = 1.
     elif dist < 1. or dist > 100.:  # limit of 1 to 100%
         dist = np.abs(min(dist, 100.))
-    dens = g.densify_by_distance(spacing=dist)
+    dens = [_add_pnts_on_line_(a, spacing=dist, is_percent=False)
+            for a in g.bits]
+    dens = arrays_to_Geo(dens, kind=k, info=None, to_origin=False)
     out_kind = shp_kind
     x, y = g.LL
     dens = dens.translate(dx=x, dy=y)
@@ -584,7 +508,7 @@ def dens_fact(in_fc, gdb, name, dist):
     """Densify by factor."""
     g, oids, shp_kind, k, m, SR = _in_(in_fc, info="densify by distance")
     if dist is None:
-        dist = 1.
+        dist = 1.0
     dens = g.densify_by_factor(factor=dist)
     out_kind = shp_kind
     x, y = g.LL
@@ -597,8 +521,10 @@ def dens_perc(in_fc, gdb, name, dist):
     """Densify by percent."""
     g, oids, shp_kind, k, m, SR = _in_(in_fc, info="densify by percent")
     if dist is None:
-        dist = 100.
-    dens = g.densify_by_percent(percent=dist, is_percent=True)
+        dist = 100.0
+    dens = [_add_pnts_on_line_(a, spacing=dist, is_percent=True)
+            for a in g.bits]
+    dens = arrays_to_Geo(dens, kind=k, info=None, to_origin=False)
     out_kind = shp_kind
     x, y = g.LL
     dens = dens.translate(dx=x, dy=y)
@@ -606,10 +532,22 @@ def dens_perc(in_fc, gdb, name, dist):
     return None
 
 
+def dissolve_boundaries(in_fc, gdb, name):
+    """Dissolve shared boundaries between shapes."""
+    g, oids, shp_kind, k, m, SR = _in_(in_fc, info="boundary dissolve")
+    out_kind = shp_kind
+    x, y = g.LL
+    g0 = union_adj(g, asGeo=True)
+    tweet("g0")
+    # g0 = arrays_to_Geo(g0, kind=2, info="extent")
+    g0 = g0.translate(dx=x, dy=y)
+    _out_(g0, gdb, name, out_kind, SR)
+    return None
+
+
 def fill_holes(in_fc, gdb, name):
     """Fill holes in a featureclass.  See the Eliminate part tool."""
     SR = get_SR(in_fc)
-    # tmp = MultipartToSinglepart(in_fc, r"memory\in_fc_temp")
     g, oids, shp_kind, k, m, SR = _in_(in_fc, info="fill holes")  # in_fc = tmp
     if g.is_multipart():
         g = g.multipart_to_singlepart(info="")
@@ -631,7 +569,6 @@ def fill_holes(in_fc, gdb, name):
 def keep_holes(in_fc, gdb, name):
     """Fill holes in a featureclass.  See the Eliminate part tool."""
     SR = get_SR(in_fc)
-    # tmp = MultipartToSinglepart(in_fc, r"memory\in_fc_temp")
     g, oids, shp_kind, k, m, SR = _in_(in_fc, info="keep holes")  # in_fc = tmp
     if g.is_multipart():
         g = g.multipart_to_singlepart(info="")
@@ -674,7 +611,6 @@ def shifter(in_fc, gdb, name, dX, dY):
 
     Multipart shapes are converted to singlepart shapes.
     """
-    # tmp = MultipartToSinglepart(in_fc, r"memory\in_fc_temp")  # in_fc = tmp
     g, oids, shp_kind, k, m, SR = _in_(in_fc, info="shift features")
     if g.is_multipart():
         g = g.multipart_to_singlepart(info="")
@@ -691,25 +627,88 @@ def shifter(in_fc, gdb, name, dX, dY):
     return None
 
 
-def dissolve_boundaries(in_fc, gdb, name):
-    """Dissolve shared boundaries between shapes."""
-    info = "boundary dissolve"
-    g, oids, shp_kind, k, m, SR = _in_(in_fc, info)
+# ============================================================================
+# ---- 4 Sort Geometry ---------------------------------------------------------
+#
+# sort by area, length
+def sort_geom(in_fc, gdb, name, sort_kind):
+    """Sort features by area, length for full shape."""
+    g, oids, shp_kind, k, m, SR = _in_(in_fc, info="sort features")
+    if g.is_multipart():
+        g = g.multipart_to_singlepart(info="")
+    if sort_kind == 'area':
+        srt = g.sort_by_area(ascending=True, just_indices=False)
+    elif sort_kind == 'length':
+        srt = g.sort_by_length(ascending=True, just_indices=False)
     out_kind = shp_kind
     x, y = g.LL
-    g0 = union_adj(g, asGeo=True)
-    tweet("g0")
-    # g0 = arrays_to_Geo(g0, kind=2, info="extent")
-    g0 = g0.translate(dx=x, dy=y)
-    _out_(g0, gdb, name, out_kind, SR)
+    srt = srt.translate(dx=x, dy=y)
+    _out_(srt, gdb, name, out_kind, SR)
+    return None
+
+
+# sort by extent
+def sort_extent(in_fc, gdb, name, key):
+    """Sort features by extent."""
+    g, oids, shp_kind, k, m, SR = _in_(in_fc, info="sort features")
+    srt = g.sort_by_extent(extent_pnt='LB', key=key, just_indices=False)
+    out_kind = shp_kind
+    x, y = g.LL
+    srt = srt.translate(dx=x, dy=y)
+    _out_(srt, gdb, name, out_kind, SR)
+    return None
 
 
 # ============================================================================
-# ---- Triangulation Tools ---------------------------------------------------
+# ---- 5 Container Tools -------------------------------------------------------
+#
+# bounding circles
+def circles(in_fc, gdb, name, out_kind):
+    """Minimum area bounding circles.
+
+    Change `angle=2` to a smaller value for denser points on circle perimeter.
+
+    `getSR`, `get_shape_K` and `fc_geometry` are from `npg_io`.
+    """
+    g, oids, shp_kind, k, m, SR = _in_(in_fc, info="bounding circles")
+    shps = g.bounding_circles(angle=2, shift_back=True, return_xyr=False)
+    _out_(shps, gdb, name, out_kind, SR)
+    return "{} completed".format("Circles")
+
+
+# convex hulls
+def convex_hull_polys(in_fc, gdb, name, out_kind):
+    """Determine the convex hulls on a shape basis."""
+    g, oids, shp_kind, k, m, SR = _in_(in_fc, info="convex hulls to polygons")
+    shps = g.convex_hulls(by_bit=False, shift_back=True, threshold=50)
+    _out_(shps, gdb, name, out_kind, SR)
+    return "{} completed".format("Convex Hulls")
+
+
+# extent_poly section
+def extent_poly(in_fc, gdb, name, out_kind):
+    """Feature envelope to polygon."""
+    g, oids, shp_kind, k, m, SR = _in_(in_fc, info="extent to polygons")
+    shps = g.extent_rectangles(shift_back=True, asGeo=True)
+    _out_(shps, gdb, name, out_kind, SR)
+    return "{} completed".format("Extents")
+
+
+def mabr(in_fc, gdb, name, out_kind):
+    """Return Minumum Area Bounding Rectangle."""
+    g, oids, shp_kind, k, m, SR = _in_(in_fc, info="minimum area bounding rectangle")
+    shps = g.min_area_rect(shift_back=True, as_structured=False)
+    # LBRT = shps[:, 1:]
+    _out_(shps, gdb, name, out_kind, SR)
+    return "{} completed".format("Minimum area bounding rectangle")
+
+
+# ============================================================================
+# ---- 7 Triangulation Tools ---------------------------------------------------
 #
 def tri_poly(in_fc, gdb, name, out_kind, constrained=True):
     """Return the Delaunay triangulation of the poly* features."""
-    tmp = MultipartToSinglepart(in_fc, r"memory\in_fc_temp")  # in_fc = tmp
+    tmp = MultipartToSinglepart(in_fc, r"memory\in_fc_temp")
     g, oids, shp_kind, k, m, SR = _in_(tmp, info="triangulate")
     out = g.triangulate(as_one=False, as_polygon=True)
     x, y = g.LL
@@ -799,7 +798,8 @@ def pick_tool(tool, in_fc, out_fc, gdb, name):
     tweet(dedent(f0).format(script, tool, in_fc, out_fc))
     #
     # ---- Attribute tools
-    if tool == 'Attribute sort':                  # ---- (1) attribute sort
+    if tool == 'Attribute sort':                 # ---- (1) attribute sort
+        out_fc = None
         sort_flds = str(sys.argv[4])
         out_fld = str(sys.argv[5])
         sort_flds = sort_flds.split(";")
@@ -809,7 +809,7 @@ def pick_tool(tool, in_fc, out_fc, gdb, name):
         a = ags.da.TableToNumPyArray(in_fc, flds)
         out = attr_sort(a, oid_fld, sort_flds, out_fld)  # run... attr_sort
         ags.da.ExtendTable(in_fc, oid_fld, out, oid_fld, append_only=False)
-    elif tool == 'Frequency and Stats':           # ---- (2) freq and stats
+    elif tool == 'Frequency and Stats':          # ---- (2) freq and stats
         cls_flds = sys.argv[4]
         stat_fld = sys.argv[5]
         cls_flds = cls_flds.split(";")  # multiple to list, singleton a list
@@ -820,7 +820,7 @@ def pick_tool(tool, in_fc, out_fc, gdb, name):
             all_flds = cls_flds + [stat_fld]
         a = ags.da.TableToNumPyArray(
             in_fc, field_names=all_flds, skip_nulls=True)
-        out = freq(a, cls_flds, stat_fld)         # do freq analysis
+        out = freq(a, cls_flds, stat_fld)        # do freq analysis
         if Exists(out_fc) and env.overwriteOutput:
             Delete(out_fc)
         ags.da.NumPyArrayToTable(out, out_fc)
@@ -829,23 +829,28 @@ def pick_tool(tool, in_fc, out_fc, gdb, name):
     #
     elif tool in cont_list:
         out_kind = sys.argv[4].upper()
-        c_d = {
-            'Bounding Circles': circles(in_fc, gdb, name, out_kind),
-            'Convex Hulls': convex_hull_polys(in_fc, gdb, name, out_kind),
-            'Extent Polys': extent_poly(in_fc, gdb, name, out_kind),
-            'Minimum area bounding rectangle': mabr(in_fc, gdb, name, out_kind)
-            }
-        c_d[tool]  # run the tool
+        if tool == 'Bounding Circles':
+            circles(in_fc, gdb, name, out_kind)
+        elif tool == 'Convex Hulls':
+            convex_hull_polys(in_fc, gdb, name, out_kind)
+        elif tool == 'Extent Polys':
+            extent_poly(in_fc, gdb, name, out_kind)
+        elif tool == 'Minimum area bounding rectangle':
+            mabr(in_fc, gdb, name, out_kind)
+        else :
+            tweet("\n... something wrong ...")
     #
     # ---- Conversion
     #
-    elif tool in ['Features to Points', 'Vertices to Points']:
-        if tool == 'Features to Points':         # ---- (1) features to point
-            out, SR = f2pnts(in_fc)
-        elif tool == 'Vertices to Points':       # ---- (2) feature to vertices
-            out, SR = p_uni_pnts(in_fc)
-        ags.da.NumPyArrayToFeatureClass(out, out_fc, ['Xs', 'Ys'], SR)
-    elif tool == 'Polygons to Polylines':        # ---- (3) polygon to polyline
+    elif tool in ['Features to Point', 'Vertices to Points']:
+        if tool == 'Features to Point':         # ---- (1) features to point
+            out_arr, SR = f2pnts(in_fc)
+        elif tool == 'Vertices to Points':      # ---- (2) feature to vertices
+            out_arr, SR = p_uni_pnts(in_fc)
+        coords = [out_arr["Xs"], out_arr["Ys"]]
+        out = append_fields(out_arr, names=["X_coord", "Y_coord"], data=coords, usemask=False)
+        ags.da.NumPyArrayToFeatureClass(out, out_fc, ['X_coord', 'Y_coord'], spatial_reference=SR)
+    elif tool == 'Polygons to Polylines':       # ---- (3) polygon to polyline
         pgon_to_pline(in_fc, gdb, name)
     elif tool == 'Split at Vertices':            # ---- (4) split at vertices
         split_at_vertices(in_fc, out_fc)
@@ -907,8 +912,8 @@ def pick_tool(tool, in_fc, out_fc, gdb, name):
     #
     # ---- Tiling
     elif tool in tile_list:
-        out_fc = sys.argv[2]      # full featureclass path and name
-        SR = sys.argv[3]          # spatial reference
+        out_fc = sys.argv[2]           # full featureclass path and name
+        SR = sys.argv[3]               # spatial reference
         out_kind = sys.argv[4]         # 1 Polyline, 2 Polygon
         dx = float(sys.argv[5])        # x distance/increment
         dy = float(sys.argv[6])        # y distance/increment
@@ -916,20 +921,32 @@ def pick_tool(tool, in_fc, out_fc, gdb, name):
         y_r = int(sys.argv[8])         # y rows
         o_x = float(sys.argv[9])       # x origin
         o_y = float(sys.argv[10])      # y origin
-        # rot_angle = sys.argv[11]
+        rot_angle = float(sys.argv[11]) # rotation angle about origin (upper left)
+        #
         k = 2 if out_kind == 'Polygon' else 1
-        tool = str(sys.argv[11])
-        t_d = {
-            'hex_flat': hex_flat(dx, -dy, x_c, y_r, o_x, o_y, True, k),
-            'hex_pointy': hex_pointy(dx, -dy, x_c, y_r, o_x, o_y, True, k),
-            'rectangle': rectangle(dx, -dy, x_c, y_r, o_x, o_y, True, k),
-            'triangle': triangle(dx, -dy, x_c, y_r, o_x, o_y, True, k)
-            }
-        a = t_d[tool]  # pick and use the appropriate function
-        tweet("type {}\n{}".format(type(a), a[:10]))
-        msg = "gdb   : {}\name : {}\nSR   : {}\ntype : {}"
-        tweet(msg.format(gdb, name, SR, out_kind))
-        _out_(a, gdb, name, k, SR)  # produce the output
+        if tool == 'hex_flat':
+            a = hex_flat(dx, -dy, x_c, y_r, o_x, o_y, True, k)
+        elif tool == 'hex_pointy':
+            a = hex_pointy(dx, -dy, x_c, y_r, o_x, o_y, True, k)
+        elif tool == 'rectangle':
+            a = rectangle(dx, -dy, x_c, y_r, o_x, o_y, True, k)
+        elif tool == 'triangle':
+            a = triangle(dx, -dy, x_c, y_r, o_x, o_y, True, k)
+        else:
+            tweet("\nSomething not correct")
+        if rot_angle != 0:
+            # UL_xy = a.aoi_extent(False)[[0, -1]]
+            # xc, yc = np.mean(a.XY, axis=0) 
+            # a = a.shift(dx=-xc, dy=-yc)
+            a = a.rotate(as_group=True, angle=rot_angle, clockwise=True)
+            # fx, fy = a[0]
+            # a = a.shift(dx=fx, dy=fy)
+        #
+        tweet("type {}\n{}\n ...".format(type(a), a.IFT))
+        msg = "Geodatabase : {}\nFeatureclass : {}\nSpat. Ref. : {}\nGeom. type : {}\nRotation : {}"
+        tweet(msg.format(gdb, name, SR, out_kind, rot_angle))
+        #
+        _out_(a, gdb, name, out_kind, SR)  # produce the output
         return None
     else:
         tweet("Tool {} not found".format(tool))
@@ -962,13 +979,18 @@ def _tool_(all_tools):
     the desired tool actually exists, so it can be parsed based on type.
     """
     tool = sys.argv[1]
-    if tool not in tile_list:  # -- tile_list doesn't require an input FC
+    if tool in stats_list:
+        in_fc = sys.argv[2]
+        out_fc = None
+    elif tool in cont_list:
+        in_fc = sys.argv[2]
+        out_fc = sys.argv[3]
+    elif tool not in tile_list:  # -- tile_list doesn't require an input FC
         in_fc = sys.argv[2]
         out_fc = sys.argv[3]
     else:
         in_fc = None
         out_fc = sys.argv[2]
-    # tweet("out_fc  {}".format(out_fc))
     if out_fc not in (None, 'None'):
         gdb, name = check_path(out_fc)           # ---- check the paths
         if gdb is None:
@@ -980,6 +1002,9 @@ def _tool_(all_tools):
     if tool not in all_tools:                    # ---- check the tool
         tweet("Tool {} not implemented".format(tool))
         return None
+    #
+    # -- pick and run the tool
+    #
     msg1 = "Tool   : {}\ninput  : {}\noutput : {}"
     tweet(msg1.format(tool, in_fc, out_fc))
     pick_tool(tool, in_fc, out_fc, gdb, name)    # ---- run the tool
@@ -994,11 +1019,8 @@ if len(sys.argv) == 1:
     result = _testing_()
 else:
     testing = False
-    AddMessage("=hello1")  # arcpy.AddMessage, AddMessage imported directly
-    AddMessage(r"<hello2>")
-    AddMessage("<{}>".format("hello3"))
     tool, in_fc, out_fc = _tool_(all_tools)
-    msg = "Outside...\nTool   : {}\ninput  : {}\noutput : {}"
+    msg = "\nExecuting...\nTool   : {}\ninput  : {}\noutput : {}"
     tweet(msg.format(tool, in_fc, out_fc))
     GetMessages()
 
