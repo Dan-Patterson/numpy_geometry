@@ -38,58 +38,58 @@ Crosstabulate
 **Containers**
 
 `1 Bounding circles
-<https://pro.arcgis.com/en/pro-app/tool-reference/data-management/minimum
--bounding-geometry.htm>`_.  minimum area bounding circle
+<https://doc.esri.com/en/arcgis-pro/latest/tool-reference/data-management/minimum
+-bounding-geometry.html>`_.  minimum area bounding circle
 
 `2 Convex hulls
-<https://pro.arcgis.com/en/pro-app/tool-reference/data-management/minimum
--bounding-geometry.htm>`_.
+<https://doc.esri.com/en/arcgis-pro/latest/tool-reference/data-management/minimum
+-bounding-geometry.html>`_.
 
 `3 Feature Envelope to Polygon
-<https://pro.arcgis.com/en/pro-app/tool-reference/data-management/feature
--envelope-to-polygon.htm>`_.  axis oriented envelope
+<https://doc.esri.com/en/arcgis-pro/latest/tool-reference/data-management/feature
+-envelope-to-polygon.html>`_.  axis oriented envelope
 
 **Conversion**
 
 `1 Feature to Point
-<https://pro.arcgis.com/en/pro-app/tool-reference/data-management/feature
--to-point.htm>`_.  centroid for point clusters, polylines or polygons
+<https://doc.esri.com/en/arcgis-pro/latest/tool-reference/data-management/feature
+-to-point.html>`_.  centroid for point clusters, polylines or polygons
 
 `2 Polygons to Polylines
-<https://pro.arcgis.com/en/pro-app/tool-reference/data-management/
-feature-to-polygon.htm>`_.  Simple conversion.
+<https://doc.esri.com/en/arcgis-pro/latest/tool-reference/data-management/
+feature-to-polygon.html>`_.  Simple conversion.
 
 `3 Feature Vertices to Points
-<https://pro.arcgis.com/en/pro-app/tool-reference/data-management/feature
--vertices-to-points.htm>`_.
+<https://doc.esri.com/en/arcgis-pro/latest/tool-reference/data-management/feature
+-vertices-to-points.html>`_.
 
 **Alter geometry**
 
 `Shift, move, translate features
-<https://pro.arcgis.com/en/pro-app/tool-reference/editing/
-transform-features.htm>`_.
+<https://doc.esri.com/en/arcgis-pro/latest/tool-reference/editing/
+transform-features.html>`_.
 
 `Sort Geometry
-<https://pro.arcgis.com/en/pro-app/tool-reference/data-management/sort.htm>`_.
+<https://doc.esri.com/en/arcgis-pro/latest/tool-reference/data-management/sort.html>`_.
 
 `Shift features
-<https://pro.arcgis.com/en/pro-app/tool-reference/editing/
-transform-features.htm>`_.
+<https://doc.esri.com/en/arcgis-pro/latest/tool-reference/editing/
+transform-features.html>`_.
 
 `Split Line at Vertices
-<https://pro.arcgis.com/en/pro-app/tool-reference/data-management/
-split-line-at-vertices.htm>`_.
+<https://doc.esri.com/en/arcgis-pro/latest/tool-reference/data-management/
+split-line-at-vertices.html>`_.
 
 `Feature to Line
-<https://pro.arcgis.com/en/pro-app/tool-reference/data-management/feature
--to-line.htm>`_.
+<https://doc.esri.com/en/arcgis-pro/latest/tool-reference/data-management/feature
+-to-line.html>`_.
 
 `Frequency
-<https://pro.arcgis.com/en/pro-app/tool-reference/analysis/frequency.htm>`_.
+<https://doc.esri.com/en/arcgis-pro/latest/tool-reference/analysis/frequency.html>`_.
 
 `Feature Envelope to Polygon
-<https://pro.arcgis.com/en/pro-app/tool-reference/data-management/feature
--envelope-to-polygon.htm>`_.
+<https://doc.esri.com/en/arcgis-pro/latest/tool-reference/data-management/feature
+-envelope-to-polygon.html>`_.
 
 `Densify examples
 <https://stackoverflow.com/questions/64995977/generating-equidistance-points
@@ -99,26 +99,26 @@ split-line-at-vertices.htm>`_.
 **To do**
 
 `Delete Identical
-<https://pro.arcgis.com/en/pro-app/latest/tool-reference/data-management/
-delete-identical.htm>`_.
+<https://doc.esri.com/en/arcgis-pro/latest/tool-reference/data-management/
+delete-identical.html>`_.
 
 `Eliminate Polygon Part
-<https://pro.arcgis.com/en/pro-app/latest/tool-reference/data-management/
-eliminate-polygon-part.htm>`_.
+<https://doc.esri.com/en/arcgis-pro/latest/tool-reference/data-management/
+eliminate-polygon-part.html>`_.
 
 `Erase
-<https://pro.arcgis.com/en/pro-app/latest/tool-reference/analysis/erase.htm>`_.
+<https://doc.esri.com/en/arcgis-pro/latest/tool-reference/analysis/erase.html>`_.
 
 `Find Identical
-<https://pro.arcgis.com/en/pro-app/tool-reference/data-management/
-find-identical.htm>`_.
+<https://doc.esri.com/en/arcgis-pro/latest/tool-reference/data-management/
+find-identical.html>`_.
 
 `Split
-<https://pro.arcgis.com/en/pro-app/latest/tool-reference/analysis/split.htm>`_.
+<https://doc.esri.com/en/arcgis-pro/latest/tool-reference/analysis/split.html>`_.
 
 `Unsplit line
-<https://pro.arcgis.com/en/pro-app/tool-reference/data-management/
-unsplit-line.htm>`_.
+<https://doc.esri.com/en/arcgis-pro/latest/tool-reference/data-management/
+unsplit-line.html>`_.
 """
 # pylint: disable=C0103  # invalid-name
 # pylint: disable-E0611  # arcpy.da or arcgisscripting.da issue
