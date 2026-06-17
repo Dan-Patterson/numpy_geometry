@@ -79,7 +79,9 @@ See the **geonumeracy** repository for more examples of numpy geometry functions
 *2026*
 
 - [Feature Vertices to Points](https://community.esri.com/t5/python-blog/feature-vertices-to-points-for-basic-arcgis-pro/ba-p/1699484).
+- [Table tools for arcgis pro](https://community.esri.com/t5/python-blog/table-tools-for-arcgis-pro/ba-p/1702377)
 - [Mixing environments for working with python](https://community.esri.com/t5/python-blog/mixing-environments-for-working-with-python/ba-p/1682268).
+- [Toolbox properties - the atbx revisited](https://community.esri.com/t5/python-blog/toolbox-properties-the-atbx-revisited/ba-p/1708534).
 
 
 *2025*
