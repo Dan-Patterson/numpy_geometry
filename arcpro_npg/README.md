@@ -12,7 +12,7 @@
 
 **NOTE**
 
-Initially developed using python <= 3.13 and numpy < 2.2 and ArcGIS Pro <= 3.6.
+Initially developed using python <= 3.13 and numpy < 2.4.4 and ArcGIS Pro <= 3.7.
 
 Currently development is using python >= 3.13 and numpy > 2.0.  A major transition is denoted pre and post numpy 2.0.
 
