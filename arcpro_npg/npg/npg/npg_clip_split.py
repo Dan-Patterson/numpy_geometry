@@ -38,6 +38,7 @@ import npg  # noqa
 from npg.npg_geom_hlp import a_eq_b
 from npg.npg_bool_hlp import (_add_pnts_, _del_seq_dupl_pnts_, _wn_clip_,
                               prep_overlay)  # _node_type_)
+from npg.npg_pip import winding_num
 from npg.npg_plots import plot_polygons  # noqa
 
 #  --- alter or use below
@@ -362,20 +363,21 @@ def split_poly(poly, line):
         if len(x_pnts) < 2:
             return [], None, None
         _p, _l = _add_pnts_(poly, line, x_pnts, whr)  # -- temporary poly, clp
-        x_pnts = _del_seq_dupl_pnts_(x_pnts, poly=False)
+        # x_pnts = _del_seq_dupl_pnts_(x_pnts, poly=False)
+        x_pnts = np.unique(x_pnts, axis=0)  # lex sorted
         pl_ = _del_seq_dupl_pnts_(np.concatenate((_p), axis=0), poly=True)
         cl_ = _del_seq_dupl_pnts_(np.concatenate((_l), axis=0), poly=False)
         return x_pnts, pl_, cl_
 
-    def _side_(pnts, line):
+    def _side_(pnts, cut_line):
         """Return the line side that points are on.
 
         Parameters
         ----------
         pnts : array
             The points being tested.
-        line : array
-            The line to compare to.
+        cut_line : array
+            The line to compare to.  This variant is only for 2 a point line.
 
         Notes
         -----
@@ -387,13 +389,87 @@ def split_poly(poly, line):
         x, y, x0, y0, x1, y1 = *p, *strt, *end  # p point, strt/end line point
         (x1 - x0) * (y - y0) - (y1 - y0) * (x - x0)
         """
-        x0, y0, x1, y1 = line.ravel()
+        x0, y0, x1, y1 = cut_line.ravel()
         v = (x1 - x0) * (pnts[:, 1] - y0) - (y1 - y0) * (pnts[:, 0] - x0)
         v = np.round(v, 6)
         lft_ids = np.nonzero(np.sign(v) >= 0.)[0]  # keep on and left of line
         rgt_ids = np.nonzero(np.sign(v) <= 0.)[0]  # keep on and right
         eq_ids = np.nonzero(np.sign(v) == 0.)[0]   # get separate ids for equal
         return lft_ids, rgt_ids, eq_ids
+
+    def _side2_(pnts, cut_line):
+        """Return the line side that points are on."""
+
+        def sd_(pnts, seg_):
+            """`_side_` for pairs of multiple cut segments."""
+            x0, y0, x1, y1 = seg_.ravel()
+            v = (x1 - x0) * (pnts[:, 1] - y0) - (y1 - y0) * (pnts[:, 0] - x0)
+            v_sgn = np.sign(np.round(v, 6))
+            lft_ids = np.nonzero(v_sgn > 0.)[0]  # keep left of line
+            rgt_ids = np.nonzero(v_sgn < 0.)[0]  # keep right
+            eq_ids = np.nonzero(v_sgn == 0.)[0]  # get ids for equal
+            return lft_ids, rgt_ids, eq_ids
+        
+        if len(cut_line) == 2:
+            return sd_(pnts, cut_line)
+        pairs_ = np.concatenate((cut_line[:-1], cut_line[1:]), axis=1)
+        lft_ids, rgt_ids, eq_ids = [], [], []
+        for cnt, seg_ in enumerate(pairs_):
+            z0, z1, z2 = sd_(pnts[:-1], seg_)
+            lft_ids.append(z0)
+            rgt_ids.append(z1)
+            eq_ids.append(z2)
+        # e_0 = np.unique(np.concatenate(eq_ids))  # -- unique and sorted
+        # l_0 = np.unique(np.concatenate(lft_ids))
+        # r_0 = np.unique(np.concatenate(rgt_ids))
+        # #
+        # l_1 = set(l_0).difference(e_0)
+        # r_1 = set(r_0).difference(e_0)
+        return lft_ids, rgt_ids, eq_ids
+
+    def _side3_(pnts, cut_line):
+        """Return the line side that points are on."""
+
+        # -- form polygons
+        L, B, R, T = npg.npg_geom_ops.pnts_to_extent(pnts, False)
+        upper = np.array([[L, T], [R, T]])  # left to right
+        lower = np.array([[R, B], [L, B]])  # right to left
+        x_diff, y_diff = (cut_line[-1] - cut_line[0])
+        if x_diff > 0.:  # left to right cut, include first x_pnt and swap line
+            l_poly = np.concatenate((cut_line[0][None, :],
+                                     upper,
+                                     cut_line[::-1]), axis=0)
+            r_poly = np.concatenate((cut_line,
+                                     lower,
+                                     cut_line[0][None, :]), axis=0)
+        elif x_diff == 0.:  # vertical cut
+            lft = np.array([[L, B], [L, T]])
+            rgt = np.array([[R, T], [R, B]])
+            if y_diff > 0:
+                l_poly = np.concatenate((lft, cut_line), axis=0)
+                r_poly = np.concatenate((cut_line, rgt), axis=0)
+        else:
+            l_poly = np.concatenate((lower, cut_line[::-1]))
+            r_poly = np.concatenate((upper, cut_line), axis=0)  # swap line
+        #
+        # -- now do the wn check
+        # finish left
+        z0, z1 = winding_num(pnts, l_poly, batch=True)
+        in_on_ = np.nonzero(z1)[0]
+        on_ = np.nonzero((l_poly == pnts[:, None]).all(-1).any(-1))[0]
+        whr_l = np.unique(np.concatenate((in_on_, on_)))
+        l_new = pnts[whr_l]
+        #
+        # finish right
+        z2, z3 = winding_num(pnts, r_poly, batch=True)
+        in_on_1 = np.nonzero(z3)[0]
+        on_1 = np.nonzero((r_poly == pnts[:, None]).all(-1).any(-1))[0]
+        whr_r = np.unique(np.concatenate((in_on_1, on_1)))
+        r_new = pnts[whr_r]
+        # vals = _wn_clip_(pnts, l_poly, all_info=True)
+        # x_pnts_, pInc_, cInp_, x_type_, whr_ = vals
+        return l_poly, r_poly
+
 
     #
     # -- (1) Prepare for splitting
@@ -408,11 +484,14 @@ def split_poly(poly, line):
     if len(x_pnts) < 2:
         print("\nNot enough intersection points to split.")
         return None, None
+    #
     # -- (2) remove any extraneous bits from cl_ and fix `line` as `dup_line`
+    #
     if cl_.shape[0] != x_pnts.shape[0]:
         whr_ = np.nonzero((cl_ == x_pnts[:, None]).all(-1))[1]
-        dup_line = cl_[np.sort(whr_[[0, -1]])]
-        cl_ = cl_[whr_]
+        # dup_line = cl_[np.sort(whr_[[0, -1]])]  # or cl_[np.sort(whr_)]
+        dup_line = np.copy(line)
+        cl_ = cl_[whr_]  # extra bits removed,
     else:
         dup_line = np.copy(line)  #x_pnts[np.sort(whr_[[0, -1]])]
     #
@@ -424,13 +503,20 @@ def split_poly(poly, line):
     if r1 != 0:
         if r1 == cl_.shape[0] - 1:
             cl_ = cl_[::-1]
-        else:
-            cl_ = np.concatenate((cl_[r1:-1], cl_[:r1], [cl_[r1]]), axis=0)
+        elif r1 > 0:
+            # -- trim off preceeding points
+            cl_ = cl_[r1:]
+            # cl_ = np.concatenate((cl_[r1:-1], cl_[:r1], [cl_[r1]]), axis=0)
     #
     # -- (3) run `_side_` to get the points to the left and right of the line
-    pl_lft_ids, pl_rgt_ids, eq_ids = _side_(pl_, cl_[[0, -1]])  # line)  # --
+    #
+    if len(line) == 2:
+        pl_lft_ids, pl_rgt_ids, eq_ids = _side_(pl_, cl_[[0, -1]])  # line)
+    else:
+        pl_lft_ids, pl_rgt_ids, eq_ids = _side2_(pl_, cl_)  # !! side selection
     #
     # -- (4) check for sorting using pl_ and cl_.
+    # cl_eq_pl_ids = np.nonzero((cl_ == pl_[:-1, None]).all(-1).any(-1))
     cl_pl_ids = np.nonzero((pl_[:-1] == cl_[:, None]).all(-1))
     arr = cl_pl_ids[1]  # -- new cl_ids
     _is_sorted_ = (arr[:-1] <= arr[1:]).all()  # if True,
@@ -457,7 +543,7 @@ def split_poly(poly, line):
         r_ += [r_[0]]
         l_ = lft_splits[0].tolist()
         l_ += [l_[0]]
-        return pl_[l_], pl_[r_]
+        return [pl_[l_]], [pl_[r_]]
     #
     # -- multiple intersections within polygon like E. `eq_ids` used here
     if N_l == 1 and N_r > 1:  # -- vertical line intersectiong multiple pnts
@@ -476,6 +562,13 @@ def split_poly(poly, line):
         rgt_final = pl_[pl_rgt_ids]  # -- or pl_[np.concatenate(_r)]
         if (dup_line[[0, 1]] == cl_[[-1, 0]]).all(-1).all():  # -- swapped line
             lft_final, rgt_final = rgt_final, lft_final
+        both = []
+        for i in [lft_final, rgt_final]:  # make sure both are lists
+            if isinstance(i, (list, tuple)):
+                both.append(i)
+            else:
+                both.append([i])
+        lft_final, rgt_final = both
         return lft_final, rgt_final
     #
     # -- multiple splits on both sides
@@ -523,17 +616,22 @@ def split_poly(poly, line):
     # poly = E; line = np.array([[0., 9.], [8.0, 0.0]])   # no   yes   3    3
     # poly = E; line = np.array([[1., 0.], [2.0, 10.0]])  # no   -     1    1
     # poly = E; line = np.array([[2., 0.], [2.0, 10.0]])  # vertical   1    3
+    # poly = E; line = np.array([[2.0, 10.0], [2., 0.]])  # rev above  3    1
     # poly = E; line = np.array([[6., 0.], [10.0, 10.0]]) # no   yes   2    2
     # poly = aoi; line = np.array([[0., 2.], [10.0, 8.0]]) #no   yes   1    1
     # -- process, then plot
-    # lft_out, rgt_out = split_poly(poly, line)
-    # plot_polygons([pl_, cl_], True, True, True)
+    # l_, r_ = split_poly(poly, line)
+    # plot_polygons(l_ + r_, True, True, True)  # lists, add them
 
     # --------
 
-
-    # line = np.array([[0., 5.], [4., 4.], [6., 8.], [10.0, 9.0]])
+    # -- alternate lines
+    # line = np.array([[0., 5.], [4., 4.], [6., 8.], [10.0, 9.0]])  # ends on
+    # --right extends
     # line = np.array([[0., 5.], [4., 4.], [6., 8.], [12.5, 10.0]])
+    # -- both extend
+    # line = np.array([[-1., 4], [0., 5.], [4., 4.], [6., 8.], [12.5, 10.0]])
+    #
     # line = np.array([[6., 0.], [10., 12.]])
     # line = np.array([[6., 0.], [12., 10.]])
 

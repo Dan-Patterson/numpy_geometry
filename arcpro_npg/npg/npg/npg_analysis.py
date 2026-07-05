@@ -334,8 +334,8 @@ def _x_sect_2(args):
     >>> s1 = np.array([[ 0.0, 0.0], [ 5.0, 5.0], [ 0.0,  2.5], [ 2.5, 0.0]])
     >>> a0, a1, a2, a3 = s0
     >>> b0, b1, b2, b3 = s1
-    >>> npg._x_sect_2(s0)  # (False, None)
-    >>> npg._x_sect_2(s1)  # (True, [1.25, 1.25])
+    >>> npg.npg_analysis._x_sect_2(s0)  # (False, None)
+    >>> npg.npg_analysis._x_sect_2(s1)  # (True, [1.25, 1.25])
 
     See npg.geom.intersect for details.  This is a variant for concave hulls.
 
@@ -362,8 +362,8 @@ def _x_sect_2(args):
         intersection_pnt = u[cnts > 1]
         return True, intersection_pnt
 
-    s10_x = p1[0] - p0[0]
-    s10_y = p1[1] - p0[1]
+    s10_x = p1[0] - p0[0]  # subtracting list elements is actually faster
+    s10_y = p1[1] - p0[1]  # for such small arrays
     s32_x = p3[0] - p2[0]
     s32_y = p3[1] - p2[1]
     s02_x = p0[0] - p2[0]
@@ -405,8 +405,8 @@ def intersection_pnt(p0, p1, p2, p3):
     `<https://en.wikipedia.org/wiki/Line–line_intersection>`_.
     """
     x0, y0, x1, y1, x2, y2, x3, y3 = (*p0, *p1, *p2, *p3)
-    dc_x, dc_y = np.subtract(p2, p3)
-    dp_x, dp_y = np.subtract(p0, p1)
+    dc_x, dc_y = p2 - p3  # np.subtract(p2, p3)
+    dp_x, dp_y = p0 - p1  # np.subtract(p0, p1)
     n1 = x2 * y3 - y2 * x3
     n2 = x0 * y1 - y0 * x1
     n3 = 1.0 / (dc_x * dp_y - dc_y * dp_x)

@@ -270,6 +270,9 @@ def _w_(a, b, all_info=False):
     b_num = (b_0 - b_1) + 0.0  # for both points of a segment
     #
     # pnts in poly
+    # 2026-06-14 ... potential changes
+    #   - chk1 = y0_y2 > 0.0
+    #   - neg = (~chk1 & ~chk2 & (chk3 <= 0)).sum(axis=0, dtype=np.int32)
     chk1 = y0_y2 >= 0.0  # y above poly's first y value, per segment
     chk2 = np.less(y0, y3[:, None])  # y above the poly's second point
     chk3 = np.sign(a_num).astype(np.int32)
@@ -566,7 +569,7 @@ def add_intersections(p0, p1, roll_to_minX=True, p0_pgon=True, p1_pgon=True):
         z = p0_[p_neq]  # check the points not on, but may be in or out
         # -- error if z is only 1 point !!!
         if len(z) == 1:
-            p_w = np_wn(z, p1_, False)  # use _w_ from _wn_clip_
+            p_w = np_wn(z, p1_, True, False)  # use _w_ from _wn_clip_
         else:
             p_w = _w_(z, p1_, False)  # original
         #

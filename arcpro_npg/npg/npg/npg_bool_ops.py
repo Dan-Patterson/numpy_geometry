@@ -1760,12 +1760,12 @@ def clip_(poly, clipper, as_geo=True):
         mean_in_chk = winding_num(bt_mean, clipper, False)
         # if none in clipper return the bit in list
         if (none_in_chk == 0) and (mean_in_chk == 0): # bt is outside clipper
-            return [bt]
+            return None  # [bt]  2026-05-11 return none, bit outside
         geom, bits_  = polygon_overlay(bt, clipper)
         if bits_ is not None:
-            out = bits_[-1]
+            out = bits_[-1]  # last bit ie.bits_[4]
         else:
-            out = geom
+            out = None  # geom
         return out
     # --
     if hasattr(poly, 'IFT'):  # -- Geo arrays
