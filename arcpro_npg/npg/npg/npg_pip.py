@@ -526,8 +526,8 @@ def np_wn(pnts, poly, on_is_in=False, return_winding=False):
         z0 = np.sum(diff_ > 0., axis=1)  # convex polygons only
         in_and_on = np.nonzero(z0 == 0)[0]
         in_0 = np.nonzero(wn)[0]
-        both_ = np.array(sorted(list(set(in_0).union(in_and_on))))
-        in_ = pnts[both_]
+        all_ = np.unique(np.concatenate((in_0, on_boundary, in_and_on)))
+        in_ = pnts[all_]
     else:  # -- use set difference
         whr_in = np.nonzero(wn)[0]  # -- initial estimate
         in_fully = np.array(sorted(list(set(whr_in).difference(on_boundary))))
