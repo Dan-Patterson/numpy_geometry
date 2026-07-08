@@ -200,7 +200,7 @@ def _is_right_side(p, strt, end):
 
 
 def crossing_num(pnts, poly, line=True):
-    """Crossing Number for point(s) in polygon.  See `pnts_in_poly`.
+    """Crossing Number for point(s) in polygon.
 
     Parameters
     ----------
@@ -468,10 +468,9 @@ def np_wn(pnts, poly, on_is_in=False, return_winding=False):
     """
     def extent_chk(pnts, poly):
         """Prune out extraneous points"""
-        e = np.concatenate((np.min(poly, axis=0), np.max(poly, axis=0)))
-        c0 = np.logical_and(e[0] <= pnts[:, 0], pnts[:, 0] <= e[2])
-        c1 = np.logical_and(e[1] <= pnts[:, 1], pnts[:, 1] <= e[3])
-        in_extent = np.logical_and(c0, c1).nonzero()[0]
+        LB, RT = np.array([poly.min(axis=0), poly.max(axis=0)])
+        comp = np.logical_and(LB <= pnts, pnts <= RT)  # using <= and <=
+        in_extent = np.logical_and(comp[..., 0], comp[..., 1]).nonzero()[0]
         return in_extent
 
     def on_edge_chk(diff_, dot_, seg_len):
@@ -491,9 +490,10 @@ def np_wn(pnts, poly, on_is_in=False, return_winding=False):
         pnts = pnts[None, :]  # 2025-11-09 to check for a single point
     #
     # -- pnts in extent check
-    # p = np.atleast_2d(pnts)
-    # in_extent = extent_chk(p, poly)
-    # pnts = pnts[in_extent]
+    # return an empty array if no points in poly, this is a quick bail
+    in_extent = extent_chk(pnts, poly)
+    if len(in_extent) == 0:
+        return in_extent
     #
     x, y = pnts.T         # point coordinates
     x0, y0 = poly[:-1].T  # polygon `from` coordinates
@@ -579,11 +579,10 @@ def pip(pnts, poly, on_is_in=False, extras=False):
     """
 
     def extent_chk(pnts, poly):
-        """Prune out extraneous points. See reference."""
-        e = np.concatenate((np.min(poly, axis=0), np.max(poly, axis=0)))
-        c0 = np.logical_and(e[0] <= pnts[:, 0], pnts[:, 0] <= e[2])
-        c1 = np.logical_and(e[1] <= pnts[:, 1], pnts[:, 1] <= e[3])
-        in_extent = np.logical_and(c0, c1).nonzero()[0]
+        """Prune out extraneous points"""
+        LB, RT = np.array([poly.min(axis=0), poly.max(axis=0)])
+        comp = np.logical_and(LB <= pnts, pnts <= RT)  # using <= and <=
+        in_extent = np.logical_and(comp[..., 0], comp[..., 1]).nonzero()[0]
         return in_extent
 
     if pnts.ndim == 1:
@@ -650,8 +649,6 @@ def pnts_in_Geo(pnts, geo, stacked=True):
     -----
     See docstring notes.
 
-    >>> # for my testing
-    >>> final  = pnts_in_Geo(g_uni, g4, True)
     """
     #
     out = []
@@ -665,7 +662,7 @@ def pnts_in_Geo(pnts, geo, stacked=True):
     return pts
 
 
-def pnts_on_segments(pnts, segs, ids_only=False):
+def pnts_on_segments(pnts, segs, ids_only=False, with_tolerance=False):
     """Determine whether any of the points in `pnts` are on segments.
 
     Parameters
@@ -677,6 +674,10 @@ def pnts_on_segments(pnts, segs, ids_only=False):
     ids_only : boolean
         True, returns the id values of the points that are on segments.  False,
         returns a structured array with full information
+    with_tolerance : boolean
+        True, uses a distance check rather than crossproduct.  Tolerance is
+        1e-9.  False uses a collinearity check and absolute position on the
+        segment.
 
     Returns
     -------
@@ -697,9 +698,9 @@ def pnts_on_segments(pnts, segs, ids_only=False):
         plot_mixed(data)
 
     """
-    def _is_pnt_on_seg_(seg, pnt, tol=1e-6):
+    def _on_seg_(seg, pnt, tol=1e-9):
         """Mini pnt_on_seg function normally required by `npGeo.pnt_on_poly`.
-        From `npg_geom_ops._closest_pnt_on_poly_`
+        From `npg_geom_ops._closest_pnt_on_poly_`.
         """
         x, y = pnt
         x0, y0, x1, y1, dx, dy = *seg[0], *seg[1], *(seg[1] - seg[0])
@@ -709,6 +710,16 @@ def pnts_on_segments(pnts, segs, ids_only=False):
         _a, _b, _c = np.sqrt([dist_, dist_0, dist_1])
         chk = _a - (_b + _c)
         if -tol <= chk and chk < tol:
+            return True
+        return False
+
+    def _on_seg_2(seg, pnt, tol=1e-9):
+        """Use cross-product for absolute check."""
+        x, y = pnt
+        x0, y0, x1, y1 = *seg[0], *seg[1]
+        # -- cross-product check to see if it equals 0
+        cross_ = (y1 - y) * (x0 - x) - (x1 - x) * (y0 - y)
+        if cross_ == 0:
             return True
         return False
 
@@ -765,8 +776,12 @@ def pnts_on_segments(pnts, segs, ids_only=False):
         else:
             seg_xy = segs[id0].reshape(2, 2)
         pnt_xys = pnts[s[:, 1]]  # -- Note, may need to change pnt_xys to pnts
-        result = [(id0, id1[c], pnt[0], pnt[1], _is_pnt_on_seg_(seg_xy, pnt))
-                  for c, pnt in enumerate(pnt_xys)]
+        if with_tolerance:
+            result = [(id0, id1[c], pnt[0], pnt[1], _on_seg_(seg_xy, pnt))
+                      for c, pnt in enumerate(pnt_xys)]
+        else:
+            result = [(id0, id1[c], pnt[0], pnt[1], _on_seg_2(seg_xy, pnt))
+                      for c, pnt in enumerate(pnt_xys)]
         out.extend(result)
     #
     seg_dt = np.dtype([('seg_id', 'i4'), ('pnt_id', 'i4'),
@@ -785,6 +800,8 @@ def pip_test(pnts=None, poly=None):
     if poly is None:
         # -- duplicate of aoi0, plus triangles
         poly = np.array([[1., 1.], [1., 9.], [9., 9.], [9., 1.], [1., 1.]])
+        # poly = np.array([[1., 1.], [1., 9.], [5., 8.], [9., 9.], [9., 1.],
+        #                  [1., 1.]])
         # poly = np.array([[1., 1.], [1., 9.], [9., 1.], [1., 1.]])  # left tri
         # poly = np.array([[1., 1.], [9., 9.], [9., 1.], [1., 1.]])  # rgt tri
     if pnts is None:
@@ -804,7 +821,7 @@ def pip_test(pnts=None, poly=None):
                        [6.0, 1.001], [5.0, 1.0], [4.0, 0.999],
                        ])
     data = [[poly, 2, 'red', '.', True ], [pnts, 0, 'black', 'o', False]]
-    plot_mixed(data, title="Points in Polygons",  invert_y=False, ax_lbls=None)
+    plot_mixed(data, title="Points in Polygon",  invert_y=False, ax_lbls=None)
     #
     in_, wn = np_wn(pnts, poly, on_is_in=False, return_winding=True)
     return in_, wn
