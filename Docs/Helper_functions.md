@@ -3,7 +3,7 @@
 **Properties and methods**
 
 
-|Info | info | geo_info | structure|
+|Info | facts | geo_props | structure|
 | --- | ---- | -------- | -------- |
 
 There are several levels of information that can be acquired for Geo arrays.
@@ -15,7 +15,7 @@ g.Info
 'rolled'
 ```
 
-A fuller description can be derived using the lowercase **info** property.  The following is returned.
+A fuller description can be derived using the **facts** property.  The following is returned.
 - extent, 
 - number of shapes
 - number of parts
@@ -24,7 +24,7 @@ A fuller description can be derived using the lowercase **info** property.  The 
 
 ```python
 
-g.info
+g.facts
 --------------
 Extents :
   LL [ 300000.00  5000000.00]
@@ -48,16 +48,16 @@ Sp Ref : NAD 1983 CSRS MTM  9
  009      9        50        55         1          1         0
 ```
 
-The similarities and differences between the Geo array and the base ndarray is ascribed to the ``geo_info`` method.
+The similarities and differences between the Geo array and the base ndarray is ascribed to the ``geo_props`` method.
 
-All common properties can be determined using ``npg.dirr`` while the output from ``npg.geo_info`` is subdivided into the properties
+All common properties can be determined using ``npg.dirr`` while the output from ``npg.geo_props`` is subdivided into the properties
 and methods specific to a geo array, their base and special properties.
 
 ```python
 
-g.geo_info()
+g.geo_props
 
-geo_info(geo_array)
+g.geo_props
 Geo methods and properties.
     Bit, CW, FT, Fr, H, IDs, IFT, IFT_str, IP, Info, K, LL, N, PID, SR, SVG, To, U,
     UR, X, XT, XY, Y, Z, __author__, __dict__, __module__, __name__, aoi_extent,
@@ -82,7 +82,7 @@ Another useful method for documentation purposes is ``structure``.  It is largel
 
 ```python
 
-g.structure()  # provide structural information and the IFT in verbose format
+g.structure  # provide structural information and the IFT in verbose format
 
 Geo array structure
 -------------------
