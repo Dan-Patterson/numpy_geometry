@@ -3,9 +3,9 @@
 r"""
 ------------
 npg_bool_hlp
------------
+------------
 
-** Boolean helpers for overlay operations on poly geometry.
+**Boolean helpers for overlay operations on poly geometry.**
 
 ----
 

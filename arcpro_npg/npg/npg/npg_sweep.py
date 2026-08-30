@@ -113,14 +113,26 @@ def sweep(seq_srted,
             return arrs_flat[fst]
         return None
 
+    def ss_chk(s_, e_, st_en_srt, arrs_flat):
+        """Check start-end within closure."""
+        s_e = np.array([s_, e_])
+        w0_ = np.nonzero((st_en_srt == s_e).all(-1))[0]
+        if len(w0_) == 0:
+            w1_ = np.nonzero((st_en_srt == s_e[::-1]).all(-1))[0]
+            if len(w1_) == 0:
+                return None
+            return arrs_flat[w1_[0]]
+        else:
+            return arrs_flat[w0_[0]]
+
     def closer(v, arrs_flat, _out_, cnt):
         """Try closing the array."""
-        q = []
         v1 = v[::]  # copy v
         for i in arrs_flat[cnt + 2:]:
             chk = len(o_set.intersection(i)) == 0
             # -- 2025-12-16  sneak in a closure test
             seg_ = es_chk(v1[0], v1[-1], st_en_srt, arrs_flat)
+            # seg_1 = ss_chk(v1[0], v1[-1], st_en_srt, arrs_flat)
             if seg_ is not None:
                 if seg_[-1] == v1[-1]:
                     v1 = np.concatenate((v1, seg_[::-1]))
@@ -128,22 +140,18 @@ def sweep(seq_srted,
                     v1 = np.concatenate((v1, seg_))
             # --
             if abs(v1[-1] - v1[0]) <= 1:
-                q.append("i, v1 {} {}".format(i, v1))
                 break  # -- return v1, q  # didn't work
-            # print(f"cnt : {cnt} chk {chk} i {i}")
             if chk:
                 if i[0] == v1[-1]:  # start meets end
                     v1 = np.concatenate((v1, i))
-                    q.append("i, v1 {} {}".format(i, v1))
                     continue
                 if i[-1] == v1[-1]:  # ends meet end
                     v1 = np.concatenate((v1, i[::-1]))
-                    q.append("i, v1 {} {}".format(i, v1))
                     continue
-                # if i[-1] == v1[0]:  # end meets start
-                #     v1 = np.concatenate((i, v1))
-                q.append("i, v1 {} {}".format(i, v1))
-        return v1, q
+            else:
+                if i[0] == v1[0]:
+                    v1 = np.concatenate((v1, i[::-1]))
+        return v1
 
     def pair_(ar):
         """Form pairs from a nested list of lists."""
@@ -175,15 +183,6 @@ def sweep(seq_srted,
     x_dif = (x_lex[1:] - x_lex[:-1])
     spl_whr2 = np.nonzero(x_dif > 0.0)[0] + 1
     swp_ln_ids = np.array_split(c_on_lex, spl_whr2)  # -- sorted by x
-    # -- by y
-    # c_on_xy_lex_2 = np.lexsort((c_on_xy[:, 0], -c_on_xy[:, 1]))  # sorted
-    # c_on_lex_2 = _on_[c_on_xy_lex_2]
-    # #
-    # y_lex = c_on_xy[c_on_xy_lex_2][:, 1]
-    # y_dif = (y_lex[1:] - y_lex[:-1])
-    # spl_whr2_2 = np.nonzero(y_dif < 0.0)[0] + 1  # -- sign changed from above
-    # swp_ln_ids_2 = np.array_split(c_on_lex_2, spl_whr2_2)
-    # !!!! work from here on
     """
     [len(o_set.intersection(i)) for i in c_seq]
     [len(i_set.intersection(i)) for i in c_seq]
@@ -209,7 +208,7 @@ def sweep(seq_srted,
     # _sweep_id_ = c_on_lex.tolist()  # used as a counter for the sweep line ids
     #
     new_count = 0
-    for cnt, ar in enumerate(arrs_flat[:-1]):  # start at XX tomorrow
+    for cnt, ar in enumerate(arrs_flat[:2]):  # -1 start at XX tomorrow
         v = None
         f, s = arrs_flat[cnt:cnt+2]
         # -- classify segments
@@ -226,6 +225,8 @@ def sweep(seq_srted,
             if f[0] == s[0]:  # first ids are the same eg. [0, 21, 7],  [0, 1]
                 if f_out:  # frst segment is definitely out, secn is in or on
                     v = np.concatenate((s[::-1], f))  # form outer polygon
+                elif s_out:
+                    v = np.concatenate((f[::-1], s))
                 elif abs(f[-1] - s[-1]) == 1:  # check last of both for closure
                     v = np.concatenate((f, s[::-1]))
                 else:
@@ -250,16 +251,9 @@ def sweep(seq_srted,
                         keep_[0] = v_
             elif diff_ == -1:
                 closed_.append(v)
-            elif abs(v[0] - v[-1]) <= 2:
-                if v[0] < v[-1]:
-                    v = np.array(v.tolist() + [v[-1] - 1, v[0]])
-                else:
-                    v = np.array([v[0], v[0] + 1] + v.tolist())
-                if abs(s[0] - s[-1]) > 1:  # [14, 25, 13], [14, 15] in E, d1_
-                    closed_.append(v)
             else:  # try closing, may require multple segments.  v_, new array
                 # run `closer` for multi segment joins
-                v_, rpt = closer(v, arrs_flat, _out_, cnt)  # rpt is a report
+                v_ = closer(v, arrs_flat, _out_, cnt)  # rpt is a report
                 if v_[0] == v_[-1]:  # -- maybe combine with below
                     closed_.append(v_)  # append the closed version
                 elif abs(v_[-1] - v_[0]) <= 1:
@@ -299,30 +293,6 @@ def sweep(seq_srted,
                     keep_.pop(k_id)  # -- now remove from keep_
                 else:
                     keep_[k_id] = np.array(v)
-            #
-            # -- 2025-12-01 added st_end_chk ** clean this up of duplicates
-            s_diff = s[-1] - s[0] 
-            if len(st_en_chk) > 0 and not s_out:
-                if s_diff != 1:
-                    # print("\ncnt {} st_en_chk :f {}, s {}".format(cnt, f, s))
-                    k_id = st_en_chk[0]
-                    v = keep_[k_id].tolist() + s.tolist()
-                    if abs(v[0] - v[-1]) <= 2:
-                        v = np.array(v + [v[0]])
-                        closed_.append(v)
-                        keep_.pop(k_id)  # -- now remove from keep_
-                    else:
-                        keep_[k_id] = np.array(v)
-                elif s_diff == 1:  # added 2025-17 for E, d1_ to add 9, 10
-                    k_id = st_en_chk[0]
-                    v = keep_[k_id].tolist() + s.tolist()
-                    if abs(v[0] - v[-1]) <= 2:
-                        v = np.array(v + [v[0]])
-                        closed_.append(v)
-                        keep_.pop(k_id)
-                    else:
-                        keep_[k_id] = np.array(v)
-        #
         # -- 2025-11-29 to try and add segs to upper clipper
         #  uses s_in, for transition
         s_diff = s[-1] - s[0]  # -- 2025-12-03 for single crossover 3,4 on
@@ -357,6 +327,9 @@ def sweep(seq_srted,
     geom = _orient_clockwise_(geom)
     return arrs_, geom
 
+# ---- tested with
+#  E, d0_   some issues with 3, 4 being included instead of 3, 5
+#  E, aoi1 : none work so far
 # ---- Final main section ----------------------------------------------------
 if __name__ == "__main__":
     """optional location for parameters"""

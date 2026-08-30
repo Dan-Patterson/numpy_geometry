@@ -16,7 +16,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-12-21
+    2026-08-30
 
 Purpose
 -------
@@ -38,7 +38,7 @@ import npg  # noqa
 from npg.npg_geom_hlp import a_eq_b
 from npg.npg_bool_hlp import (_add_pnts_, _del_seq_dupl_pnts_, _wn_clip_,
                               prep_overlay)  # _node_type_)
-from npg.npg_pip import winding_num
+from npg.npg_pip import winding_num, np_wn
 from npg.npg_plots import plot_polygons  # noqa
 
 #  --- alter or use below
@@ -283,7 +283,7 @@ def clip_poly(poly, clp, as_geo=False):
         # out.extend(pl_n[p_missing])
         # out.extend(cl_n[c_missing])
         msg = "\nMissed during processing clip {} poly {}"
-        # print(msg.format(c_missing, p_missing))
+        print(msg.format(c_missing, p_missing))
     #
     final = np.asarray(out)
     #
@@ -315,7 +315,113 @@ def clip_poly(poly, clp, as_geo=False):
 
 
 # ---- ---------------------------
-# ---- (2) split polygon
+# ---- (2) side options
+#
+def _side_(pnts, cut_line):
+    """Return the line side that points are on.
+
+    Parameters
+    ----------
+    pnts : array
+        The points being tested.
+    cut_line : array
+        The line to compare to.  This variant is only for 2 a point line.
+
+    Notes
+    -----
+    The variant keeps the points on the line in both the left and right
+    side ids since reconstructing both halves of a split will require those
+    on as well.
+
+    See _is_right_side in npg_pip
+    x, y, x0, y0, x1, y1 = *p, *strt, *end  # p point, strt/end line point
+    (x1 - x0) * (y - y0) - (y1 - y0) * (x - x0)
+    """
+    x0, y0, x1, y1 = cut_line.ravel()
+    v = (x1 - x0) * (pnts[:, 1] - y0) - (y1 - y0) * (pnts[:, 0] - x0)
+    v = np.round(v, 6)
+    lft_ids = np.nonzero(np.sign(v) >= 0.)[0]  # keep on and left of line
+    rgt_ids = np.nonzero(np.sign(v) <= 0.)[0]  # keep on and right
+    eq_ids = np.nonzero(np.sign(v) == 0.)[0]   # get separate ids for equal
+    return lft_ids, rgt_ids, eq_ids
+
+def _side2_(pnts, cut_line):
+    """Return the line side that points are on."""
+
+    def sd_(ps, seg_):
+        """`_side_` for pairs of multiple cut segments."""
+        x0, y0, x1, y1 = seg_.ravel()
+        v = (x1 - x0) * (ps[:, 1] - y0) - (y1 - y0) * (ps[:, 0] - x0)
+        v_sgn = np.sign(np.round(v, 6))
+        lft_ids = np.nonzero(v_sgn > 0.)[0]  # keep left of line
+        rgt_ids = np.nonzero(v_sgn < 0.)[0]  # keep right
+        eq_ids = np.nonzero(v_sgn == 0.)[0]  # get ids for equal
+        return lft_ids, rgt_ids, eq_ids
+    
+    if len(cut_line) == 2:
+        return sd_(pnts, cut_line)
+    pairs_ = np.concatenate((cut_line[:-1], cut_line[1:]), axis=1)
+    lft_ids, rgt_ids, eq_ids = [], [], []
+    ps = np.copy(pnts[:-1])  # -- first input is all the points
+    for cnt, seg_ in enumerate(pairs_):
+        z0, z1, z2 = sd_(ps, seg_)
+        lft_ids.append(z0)
+        rgt_ids.append(z1)
+        eq_ids.append(z2)
+    e_0 = np.unique(np.concatenate(eq_ids))  # -- unique and sorted
+    l_0 = np.unique(np.concatenate(lft_ids))
+    r_0 = np.unique(np.concatenate(rgt_ids))
+    #
+    l_1 = set(l_0).difference(e_0)
+    r_1 = set(r_0).difference(e_0)
+    return lft_ids, rgt_ids, eq_ids
+
+def _side3_(pnts, cut_line):
+    """Return the line side that points are on."""
+
+    # -- form polygons
+    L, B, R, T = npg.npg_geom_ops.pnts_to_extent(pnts, False)
+    upper = np.array([[L, T], [R, T]])  # left to right
+    lower = np.array([[R, B], [L, B]])  # right to left
+    x_diff, y_diff = (cut_line[-1] - cut_line[0])
+    if x_diff > 0.:  # left to right cut, include first x_pnt and swap line
+        l_poly = np.concatenate((cut_line[0][None, :],
+                                 upper,
+                                 cut_line[::-1]), axis=0)
+        r_poly = np.concatenate((cut_line,
+                                 lower,
+                                 cut_line[0][None, :]), axis=0)
+    elif x_diff == 0.:  # vertical cut
+        lft = np.array([[L, B], [L, T]])
+        rgt = np.array([[R, T], [R, B]])
+        if y_diff > 0:
+            l_poly = np.concatenate((lft, cut_line), axis=0)
+            r_poly = np.concatenate((cut_line, rgt), axis=0)
+    else:
+        l_poly = np.concatenate((lower, cut_line[::-1]))
+        r_poly = np.concatenate((upper, cut_line), axis=0)  # swap line
+    #
+    # -- now do the wn check
+    # finish left
+    z0, z1 = winding_num(pnts, l_poly, batch=True)
+    in_on_ = np.nonzero(z1)[0]
+    on_ = np.nonzero((l_poly == pnts[:, None]).all(-1).any(-1))[0]
+    whr_l = np.unique(np.concatenate((in_on_, on_)))
+    l_new = pnts[whr_l]
+    #
+    # finish right
+    z2, z3 = winding_num(pnts, r_poly, batch=True)
+    in_on_1 = np.nonzero(z3)[0]
+    on_1 = np.nonzero((r_poly == pnts[:, None]).all(-1).any(-1))[0]
+    whr_r = np.unique(np.concatenate((in_on_1, on_1)))
+    r_new = pnts[whr_r]
+    # vals = _wn_clip_(pnts, l_poly, all_info=True)
+    # x_pnts_, pInc_, cInp_, x_type_, whr_ = vals
+    return l_poly, r_poly, l_new, r_new
+
+
+# ---- ---------------------------
+# ---- (3) split polygon
 #
 def split_poly(poly, line):
     """Return polygon parts split by a polyline.
@@ -360,256 +466,145 @@ def split_poly(poly, line):
         """
         vals = _wn_clip_(poly, line, all_info=True)
         x_pnts, pInc, cInp, x_type, whr = vals
+        #
+        # -- bail if no intersections
         if len(x_pnts) < 2:
-            return [], None, None
+            return [], None, None, None
         _p, _l = _add_pnts_(poly, line, x_pnts, whr)  # -- temporary poly, clp
         # x_pnts = _del_seq_dupl_pnts_(x_pnts, poly=False)
         x_pnts = np.unique(x_pnts, axis=0)  # lex sorted
         pl_ = _del_seq_dupl_pnts_(np.concatenate((_p), axis=0), poly=True)
         cl_ = _del_seq_dupl_pnts_(np.concatenate((_l), axis=0), poly=False)
-        return x_pnts, pl_, cl_
-
-    def _side_(pnts, cut_line):
-        """Return the line side that points are on.
-
-        Parameters
-        ----------
-        pnts : array
-            The points being tested.
-        cut_line : array
-            The line to compare to.  This variant is only for 2 a point line.
-
-        Notes
-        -----
-        The variant keeps the points on the line in both the left and right
-        side ids since reconstructing both halves of a split will require those
-        on as well.
-
-        See _is_right_side in npg_pip
-        x, y, x0, y0, x1, y1 = *p, *strt, *end  # p point, strt/end line point
-        (x1 - x0) * (y - y0) - (y1 - y0) * (x - x0)
-        """
-        x0, y0, x1, y1 = cut_line.ravel()
-        v = (x1 - x0) * (pnts[:, 1] - y0) - (y1 - y0) * (pnts[:, 0] - x0)
-        v = np.round(v, 6)
-        lft_ids = np.nonzero(np.sign(v) >= 0.)[0]  # keep on and left of line
-        rgt_ids = np.nonzero(np.sign(v) <= 0.)[0]  # keep on and right
-        eq_ids = np.nonzero(np.sign(v) == 0.)[0]   # get separate ids for equal
-        return lft_ids, rgt_ids, eq_ids
-
-    def _side2_(pnts, cut_line):
-        """Return the line side that points are on."""
-
-        def sd_(pnts, seg_):
-            """`_side_` for pairs of multiple cut segments."""
-            x0, y0, x1, y1 = seg_.ravel()
-            v = (x1 - x0) * (pnts[:, 1] - y0) - (y1 - y0) * (pnts[:, 0] - x0)
-            v_sgn = np.sign(np.round(v, 6))
-            lft_ids = np.nonzero(v_sgn > 0.)[0]  # keep left of line
-            rgt_ids = np.nonzero(v_sgn < 0.)[0]  # keep right
-            eq_ids = np.nonzero(v_sgn == 0.)[0]  # get ids for equal
-            return lft_ids, rgt_ids, eq_ids
-        
-        if len(cut_line) == 2:
-            return sd_(pnts, cut_line)
-        pairs_ = np.concatenate((cut_line[:-1], cut_line[1:]), axis=1)
-        lft_ids, rgt_ids, eq_ids = [], [], []
-        for cnt, seg_ in enumerate(pairs_):
-            z0, z1, z2 = sd_(pnts[:-1], seg_)
-            lft_ids.append(z0)
-            rgt_ids.append(z1)
-            eq_ids.append(z2)
-        # e_0 = np.unique(np.concatenate(eq_ids))  # -- unique and sorted
-        # l_0 = np.unique(np.concatenate(lft_ids))
-        # r_0 = np.unique(np.concatenate(rgt_ids))
-        # #
-        # l_1 = set(l_0).difference(e_0)
-        # r_1 = set(r_0).difference(e_0)
-        return lft_ids, rgt_ids, eq_ids
-
-    def _side3_(pnts, cut_line):
-        """Return the line side that points are on."""
-
-        # -- form polygons
-        L, B, R, T = npg.npg_geom_ops.pnts_to_extent(pnts, False)
-        upper = np.array([[L, T], [R, T]])  # left to right
-        lower = np.array([[R, B], [L, B]])  # right to left
-        x_diff, y_diff = (cut_line[-1] - cut_line[0])
-        if x_diff > 0.:  # left to right cut, include first x_pnt and swap line
-            l_poly = np.concatenate((cut_line[0][None, :],
-                                     upper,
-                                     cut_line[::-1]), axis=0)
-            r_poly = np.concatenate((cut_line,
-                                     lower,
-                                     cut_line[0][None, :]), axis=0)
-        elif x_diff == 0.:  # vertical cut
-            lft = np.array([[L, B], [L, T]])
-            rgt = np.array([[R, T], [R, B]])
-            if y_diff > 0:
-                l_poly = np.concatenate((lft, cut_line), axis=0)
-                r_poly = np.concatenate((cut_line, rgt), axis=0)
-        else:
-            l_poly = np.concatenate((lower, cut_line[::-1]))
-            r_poly = np.concatenate((upper, cut_line), axis=0)  # swap line
         #
-        # -- now do the wn check
-        # finish left
-        z0, z1 = winding_num(pnts, l_poly, batch=True)
-        in_on_ = np.nonzero(z1)[0]
-        on_ = np.nonzero((l_poly == pnts[:, None]).all(-1).any(-1))[0]
-        whr_l = np.unique(np.concatenate((in_on_, on_)))
-        l_new = pnts[whr_l]
+        # -- roll pl_ to first intersection point
+        r0 = np.nonzero((x_pnts[0] == pl_[:, None]).all(-1).any(-1))[0]
+        r0 = r0[0]
+        if r0 != 0:
+            pl_ = np.concatenate((pl_[r0:-1], pl_[:r0], [pl_[r0]]), axis=0)
         #
-        # finish right
-        z2, z3 = winding_num(pnts, r_poly, batch=True)
-        in_on_1 = np.nonzero(z3)[0]
-        on_1 = np.nonzero((r_poly == pnts[:, None]).all(-1).any(-1))[0]
-        whr_r = np.unique(np.concatenate((in_on_1, on_1)))
-        r_new = pnts[whr_r]
-        # vals = _wn_clip_(pnts, l_poly, all_info=True)
-        # x_pnts_, pInc_, cInp_, x_type_, whr_ = vals
-        return l_poly, r_poly
+        # -- slice cl_ before or after x_pnts
+        # r1 = np.nonzero((x_pnts[0] == cl_[:, None]).all(-1).any(-1))
+        r2 = np.nonzero((x_pnts[[0, -1]] == cl_[:, None]).all(-1).any(-1))[0]
+        _st = r2[0]
+        if _st != 0:
+            f, s = r2
+            cl_ = cl_[f: s + 1]  # clip cl_ and wn first prior to getting
+            #wn = wn[f: s + 1]   # finding wn
+        # parse cl_ vs original poly to see what points are in the original
+        # or which splits
+        in_, wn = np_wn(cl_, poly, on_is_in=True, return_winding=True)
+        cl_out_ids = np.nonzero(wn == 0)[0]
+        #
+        # splits, not needed I think
+        if len(in_) > 2:  # split, segments if they exist, doing it stepwise
+            s0 = np.diff(np.nonzero(wn)[0]) != 1
+            s1 = np.nonzero(s0)[0] + 1
+            splits = np.array_split(in_, s1)
+        return x_pnts, pl_, cl_, splits, cl_out_ids
 
+    def _is_rght_sd_(ps, seg_):
+        """Return whether ps is to the right of the start-end of seg_."""
+        x0, y0, x1, y1 = seg_[[0, -1]].ravel()
+        v = (x1 - x0) * (ps[:, 1] - y0) - (y1 - y0) * (ps[:, 0] - x0)
+        v_sgn = np.sign(np.round(v, 6))
+        is_rght = np.nonzero(v_sgn < 0.)[0].any()
+        return is_rght
 
     #
     # -- (1) Prepare for splitting
     # Line direction must be increasing in x, swap if necessary.
     # Determine intersection points, and add to the arrays.  Roll to the
     # first intersection.
-    #  
+    #
+    # dup_line = np.copy(line)
+    swapped = False
     if line[0][0] > line[1][0]:
         line = line[::-1]
-    x_pnts, pl_, cl_ = _prep_(poly, line)  # -- `_prep_` stage
+        swapped =  True
+
+    # -- determine intersections and add points
+    x_pnts, pl_, cl_, splits, cl_out_ids = _prep_(poly, line)  # -- `_prep_` stage
     #
     if len(x_pnts) < 2:
         print("\nNot enough intersection points to split.")
         return None, None
     #
-    # -- (2) remove any extraneous bits from cl_ and fix `line` as `dup_line`
+    # -- form the from-to pairs for slicing
+    whr_p = np.nonzero((x_pnts == pl_[:, None]).all(-1))[0]
+    z0 = np.concatenate((whr_p[:-1][:, None], whr_p[1:][:, None] + 1), axis=1)
+    pl_s = [pl_[i[0]: i[1]] for i in z0]
     #
-    if cl_.shape[0] != x_pnts.shape[0]:
-        whr_ = np.nonzero((cl_ == x_pnts[:, None]).all(-1))[1]
-        # dup_line = cl_[np.sort(whr_[[0, -1]])]  # or cl_[np.sort(whr_)]
-        dup_line = np.copy(line)
-        cl_ = cl_[whr_]  # extra bits removed,
-    else:
-        dup_line = np.copy(line)  #x_pnts[np.sort(whr_[[0, -1]])]
+    # -- cl_ split based on points outside of poly
+    # if len(splits) > 1:
+    #    lft, rgt = _two_bits_(splits, pl_s)
+    #    return lft, rgt
+    # -- no splits, so process
+    whr_c = np.nonzero((x_pnts == cl_[:, None]).all(-1))[0]
+    z1 = np.concatenate((whr_c[:-1][:, None], whr_c[1:][:, None] + 1), axis=1)
+    cl_s = [cl_[i[0]: i[1]] for i in z1]
+    # brev = cl_s[::-1]  # -- bts1 reversed
+    # if len(cl_out_ids) > 0:
+    #     cl_out = cl_[cl_out_ids]
+    # else:
+    #     cl_out = None
     #
-    r0 = np.nonzero((x_pnts[0] == pl_[:, None]).all(-1).any(-1))[0]
-    r1 = np.nonzero((x_pnts[0] == cl_[:, None]).all(-1).any(-1))[0]
-    r0, r1 = [r0[0], r1[0]]
-    if r0 != 0:
-        pl_ = np.concatenate((pl_[r0:-1], pl_[:r0], [pl_[r0]]), axis=0)
-    if r1 != 0:
-        if r1 == cl_.shape[0] - 1:
-            cl_ = cl_[::-1]
-        elif r1 > 0:
-            # -- trim off preceeding points
-            cl_ = cl_[r1:]
-            # cl_ = np.concatenate((cl_[r1:-1], cl_[:r1], [cl_[r1]]), axis=0)
-    #
-    # -- (3) run `_side_` to get the points to the left and right of the line
-    #
-    if len(line) == 2:
-        pl_lft_ids, pl_rgt_ids, eq_ids = _side_(pl_, cl_[[0, -1]])  # line)
-    else:
-        pl_lft_ids, pl_rgt_ids, eq_ids = _side2_(pl_, cl_)  # !! side selection
-    #
-    # -- (4) check for sorting using pl_ and cl_.
-    # cl_eq_pl_ids = np.nonzero((cl_ == pl_[:-1, None]).all(-1).any(-1))
-    cl_pl_ids = np.nonzero((pl_[:-1] == cl_[:, None]).all(-1))
-    arr = cl_pl_ids[1]  # -- new cl_ids
-    _is_sorted_ = (arr[:-1] <= arr[1:]).all()  # if True,
-    # 
-    # -- (5) Locate gaps in pl_lft_ids and pl_rgt_ids.  Gaps in the ids can
-    #  indicate that there may be more than 1 piece on one or both sides.
-    #  Pair the gaps, slice the points and concatenate with the slicing line.
-    lft_out = pl_[pl_lft_ids]  # -- left of the line, should only be 1 poly
-    #
-    _lft_ = np.nonzero(np.diff(pl_lft_ids) > 1)[0] + 1
-    _l = np.array_split(pl_lft_ids, _lft_)
-    lft_splits = [i for i in _l if len(i) > 1]
-    #
-    _rgt_ = np.nonzero(np.diff(pl_rgt_ids) > 1)[0] + 1
-    _r = np.array_split(pl_rgt_ids, _rgt_)  # -- used below
-    rgt_splits = [i for i in _r if len(i) > 1]
-    #
-    # -- (6) Now process the possibilities
-    # -- simple split -- only one split on left and right
-    N_l = len(lft_splits)
-    N_r = len(rgt_splits)
-    if N_l == 1 and N_r == 1:
-        r_ = rgt_splits[0].tolist()
-        r_ += [r_[0]]
-        l_ = lft_splits[0].tolist()
-        l_ += [l_[0]]
-        return [pl_[l_]], [pl_[r_]]
-    #
-    # -- multiple intersections within polygon like E. `eq_ids` used here
-    if N_l == 1 and N_r > 1:  # -- vertical line intersectiong multiple pnts
-        l_ = pl_lft_ids[:-1]  # first and last are the same point
-        # -- eq_ids from _side_
-        _tmp = np.array(list(zip(eq_ids[:-1], eq_ids[1:])))
-        _dif = (_tmp[:, -1] - _tmp[:, 0])
-        _w = np.nonzero(_dif > 1)[0]
-        keep_ = _tmp[_w]
-        lft_final = []
-        for i in keep_:
-            f, t = i[0], i[1]
-            ftf = l_[f: t + 1].tolist() + [f]
-            if len(ftf) > 3:
-                lft_final.append(pl_[ftf])
-        rgt_final = pl_[pl_rgt_ids]  # -- or pl_[np.concatenate(_r)]
-        if (dup_line[[0, 1]] == cl_[[-1, 0]]).all(-1).all():  # -- swapped line
-            lft_final, rgt_final = rgt_final, lft_final
-        both = []
-        for i in [lft_final, rgt_final]:  # make sure both are lists
-            if isinstance(i, (list, tuple)):
-                both.append(i)
+    # -- get cl, pl id combinations to see if this helps in splitting
+    # cl_pl_ids = np.nonzero((pl_[:-1] == cl_[:, None]).all(-1))
+    # pl_cl_ids = np.nonzero((cl_ == pl_[:-1][:, None]).all(-1))
+
+    # -- new process works with E and
+    #    line = np.array([[-1.0, 2.0], [11.0, 9.0]])
+    lft_ = []
+    rgt_ = []
+    keep_ = []
+    rev = len(pl_s) - 1
+    for cnt, _ in enumerate(cl_s):  # -- clipper segments
+        c = cl_s[cnt]
+        # cr = c[[-1, 0]]
+        p = pl_s[cnt]
+        pr = pl_s[rev - cnt]
+        chk_0 = (c[[0, -1]] == p[[0, -1]]).all()
+        chk_1 = (c[[0, -1]] == pr[[-1, 0]]).all()
+        # chk_2 = (c[[-1, 0]] == p[[0, -1]]).all()  # -- not used yet
+        is_rght = _is_rght_sd_(pr, c)  # is `pr` is on the right side of `c`
+    
+        if chk_0:
+            lft_.append([p, c[::-1]])
+            rgt_.append([pr, c])
+        elif (not chk_0) and chk_1 and cnt == 0:  # bit on left not closed, bit on right is
+            keep_ = np.concatenate((c[::-1], p), axis=0)
+            rgt_.append(np.concatenate((c, pr), axis=0))
+        elif (not chk_0) and chk_1:  # add to keep
+            if is_rght:
+                keep_ = np.concatenate((c[::-1], keep_), axis=0)
+                rgt_.append(np.concatenate((c, pr), axis=0))  # -- not a hole
             else:
-                both.append([i])
-        lft_final, rgt_final = both
-        return lft_final, rgt_final
+               keep_ = np.concatenate((pr, keep_), axis=0)
+    chk = _is_rght_sd_(keep_, line)
+    if not chk:
+        lft_ = keep_
     #
-    # -- multiple splits on both sides
-    if N_l == N_r:  # ---- carry on, multiple splits
-        lft_final = []
-        rgt_final = []  # [rgt_splits[0]]  # add the first split from cl_ segs
-        keep_ = []
-        for cnt, i in enumerate(lft_splits):  # [:-1]):
-            i = lft_splits[cnt]               
-            if i[-1] + 1 in pl_rgt_ids:
-                lft_final.append(i)  # left piece
-                rgt_final.append(rgt_splits[cnt])  # may not be needed !!!
-            elif i[-1] == pl_.shape[0] - 1:  # only one clip outside
-                # lft_final.append(i)
-                # rgt_final.append(rgt_splits[cnt])
-                keep_.append(i)
-    # -- assemble the appropriate bits
-    if _is_sorted_:  # splits are paired
-        rgt_ids = np.concatenate(rgt_splits).tolist()  # equal to pl_rgt_ids !!
-        rgt_ids += [rgt_ids[0]]
-        rgt_out = pl_[rgt_ids]
-        lft_ids = [i.tolist() + [i[0]] for i in lft_final if len(i) > 1]
-        lft_out = [pl_[i] for i in lft_ids]    
-    else:  # split orders differ, eg. last clp pairs with 1st ply
-        lft_ids = np.concatenate(lft_splits).tolist()  # equal to pl_lft_ids !!
-        lft_ids += [lft_ids[0]]
-        lft_out = pl_[lft_ids]
-        rgt_ids = [i.tolist() + [i[0]] for i in rgt_final if len(i) > 1]
-        rgt_out = [pl_[i] for i in rgt_ids]
-    # -- note line may have been swapped when intersecting, check the reverse
-    if (dup_line == cl_[[-1, 0]]).all(-1).all():  # -- swapped line
-       lft_out, rgt_out =  rgt_out, lft_out
-    both_ = []
-    for i in [lft_out, rgt_out]:
-        if isinstance(i, list):
-            both_.append(i)
-        else:
-            both_.append([i])
-    l_, r_ = both_
-    return l_, r_  # , pl_, cl_
-#
+    if swapped:  # -- do the final swap if line direction wass switched.
+        lft_, rgt_ = rgt_, lft_
+    return lft_, rgt_
+
+"""
+    # -- original first check
+    out = []
+    used = []
+    keep_ = []
+    for i, c in enumerate(cl_s):  # -- clipper segments
+        for j, b in enumerate(pl_s):  # -- poly segments
+            chk = (c[[-1, 0]] == b[[0, -1]]).all()
+            if chk:
+                out.append(np.concatenate((c, b), axis=0))  # [c, b])
+                used.append([i, j])
+                break
+            else:
+                keep_.append(b)
+    # return lft, rgt
+"""
+
     # sample geometry                                       swap srted lft  rgt
     # poly = C; line = np.array([[0., 5.], [10.0, 9.0]])  # works
     # poly = E; line = np.array([[0., 2.], [10.0, 9.0]])  # no   no    3    3
@@ -621,10 +616,35 @@ def split_poly(poly, line):
     # poly = aoi; line = np.array([[0., 2.], [10.0, 8.0]]) #no   yes   1    1
     # -- process, then plot
     # l_, r_ = split_poly(poly, line)
-    # plot_polygons(l_ + r_, True, True, True)  # lists, add them
+    # plot_polygons(lft_ + rgt_, True, True, True)  # lists, add them
 
     # --------
+"""
+simple crossing one outside on either end of the line
 
+line = np.array([[-1.0, 2.0], [11.0, 9.0]])
+
+Testing use E and a modified piece of d0_
+line = np.array([[-1.000, 5.000], [ 0.000,  5.000], [ 1.450, 6.000],
+                 [ 3.000, 7.000], [ 4.000,  8.500], [ 5.000, 10.000]])
+one before and after
+line = np.array([[-1.000, 5.000], [ 0.000,  5.000], [ 1.450, 6.000],
+                 [ 3.000, 7.000], [ 4.000,  8.500], [ 5.000, 10.000],
+                 [6.0, 11.]])
+or
+line = np.array([[0., 2.], [10.0, 9.0]])  # like # 2 above
+line = np.array([[0., 2.], [1.0, 2.75], [4.0, 4.85], [10.0, 9.0]])
+or
+line = np.array([[-1.0, 1.0], [0., 2.], [1.0, 2.75], [4.0, 4.85],
+                 [10.5, 9.0]])
+
+pieces or left rather than right
+
+poly = W
+line = np.array([[0., 2.], [10.0, 9.0]])
+
+
+"""
     # -- alternate lines
     # line = np.array([[0., 5.], [4., 4.], [6., 8.], [10.0, 9.0]])  # ends on
     # --right extends
@@ -675,6 +695,9 @@ def find_overlap_segments(arr, is_poly=True, return_all=True):
         return final, [subs, idx_dup, dups]
     return final, []
 
+# ---- ---------------------------
+# ---- keep for now --------------------------------------------------------
+#
 
 # ---- Final main section ----------------------------------------------------
 if __name__ == "__main__":

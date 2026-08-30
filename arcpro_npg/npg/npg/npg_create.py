@@ -14,7 +14,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2026-04-24
+    2026-05-16
 
 Purpose
 -------
@@ -130,7 +130,7 @@ __all__ = [
     'base_spiral',
     'to_spiral',
     'from_spiral',
-    'repeat',                          # (7) spirals
+    'repeat',                          # (7) keep
     'mini_weave',
 ]
 
@@ -592,6 +592,7 @@ def ellipse(x_radius=1.0, y_radius=1.0,
 def hex_flat(dx=1, dy=1,
              x_cols=1, y_rows=1,
              orig_x=0, orig_y=0,
+             upper_left=True,
              asGeo=True, kind=2):
     """Generate the points for the flat-headed hexagon.
 
@@ -609,7 +610,11 @@ def hex_flat(dx=1, dy=1,
     seed = np.array(list(zip(X, Y)))  # array of coordinates
     _dx_ = dx * 1.5
     _dy_ = dy * np.sqrt(3.) / 2.0
-    hexs = [seed + [_dx_ * i, _dy_ * (i % 2)] for i in range(0, x_cols)]
+    if upper_left:
+        y_fac = -_dy_
+    else:
+        y_fac = _dy_
+    hexs = [seed + [_dx_ * i, y_fac * (i % 2)] for i in range(0, x_cols)]
     m = len(hexs)
     for j in range(1, y_rows):  # create the other rows
         hexs += [hexs[h] + [0, -_dy_ * 2 * j] for h in range(m)]
@@ -659,7 +664,7 @@ def hex_pointy(dx=1, dy=1,
 # ---- (4) rectangles/squares, triangles
 #
 # The following all share the same parameter list.
-# x = cos(2kπ/n),y = sin(2kπ/n),k=1,2,3⋯n where ``n`` is the number of sides.
+# x = cos(2kπ/n), y = sin(2kπ/n),k=1,2,3⋯n where ``n`` is the number of sides.
 # general equation
 def rectangle(dx=1, dy=1,
               x_cols=1, y_rows=1,
@@ -676,10 +681,12 @@ def rectangle(dx=1, dy=1,
     orig_x, orig_y : number
         Planar coordinates assumed.  You can alter the location of the origin
         by specifying the correct combination of (dx, dy) and (orig_x, orig_y).
-        The defaults produce a clockwise, closed-loop geometry, beginning and
-        ending in the upper left.
-    kind, asGeo :
-        These relate to Geo arrays.
+        The defaults produce clockwise, closed-loop poly* shapes beginning in
+        the upper left.
+    kind : integer
+        1 for polylines, 2 for polygons,
+    asGeo : boolean
+        True to produce a Geo array, False for a ndarray (ndim=3).
 
     Example
     -------
@@ -690,9 +697,9 @@ def rectangle(dx=1, dy=1,
 
     Notes
     -----
-    Cells are constructed clockwise from the bottom-left.  The rectangular grid
-    is constructed from the top-left.  Specifying an origin (upper left) of
-    (0, 2) yields a bottom-right corner of (3, 3) when the following are used.
+    Each cell is constructed clockwise from the upper left.  The rectangular
+    grid is constructed from the upper left.  An origin (upper left) of (0, 2)
+    yields a bottom-right corner of (3, 3) when the following are used.
 
     >>> z = rectangle(dx=1, dy=1, x_cols=3, y_rows=2, orig_x=0, orig_y=2,
     ...               kind=2, asGeo=False)

@@ -704,9 +704,6 @@ p0_pgon, p1_pgon : boolean
     Some operations permit polygon and polyline inputs, so you can alter
     `p0_pgon=True, p1_pgon=False]` if the first is a polygon and the
     second a polyline.
-class_ids : boolean
-    Return Pout, Pin, Cout, Cin if True.  These are the indices of the
-    points that are in or out of their respective counterpart.
 
 Requires
 --------

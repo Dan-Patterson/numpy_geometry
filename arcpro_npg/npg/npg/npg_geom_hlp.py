@@ -16,7 +16,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2026-03-07
+    2026-07-10
 
 Purpose
 -------
@@ -225,7 +225,7 @@ def _bit_check_(a, just_outer=False):
             a = a.bits
     elif isinstance(a, (list, tuple)):
         a = np.asarray(a, dtype='O')
-    if len(a) == 1:
+    if len(a[0]) == 1:
         a = [a]
     return a
 
@@ -385,7 +385,7 @@ def _in_LBRT_(pnts, extent):
     pnts : array
         An Nx2 array representing point objects.
     extent : array-like
-        A 1x4, as [x0, y0, x1, y1] where the first tw is the left-bottom
+        A 1x4, as [x0, y0, x1, y1] where the first two is the left-bottom
         and the second two are the right-top coordinate.
 
     See Also
@@ -609,7 +609,7 @@ def _bit_crossproduct_(a, is_closed=True, extras=False):
 
     .. note::
 
-        np.cross for 2D arrays was deprecated in numpy 2.0, use `cross_2d`
+        np.cross for 2D arrays was deprecated in numpy 2.0, use `cross2d`
     """
     def cross2d(x, y):
         return x[..., 0] * y[..., 1] - x[..., 1] * y[..., 0]
@@ -871,9 +871,8 @@ def close_pnts(a, b, tol=.0001, ret_whr=True):
 
 
 def classify_pnts(a):
-    """Classify Geo array points.
+    """Classify Geo array points using np.argsort to sort the array.
 
-    Use np.argsort to sort the array and get the indices.
     >>> z = uts(sq2)  # convert to a structured array
     >>> perm = z.argsort(kind='mergesort')
     >>> aux = z[perm]  # sorted
@@ -1286,7 +1285,10 @@ def dist_angle_sort(a, sort_point=None, close_poly=True):
     Useful for polygons.  First and last point equality is checked.
     """
     a = np.array(a)
-    min_f = np.array([np.min(a[:, 0]), np.min(a[:, 1])])
+    if sort_point is None:
+        min_f = np.array([np.min(a[:, 0]), np.min(a[:, 1])])
+    elif isinstance(sort_point, (list, tuple)) and len(sort_point) == 2:
+        min_f = np.asarray(sort_point, dtype="float")
     dxdy = np.subtract(a, np.atleast_2d(min_f))
     ang = np.degrees(np.arctan2(dxdy[:, 1], dxdy[:, 0]))
     dist = _e_2d_(a, min_f)

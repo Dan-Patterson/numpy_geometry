@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2026-03-26
+    2026-08-10
 
 Purpose
 -------
@@ -149,29 +149,29 @@ script = sys.argv[0]  # print this should you need to locate the script
 # -- See script header
 
 __all__ = [
-    'on_line_chk',                     # (1a) distance functions
+    'on_line_chk',                     # (2) distance functions
     'eucl_dist',
-    'dist_array',                      # (1b) distance workflows
+    'dist_array',                      # (3) distance workflows
     'find_closest',
     'pnts_on_poly',
     'near_analysis',
     'spider_diagram',
-    'pnts_to_extent',                  # (2) extent functions
+    'pnts_to_extent',                  # (4) extent functions
     'common_extent',
     'extent_to_poly',
-    'densify_by_factor',               # (3) densify/simplify
+    'densify_by_factor',               # (5) densify/simplify
     'densify_by_distance',
     'simplify',
-    '_ch_',                            # (4) convex hulls
+    '_ch_',                            # (6) convex hulls
     '_ch_scipy_',
     '_ch_simple_',
-    'mabr',                            # (6) mabr
-    'triangulate_pnts',                # (7) triangulation
-    'polys_to_unique_pnts',            # (8) poly* conversion
+    'mabr',                            # (7) mabr
+    'triangulate_pnts',                # (8) triangulation
+    'polys_to_unique_pnts',            # (9) poly* conversion
     'polys_to_segments',
     'segments_to_polys',
     'simplify_lines',
-    'pnts_in_pnts',                    # (9) pnts in, or on, geometries
+    'pnts_in_pnts',                    # (10) pnts in, or on, geometries
     'bin_pnts',                        # Not included yet
     'in_hole_check',
     'which_quad'
@@ -263,7 +263,7 @@ def _percent_along_(a, percent=0):
 
     Requires
     --------
-    Called by `pnt_on_poly`.
+    Called by `npGeo.pnt_on_poly`.
     """
     a = _base_(a)
     if percent > 1.:
@@ -277,6 +277,11 @@ def _percent_along_(a, percent=0):
     if percent >= perleng[-1]:    # check for greater distance than cumulative
         return a[-1]
     _end_ = np.digitize(percent, perleng)
+    #
+    chk = (a[_end_] == a).all(-1).any(-1)
+    if chk:  # -- point is equal to percentage at the end point
+        return a[_end_]
+    #
     x1, y1 = a[_end_]
     _start_ = _end_ - 1
     x0, y0 = a[_start_]
@@ -602,11 +607,12 @@ def dist_array(a, centroid=True, as_table=True, prn=False):
 
     Notes
     -----
-    Centroid use is slower, as is structured table output::
+    Centroid use is slower, as is structured table output. `a` = `sq2` which
+    has 7 polygons::
 
       107 μs : dist_array(a, centroid=False, as_table=False, prn=False)
-      204 μs : dist_array(a, centroid=False, as_table=True, prn=False)
-      521 μs : dist_array(a, centroid=True, as_table=True, prn=False)
+      170 μs : dist_array(a, centroid=False, as_table=True, prn=False)
+      411 μs : dist_array(a, centroid=True, as_table=True, prn=False)
     """
     if not hasattr(a, 'IFT'):
         print("\nGeo array required.")
@@ -691,7 +697,7 @@ def near_analysis(a, pnts, azimuth=True):
     See Also
     --------
     ` n_near ` in `npg.npg_analysis`  if you are interested in closest-point
-    analysis specifically
+    analysis specifically.
 
     Notes
     -----
@@ -917,7 +923,7 @@ def densify_by_factor(a, factor=2):
     c[:, 0] = c0
     c[:, 1] = c1
     # check for, and remove duplicate end points if it is present.
-    if (c[-2] == c[-1]).all():
+    if (c[0] == c[-1]).all():
         return c[:-1]
     return c
 
@@ -1097,7 +1103,9 @@ def mabr(polys, p_centers, p_angles):
 
 # ---- ---------------------------
 # ---- (8) triangulation, Delaunay helper
-#
+#  Note : there is no use case for producing Voronoi areas around polygon/line
+#         points.  See `PointTools` toolbox.
+
 def triangulate_pnts(pnts):
     """Triangulate the points and return the triangles.
 
@@ -1275,7 +1283,55 @@ def pnts_in_pnts(pnts, geo, just_common=True):
 # ---- ---------------------------
 # ---- Not included yet --------
 #
-def bin_pnts(pnts, x_bins=None, y_bins=None):
+def bins_to_poly(x_bins, y_bins, bottom_up=True, asGeo=True, polygon=True):
+    """Return polygons from bins ranges for the x and y values.
+
+    Parameters
+    ----------
+    x_bins, y_bins : array_like
+        The sequential values representing the increments to use for the x-axis
+        and y-axis.  The length of the bins must be equal
+    bottom_up : boolean
+        True, orders the cell rows from the lower-left.  False, orders from the
+        upper-left
+    asGeo : boolean
+        True, creates a Geo array.  False
+    polygon : boolean
+        Only applies to Geo arrays.
+
+    Returns
+    -------
+    Clockwise oriented polygon boundaries.  The polygons are closed-loops.
+    The origin of the output eminates from the bottom-left to the top-right of
+    the extent delineated by the minimum and maximum of the bin ranges.
+    """
+    if len(x_bins) != len(y_bins):
+        print("\nBins sizes must be equal.")
+        return None
+    x, y = np.meshgrid(x_bins, y_bins)
+    N = len(x) - 1
+    M = len(y) - 1
+    polys = []
+    for i in range(N):
+        sub = []
+        for j in range(M):
+            po = [(x[i, j], y[i, j]),
+                  (x[i+1, j], y[i+1, j]),
+                  (x[i+1, j+1], y[i+1, j+1]),
+                  (x[i, j+1], y[i, j+1]),
+                  (x[i, j], y[i, j])
+                 ]  # -- clockwise orientation
+            sub.append(np.array(po))
+        polys.append(sub)
+    if not bottom_up:
+        polys = polys[::-1]
+    if asGeo:
+        k = 2 if polygon else 1
+        polys = npGeo.arrays_to_Geo(polys, k)
+    return polys
+
+
+def bin_pnts(pnts, x_bins=None, y_bins=None, num_bins=0):
     """Bin points using a 2D bin.
 
     Parameters
@@ -1284,6 +1340,12 @@ def bin_pnts(pnts, x_bins=None, y_bins=None):
         An Nx2 array of point objects.
     x_bins, y_bins : array-like
         A sequence of incrementing bin thresholds.
+    num_bins : integer
+        If `x_bins` and `y_bins` are None, then `num_bins` is used.
+
+    Returns
+    -------
+    The counts within the bin ranges and the x and y bins ranges.
 
     Example
     -------
@@ -1303,14 +1365,17 @@ def bin_pnts(pnts, x_bins=None, y_bins=None):
     <https://pro.arcgis.com/en/pro-app/tool-reference/geoanalytics-desktop/
     aggregate-points.htm>`_.
     """
-    if x_bins is None:
+    if x_bins is None or y_bins is None and num_bins==0:
+        print("\nBins ranges for x and y or num_bins must be specified.")
+        return None
+    if x_bins is None and num_bins > 0:
         mn_ = pnts[:, 0].min()
         mx_ = pnts[:, 0].max()
-        x_bins = np.arange(mn_, mx_, (mx_ - mn_) / 10.)
-    if y_bins is None:
+        x_bins = np.arange(mn_, mx_, (mx_ - mn_) / num_bins)
+    if y_bins is None and num_bins > 0:
         mn_ = pnts[:, 1].min()
         mx_ = pnts[:, 1].max()
-        y_bins = np.arange(mn_, mx_, (mx_ - mn_) / 10.)
+        y_bins = np.arange(mn_, mx_, (mx_ - mn_) / num_bins)
     h = np.histogram2d(pnts[:, 0], pnts[:, 1], [x_bins, y_bins])
     return h
 

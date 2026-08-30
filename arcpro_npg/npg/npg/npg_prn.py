@@ -19,7 +19,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-12-22
+    2026-04-07
 
 Purpose
 -------
@@ -61,7 +61,7 @@ INTS = np.typecodes['AllInteger']
 NUMS = FLOATS + INTS
 
 fmt_ = {"bool": lambda x: repr(x.astype(np.int32)),
-      "float_kind": '{: 0.3f}'.format}
+        "float_kind": '{: 0.3f}'.format}
 np.set_printoptions(precision=3, threshold=100, edgeitems=10, linewidth=80,
                     suppress=True,
                     formatter=fmt_,

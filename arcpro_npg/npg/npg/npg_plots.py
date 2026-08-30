@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2026-02-15
+    2026-06-23
 
 Purpose
 -------
@@ -71,7 +71,7 @@ from matplotlib.collections import LineCollection
 # from matplotlib.markers import MarkerStyle
 
 fmt_ = {"bool": lambda x: repr(x.astype(np.int32)),
-      "float_kind": '{: 0.3f}'.format}
+        "float_kind": '{: 0.3f}'.format}
 np.set_printoptions(precision=3, threshold=100, edgeitems=10, linewidth=80,
                     suppress=True,
                     formatter=fmt_,
@@ -198,7 +198,7 @@ def scatter_params(plt, fig, ax, title=None, ax_lbls=None):
     """
     fig.set_figheight = 4  # 4
     fig.set_figwidth = 4  # 4
-    fig.dpi = 200  # default
+    fig.dpi = 100  # default is 100
     if ax_lbls is None:
         ax_lbls = ['X', 'Y']
     x_label, y_label = ax_lbls
@@ -232,7 +232,27 @@ def plot_mixed(data, title="Title", invert_y=False, ax_lbls=None):
     >>> plot_mixed(data, title="Points in Polygons",
     ...            invert_y=False, ax_lbls=None)
     >>> out, ift, ps, final = pnts_in_Geo(psrt, p3)
+    >>>
+    >>> data = [[segs, 1, 'red', '.', True ], [pnts, 0, 'black', 'o', False]]
+    >>> plot_mixed(data, title="Points on segments")
     """
+
+    def _seg_chk_(a):
+        """Assemble the inputs."""
+        if a.ndim == 3:
+            pairs = a
+        elif a.shape[1] == 4:
+            pairs = a.reshape((-1, 2, 2))
+        elif hasattr(a, "IFT"):
+            a_vals = a.bits
+            # -- Do the concatenation
+            fr_to = np.concatenate([np.concatenate((i[:-1], i[1:]), axis=1)
+                                    for i in a_vals], axis=0)
+            pairs = fr_to.reshape((-1, 2, 2))
+        else:
+            print("An Nx4 or an Nx2x2 array is expected")
+            pairs = None
+        return pairs
 
     def _label_pnts(pnts, plt):
         """Label the points.
@@ -263,20 +283,36 @@ def plot_mixed(data, title="Title", invert_y=False, ax_lbls=None):
     if len(data) == 5:
         data = [data]
     for i, vals in enumerate(data):
-        pnts, kind, color, marker, connect = vals
+        if len(vals) == 5:
+            pnts, kind, color, marker, connect = vals
+        else:
+            msg = "\n--------\nRequired format, list of list(s) :\n" \
+                  "points (0), lines (1) polygons (2) \n" \
+                  "    [[values, type, color, marker, connect]] \n" \
+                  "    [[polygon, 2, 'red', '.', True ], \n" \
+                  "     [points, 0, 'black', 'o', False]]"
+            print(msg)
+            return None
         if kind == 0:
             _scatter(pnts, plt, color='black', marker='o')
             _label_pnts(pnts, plt)
+        elif kind == 1:  # see plot_segments for more options
+            pairs = _seg_chk_(pnts)
+            for pair in pairs:
+                # i, j = pair
+                # mid_pnts.append(np.average(pair, axis=0))
+                plt.plot(pair[:, 0], pair[:, 1], marker='o')
         elif kind == 2:
-            # cmap = plt.cm.get_cmap('hsv', len(pnts))
-            # cmap = matplotlib.colormaps['hsv']
-            for j, p in enumerate(pnts):
-                # clr = cmap(j)  # clr=np.random.random(3,)  # clr = "b"
-                # clr = 'None'
-                _line(p, plt)  # color, marker, linewdth=2)
-                # plt.fill(*zip(*p), facecolor=clr)
-                _scatter(p, plt, color, marker)
+            if isinstance(vals[0], (list, tuple)):  # for geo array bits
+                for p in vals[0]:
+                    _line(p, plt)
+                    _scatter(p, plt, color, marker)
+            else:  # -- single polygon
+                _line(pnts, plt)
+                _scatter(pnts, plt, color, marker)
+            #
     plt.show()
+    return
 
 
 def plot_2d(pnts, label_pnts=False, connect=False,
@@ -382,6 +418,7 @@ def plot_2d(pnts, label_pnts=False, connect=False,
                     p = p[:-1]
                 _label_pnts(p, plt)
     plt.show()
+    return
 
 
 def plot_3d(a):
@@ -414,7 +451,7 @@ def plot_3d(a):
     fig = plt.figure()
     fig.set_figheight = 4  # 4
     fig.set_figwidth = 4  # 4
-    fig.dpi = 200
+    fig.dpi = 200  # default is 100
     # ax = Axes3D(fig)  # old  #ax = fig.gca(projection='3d')
     ax = fig.add_subplot(projection='3d')
     #
@@ -503,7 +540,7 @@ def plot_polygons(arr, outline=True, vertices=True,
     fig, ax = plt.subplots(1, 1)
     fig.set_figheight = 4  # 4
     fig.set_figwidth = 4  # 4
-    fig.dpi = 100
+    fig.dpi = 100  # default is 100
     plt.tight_layout(pad=0.2, h_pad=0.1, w_pad=0.1)
     plt.grid(False)
     plt.rc('font', **font1)
@@ -550,7 +587,7 @@ def plot_polygons(arr, outline=True, vertices=True,
                 _label_pnts(shape, labels, plt, color_=colors_[i],
                             offx=ox, offy=oy)  # got rid of shape[:-1]
     plt.show()
-    return plt
+    return  # plt
 
 
 def plot_mesh(x=None, y=None):
@@ -655,7 +692,7 @@ def plot_polylines(a, title=None, label_segs=False):
     fig, ax = plt.subplots(1, 1)
     fig.set_figheight = 4  # 4
     fig.set_figwidth = 4  # 4
-    fig.dpi = 200
+    fig.dpi = 200  # default is 100
     plt.tight_layout(pad=0.2, h_pad=0.1, w_pad=0.1)
     plt.grid(False)
     plt.rc('font', **font1)
@@ -739,7 +776,7 @@ def plot_segments(a, title=None,  label_segs=False):
     fig, ax = plt.subplots(1, 1)
     fig.set_figheight = 4  # 4
     fig.set_figwidth = 4  # 4
-    fig.dpi = 200
+    fig.dpi = 200  # default is 100
     plt.tight_layout(pad=0.2, h_pad=0.1, w_pad=0.1)
     plt.grid(False)
     plt.rc('font', **font1)
@@ -823,6 +860,7 @@ def plot_buffs(a, label_pnts=False, as_segments=False):
 
 def _demo():
     """Plot 20 points which have a minimum 1 unit point spacing."""
+
     a = np.array([[0.4, 0.5], [1.2, 9.1], [1.2, 3.6], [1.9, 4.6],
                   [2.9, 5.9], [4.2, 5.5], [4.3, 3.0], [5.1, 8.2],
                   [5.3, 9.5], [5.5, 5.7], [6.1, 4.0], [6.5, 6.8],

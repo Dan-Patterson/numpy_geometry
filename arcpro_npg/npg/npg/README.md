@@ -372,11 +372,10 @@ Here is a partial listing of the code to the left with their **dir** contents.
   (001)  __all__                __builtins__           __cached__             
   (002)  __doc__                __file__               __helpers__            
   (003)  __loader__             __name__               __package__            
-  (004)  __spec__               _is_right_side         _side_                 
-  (005)  crossing_num           fmt_                   np                     
-  (006)  np_wn                  partition              pip                    
-  (007)  pip_test               pnts_in_Geo            pnts_on_segments       
-  (008)  script                 sys                    winding_num  
+  (004)  __spec__               _is_right_side         _side_      
+  (005)  crossing_num           fmt_                   np                 
+  (006)  np_wn                  partition           pnts_in_Geo            
+  (007)  script                 sys                    winding_num
 ```
 
 **npg.npg_plots**

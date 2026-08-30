@@ -10,7 +10,7 @@ to geometry have been assigned and methods developed to return geometry
 properties.
 
 Modified :
-    2025-12-10
+    2026-05-17
 
 ----
 
@@ -52,7 +52,7 @@ from npg.npgDocs import (
 )  #
 
 fmt_ = {"bool": lambda x: repr(x.astype(np.int32)),
-      "float_kind": '{: 0.3f}'.format}
+        "float_kind": '{: 0.3f}'.format}
 np.set_printoptions(precision=3, threshold=100, edgeitems=10, linewidth=80,
                     suppress=True,
                     formatter=fmt_,
@@ -203,7 +203,7 @@ class Geo(np.ndarray):
     @property
     def H(self):
         """Print the documentation for an instance of the Geo class."""
-        print(Geo_hlp)
+        print(Geo_hlp)  # -- npgDocs contains Geo_hlp
 
     @property
     def facts(self):
@@ -246,7 +246,7 @@ class Geo(np.ndarray):
         srt = sorted(list(geo_set.difference(arr_set)))
         t = ", ".join([str(i) for i in srt])
         w = wrap(t, 79)
-        print(">>> geo_info(geo_array)\n... Geo methods and properties.")
+        print(">>> geo_props\n... Geo methods and properties.")
         for i in w:
             print(indent(f"{i}", prefix="    "))
         print("\n... Geo base properties.")
@@ -376,12 +376,12 @@ class Geo(np.ndarray):
         Points are shifted back to their original bounding box.
         """
         N = self.shape[0]
-        dt = [('ID_', '<i4'), ('ShpID_', '<i4'), ('X_', '<f8'), ('Y_', '<f8')]
+        dt = [('ID_', '<i4'), ('ShpID_', '<i4'), ('Xs', '<f8'), ('Ys', '<f8')]
         z = np.empty((N,), dtype=dt)
         z['ID_'] = np.arange(N)
         z['ShpID_'] = self.pnt_ids
-        z['X_'] = self.X + self.LL[0]
-        z['Y_'] = self.Y + self.LL[1]
+        z['Xs'] = self.X + self.LL[0]
+        z['Ys'] = self.Y + self.LL[1]
         z = repack_fields(z)
         return z
 
@@ -389,7 +389,7 @@ class Geo(np.ndarray):
     # ---- counts : shape, part, bit
     @property
     def shp_pnt_cnt(self):
-        """Points in each shape.  Columns: shape, points."""
+        """Points in each shape.  Columns: IDs, point count."""
         df = self.To - self.Fr
         cnt = np.bincount(self.IDs, weights=df)[1:]
         gt0 = np.nonzero(cnt)[0]         # -- discontinuous ids
@@ -534,7 +534,7 @@ class Geo(np.ndarray):
             return Geo(a_2d, ift_s, self.K, self.XT, info)
         return a_2d
 
-    def slice_(self, fr=0, to=1, step=1, asGeo=True):
+    def slice_(self, fr=0, to=1, step=1, asGeo=True, to_origin=True):
         """Get the shapes in the range of `fr`om - `to` by `step`."""
         ids = self.shp_ids[fr:to]
         if step > 1:
@@ -552,11 +552,13 @@ class Geo(np.ndarray):
             info = "Old_order" + (" {}" * len(ids)).format(*ids)
             if len(ids) == 1:  # cludge workaround for length 1 ids
                 arr = arrays_to_Geo(
-                    xys, kind=self.K, info=info, to_origin=False)
+                    xys, kind=self.K, info=info, to_origin=to_origin)
                 arr.IFT[:, 0] = 0
                 # arr.IFT[:, 5] = np.arange(len(arr.IFT))  # fixed in arr2geo
                 return arr
-            return arrays_to_Geo(xys, kind=self.K, info=info, to_origin=False)
+            arr =  arrays_to_Geo(
+                xys, kind=self.K, info=info, to_origin=to_origin)
+            return arr
         return xys
 
     def get_shapes(self, ids=None, asGeo=True):
@@ -1190,7 +1192,7 @@ class Geo(np.ndarray):
         return Geo(g, ift, self.K, self.XT, "Densify by distance")
 
     def densify_by_factor(self, factor=2):
-        """Densify poly features by a specified distance.
+        """Densify poly features by a specified factor.
 
         Convert multipart to singlepart features during the process.
         Calls `_pnts_on_line_` for Geo bits.
@@ -1467,6 +1469,41 @@ class Geo(np.ndarray):
         if not a and not b:
             return self.XY[np.lexsort((-self.Y, -self.X))]
         return self
+
+    def sort_lex(self, extent_pnt='LB', just_indices=False):
+        """Sort the geometry using the conditions outlined below."""
+        if extent_pnt not in ('LB', 'LT'):
+            print("Extent point is incorrect... read the docs.")
+            return None
+        if extent_pnt == 'LB':
+            ext = self.extent_corner('LB')  # extent left-bottom
+        elif extent_pnt == 'LT':
+            ext = self.extent_corner('LT')  # extent left-top
+        ext_ids = self.shp_ids
+        xs = ext[:, 0]
+        ys = ext[:, 1]
+        # -- sort lexicographically
+        if extent_pnt == 'LB':
+            lex_idx = np.lexsort((ys, xs))
+        elif extent_pnt == 'LT':
+            lex_idx = np.lexsort((-ys, xs))
+        sorted_ids = ext_ids[lex_idx]
+        if just_indices:
+            return sorted_ids
+        #
+        xys = []
+        for id_num in sorted_ids:
+            case_ = self.FT[self.IDs == id_num]
+            if len(case_) > 1:  # multipart and-or holes
+                sub = [self.XY[c[0]: c[-1]] for c in case_]
+                xys.append(sub)
+            else:
+                c0, c1 = case_.squeeze()
+                xys.append(self.XY[c0:c1])
+        info = "Old_order" + (" {}" * len(ext_ids)).format(*ext_ids)
+        sorted_array = arrays_to_Geo(xys, kind=self.K,
+                                     info=info, to_origin=False)
+        return sorted_array
 
     def radial_sort(self, asGeo=True):
         """Sort the coordinates of polygon/polyline features."""
@@ -1799,7 +1836,7 @@ def arrays_to_Geo(in_arrays, kind=2, info=None, to_origin=False):
     a_2d = a_2d.astype(np.float64)  # see Notes
     a_2d[:, 0] = np.round(a_2d[:, 0], 3)  # -- added round 2024-12-04
     a_2d[:, 1] = np.round(a_2d[:, 1], 3)
-    # a_2d = a_2d.astype(np.float64)  # moved up a few linesround has
+    # a_2d = a_2d.astype(np.float64)  # moved up a few lines above round
     rows, cols = ift.shape
     z0 = np.full((rows, 6), fill_value=-1, dtype=ift.dtype)
     z0[:, :cols] = ift

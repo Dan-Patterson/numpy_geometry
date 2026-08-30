@@ -21,7 +21,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-12-20
+    2026-05-31
 
 Purpose
 -------
@@ -563,6 +563,9 @@ def prn_keys(data, num=0):
         elif i[0] == 3:
             print(f2.format(*i))
 
+
+# ---- ---------------------------
+# ---- (3) other utilities
 
 def len_check(arr):
     """Check iterator lengths."""

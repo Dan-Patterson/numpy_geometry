@@ -6,7 +6,7 @@ npg_pip
 -------
 
 Point in Polygon implementation using winding numbers.  This is for Geo arrays
-and uses numpy enhancements.
+or numpy ndarrays and uses numpy enhancements.
 
 ----
 
@@ -199,6 +199,9 @@ def _is_right_side(p, strt, end):
     return (x1 - x0) * (y - y0) - (y1 - y0) * (x - x0)
 
 
+# ---- ---------------------------
+# ---- (2) ... general algorithms
+
 def crossing_num(pnts, poly, line=True):
     """Crossing Number for point(s) in polygon.
 
@@ -316,7 +319,7 @@ def winding_num(pnts, poly, batch=True):
 
 
 # ---- ---------------------------
-# ---- (2) ... points in polygons
+# ---- (3) ... points in polygons
 #
 def partition(pnts, geo, as_structured=False):
     """Partition points into the first polygon they fall into.
@@ -530,7 +533,8 @@ def np_wn(pnts, poly, on_is_in=False, return_winding=False):
         in_ = pnts[all_]
     else:  # -- use set difference
         whr_in = np.nonzero(wn)[0]  # -- initial estimate
-        in_fully = np.array(sorted(list(set(whr_in).difference(on_boundary))))
+        _tmp = sorted(list(set(whr_in).difference(on_boundary)))
+        in_fully = np.array(_tmp, dtype=int)
         in_ = pnts[in_fully]
     if return_winding:  # correct wn for boundary points
         if on_is_in and len(on_boundary) > 0:
