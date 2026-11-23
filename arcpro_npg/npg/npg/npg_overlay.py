@@ -26,7 +26,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2025-12-22
+    2026-11-22
 
 Purpose
 -------
@@ -79,11 +79,10 @@ import numpy as np
 # import npGeo
 # from npGeo import array_IFT, arrays_to_Geo, roll_coords
 # from npg import npGeo
-from npg.npg_bool_hlp import _p_ints_p_
 from npg.npg_bool_ops import union_adj
 # from npg.npg_pip import np_wn
 # import npg_geom_hlp
-from npg.npg_geom_hlp import _in_LBRT_
+from npg.npg_geom_hlp import _in_LBRT_, sort_segment_pairs
 from npg.npg_helpers import _to_lists_
 
 # -- optional imports
@@ -110,13 +109,16 @@ __all__ = [
     'line_crosses',
     'in_out_crosses',
     'crossings',
+    'segment_intersections',
     'left_right_pnts',
     'line_side',
 ]
 
 __helpers__ = [
     '_intersect_',
-    '_line_crossing_'
+    '_line_crossing_',
+    '_p_ints_p_',
+    '_seg_prep_'
 ]
 
 
@@ -219,6 +221,74 @@ def _line_crossing_(clip_, poly):
     z3 = np.where(w3 == 1, -2, 0)         # -2
     z = z0 + z1 + z2 + z3
     return z, a, b
+
+
+def _p_ints_p_(poly0, poly1):
+    r"""Intersect two polygons.  Used in clipping.
+
+    Parameters
+    ----------
+    poly0, poly1 : ndarrays
+        Two polygons/polylines. poly0, feature to intersect using poly1 as the
+        clipping feature.
+
+    Returns
+    -------
+    Points of intersection or None.
+
+    Notes
+    -----
+    Using Paul Bourke`s notation.
+
+    Intersection point of two line segments in 2 dimensions, 1989.
+
+    `<http://paulbourke.net/geometry/pointlineplane/>`_.
+
+    `<http://paulbourke.net/geometry/polygonmesh/>`_.
+
+    | line a : p0-->p1
+    | line b : p2-->p3
+
+    >>> d_nom = (y3 - y2) * (x1 - x0) - (x3 - x2) * (y1 - y0)
+    >>>       = (y3[:, None] - y2) * (x1[:, None] - x0) -
+    ...         (x3[:, None] - x2) * (y1[:, None] - x0)
+    >>> a_num = (x3 - x2) * (y0 - y2) - (y3 - y2) * (x0 - x2)  # ==> u_a
+    >>> b_num = (x1 - x0) * (y0 - y2) - (y1 - y0) * (x0 - x2)  # ==> u_b
+    >>> u_a = a_num/d_nom  # if d_nom != 0
+    >>> u_b = b_num/d_nom
+
+    if 0 <= u_a, u_b <=1 then the intersection is on both segments
+    """
+    poly0, poly1 = [i.XY if hasattr(i, "IFT") else i for i in [poly0, poly1]]
+    p10 = poly0[1:] - poly0[:-1]
+    p32 = poly1[1:] - poly1[:-1]
+    p10_x, p10_y = p10.T
+    p32_x, p32_y = p32.T
+    p02 = poly0[:-1] - poly1[:-1][:, None]
+    d_nom = (p32_y[:, None] * p10_x) - (p32_x[:, None] * p10_y)
+    a_num = p32_x[:, None] * p02[..., 1] - p32_y[:, None] * p02[..., 0]
+    b_num = p10_x * p02[..., 1] - p10_y * p02[..., 0]
+    #
+    with np.errstate(divide='ignore', invalid='ignore'):  # all='ignore'):
+        u_a = a_num / d_nom
+        u_b = b_num / d_nom
+        z0 = np.logical_and(u_a >= 0., u_a <= 1.)
+        z1 = np.logical_and(u_b >= 0., u_b <= 1.)
+        both = z0 & z1
+        xs = u_a * p10_x + poly0[:-1][:, 0]
+        ys = u_a * p10_y + poly0[:-1][:, 1]
+        # *** np.any(both, axis=1)
+        # yields the segment on the clipper that the points are on
+        # *** np.sum(both, axis=1)  how many intersections on clipper
+        #     np.sum(both, axis=0)  intersections on the polygon
+    xs = xs[both]
+    ys = ys[both]
+    if xs.size > 0:
+        final = np.zeros((len(xs), 2))
+        final[:, 0] = xs
+        final[:, 1] = ys
+        return final  # z0, z1, both  # np.unique(final, axis=0)
+    return None
 
 
 # ---- ---------------------------
@@ -508,7 +578,101 @@ def crossings(geo, clipper):
 
 
 # ---- ---------------------------
-# ---- (4) polygon from points
+# ---- (4) segment intersections
+#
+def _seg_prep_(a, b, all_info=False):
+    """Prepare segment intersection information.
+
+    a, b : arrays
+        The arrays are in the form of Nx4 point pairs, each row is a two point
+        line or a segment of from-to values of x0,y0 x1,y1.
+
+    Returns
+    -------
+    The intersection points.
+
+    Notes
+    -----
+    Use `npg_geom_hlp.sort_segment_pairs` to get the sorted from-to points in
+    the Nx4 format.
+
+    Use `npg_plots.plot_segments` to plot the segments.
+    """
+    def _xsect_(a_num, b_num, denom, x1_x0, y1_y0, x0, y0):
+        """Return the intersections and their id values."""
+        with np.errstate(divide='ignore', invalid='ignore'):  # all='ignore'
+            u_a = (a_num / denom) + 0.0
+            u_b = (b_num / denom) + 0.0
+            z0 = np.logical_and(u_a >= 0., u_a <= 1.)  # np.isfinite(u_a)`
+            z1 = np.logical_and(u_b >= 0., u_b <= 1.)  # np.isfinite(u_b)
+            both = z0 & z1
+            xs = (u_a * x1_x0 + x0)[both]
+            ys = (u_a * y1_y0 + y0)[both]
+        x_pnts = []
+        if xs.size > 0:
+            x_pnts = np.concatenate((xs[:, None], ys[:, None]), axis=1)
+        whr = np.array(np.nonzero(both)).T
+        return whr, x_pnts
+
+    x0, y0, x1, y1 = a.T  # segments `from-to` coordinates
+    res0 = (a[:, -2:] - a[:, :2]).T
+    x1_x0, y1_y0 = res0
+    #
+    x2, y2, x3, y3 = b.T  # intersecting shapes `from-to` coordinates
+    res1 = (b[:, -2:] - b[:, :2]).T
+    x3_x2, y3_y2 = res1
+    # reshape poly deltas
+    x3_x2 = x3_x2[:, None]
+    y3_y2 = y3_y2[:, None]
+    # deltas between pnts/poly x and y
+    x0_x2 = x0 - x2[:, None]
+    y0_y2 = y0 - y2[:, None]
+    #
+    a_0 = y0_y2 * x3_x2
+    a_1 = y3_y2 * x0_x2
+    b_0 = y0_y2 * x1_x0
+    b_1 = y1_y0 * x0_x2
+    #
+    # numerators and denom of determinant
+    a_num = (a_0 - a_1) + 0.0  # signed distance diff_ in npg.pip.np_wn
+    b_num = (b_0 - b_1) + 0.0
+    denom = (x1_x0 * y3_y2) - (y1_y0 * x3_x2) + 0.0
+    whr, x_pnts = _xsect_(a_num, b_num, denom, x1_x0, y1_y0, x0, y0)
+    if all_info:
+        return whr, x_pnts, a_num, b_num, denom
+    return whr, x_pnts
+
+
+def segment_intersections(a, b):
+    """Return the intersection points of two sets of line segments.
+
+    Parameters
+    ----------
+    a, b : arrays
+        The Nx2 arrays to intersect.  These can represent polygon boundaries,
+        polylines or two point line segments.
+
+    Requires
+    --------
+    `npg_geom_hlp._sort_segment_pairs`
+
+    Returns
+    -------
+    `whr` is an array of id values of the sorted segment pairs `a_s`, `b_s`.
+    `x_pnts` are the intersection points on those ordered segments.
+
+    Notes
+    -----
+    If the geometry is composed of multi-segments, they are devolved into two
+    point lines and ordered lexicographically.
+    """
+    a_s, idx_a = sort_segment_pairs(a)
+    b_s, idx_b = sort_segment_pairs(b)
+    whr, x_pnts, a_num, b_num, denom = _seg_prep_(a_s, b_s, all_info=True)
+    return whr, a_s, b_s, x_pnts
+
+# ---- ---------------------------
+# ---- (5) polygon from points
 #
 def left_right_pnts(a):
     """Return the two points that contain the min and max ``X`` coordinate.

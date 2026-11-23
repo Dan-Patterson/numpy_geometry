@@ -129,7 +129,7 @@ def dtype_info(a, as_string=False):
 
 
 def load_geo(f_name, extras=False, prn_info=False):
-    r"""Load a well formed `npy` file representing a structured array.
+    r"""Load a well formed `npz` file representing a structured array.
 
     Unpack an `npz` file containing a Geo array.
 
@@ -148,7 +148,7 @@ def load_geo(f_name, extras=False, prn_info=False):
     geo : Geo array
         The Geo array is created within this function and returned along with
         the base arrays, (`arrs`) and the list of array names (`names`), if
-        ``suppress_extras`` is True.
+        ``extras`` is True.
     arrs : arrays
         The arrays within the npz,
     names : list

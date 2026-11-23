@@ -227,12 +227,13 @@ def fc_to_Geo(in_fc, geom_kind=2, minX=0, minY=0, sp_ref=None, info=""):
         Featureclass in a file geodatabase.
     geom_kind : integer
         Points (0), Polylines (1) and Polygons (2)
-
     minX, minY : numbers
         If these values are 0, then the minimum values will be determined and
         used to shift the data towards the origin.
     sp_ref : text
         Spatial reference name.  eg `'NAD_1983_CSRS_MTM_9'`
+    info : text
+        Any desired text descriptor for the data.
 
     Notes
     -----
@@ -733,7 +734,7 @@ def array_poly(arrs, p_type=None, sr=None, IFT=None):
     counterclockwise.
     """
     def _arr_poly_(arr, SR, as_type):
-        """Slice the array where nan values appear, splitting them off."""
+        """Return an arcpy geometry from array x,y pairs."""
         aa = [Point(*pairs) for pairs in arr]
         if as_type.upper() == 'POLYGON':
             poly = Polygon(Array(aa), SR)

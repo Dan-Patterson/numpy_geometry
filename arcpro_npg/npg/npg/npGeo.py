@@ -10,7 +10,7 @@ to geometry have been assigned and methods developed to return geometry
 properties.
 
 Modified :
-    2026-05-17
+    2026-11-21
 
 ----
 
@@ -30,15 +30,19 @@ from numpy.lib.recfunctions import unstructured_to_structured as uts
 from numpy.lib.recfunctions import repack_fields
 
 import npg  # noqa
-from npg import npg_geom_hlp, npg_io, npg_prn  # npg_create
+from npg import npg_io, npg_prn  # npg_chk_fix, npg_geom_hlp, npg_create
 from npg import npg_geom_ops as geom
 from npg import npg_bool_ops, npg_bool_hlp
 from npg import npg_min_circ as sc  # requires scipy
 
 from npg.npg_geom_hlp import (
-    _area_centroid_, _bit_area_, _bit_crossproduct_,
-    _clean_segments_, _bit_min_max_, _bit_length_, _rotate_, geom_angles,
-)  # swap_segment_pnts
+    _area_centroid_, _bit_area_, 
+    _bit_min_max_, _bit_length_, _rotate_, geom_angles,
+)
+
+from npg.npg_chk_fix import (
+    _bit_crossproduct_, clean_segments
+)
 
 from npg.npg_maths import _angles_3pnt_
 
@@ -71,6 +75,7 @@ __all__ = [
     'Geo',                             # (1) ... Geo class
     'roll_coords',                     # (2) Create Geo
     'roll_arrays',
+    'array_to_rings',
     'array_IFT',
     'arrays_to_Geo',
     'Geo_to_arrays',                   # (3) Geo to arrays/lists
@@ -462,6 +467,10 @@ class Geo(np.ndarray):
         """Return the shapes."""
         return self.parts
 
+    def all_rings(self, shift_back=False):
+        """Return the Geo array as list of arrays, potentially nested"""
+        return Geo_to_arrays(self, shift_back=shift_back)
+
     def outer_rings(self, asGeo=True):
         """Get the first bit of multipart shapes and/or shapes with holes."""
         if np.any(self.CL == 0):
@@ -620,6 +629,9 @@ class Geo(np.ndarray):
         The `by_shape=True` parameter returns the area for each shape. If
         False, each bit area is returned.  Negative areas are holes.  This is
         intentionally reversed from the `shoelace` formula.
+
+        See Also:
+        `npg_geom_hlp._hole_area_` if you need just the area of the holes.
         """
         if self.K != 2:
             print("Polygons required.")
@@ -823,11 +835,12 @@ class Geo(np.ndarray):
         return out
 
     def is_convex(self, as_structured=False):
-        """Return True (convex), False (concave). Uses `_bit_crossproduct_`.
+        """Return True (convex), False (concave).
 
-        Holes are excluded.  The first part of a multipart shapes is used.
-        Duplicate start-end points removed prior to cross product.
-        The cross product does it for the whole shape all at once.
+        Uses `npg_chk_fix._bit_crossproduct_`.Holes are excluded.  The first
+        part of a multipart shapes is used.  Duplicate start-end points are
+        removed prior to cross product. The cross product does it for the
+        whole shape all at once.
         """
         if self.K != 2:
             print("Polygons are required.")
@@ -923,7 +936,7 @@ class Geo(np.ndarray):
         return Geo(self.XY + [dx, dy], self.IFT, self.K, self.XT + [dx, dy])
 
     def translate(self, dx=0, dy=0):
-        """Move/shift/translate by dx, dy to a new location."""
+        """Move/shift/translate by dx, dy to a new lower left location."""
         return Geo(self.XY + [dx, dy], self.IFT, self.K, self.XT + [dx, dy])
 
     def rotate(self, as_group=True, angle=0.0, clockwise=False):
@@ -1325,8 +1338,6 @@ class Geo(np.ndarray):
             common_pair_ids = np.asarray([i for i in idx_01 if i[0] < i[1]])
             pair_0 = common_pair_ids[:, 0]
             common = fr_to[pair_0]
-            # em, idx_ = swap_segment_pnts(common)  # added 2025-09-12 em, idx_
-            # common = np.unique(em, axis=0)
         if shift_back:
             common[:, :2] += self.LL
             common[:, 2:] += self.LL
@@ -1604,7 +1615,7 @@ class Geo(np.ndarray):
         return uni
 
     def geom_check(self):
-        """Run some geometry checks.  See `check_geometry` for details."""
+        """See `npg.npg_chk_fix.check_geometry` for details."""
         return check_geometry(self)
 
     def roll_shapes(self):
@@ -1718,6 +1729,98 @@ def roll_arrays(arrs):
     return out
 
 
+def array_to_rings(arr):
+    """Partition an array into outer and inner rings.
+
+    Parameters
+    ----------
+    arr : array_like
+        An Nx2 array/list/geo array of x, y coordinates, which may contain one
+        or more outer and inner (holes) rings.
+        A Geo array can be partitioned using:
+            `npGeo.all_rings(self, asGeo=False)`.
+
+    Requires
+    --------
+    `_area_` derived from npg.npg_geom_hlp._bit_area_
+    `is_ccw_` derived from npg.npg_geom_hlp._is_ccw_
+
+    The first ring must be an outer ring, not a hole.  Clockwise coordinates
+    are required.  Holes must follow their outer ring as is the case for
+    GeoJson, WKT and Shapely polygon and multipolygon data structures.
+
+    Returns
+    -------
+    A list of arrays, possibly nested if there are inner rings/holes.
+
+    Notes
+    -----
+    Sometimes you get a list of coordinates for what is supposed to be a
+    polygon, but it may not be well formed into its consituent bits.  This can
+    serve as a check prior to running `array_IFT` and/or `arrays_to_Geo`.
+    """
+    # --
+    def _area_(a):
+        """Modified `_bit_area_`. Negative areas are holes.  Reversed from
+        the `shoelace` formula.
+        """
+        x0, y1 = (a.T)[:, 1:]  # cross set up as follows
+        x1, y0 = (a.T)[:, :-1]
+        e0 = np.einsum('...i,...i->...i', x0, y0)  # 2024-03-28 modified
+        e1 = np.einsum('...i,...i->...i', x1, y1)
+        return np.sum((e0 - e1) * 0.5)
+
+    def _is_ccw_(a):
+        """Counterclockwise check.  Reversed from shoelace formula."""
+        return 0 if _area_(a) > 0. else 1
+    # --
+    #
+    msg = "\nAn Nx2 np.ndarray is required."
+    if not isinstance(arr, np.ndarray):
+        print(msg)
+        return None
+    if hasattr(arr, "IFT"):
+        arr = np.copy(arr, subok=False)
+    if len(arr.shape) != 2:
+        print(msg)
+        return None
+    #   
+    N = len(arr)
+    fst = 0
+    out = []
+    n = 0
+    c_o = 0  # -- outer ring counter
+    outer_ = []
+    inner_ = []
+    frto_ = []  # -- from-to ids to split the input array `arr`
+    while n < N:
+        ids = np.nonzero((arr[fst] == arr[fst:]).all(-1))[0]
+        if len(ids) >= 2:
+            pair = ids[:2]
+        else:
+            print("\nNo matching point, input array is defective.")
+            return None
+        fst, lst = pair + n
+        sub = arr[fst:lst + 1]
+        n = n + len(sub)  # size of sub array
+        res = _is_ccw_(sub)
+        if res != 1:
+            outer_.append(sub)
+            out.append([sub])
+            c_o += 1
+        else:
+            inner_.append(sub)
+            if len(out) > 0:  # append hole rings to an existing outer ring
+                out[-1].append(sub)
+            else:  # just in case a hole is encountered before an outer ring
+                out.append([sub])
+        frto_.append([c_o, fst, lst + 1])
+        fst = lst + 1
+    # -- return a list of arrays or a list of lists of arrays in some form
+    out = [i[0] if len(i) == 1 else i for i in out]
+    return out, frto_
+
+
 def array_IFT(in_arrays, kind=2, shift_to_origin=False):
     """Produce the Geo array.  Construction information in `npgDocs`."""
     id_too = []
@@ -1800,7 +1903,9 @@ def arrays_to_Geo(in_arrays, kind=2, info=None, to_origin=False):
     ----------
     in_arrays : arrays/lists/tuples
         `in_arrays` can be created by adding existing 2D arrays to a list.
-        You can also convert poly features to arrays using `poly2arrays`.
+        You can also convert poly features to arrays using various functions
+        in `npg.npg_arc_npg` if you have ArcGIS Pro.  `array_to_rings` is used
+        first if an Nx2 ndarray representing geometry is encountered.
     kind : integer
         Points (0), polylines (1) or polygons (2).
     info : text
@@ -1811,7 +1916,7 @@ def arrays_to_Geo(in_arrays, kind=2, info=None, to_origin=False):
 
     Requires
     --------
-    `array_IFT`
+    `array_IFT`, `array_to_rings`
 
     Returns
     -------
@@ -1826,9 +1931,17 @@ def arrays_to_Geo(in_arrays, kind=2, info=None, to_origin=False):
 
     See Also
     --------
+    See `npg.npg_io.lists_to_arrays` to converted nested lists to nested
+    arrays.
+
     Use `npg_arc_npg.fc_geometry` to produce `Geo` objects directly from
     arcgis pro featureclasses.
     """
+    # -- call array_to_rings if passed an ndarray, to check for rings
+    if isinstance(in_arrays, np.ndarray):
+        if in_arrays.ndim == 2:
+            in_arrays = array_to_rings(in_arrays)
+    #
     # -- call array_IFT
     a_2d, ift, extent = array_IFT(in_arrays,
                                   kind=kind,
@@ -1855,13 +1968,13 @@ def arrays_to_Geo(in_arrays, kind=2, info=None, to_origin=False):
             # note, below changed z0.shape[-1] to z0.shape[0]
             w = np.concatenate((np.where(z0[:, 3] == 1)[0], [z0.shape[0]]))
             dif = w[1:] - w[:-1]
-            if len(dif) > 1:  # *** added
+            if len(dif) >= 1:  # *** added modified 2026-09-15 from > 1
                 fix_seq = np.concatenate([np.arange(i) for i in dif])
                 z0[:len(fix_seq), 5] = fix_seq
                 # -- need to fix the ids z0[:, 0]  # -- 2025-11-10 for A0
                 if len(z0) == 2:
                     # from npg.npg_pip import np_wn
-                    # bt0, bt1 = np_wn(bt1, bt0)
+                    # bt0, bt1 = g.bits
                     # in_ = np_wn(bt1, bt0)
                     # if np.equal(bt1, in_).all():
                     #     they are all in, so renumber    
@@ -1931,7 +2044,7 @@ def Geo_to_arrays(g, shift_back=True):
 
 
 def Geo_to_lists(g, shift_back=True):
-    """Convert the Geo arrays back to the original input arrays.
+    """Convert Geo arrays to a list, potentially nexted of coordinate pairs.
 
     Parameters
     ----------
@@ -2010,6 +2123,11 @@ def remove_seq_dupl(g, asGeo=True):
     Account for duplicate start/end points in polygons that need to be
     added back into `sub` after removing other duplicates.
 
+    See Also
+    --------
+    Use `npg_chk_fix.del_seq_dupl_pnts` for similar functionality for
+    ndarrays.
+
     Returns
     -------
     A new Geo array or list of lists, with sequential duplicates removed.
@@ -2078,13 +2196,13 @@ def check_geometry(g):
     if np.sum(check_0) > 0:
         c2 = g.IDs[check_0]
         print("\ng.CL and g.Bit mismatch\n{}\n...IFT info\n".format(c2))
-        npg_prn.prn_tbl(g.IFT_str)
+        npg.prn.prn_tbl(g.IFT_str)  # from npg.npg_prn.
     elif np.sum(check_1) > 0:
         c3 = g.IDs[check_1]
         print("\nError in ring orientation\n... shapes {}\n".format(c3))
         print("IFT information...\n")
     else:
-        print("no errors found")
+        print("\nNo errors found.")
     return None
 
 
@@ -2100,7 +2218,7 @@ def clean_polygons(g, tol=1e-06, asGeo=True):
         K = g.K
     elif isinstance(g, np.ndarray):
         g = [g]
-    out = [_clean_segments_(a, tol=1e-06) for a in g]
+    out = [clean_segments(a, tol=1e-06) for a in g]
     if asGeo:
         return arrays_to_Geo(out, K, info='clean polygons', to_origin=False)
     return out
@@ -2242,9 +2360,13 @@ def dirr(obj, cols=3, prn=True):
         a.extend(["\n... npg_geom_ops  helpers ..."])
         a.extend(_sub_(sorted(geom.__helpers__), cols))
         a.extend(["\n... npg_geom_hlp ..."])
-        a.extend(_sub_(sorted(npg_geom_hlp.__all__), cols))
+        a.extend(_sub_(sorted(npg.npg_geom_hlp.__all__), cols))
         a.extend(["\n... npg_geom_hlp  helpers ..."])
-        a.extend(_sub_(sorted(npg_geom_hlp.__helpers__), cols))
+        a.extend(_sub_(sorted(npg.npg_geom_hlp.__helpers__), cols))
+        a.extend(["\n... npg_chk_fix ..."])
+        a.extend(_sub_(sorted(npg.npg_chk_fix.__all__), cols))
+        a.extend(["\n... npg_chk_fix helpers ..."])
+        a.extend(_sub_(sorted(npg.npg_chk_fix.__helpers__), cols))
         a.extend(["\n... npg_bool_ops ..."])
         a.extend(_sub_(sorted(npg_bool_ops.__all__), cols))
         a.extend(["\n... npg_bool_ops  helpers ..."])

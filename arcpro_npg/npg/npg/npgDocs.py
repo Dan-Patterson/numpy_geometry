@@ -707,7 +707,7 @@ p0_pgon, p1_pgon : boolean
 
 Requires
 --------
-`_add_pnts_`, `_del_seq_dupl_pnts_`, `_w_`, `_wn_clip_`
+`_add_pnts_`, `del_seq_dupl_pnts`, `_w_`, `_wn_clip_`
  _add_pnts_(p0, p1, x_pnts, whr)
 
 Returns
@@ -775,7 +775,7 @@ This script compiles the common functions::
 - `_wn_clip_`
 - `_node_type_`
 - `_add_pnts_`
-- `_del_seq_dupl_pnts_`
+- `del_seq_dupl_pnts`
 
 Returns
 -------

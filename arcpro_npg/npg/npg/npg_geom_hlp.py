@@ -16,7 +16,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2026-07-10
+    2026-11-22
 
 Purpose
 -------
@@ -77,7 +77,8 @@ import numpy as np
 from numpy.lib.recfunctions import unstructured_to_structured as uts
 # from numpy.lib.recfunctions import repack_fields
 
-from npg.npg_prn import prn_tbl  # used by `shape_finder`
+from npg_chk_fix import _bit_crossproduct_
+from npg_prn import prn_tbl  # used by `shape_finder`
 
 fmt_ = {"bool": lambda x: repr(x.astype(np.int32)),
         "float_kind": '{: 0.3f}'.format}
@@ -111,13 +112,12 @@ __all__ = [
     'keep_geom',
     'remove_geom',
     'del_seq_dups',
-    'multi_check',
-    'sort_xy',                         # (6) sort coordinates
+    'sort_xy',                         # (7) sort coordinates
     'swap_segment_pnts',
     'sort_segment_pairs',
     'dist_angle_sort',
     'radial_sort',
-    'interweave',                      # (7) others functions
+    'interweave',                      # (8) others functions
     'shape_finder',
     'coerce2array',
     'flat',
@@ -125,10 +125,9 @@ __all__ = [
 ]
 
 __helpers__ = [
-    '_adj_within_',                    # (1) Geo Helpers
+    '_adjacent_within_',               # (1) Geo Helpers
     '_base_',
     '_bit_check_',
-    '_clean_segments_',
     '_e_2d_',
     '_from_to_pnts_',
     '_is_clockwise_',                  # (2) Condition checking
@@ -144,7 +143,7 @@ __helpers__ = [
     '_od_angles_dist_',
     '_area_centroid_',
     '_bit_area_',
-    '_bit_crossproduct_',
+    '_hole_area_'
     '_bit_min_max_',
     '_bit_length_',
     '_bit_segment_angles_',
@@ -163,7 +162,7 @@ __helpers__ = [
 # ---- core bit functions
 # ---- (1) Geo Helpers
 #
-def _adj_within_(a, full=False):
+def _adjacent_within_(a, full=False):
     """Determine adjacency within a Geo array's outer rings.
 
     Parameters
@@ -228,30 +227,6 @@ def _bit_check_(a, just_outer=False):
     if len(a[0]) == 1:
         a = [a]
     return a
-
-
-def _clean_segments_(a, tol=1e-06):
-    """Remove overlaps and extra points on poly* segments. In `npg_geom_hlp`.
-
-    Parameters
-    ----------
-    a : array
-        The input array or a bit from a Geo array.
-    tol : float
-        The tolerance for determining whether a point deviates from a line.
-
-    Notes
-    -----
-    - Segments along a straight line can overlap (a construction error).
-          [[0,0], [5, 5], [2, 2], [7, 7]]  # points out of order
-    - Extraneous points can exist along a segment.
-          [[0,0], [2, 2], [5, 5], [7, 7]]  # extra points not needed for line.
-    """
-    cr, ba, bc = _bit_crossproduct_(a, extras=True)
-    # -- avoid duplicating the 1st point (0).
-    whr = [i for i in np.nonzero(np.abs(cr) > tol)[0] if i != 0]
-    vals = np.concatenate((a[0][None, :], a[whr], a[-1][None, :]), axis=0)
-    return vals
 
 
 def _e_2d_(a, p):
@@ -602,29 +577,22 @@ def _bit_area_(a):
     return np.sum((e0 - e1) * 0.5)
 
 
-def _bit_crossproduct_(a, is_closed=True, extras=False):
-    """Cross product.
+def _hole_area_(a):
+    """Return the area of holes in polygons.
 
-    Used by `is_convex`, `_angles_3pnt_` and `_clean_segments_`.
-
-    .. note::
-
-        np.cross for 2D arrays was deprecated in numpy 2.0, use `cross2d`
+    See `npg.npGeo.areas` for more information.  This is just a modification
+    to take the just the area of the holes, if they exist in a polygon.
     """
-    def cross2d(x, y):
-        return x[..., 0] * y[..., 1] - x[..., 1] * y[..., 0]
+    if not hasattr(a, "IFT"):
+        print("Geo array required.")
+        return None
+    b_ids = a.bit_ids
+    bit_totals = [_bit_area_(i) for i in a.bits]  # by bit
+    h_area = [0. if i >= 0 else abs(i) for i in bit_totals]  # just take holes
+    return np.bincount(b_ids, weights=h_area)[a.U]
 
-    a = _base_(a)
-    if is_closed:
-        if np.allclose(a[0], a[-1]):  # closed loop, remove dupl.
-            a = a[:-1]
-    ba = a - np.concatenate((a[-1][None, :], a[:-1]), axis=0)
-    bc = a - np.concatenate((a[1:], a[0][None, :]), axis=0)
-    # cr = np.cross(ba, bc) + 0.0  # deprecated
-    cr = cross2d(ba, bc)
-    if extras:
-        return cr, ba, bc
-    return cr
+
+
 
 
 def _bit_min_max_(a):
@@ -1032,7 +1000,7 @@ def compare_geom(arr, look_for, unique=True, invert=False, return_idx=False):
     Returns
     -------
     The intersection or difference in both arrays, depending on `invert`.
-    The indices of where the objects were found
+    The indices of where the objects were found.
 
     >>> a = np.array([[ 5.,  5.], [ 6.,  6.], [10., 10.], [12., 12.]])
     >>> b = np.array([[ 6.,  6.], [12., 12.]])
@@ -1126,43 +1094,6 @@ def del_seq_dups(arr, poly=True):
     return tmp
 
 
-def multi_check(arr):
-    """Check for possible multiple parts in an array.
-
-    Parameters
-    ----------
-    arr : array_like
-        Nx2 array of clockwise coordinates with the first and last being equal.
-
-    Notes
-    -----
-    If there is a duplicate vertex, in a polygon array, other than the
-    start/end vertex, this may represent the presence of a multipart shape.
-    In a `Geo` array, this really isnt necessary.
-    """
-    uni, idx, cnt = np.unique(arr, return_index=True, return_counts=True,
-                              axis=0)
-    chk = uni[cnt > 1]
-    # whr = np.nonzero(cnt > 1)[0]
-    parts = []
-    if len(chk) == 1:
-        val = chk[1]
-        result = (arr[:, None] == val).all(-1).any(-1)
-        idxs = np.nonzero(result)[0]
-        bits = np.array_split(arr, idxs.tolist())
-        parts = [np.concatenate((bits[0], bits[-1]), axis=0),
-                 np.concatenate((bits[1], np.atleast_2d(bits[1][0])), axis=0)]
-        # -- assert idxs only contains 2 ids for this to work
-    elif len(chk) > 2:
-        result = (arr[:, None] == chk).all(-1).any(-1)
-        idxs = np.nonzero(result)[0]
-        bits = np.array_split(arr, idxs.tolist())
-        parts = []
-        for i in range(1, len(bits), 2):
-            sub = np.concatenate((bits[i], bits[i + 1]), axis=0)
-            parts.append(sub)
-    return parts
-
 
 # ---- ---------------------------
 # ---- (6) sort coordinates
@@ -1221,7 +1152,7 @@ def swap_segment_pnts(a):
     if shp1 == 2:
         tmp = np.concatenate((a[:-1], a[1:]), axis=1)
         # idx_ = np.zeros((shp0, 2), dtype=int)  # modified 2025-09-12
-        # idx_[:, 0] = np.arange(shp0)           # moved idx_ cals below
+        # idx_[:, 0] = np.arange(shp0)           # moved idx_ cols below
         # idx_[:-1, 1] = np.arange(1, shp0)
     elif shp1 == 4:
         tmp = np.copy(a)
@@ -1492,6 +1423,10 @@ def coerce2array(arr, start=0):
         if isinstance(arr, np.ndarray):
             if arr.ndim == 2:
                 return arr
+        elif isinstance(arr, (list, tuple)):  # quick single part list check
+            tmp = np.array(arr)
+            if tmp.ndim == 2:
+                return tmp
         result = [_len_check_(i) for i in arr]
         out = []
         if len(result) == 1:

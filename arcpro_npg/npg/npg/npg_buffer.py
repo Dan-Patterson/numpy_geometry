@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2026-03-31
+    2026-11-22
     
 Purpose
 -------
@@ -42,11 +42,10 @@ import numpy as np
 
 from npg import npGeo  # noqa
 
-from npg.npg_bool_hlp import _del_seq_dupl_pnts_
-from npg.npg_geom_hlp import (_area_centroid_, _in_extent_) # noqa
-from npg.npg_geom_ops import _is_pnt_on_line_  # noqa
+from npg.npg_chk_fix import _bit_crossproduct_, del_seq_dupl_pnts
+from npg.npg_geom_hlp import (_area_centroid_, _in_extent_)
 from npg.npg_maths import _angles_3pnt_
-from npg.npg_pip import np_wn, _side_  # noqa
+# from npg.npg_pip import np_wn, _side_  # noqa
 from npg.npg_plots import plot_polygons, plot_segments, plot_polylines  # noqa
 
 
@@ -65,7 +64,7 @@ script = sys.argv[0]  # print this should you need to locate the script
 
 __all__ = [
     'on_line_chk',                     # (1a) distance functions
-    'area_buffer',                     # (4) buffer, scale
+    'area_buffer',                     # (2) buffer, scale
     'offset_buffer',
     'node_buffer',
     'rounded_buffer'
@@ -78,13 +77,11 @@ __helpers__ = [
 
 __imports__ = [
     'npGeo',                # npGeo and sub modules
-    'np_wn', '_side_',      # npg.npg_pip
-    '_del_seq_dupl_pnts_',  # npg.npg_bool_hlp
+    'del_seq_dupl_pnts',    # npg.npg_chk_fix
     '_area_centroid_',      # npg_geom_hlp
     '_in_extent_',
-    '_is_pnt_on_line_',     # npg_geom_ops
     '_angles_3pnt_'         # npg_maths
-]
+]  # 'np_wn', '_side_',      # npg.npg_pip
 
 
 # ---- ---------------------------
@@ -180,7 +177,7 @@ def _offset_np_(poly, buff_dist=1.0, offset_check=False, as_segments=False):
 
     Parameters
     ----------
-    a : array
+    poly : array
         The array of polygon points to be buffered.
     buff_dist : number
         Positive number buffers outward, negative for inwards.
@@ -202,13 +199,12 @@ def _offset_np_(poly, buff_dist=1.0, offset_check=False, as_segments=False):
     if hasattr(poly, "IFT"):
         poly = poly.XY
     #
-    # -- no longer checking for convexity.
-    #
     dxdy = poly[1:] - poly[:-1]
     r = buff_dist / np.sqrt(np.einsum('ij,ij->i', dxdy, dxdy))
     rr = np.concatenate((r[:, None], -r[:, None]), axis=1)
     dx_dy = dxdy * rr
     dy_dx = dx_dy[:, [1, 0]]  # -- swap order yielding dy, dx
+    #
     pnt0 = poly[:-1] + dy_dx  # new start and ...
     pnt1 = poly[1:] + dy_dx   # end points for offset segments
     #
@@ -216,6 +212,7 @@ def _offset_np_(poly, buff_dist=1.0, offset_check=False, as_segments=False):
     _offset_orig_ = np.concatenate((pnt0, pnt1), axis=1)
     #
     _offset_ = np.copy(_offset_orig_)
+    # z = np.reshape(_offset_, (-1, 2))  # -- truncated corners
     tmp = np.concatenate((_offset_[:-1], _offset_[1:]), axis=1)
     to_add = np.concatenate(
         (_offset_[-1], _offset_[0]))[None, :]  # atleast_2d
@@ -232,7 +229,7 @@ def _offset_np_(poly, buff_dist=1.0, offset_check=False, as_segments=False):
     b = x2 * y3 - x3 * y2
     c = y1_y0 * x3_x2 - y3_y2 * x1_x0  # (y1-y0)*(x3-x2) - (y3-y2)*(x1-x0)
     #
-    # -- see `p_int_p` in npg_bool_hlp for notes regarding intersections
+    # -- see `p_ints_p` in npg_bool_hlp for notes regarding intersections
     #    on both segments
     with np.errstate(divide='ignore', invalid='ignore'):
         n1 = (a * x3_x2 - b * x1_x0) / c
@@ -245,19 +242,31 @@ def _offset_np_(poly, buff_dist=1.0, offset_check=False, as_segments=False):
         tmp = np.concatenate((tmp[-1][None, :], tmp), axis=0)
         tmp = np.round(tmp, 6)  # try to address floating pnt issues
     #
-    new_pnts = _del_seq_dupl_pnts_(tmp, True)
+    new_pnts = del_seq_dupl_pnts(tmp, True)
+    #
+    # -- clean the points since segments may overlap from `_clean_segments_`
+    # new_pnts = _clean_segments_(new_pnts)
+    if offset_check:  # messy... fix
+        cr = _bit_crossproduct_(new_pnts, extras=False)
+        all_ids = np.arange(len(a))
+        keep_ids = np.nonzero(np.abs(cr) > 1e-06)[0].tolist() + [all_ids[-1]]
+        keep_ids = sorted(list(set(keep_ids)))
+        drop_ids = sorted(list(set(all_ids).difference(keep_ids)))
+        new_pnts = new_pnts[keep_ids]
     #
     new_segs = np.concatenate((new_pnts[:-1], new_pnts[1:]), axis=1)
+    to_add = np.concatenate((new_pnts[-1], new_pnts[0]))[None, :]
+    new_segs = np.concatenate((new_segs, to_add), axis=0)
     #
-    if as_segments:  # return both the polygon and the original segments
+    if offset_check and as_segments:  # return both the polygon and the original segments
         # -- plotting demo
         # o_segs = np.concatenate((poly[:-1], poly[1:]), axis=1)
         # plot_segments(np.concatenate((o_segs, _offset_orig_), axis=0))
         # plot_segments(np.concatenate((o_segs, new_segs), axis=0))
         #
-        if _offset_ is None:
-            _offset_ = _offset_orig_
-        return new_segs, _offset_orig_, new_pnts
+        return new_segs, _offset_orig_, new_pnts, keep_ids, drop_ids
+    elif as_segments:
+        return new_segs
     #
     return new_pnts
 
@@ -285,7 +294,7 @@ def area_buffer(poly, factor=1, asGeo=False):
 
     Notes
     -----
-    - Translate to the origin of the unique points in the polygon.
+    - Translate to the center of the unique points in the polygon.
     - Determine the initial area.
     - Scale the coordinates.
     - Shift back to the original center.
@@ -338,7 +347,7 @@ def offset_buffer(poly, buff_dist=1, keep_holes=False, asGeo=False):
     -----
     Use `plot_buffs` to view the results.
 
-    If you want rounded corners, use something else.
+    If you want rounded corners, try `rounded_buffer` or use something else.
     Singlepart shapes supported with or without holes.
     """
 
@@ -368,7 +377,7 @@ def offset_buffer(poly, buff_dist=1, keep_holes=False, asGeo=False):
     if npGeo.is_Geo(poly):
         final = _Geo_buff_(poly, buff_dist, keep_holes)
     else:
-        final = _offset_np_(poly, buff_dist)
+        final = _offset_np_(poly, buff_dist, offset_check=True)
     if asGeo:
         a_stack, ift, extent = npGeo.array_IFT(final, shift_to_origin=False)
         return npGeo.Geo(a_stack, IFT=ift, Kind=2, Extent=extent, Info=None)
@@ -423,7 +432,7 @@ def rounded_buffer(poly, buff_dist=1.0, radius=1, step=5):
     Requires
     --------
     `_x_ings_` to derive segment intersection points
-    `_arc_` for rounded corners
+    `_a_` for rounded corners
 
     Notes
     -----
@@ -435,7 +444,7 @@ def rounded_buffer(poly, buff_dist=1.0, radius=1, step=5):
     poly = np.copy(sub)
 
     """
-    def _a_(circ_pnts, p_st, cent, p_en, radius, step, outside=True):
+    def _a_(ang, circ_pnts, p_st, cent, p_en, radius, step, outside=True):
         """Create arc from a mini circle.  A circle center of 0,0 is used."""
         #
         d0 = p_st - cent
@@ -464,12 +473,12 @@ def rounded_buffer(poly, buff_dist=1.0, radius=1, step=5):
         new_pnts = circ_pnts[ids] + cent
         return new_pnts
     #
-    # -- rounded corners
+    # -- rounded corners -- precalculated for `_a_` function
     circ_pnts = None
     xc = 0.0
     yc = 0.0
     angles = np.deg2rad(np.arange(180.0, -180.0 - step, -step))
-    ang = np.degrees(angles)
+    vert_angles = np.degrees(angles)
     x_s = buff_dist * np.cos(angles) + xc  # X and Y values
     y_s = buff_dist * np.sin(angles) + yc  # add the circle center later
     circ_pnts = np.array([x_s, y_s]).T
@@ -483,7 +492,8 @@ def rounded_buffer(poly, buff_dist=1.0, radius=1, step=5):
                     offset_check=True,  # do the `_cross_chk` on the first run
                     as_segments=True)
     # --
-    new_segs, _offset_, keep_ids, dump_segs, wn_vals, new_pnts = r
+    # new_segs, _offset_orig_, new_pnts
+    new_segs, _offset_, new_pnts, keep_ids, drop_ids = r  #
     #
     # o_segs = np.concatenate((poly[:-1], poly[1:]), axis=1)
     # plot_segments(np.concatenate((o_segs, new_segs), axis=0))
@@ -491,17 +501,22 @@ def rounded_buffer(poly, buff_dist=1.0, radius=1, step=5):
     # (2) rounded corners are needed, so proceed -----------------------------
     #
     orig_ids = np.arange(0, poly.shape[0] - 1)
-    angles_orig = _angles_3pnt_(poly, inside=False, in_deg=True)
-    cents_orig = poly[orig_ids]
+    angles_ = _angles_3pnt_(poly, inside=False, in_deg=True)
+    cents_ = poly[orig_ids]
     #
-    if orig_ids.shape[0] != keep_ids.shape[0]:
-        cents_ = cents_orig[keep_ids]
-        angles_ = _angles_3pnt_(poly[keep_ids], inside=False, in_deg=True)
-        # circ_ids = [keep_ids[i] for i in range(0, len(angles_))
-        #             if angles_[i] > 0]
-    else:
-        cents_ = np.copy(cents_orig)
-        angles_ = np.copy(angles_orig)
+    if len(orig_ids) != len(keep_ids):
+        # -- drop any points and their center by buffering back
+        cents_ = _offset_np_(new_pnts, buff_dist= -buff_dist,
+                                offset_check=False, as_segments=False)
+        angles_ = _angles_3pnt_(cents_, inside=False, in_deg=True)
+        # -- buffer back out again
+        r0 = _offset_np_(cents_,
+                        buff_dist=buff_dist,
+                        offset_check=True,  # do the `_cross_chk` on the first run
+                        as_segments=True)
+        new_segs, _offset_, new_pnts, keep_ids, drop_ids = r0  #
+    # o_segs = np.concatenate((poly[:-1], poly[1:]), axis=1)
+    # plot_segments(np.concatenate((o_segs, new_segs), axis=0))
     #
     # (3) All convex, shortcut -----------------------------------------------
     #
@@ -512,7 +527,7 @@ def rounded_buffer(poly, buff_dist=1.0, radius=1, step=5):
             p_st = _offset_[cnt - 1][-2:]
             cent = cents_[cnt]
             p_en = _offset_[cnt][:2]
-            arc = _a_(circ_pnts, p_st, cent, p_en,
+            arc = _a_(vert_angles, circ_pnts, p_st, cent, p_en,
                       radius=buff_dist, step=step, outside=True)
             segs.append(arc)
             segs.append(_offset_[cnt].reshape(2, 2))
@@ -522,7 +537,6 @@ def rounded_buffer(poly, buff_dist=1.0, radius=1, step=5):
     # (4) Not all convex so really working it --------------------------------
     #
     segs = []
-    # max_id = angles_.shape[0] + 1  # limit slicing and force roll to 0
     for cnt, ang_ in enumerate(angles_):  # out):
         ang_ = angles_[cnt]  # keep in for testing
         #
@@ -532,16 +546,20 @@ def rounded_buffer(poly, buff_dist=1.0, radius=1, step=5):
         p_en = _offset_[cnt][:2]  # p_st, cent, p_en
         if ang_ <= 0:
             if angles_[cnt - 1] > 0:
-                segs.append(prev_.reshape(2, 2))
+                tmp = new_segs[cnt][:2][None, :]
+                segs.append(tmp)
+                # segs.append(prev_.reshape(2, 2))
             else:
-                segs.append(np.array([p_st, p_en]))
+                tmp = new_segs[cnt][:2][None, :]  # just add the start point
+                segs.append(tmp)
+                # segs.append(np.array([p_st, p_en]))
         else:
-            arc = _a_(circ_pnts, p_st, cent, p_en,
+            arc = _a_(vert_angles, circ_pnts, p_st, cent, p_en,
                       radius=buff_dist, step=step, outside=True)
             if angles_[cnt - 1] > 0:
                 segs.append(prev_.reshape(2, 2))  # previous offset
-            # segs.append(arccc)  # attempt at just joining chord
             segs.append(arc)
+            # plot_polygons(np.concatenate((segs), axis=0))  # for testing 
     final = np.concatenate((segs), axis=0)
     return final  # plot_polygons([final, poly])
 

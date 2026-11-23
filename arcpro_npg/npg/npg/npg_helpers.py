@@ -16,7 +16,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2026-03-07
+    2026-11-11
 
 Purpose
 -------
@@ -37,11 +37,11 @@ script = sys.argv[0]
 
 __all__ = [
     'cartesian_product',               # (2) main functions
-    'drop_seq_dupl',
     'separate_string_number',
-    'find_sequence',                   # (3) sequences
-    'sequences',
-    'stride_2d',
+    'sequences',                       # (3) sequences
+    'drop_seq_dupl',
+    'find_sequence',
+    'stride_2d',                       # (4) stride, unique, flatten
     'uniq_1d',
     'uniq_2d',
     'flatten_list',
@@ -351,7 +351,7 @@ def drop_seq_dupl(a):
     
     See Also
     --------
-    Based on ` del_seq_dups` in `npg_geom_hlp`.
+    Based on ` del_seq_dup_pnts` in `npg_chk_fix`.
     """
     if isinstance(a, (list, tuple)):
         a = np.array(a)
@@ -426,7 +426,7 @@ def find_sequence(a, b):
     return seqs
 
 
-# ---- (6) stride, unique, flatten
+# ---- (4) stride, unique, flatten
 #
 def stride_2d(a, win=(2, 2), stepby=(1, 1)):
     """Provide a 2D sliding/moving view of a 2D array.

@@ -35,9 +35,9 @@ import sys
 import numpy as np
 import npg  # noqa
 # from npg.npGeo import roll_arrays
+from npg.npg_chk_fix import del_seq_dupl_pnts
 from npg.npg_geom_hlp import a_eq_b
-from npg.npg_bool_hlp import (_add_pnts_, _del_seq_dupl_pnts_, _wn_clip_,
-                              prep_overlay)  # _node_type_)
+from npg.npg_bool_hlp import (_add_pnts_, _wn_clip_,  prep_overlay)
 from npg.npg_pip import winding_num, np_wn
 from npg.npg_plots import plot_polygons  # noqa
 
@@ -73,7 +73,7 @@ def clip_poly(poly, clp, as_geo=False):
     --------
     `npg_geom_hlp` : `a_eq_b`
 
-    `npg.npg_bool_hlp` : `_del_seq_dupl_pnts_`
+    `npg.npg_bool_hlp` : `del_seq_dupl_pnts`
     """
 
     def _bits_(i0, i1, in_, seen_):
@@ -196,7 +196,7 @@ def clip_poly(poly, clp, as_geo=False):
                     sub.append(pl_n[j_c])
             elif d1 > 1:  # this may close a sub-polygon
                 if j_c not in p_seen:  # and cnt < 2 :   # cludge
-                    p_a = _bits_(j_p, j_c, pinside, p_seen)  # !!!!!
+                    p_a = _bits_(j_p, j_c, pinside, p_seen)
                     if d1 > 2 and cnt > 2 and len(p_a) == 0:  # check
                         sub.append(null_pnt)  # this works with E, d0_
                     if p_a:  # needed for edgy1, eclip
@@ -316,7 +316,8 @@ def clip_poly(poly, clp, as_geo=False):
 
 # ---- ---------------------------
 # ---- (2) side options
-#
+#  only `_side_` is currently used, the others are kept for further testing.
+
 def _side_(pnts, cut_line):
     """Return the line side that points are on.
 
@@ -374,7 +375,7 @@ def _side2_(pnts, cut_line):
     #
     l_1 = set(l_0).difference(e_0)
     r_1 = set(r_0).difference(e_0)
-    return lft_ids, rgt_ids, eq_ids
+    return lft_ids, rgt_ids, eq_ids, [e_0, l_1, r_1]
 
 def _side3_(pnts, cut_line):
     """Return the line side that points are on."""
@@ -436,7 +437,7 @@ def split_poly(poly, line):
 
     Requires
     --------
-    `npg.npg_bool_hlp` : `_wn_clip_`, `_del_seq_dupl_pnts_`
+    `npg.npg_bool_hlp` : `_wn_clip_`, `del_seq_dupl_pnts`
 
     Returns
     -------
@@ -471,10 +472,10 @@ def split_poly(poly, line):
         if len(x_pnts) < 2:
             return [], None, None, None
         _p, _l = _add_pnts_(poly, line, x_pnts, whr)  # -- temporary poly, clp
-        # x_pnts = _del_seq_dupl_pnts_(x_pnts, poly=False)
+        # x_pnts = del_seq_dupl_pnts(x_pnts, poly=False)
         x_pnts = np.unique(x_pnts, axis=0)  # lex sorted
-        pl_ = _del_seq_dupl_pnts_(np.concatenate((_p), axis=0), poly=True)
-        cl_ = _del_seq_dupl_pnts_(np.concatenate((_l), axis=0), poly=False)
+        pl_ = del_seq_dupl_pnts(np.concatenate((_p), axis=0), poly=True)
+        cl_ = del_seq_dupl_pnts(np.concatenate((_l), axis=0), poly=False)
         #
         # -- roll pl_ to first intersection point
         r0 = np.nonzero((x_pnts[0] == pl_[:, None]).all(-1).any(-1))[0]
@@ -483,19 +484,18 @@ def split_poly(poly, line):
             pl_ = np.concatenate((pl_[r0:-1], pl_[:r0], [pl_[r0]]), axis=0)
         #
         # -- slice cl_ before or after x_pnts
-        # r1 = np.nonzero((x_pnts[0] == cl_[:, None]).all(-1).any(-1))
         r2 = np.nonzero((x_pnts[[0, -1]] == cl_[:, None]).all(-1).any(-1))[0]
         _st = r2[0]
         if _st != 0:
             f, s = r2
-            cl_ = cl_[f: s + 1]  # clip cl_ and wn first prior to getting
-            #wn = wn[f: s + 1]   # finding wn
+            cl_ = cl_[f: s + 1]  # clip cl_
         # parse cl_ vs original poly to see what points are in the original
         # or which splits
         in_, wn = np_wn(cl_, poly, on_is_in=True, return_winding=True)
         cl_out_ids = np.nonzero(wn == 0)[0]
         #
         # splits, not needed I think
+        splits = []
         if len(in_) > 2:  # split, segments if they exist, doing it stepwise
             s0 = np.diff(np.nonzero(wn)[0]) != 1
             s1 = np.nonzero(s0)[0] + 1
@@ -518,10 +518,14 @@ def split_poly(poly, line):
     #
     # dup_line = np.copy(line)
     swapped = False
-    if line[0][0] > line[1][0]:
+    st, en = line[0], line[1]
+    if st[0] > en[0]:        
         line = line[::-1]
         swapped =  True
-
+    elif st[0] == en[0] and st[1] > en[1]:
+        line = line[::-1]
+        swapped = True
+    #
     # -- determine intersections and add points
     x_pnts, pl_, cl_, splits, cl_out_ids = _prep_(poly, line)  # -- `_prep_` stage
     #
@@ -534,43 +538,50 @@ def split_poly(poly, line):
     z0 = np.concatenate((whr_p[:-1][:, None], whr_p[1:][:, None] + 1), axis=1)
     pl_s = [pl_[i[0]: i[1]] for i in z0]
     #
-    # -- cl_ split based on points outside of poly
-    # if len(splits) > 1:
-    #    lft, rgt = _two_bits_(splits, pl_s)
-    #    return lft, rgt
-    # -- no splits, so process
     whr_c = np.nonzero((x_pnts == cl_[:, None]).all(-1))[0]
     z1 = np.concatenate((whr_c[:-1][:, None], whr_c[1:][:, None] + 1), axis=1)
     cl_s = [cl_[i[0]: i[1]] for i in z1]
-    # brev = cl_s[::-1]  # -- bts1 reversed
-    # if len(cl_out_ids) > 0:
-    #     cl_out = cl_[cl_out_ids]
-    # else:
-    #     cl_out = None
     #
-    # -- get cl, pl id combinations to see if this helps in splitting
-    # cl_pl_ids = np.nonzero((pl_[:-1] == cl_[:, None]).all(-1))
-    # pl_cl_ids = np.nonzero((cl_ == pl_[:-1][:, None]).all(-1))
-
-    # -- new process works with E and
-    #    line = np.array([[-1.0, 2.0], [11.0, 9.0]])
+    # -- quick bail if there is only 1 clipping line and 2 clipped pieces
+    if len(cl_s) == 1 and len(pl_s) == 2:
+        p = pl_s[0]
+        pr = pl_s[-1]
+        c = cl_s[0]
+        lft_ = [np.concatenate((p, c[::-1]), axis=0)]  # return as lists
+        rgt_ = [np.concatenate((c, pr), axis=0)]
+        return lft_, rgt_
+    #
+    # -- if first pl_ bit is on the right side of cl_, swap cl
+    # take first 2 pnts of pl_s
+    chk = _is_rght_sd_(pl_s[0][:2], cl_s[0])
+    if chk:
+        cl_s = cl_s[::-1]
+    #
+    # --
     lft_ = []
     rgt_ = []
     keep_ = []
     rev = len(pl_s) - 1
+    #
     for cnt, _ in enumerate(cl_s):  # -- clipper segments
         c = cl_s[cnt]
         # cr = c[[-1, 0]]
         p = pl_s[cnt]
         pr = pl_s[rev - cnt]
-        chk_0 = (c[[0, -1]] == p[[0, -1]]).all()
-        chk_1 = (c[[0, -1]] == pr[[-1, 0]]).all()
+        chk_0 = (c[[0, -1]] == p[[0, -1]]).all()  # c, p segments equal
+        chk_1 = (c[[0, -1]] == pr[[-1, 0]]).all() # c, pr 
         # chk_2 = (c[[-1, 0]] == p[[0, -1]]).all()  # -- not used yet
         is_rght = _is_rght_sd_(pr, c)  # is `pr` is on the right side of `c`
-    
-        if chk_0:
-            lft_.append([p, c[::-1]])
-            rgt_.append([pr, c])
+        #
+        if chk_0 and (not chk_1) and cnt == 0:  # -- more on right side
+            keep_ = np.concatenate((pr, c), axis=0)
+            lft_.append(np.concatenate((p, c[::-1]), axis=0))
+        elif (chk_0 and not chk_1):
+            if is_rght:
+                keep_ = np.concatenate((keep_, c), axis=0)
+                lft_.append(np.concatenate((p, c[::-1]), axis=0))
+            else:
+                keep_ = np.concatenate((keep_, p), axis=0)
         elif (not chk_0) and chk_1 and cnt == 0:  # bit on left not closed, bit on right is
             keep_ = np.concatenate((c[::-1], p), axis=0)
             rgt_.append(np.concatenate((c, pr), axis=0))
@@ -580,11 +591,14 @@ def split_poly(poly, line):
                 rgt_.append(np.concatenate((c, pr), axis=0))  # -- not a hole
             else:
                keep_ = np.concatenate((pr, keep_), axis=0)
-    chk = _is_rght_sd_(keep_, line)
-    if not chk:
-        lft_ = keep_
     #
-    if swapped:  # -- do the final swap if line direction wass switched.
+    if len(keep_) != 0:
+        if len(lft_) == 0:
+            lft_ = [keep_]
+        elif len(rgt_) == 0:
+            rgt_ = [keep_]
+    #
+    if swapped:  # -- do the final swap if line direction was switched.
         lft_, rgt_ = rgt_, lft_
     return lft_, rgt_
 
@@ -604,56 +618,42 @@ def split_poly(poly, line):
                 keep_.append(b)
     # return lft, rgt
 """
-
-    # sample geometry                                       swap srted lft  rgt
-    # poly = C; line = np.array([[0., 5.], [10.0, 9.0]])  # works
-    # poly = E; line = np.array([[0., 2.], [10.0, 9.0]])  # no   no    3    3
-    # poly = E; line = np.array([[0., 9.], [8.0, 0.0]])   # no   yes   3    3
-    # poly = E; line = np.array([[1., 0.], [2.0, 10.0]])  # no   -     1    1
-    # poly = E; line = np.array([[2., 0.], [2.0, 10.0]])  # vertical   1    3
-    # poly = E; line = np.array([[2.0, 10.0], [2., 0.]])  # rev above  3    1
-    # poly = E; line = np.array([[6., 0.], [10.0, 10.0]]) # no   yes   2    2
-    # poly = aoi; line = np.array([[0., 2.], [10.0, 8.0]]) #no   yes   1    1
-    # -- process, then plot
-    # l_, r_ = split_poly(poly, line)
-    # plot_polygons(lft_ + rgt_, True, True, True)  # lists, add them
-
-    # --------
 """
-simple crossing one outside on either end of the line
-
-line = np.array([[-1.0, 2.0], [11.0, 9.0]])
-
-Testing use E and a modified piece of d0_
+# sample geometry                                     swap srted lft  rgt
+poly = aoi; line = np.array([[0., 2.], [10.0, 8.0]]) #no   yes   1    1
+poly = C; line = np.array([[0., 5.], [10.0, 9.0]])  # no         1    2
+poly = E; line = np.array([[0., 2.], [10.0, 9.0]])  # no   no    1    3
+poly = E; line = np.array([[0., 9.], [8.0, 0.0]])   # no   yes   3    1
+poly = E; line = np.array([[1., 0.], [2.0, 10.0]])  # no   -     1    1
+poly = E; line = np.array([[2., 0.], [2.0, 10.0]])  # vertical   1    3
+poly = E; line = np.array([[2.0, 10.0], [2., 0.]])  # rev above  3    1
+poly = E; line = np.array([[6., 0.], [10.0, 10.0]]) # no   yes   1    2
+poly = E; line = np.array([[-1.0, 2.0], [11.0, 9.0]]) no         1    3
+poly = E
 line = np.array([[-1.000, 5.000], [ 0.000,  5.000], [ 1.450, 6.000],
                  [ 3.000, 7.000], [ 4.000,  8.500], [ 5.000, 10.000]])
-one before and after
+                                                                 1    2
+poly = E
 line = np.array([[-1.000, 5.000], [ 0.000,  5.000], [ 1.450, 6.000],
                  [ 3.000, 7.000], [ 4.000,  8.500], [ 5.000, 10.000],
                  [6.0, 11.]])
-or
-line = np.array([[0., 2.], [10.0, 9.0]])  # like # 2 above
+                                                                 1    2
+poly = E
 line = np.array([[0., 2.], [1.0, 2.75], [4.0, 4.85], [10.0, 9.0]])
-or
+                                                                 1    3
+poly = E
 line = np.array([[-1.0, 1.0], [0., 2.], [1.0, 2.75], [4.0, 4.85],
                  [10.5, 9.0]])
+                                                                 1    3
+poly = W; line = np.array([[0., 2.], [10.0, 9.0]])               2    1
+poly = W; line = np.array([[0., 4.], [10.0, 4.0]])               3    1
 
-pieces or left rather than right
-
-poly = W
-line = np.array([[0., 2.], [10.0, 9.0]])
-
+# -- process, then plot
+lft_, rgt_ = split_poly(poly, line)
+plot_polygons(lft_ + rgt_, True, True, True)  # lists, add them
 
 """
-    # -- alternate lines
-    # line = np.array([[0., 5.], [4., 4.], [6., 8.], [10.0, 9.0]])  # ends on
-    # --right extends
-    # line = np.array([[0., 5.], [4., 4.], [6., 8.], [12.5, 10.0]])
-    # -- both extend
-    # line = np.array([[-1., 4], [0., 5.], [4., 4.], [6., 8.], [12.5, 10.0]])
-    #
-    # line = np.array([[6., 0.], [10., 12.]])
-    # line = np.array([[6., 0.], [12., 10.]])
+# --------
 
 
 # ---- ---------------------------
@@ -667,11 +667,15 @@ def find_overlap_segments(arr, is_poly=True, return_all=True):
     The idx, cnts and uni are for the frto array, so the indices will be out
     by 1.  Split `tmp` using the `idx_dup + 1`
 
+    Example
+    -------
+    tri = np.array([[0.0, 0.0], [0.5, 1.0], [1.0, 0.0], [0.0, 0.0]])
+    
     See Also
     --------
     See `simplify` in `npg_geom_ops`.
     """
-    tmp = _del_seq_dupl_pnts_(np.asarray(arr), poly=is_poly)  # keep dupl pnt
+    tmp = del_seq_dupl_pnts(np.asarray(arr), poly=is_poly)  # keep dupl pnt
     # -- create from-to points
     frto = np.concatenate((tmp[:-1], tmp[1:]), axis=1)
     frto_idx = np.arange(frto.shape[0])

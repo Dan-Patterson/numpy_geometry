@@ -18,7 +18,7 @@ Author :
     `<https://github.com/Dan-Patterson>`_.
 
 Modified :
-    2026-08-10
+    2026-11-22
 
 Purpose
 -------
@@ -72,8 +72,11 @@ References
 See comment by Serge Tolstov in:
 
 `Geometry checks
-<https://community.esri.com/thread/244587-check-geometry-fails-in-shared
--origin-edge-case>`_.
+<https://community.esri.com/en/discussion/763601/check-geometry-fails-in-
+shared-origin-edge-case>`_.
+
+`<https://community.esri.com/en/discussion/365559/hole-lies-outside-shell-
+and-arcpy>`_.
 
 **Clipping, intersection references**
 
@@ -162,9 +165,9 @@ __all__ = [
     'densify_by_factor',               # (5) densify/simplify
     'densify_by_distance',
     'simplify',
-    '_ch_',                            # (6) convex hulls
-    '_ch_scipy_',
+    '_ch_scipy_',                      # (6) convex hulls
     '_ch_simple_',
+    '_ch_',
     'mabr',                            # (7) mabr
     'triangulate_pnts',                # (8) triangulation
     'polys_to_unique_pnts',            # (9) poly* conversion
@@ -172,7 +175,8 @@ __all__ = [
     'segments_to_polys',
     'simplify_lines',
     'pnts_in_pnts',                    # (10) pnts in, or on, geometries
-    'bin_pnts',                        # Not included yet
+    'bins_to_poly',                    # Not included yet
+    'bin_pnts',
     'in_hole_check',
     'which_quad'
 ]
@@ -1290,7 +1294,7 @@ def bins_to_poly(x_bins, y_bins, bottom_up=True, asGeo=True, polygon=True):
     ----------
     x_bins, y_bins : array_like
         The sequential values representing the increments to use for the x-axis
-        and y-axis.  The length of the bins must be equal
+        and y-axis.
     bottom_up : boolean
         True, orders the cell rows from the lower-left.  False, orders from the
         upper-left
@@ -1304,27 +1308,30 @@ def bins_to_poly(x_bins, y_bins, bottom_up=True, asGeo=True, polygon=True):
     Clockwise oriented polygon boundaries.  The polygons are closed-loops.
     The origin of the output eminates from the bottom-left to the top-right of
     the extent delineated by the minimum and maximum of the bin ranges.
+
+    Example
+    -------
+    >>> strt, stop, step = [0.0, 3.0, 0.5]
+    >>> x_bins = np.arange(strt, stop + step, step)
+    >>> x_bins
+    ... array([ 0.000, 0.500, 1.000, 1.500, 2.000, 2.500, 3.000])
+ 
+    Repeat for y_bins with desired values prior to running the function.
     """
-    if len(x_bins) != len(y_bins):
-        print("\nBins sizes must be equal.")
-        return None
+    #
     x, y = np.meshgrid(x_bins, y_bins)
-    N = len(x) - 1
-    M = len(y) - 1
-    polys = []
-    for i in range(N):
-        sub = []
-        for j in range(M):
-            po = [(x[i, j], y[i, j]),
-                  (x[i+1, j], y[i+1, j]),
-                  (x[i+1, j+1], y[i+1, j+1]),
-                  (x[i, j+1], y[i, j+1]),
-                  (x[i, j], y[i, j])
-                 ]  # -- clockwise orientation
-            sub.append(np.array(po))
-        polys.append(sub)
+    grid = np.dstack((x, y))
+    cells = np.stack([
+         grid[:-1, :-1],  # bottom-left
+         grid[1:,  :-1],  # top-left
+         grid[1:,  1:],   # top-right
+         grid[:-1, 1:],   # bottom-right
+         grid[:-1, :-1]], # bottom-left
+        axis=2)
     if not bottom_up:
-        polys = polys[::-1]
+        cells = cells[::-1]
+    polys = cells.reshape(-1, 5, 2)
+    #
     if asGeo:
         k = 2 if polygon else 1
         polys = npGeo.arrays_to_Geo(polys, k)
