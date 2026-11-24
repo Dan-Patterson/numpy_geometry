@@ -5,7 +5,7 @@
 
 Some basics
 -----------
-Consider the following multipart shapes.  The first shape has is second part slightly offset and it also contains a hole.  The second shape is a flip/mirror/translate of its first part.
+Consider the following multipart shapes.  The first shape has its second part slightly offset and it also contains a hole.  The second shape is a flip/mirror/translate of its first part.
 
 The centroids of each part are shown on the image.  These locations have been confirmed using arcpy and npGeo methods.
 
