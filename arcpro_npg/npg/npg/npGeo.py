@@ -40,9 +40,7 @@ from npg.npg_geom_hlp import (
     _bit_min_max_, _bit_length_, _rotate_, geom_angles,
 )
 
-from npg.npg_chk_fix import (
-    _bit_crossproduct_, clean_segments
-)
+from npg.npg_chk_fix import (_bit_crossproduct_, clean_segments)
 
 from npg.npg_maths import _angles_3pnt_
 
@@ -837,7 +835,7 @@ class Geo(np.ndarray):
     def is_convex(self, as_structured=False):
         """Return True (convex), False (concave).
 
-        Uses `npg_chk_fix._bit_crossproduct_`.Holes are excluded.  The first
+        Uses `npg_chk_fix._bit_crossproduct_`.  Holes are excluded.  The first
         part of a multipart shapes is used.  Duplicate start-end points are
         removed prior to cross product. The cross product does it for the
         whole shape all at once.

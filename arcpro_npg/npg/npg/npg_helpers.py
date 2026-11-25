@@ -45,7 +45,11 @@ __all__ = [
     'uniq_1d',
     'uniq_2d',
     'flatten_list',
-    'unpack'
+    'unpack',
+    'coerce2array',                    # (5) other functions
+    'flat' ,
+    'interweave',
+    'which_quad'
 ]
 
 __helpers__ = [                        # (1) private helpers
@@ -575,6 +579,146 @@ def unpack(iterable, param='__iter__'):
         else:
             xy.append(x)
     return xy
+
+
+# ---- ---------------------------
+# ---- (7) others functions
+#
+def coerce2array(arr, start=0):
+    """Return arrays using the principles of `shape_finder`.
+
+    Parameters
+    ----------
+    arr : array-like
+        Either lists of lists, lists or arrays, arrays of lists or similar.
+        There is the expectation that the objects represent Nx2 geometry
+        objects with potentially multiple parts and bits.
+    start : integer
+        Either use 0 or 1 for array part numbering purposes.
+
+    Returns
+    -------
+    Most likely an object array will be returned if the input structure is
+    also nested.
+    """
+    #
+    def _len_check_(arr):
+        """Check iterator lengths."""
+        arr = np.asarray(arr, dtype='O').squeeze()
+        if arr.shape[0] == 1:
+            return False, len(arr)
+        q = [len(a) == len(arr[0])      # check subarray and array lengths
+             if hasattr(a, '__iter__')  # if it is an iterable
+             else False                 # otherwise, return False
+             for a in arr]              # for each subarray in the array
+        return np.all(q), len(arr)
+
+    def _arr_(arr):
+        """Assign dtype based on nested array lengths from `_len_check_`."""
+        if isinstance(arr, np.ndarray):
+            if arr.ndim == 2:
+                return arr
+        elif isinstance(arr, (list, tuple)):  # quick single part list check
+            tmp = np.array(arr)
+            if tmp.ndim == 2:
+                return tmp
+        result = [_len_check_(i) for i in arr]
+        out = []
+        if len(result) == 1:
+            return np.asarray(arr, dtype='float').squeeze()
+        for i, r in enumerate(result):
+            if r[0]:
+                out.append(np.asarray(arr[i], dtype='float').squeeze())
+            else:
+                sub = []
+                chk2 = _len_check_(arr[i])
+                if chk2[0]:
+                    out.append(np.asarray(arr[i], dtype='float').squeeze())
+                else:
+                    # chk3 = _len_check_(arr[i])  # testing, keep for now
+                    # print("chk3 {}".format(chk3))
+                    for ar in arr[i]:
+                        sub.append(np.asarray(ar, dtype='float').squeeze())
+                    dt1 = 'O' if len(sub) > 1 else 'float'
+                    out.append(np.asarray(sub, dtype=dt1))
+        return np.asarray(out, dtype='O')
+    #
+    out = []
+    chk = _len_check_(arr)
+    if chk[0] and chk[1] > 2:
+        return np.array(arr)
+    for ar in arr:
+        out.append(_arr_(ar))
+    return np.array(out, dtype="O")
+
+
+def flat(lst):
+    """Flatten input. Basic flattening but doesn't yield where things are."""
+    def _flat(lst, r):
+        """Recursive flattener."""
+        if len(lst) > 0:
+            if not isinstance(lst[0], (list, np.ndarray, tuple)):  # added [0]
+                r.append(lst)
+            else:
+                for i in lst:
+                    r = r + flat(i)
+        return r
+    return _flat(lst, [])
+
+
+def interweave(arr, as_3d=False):
+    """Weave an array to produce from-to pairs.  Returns a copy.
+
+     >>> np.array(list(zip(arr[:-1], arr[1:])))  # returns a copy
+
+    Parameters
+    ----------
+    arr : ndarray
+        A 2d ndarray.
+    as_3d : boolean
+        If True, an (N, 2, 2) shaped array is returned, otherwise the
+        `from-to` values appear on the same line with a (N, 4) shape.
+    """
+    fr_to = np.concatenate((arr[:-1], arr[1:]), axis=1)
+    if as_3d:
+        return fr_to.reshape((-1, 2, 2))  # for ndim=3d
+    return fr_to
+
+
+
+def which_quad(line):
+    """Return the quadrant a vector lies in.
+
+    Notes
+    -----
+    old school refresher::
+
+                 |
+              II |  I
+            -----------
+             III | IV
+                 |
+
+           I       II      III     IV
+    x,y :  (+,+)   (−,+)   (−,−)   (+,−)
+    sin    +       +       -       -
+    cos    +       -       -       +
+    tan    +       -       +       -
+
+    >>> q = which_quad(line)
+    >>> if q in [2, 3]:
+    >>>     line = line[::-1]
+    """
+    x_, y_ = np.sign(np.diff(line[[0, -1]], axis=0))[0]
+    # right
+    if x_ >= 0:
+        if y_ >= 0:  # upper
+            return 1
+        return 4
+    # left
+    if y_ >= 0:  # upper
+        return 2
+    return 3
 
 
 # ---- ---------------------------

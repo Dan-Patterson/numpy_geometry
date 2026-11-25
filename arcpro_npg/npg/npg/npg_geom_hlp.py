@@ -77,8 +77,10 @@ import numpy as np
 from numpy.lib.recfunctions import unstructured_to_structured as uts
 # from numpy.lib.recfunctions import repack_fields
 
-from npg_chk_fix import _bit_crossproduct_
-from npg_prn import prn_tbl  # used by `shape_finder`
+import npg
+
+# from npg import npg_chk_fix  # , npg_prn
+from npg.npg_chk_fix import _bit_crossproduct_
 
 fmt_ = {"bool": lambda x: repr(x.astype(np.int32)),
         "float_kind": '{: 0.3f}'.format}
@@ -97,7 +99,7 @@ nums = 'efdgFDGbBhHiIlLqQpP'
 #
 # ---- __all__, __helpers__
 #
-__imports__ = ['uts', 'prn_tbl']
+__imports__ = ['uts']  #, 'prn_tbl']
 
 __all__ = [
     'geom_angles',                     # (4) Geo / ndarray stuff
@@ -112,16 +114,12 @@ __all__ = [
     'keep_geom',
     'remove_geom',
     'del_seq_dups',
-    'sort_xy',                         # (7) sort coordinates
+    'sort_xy',                         # (6) sort coordinates
     'swap_segment_pnts',
     'sort_segment_pairs',
     'dist_angle_sort',
-    'radial_sort',
-    'interweave',                      # (8) others functions
-    'shape_finder',
-    'coerce2array',
-    'flat',
-    'reclass_ids',
+    'radial_sort',              
+    'reclass_ids'                      # (7) other functions
 ]
 
 __helpers__ = [
@@ -1094,7 +1092,6 @@ def del_seq_dups(arr, poly=True):
     return tmp
 
 
-
 # ---- ---------------------------
 # ---- (6) sort coordinates
 #
@@ -1266,211 +1263,8 @@ def radial_sort(a, extent_center=True, close_poly=True, clockwise=True):
 
 
 # ---- ---------------------------
-# ---- (7) others functions
+# ---- (7) other functions
 #
-def interweave(arr, as_3d=False):
-    """Weave an array to produce from-to pairs.  Returns a copy.
-
-     >>> np.array(list(zip(arr[:-1], arr[1:])))  # returns a copy
-
-    Parameters
-    ----------
-    arr : ndarray
-        A 2d ndarray.
-    as_3d : boolean
-        If True, an (N, 2, 2) shaped array is returned, otherwise the
-        `from-to` values appear on the same line with a (N, 4) shape.
-    """
-    fr_to = np.concatenate((arr[:-1], arr[1:]), axis=1)
-    if as_3d:
-        return fr_to.reshape((-1, 2, 2))  # for ndim=3d
-    return fr_to
-
-
-def shape_finder(arr, start=0, prn=False, structured=True):
-    """Provide the structure of an array/list which may be uneven and nested.
-
-    Parameters
-    ----------
-    arr : array-like
-        An list/tuple/array of objects. In this case points. Shapes are
-        usually formed as parts with/without holes and they may have multiple
-        parts.
-    start : integer
-        Start number to use for the counter.  Usually 0 or 1.
-    prn : boolean
-        True, to print the output.  False returns a structured array.
-    structured : boolean
-        True, returns a structured array if prn is False, otherwise an ndarray
-        is returned.
-
-    Requires
-    --------
-    `prn_tbl` from npg_prn.
-
-    Used by
-    -------
-    `npg_prn.prn_lists` and `npg_prn.prn_arrays`.
-
-    Notes
-    -----
-    >>> # -- 3 shapes, (1, 2, 3)
-    >>> array([[1, 0, 0, (5, 2)],
-               [1, 0, 1, (5, 2)],  shape 1 has 2 parts (0, 1)
-               [1, 0, 2, (4, 2)],     part 0 has 4 parts (0, 1, 2, 3)
-               [1, 0, 3, (4, 2)],
-               [1, 1, 0, (5, 2)],     part 1 has 2 parts (0, 1)
-               [1, 1, 1, (4, 2)],
-               [2, 0, 0, (9, 2)],  shape 2 has 2 parts
-               [2, 1, 0, (10, 2)],    part 1 has 4 parts (0, 1, 2, 3)
-               [2, 1, 1, (4, 2)],
-               [2, 1, 2, (4, 2)],
-               [2, 1, 3, (4, 2)],
-               [3, 0, 0, (4, 2)]], shape 3 has 1 part consisting of 4 points
-              dtype=object)
-    """
-    def _len_check_(arr):
-        """Check iterator lengths."""
-        if len(arr) == 1:
-            return False
-        q = [len(a) == len(arr[0])      # check subarray and array lengths
-             if hasattr(a, '__iter__')  # if it is an iterable
-             else False                 # otherwise, return False
-             for a in arr]              # for each subarray in the array
-        return np.all(q)
-
-    def _arr_(arr):
-        """Assign dtype based on nested array lengths from `_len_check_`."""
-        dt = 'float' if _len_check_(arr) else 'O'
-        return np.asarray(arr, dtype=dt).squeeze()
-    #
-    cnt = start
-    info = []
-    arrs = []
-    if isinstance(arr, (list, tuple)):
-        if len(arr[0]) == 2 and isinstance(arr[0][0], (int, float)):
-            arrs = [arr]
-        else:
-            arrs = [i for i in arr if hasattr(i, '__len__')]
-    elif isinstance(arr, np.ndarray):
-        if arr.dtype.kind == "O":
-            arrs = arr
-        elif len(arr.shape) == 2:
-            arrs = [arr]
-    for ar in arrs:
-        a0 = _arr_(ar)  # -- create an appropriate array
-        if a0.dtype.kind in 'efdg' or len(a0.shape) > 1:
-            info.append([cnt, 0, 0, a0.shape[0]])
-        else:
-            i = 0
-            for a1 in a0:
-                a1 = _arr_(a1)
-                j = 0
-                if a1.dtype.kind in 'efdg' or len(a1.shape) > 1:
-                    info.append([cnt, i, j, a1.shape[0]])
-                else:
-                    for a2 in a1:
-                        a2 = _arr_(a2)
-                        info.append([cnt, i, j, a2.shape[0]])
-                        j += 1
-                i += 1
-        cnt += 1
-    dt = [("shape", "i8"), ("part", "i8"), ("bit", "i8"), ("Nx2", "i8")]
-    info = np.array(info)
-    if structured:
-        out = np.zeros((len(info),), dtype=dt)
-        names = out.dtype.names
-        for i, nme in enumerate(names):
-            out[nme] = info[:, i]
-        if prn:
-            prn_tbl(out)
-            return None
-        return out
-    return info
-
-
-def coerce2array(arr, start=0):
-    """Return arrays using the principles of `shape_finder`.
-
-    Parameters
-    ----------
-    arr : array-like
-        Either lists of lists, lists or arrays, arrays of lists or similar.
-        There is the expectation that the objects represent Nx2 geometry
-        objects with potentially multiple parts and bits.
-    start : integer
-        Either use 0 or 1 for array part numbering purposes.
-
-    Returns
-    -------
-    Most likely an object array will be returned if the input structure is
-    also nested.
-    """
-    #
-    def _len_check_(arr):
-        """Check iterator lengths."""
-        arr = np.asarray(arr, dtype='O').squeeze()
-        if arr.shape[0] == 1:
-            return False, len(arr)
-        q = [len(a) == len(arr[0])      # check subarray and array lengths
-             if hasattr(a, '__iter__')  # if it is an iterable
-             else False                 # otherwise, return False
-             for a in arr]              # for each subarray in the array
-        return np.all(q), len(arr)
-
-    def _arr_(arr):
-        """Assign dtype based on nested array lengths from `_len_check_`."""
-        if isinstance(arr, np.ndarray):
-            if arr.ndim == 2:
-                return arr
-        elif isinstance(arr, (list, tuple)):  # quick single part list check
-            tmp = np.array(arr)
-            if tmp.ndim == 2:
-                return tmp
-        result = [_len_check_(i) for i in arr]
-        out = []
-        if len(result) == 1:
-            return np.asarray(arr, dtype='float').squeeze()
-        for i, r in enumerate(result):
-            if r[0]:
-                out.append(np.asarray(arr[i], dtype='float').squeeze())
-            else:
-                sub = []
-                chk2 = _len_check_(arr[i])
-                if chk2[0]:
-                    out.append(np.asarray(arr[i], dtype='float').squeeze())
-                else:
-                    # chk3 = _len_check_(arr[i])  # testing, keep for now
-                    # print("chk3 {}".format(chk3))
-                    for ar in arr[i]:
-                        sub.append(np.asarray(ar, dtype='float').squeeze())
-                    dt1 = 'O' if len(sub) > 1 else 'float'
-                    out.append(np.asarray(sub, dtype=dt1))
-        return np.asarray(out, dtype='O')
-    #
-    out = []
-    chk = _len_check_(arr)
-    if chk[0] and chk[1] > 2:
-        return np.array(arr)
-    for ar in arr:
-        out.append(_arr_(ar))
-    return np.array(out, dtype="O")
-
-
-def flat(lst):
-    """Flatten input. Basic flattening but doesn't yield where things are."""
-    def _flat(lst, r):
-        """Recursive flattener."""
-        if len(lst) > 0:
-            if not isinstance(lst[0], (list, np.ndarray, tuple)):  # added [0]
-                r.append(lst)
-            else:
-                for i in lst:
-                    r = r + flat(i)
-        return r
-    return _flat(lst, [])
-
-
 def reclass_ids(vals=None):
     """Reclass a 1d sequence of integers.  Usually used to reclass ID values.
 

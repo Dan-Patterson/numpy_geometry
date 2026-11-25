@@ -40,12 +40,13 @@ Notes for the `npg_maths`
 import sys
 import numpy as np
 
-import npg  # noqa
+# import npg  # noqa
 
 script = sys.argv[0]
 
 __all__ = [
-    'flip_left_right',                 # (2) geom helpers
+    'on_line_chk',                     # (2) geom helpers
+    'flip_left_right',
     'flip_up_down',
     'cross_product_2d',                # (3) math helpers
     'dot_product_2d',
@@ -398,7 +399,51 @@ def _pnt_on_segment_(pnt, seg, full=True):
 
 
 # ---- ---------------------------
-# ---- (2) geom helpers
+# ---- (2) geom helpers, checkers
+def on_line_chk(start, end, xy, tolerance=1.0e-12):
+    """Perform a distance check of whether a point is on a line.
+
+    Parameters
+    ----------
+    start, end, xy : array_like
+        The x,y values for the points.
+    tolerance : number
+        Acceptable distance tolerance to account for floating point issues.
+
+    Returns
+    -------
+    A boolean indicating whether the x,y point is on the line and a list of
+    values as follows::
+        [xy] : if start or end equals xy
+        [start, xy, d0] : `xy` is closest to `start` with a distance `d0`.
+        [xy, end, d1] : `xy` is closest to `end` with a distance of `d1`.
+        [] : the empty list is returned when `xy` is not on the line.
+
+    See Also
+    --------
+    `npg_geom_ops._is_pnt_on_line_` use if just a boolean check is required.
+    """
+    #
+    def dist(a, b):
+        """Actual distance."""
+        return np.sqrt((b[0] - a[0])**2 + (b[1] - a[1])**2)
+    #
+    # boolean checks for start, end xy equality
+    if (start == xy).all():
+        return True, [xy]
+    if (end == xy).all():
+        return True, [xy]
+    line_leng = dist(start, end)
+    d0, d1 = dist(start, xy), dist(end, xy)
+    d = (d0 + d1) - line_leng
+    chk = -tolerance <= d <= tolerance
+    if chk:  # -- xy is on line
+        if d0 <= d1:  # -- closest to start
+            return chk, [start, xy, d0]
+        return chk, [xy, end, d1]  # -- closest to end
+    return chk, []  # -- not on line
+
+
 # !!! these two don't work for Nx2 array
 def flip_left_right(a, shift_back=True):
     """Return an array flipped left to right.
@@ -685,7 +730,8 @@ def segment_crossing(args):
 
     See Also
     --------
-    This is a duplicate, for now, of `npg_buffer._x_ings_`
+    This is a duplicate, for now, of `_x_ings_`
+
     Returns
     -------
     The intersection point if two segments cross, or an extrapolation to a

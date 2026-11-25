@@ -46,8 +46,6 @@ import numpy as np
 
 # import npGeo
 
-from npg import npg_geom_hlp as n_h
-
 # ---- Keep for now.
 from numpy.lib.recfunctions import structured_to_unstructured as stu
 from numpy.lib.recfunctions import unstructured_to_structured as uts  #noqa
@@ -170,6 +168,106 @@ def make_row_format(dim=3, cols=5, a_kind='f', deci=1,
         print(row_frmt.format(*a))
     else:
         return row_frmt
+
+
+def shape_finder(arr, start=0, structured=True):
+    """Provide the structure of an array/list which may be uneven and nested.
+
+    Parameters
+    ----------
+    arr : array-like
+        An list/tuple/array of objects. In this case points. Shapes are
+        usually formed as parts with/without holes and they may have multiple
+        parts.
+    start : integer
+        Start number to use for the counter.  Usually 0 or 1.
+    prn : boolean
+        True, to print the output.  False returns a structured array.
+    structured : boolean
+        True, returns a structured array if prn is False, otherwise an ndarray
+        is returned.
+
+    Requires
+    --------
+    `prn_tbl` from npg_prn.
+
+    Used by
+    -------
+    `npg_prn.prn_lists` and `npg_prn.prn_arrays`.
+
+    Notes
+    -----
+    >>> # -- 3 shapes, (1, 2, 3)
+    >>> array([[1, 0, 0, (5, 2)],
+               [1, 0, 1, (5, 2)],  shape 1 has 2 parts (0, 1)
+               [1, 0, 2, (4, 2)],     part 0 has 4 parts (0, 1, 2, 3)
+               [1, 0, 3, (4, 2)],
+               [1, 1, 0, (5, 2)],     part 1 has 2 parts (0, 1)
+               [1, 1, 1, (4, 2)],
+               [2, 0, 0, (9, 2)],  shape 2 has 2 parts
+               [2, 1, 0, (10, 2)],    part 1 has 4 parts (0, 1, 2, 3)
+               [2, 1, 1, (4, 2)],
+               [2, 1, 2, (4, 2)],
+               [2, 1, 3, (4, 2)],
+               [3, 0, 0, (4, 2)]], shape 3 has 1 part consisting of 4 points
+              dtype=object)
+    """
+    def _len_check_(arr):
+        """Check iterator lengths."""
+        if len(arr) == 1:
+            return False
+        q = [len(a) == len(arr[0])      # check subarray and array lengths
+             if hasattr(a, '__iter__')  # if it is an iterable
+             else False                 # otherwise, return False
+             for a in arr]              # for each subarray in the array
+        return np.all(q)
+
+    def _arr_(arr):
+        """Assign dtype based on nested array lengths from `_len_check_`."""
+        dt = 'float' if _len_check_(arr) else 'O'
+        return np.asarray(arr, dtype=dt).squeeze()
+    #
+    cnt = start
+    info = []
+    arrs = []
+    if isinstance(arr, (list, tuple)):
+        if len(arr[0]) == 2 and isinstance(arr[0][0], (int, float)):
+            arrs = [arr]
+        else:
+            arrs = [i for i in arr if hasattr(i, '__len__')]
+    elif isinstance(arr, np.ndarray):
+        if arr.dtype.kind == "O":
+            arrs = arr
+        elif len(arr.shape) == 2:
+            arrs = [arr]
+    for ar in arrs:
+        a0 = _arr_(ar)  # -- create an appropriate array
+        if a0.dtype.kind in 'efdg' or len(a0.shape) > 1:
+            info.append([cnt, 0, 0, a0.shape[0]])
+        else:
+            i = 0
+            for a1 in a0:
+                a1 = _arr_(a1)
+                j = 0
+                if a1.dtype.kind in 'efdg' or len(a1.shape) > 1:
+                    info.append([cnt, i, j, a1.shape[0]])
+                else:
+                    for a2 in a1:
+                        a2 = _arr_(a2)
+                        info.append([cnt, i, j, a2.shape[0]])
+                        j += 1
+                i += 1
+        cnt += 1
+    dt = [("shape", "i8"), ("part", "i8"), ("bit", "i8"), ("Nx2", "i8")]
+    info = np.array(info)
+    if structured:
+        out = np.zeros((len(info),), dtype=dt)
+        names = out.dtype.names
+        for i, nme in enumerate(names):
+            out[nme] = info[:, i]
+        return out
+    return info
+
 
 
 def prn_(a, deci=2, width=120, prefix=". . "):
@@ -395,15 +493,15 @@ def prn_lists(a, max_=None, prn_structure=False):
 
     Requires
     --------
-    ``npg.shape_finder``
+    `shape_finder`
 
     See Also
     --------
-    ``npg_geom_hlp.shape_finder`` to print or return the structure of the
+    `shape_finder` to print or return the structure of the
     nested structure.
     """
     if prn_structure:
-        n_h.shape_finder(a, prn=True)  # see npg_geom_hlp
+        shape_finder(a, prn=True)  # -- get input structure info
     if max_ is None:
         max_ = 70
     for i, v in enumerate(a):
@@ -439,7 +537,7 @@ def prn_arrays(a, edgeitems=2):
     if a.ndim == 2:
         return a
     _e = edgeitems
-    s = n_h.shape_finder(a)
+    s = shape_finder(a)  # -- get input structure info
     u, cnts = np.unique(s[['shape', 'part']], return_counts=True)
     s0 = stu(u)
     N = np.arange(len(s0))

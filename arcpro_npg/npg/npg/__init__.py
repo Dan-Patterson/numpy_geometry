@@ -19,7 +19,7 @@ Author :
     Dan Patterson
 - https://github.com/Dan-Patterson
 
-Modified : 2025-03-11
+Modified : 2026-11-23
     Creation date during 2019 as part of ``arraytools``.
 
 Purpose
@@ -93,27 +93,34 @@ import numpy as np
 # ---- import for npg
 # import npg
 
-from . import npgDocs, npGeo, npg_geom_hlp, npg_geom_ops
-from . import npg_chk_fix, npg_helpers
+from . import npgDocs, npGeo
+from . import npg_chk_fix, npg_maths, npg_helpers
+from . import npg_geom_hlp, npg_geom_ops
+
 from . import npg_bool_hlp, npg_bool_ops, npg_buffer
-from . import npg_min_circ, npg_overlay, npg_analysis, npg_maths
+from . import npg_min_circ, npg_overlay, npg_analysis
 from . import npg_setops, npg_io, npg_table, npg_create, npg_utils
 from . import npg_pip, npg_prn  # noqa
+
 # --
 # requires arcpy
 # npg_create, npg_arc_npg, npg_geom_ops, npg_io
 
 from . npGeo import *  # noqa
+from . npg_chk_fix import * # noqa
+from . npg_maths import *  # noqa
+from . npg_helpers import *  # noqa
+from . npg_prn import *  # noqa
 from . npg_geom_hlp import *  # noqa
 from . npg_geom_ops import *  # noqa
-from . npg_chk_fix import * # noqa
-from . npg_buffer import *  # noqa
-from . npg_helpers import *  # noqa
+
 from . npg_bool_hlp import *  # noqa
 from . npg_bool_ops import *  # noqa
-from . npg_maths import *  # noqa
-from . npg_clip_split import clip_poly, split_poly  # noqa
+
+# from . npg_clip_split import clip_poly, split_poly  # noqa
 from . npg_io import *  # noqa
+from . npg_buffer import *  # noqa
+from . npg_pip import *  # noqa
 
 # from . npg_pip import *
 # from . npg_min_circ import *
@@ -166,13 +173,14 @@ __helpers__ = [
 
 __all__.extend(npgDocs.__all__)
 __all__.extend(npGeo.__all__)
+__all__.extend(npg_chk_fix.__all__)
+__all__.extend(npg_maths.__all__)
 __all__.extend(npg_geom_ops.__all__)
 __all__.extend(npg_geom_hlp.__all__)
-__all__.extend(npg_chk_fix.__all__)
 __all__.extend(npg_bool_ops.__all__)
 __all__.extend(npg_bool_hlp.__all__)
+__all__.extend(npg_pip.__all__)
 __all__.extend(npg_buffer.__all__)
-__all__.extend(npg_maths.__all__)
 __all__.sort()
 
 __helpers__.extend(npg_geom_hlp.__helpers__)
